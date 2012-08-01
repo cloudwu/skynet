@@ -4,7 +4,7 @@
 struct skynet_config {
 	int thread;
 	int mqueue_size;
-	char * logger;
+	const char * logger;
 	const char * module_path;
 };
 

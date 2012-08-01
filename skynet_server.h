@@ -4,7 +4,7 @@
 struct skynet_context;
 struct skynet_message;
 
-struct skynet_context * skynet_context_new(const char * name, char * parm);
+struct skynet_context * skynet_context_new(const char * name, const char * parm);
 void skynet_context_grab(struct skynet_context *);
 struct skynet_context * skynet_context_release(struct skynet_context *);
 int skynet_context_handle(struct skynet_context *);

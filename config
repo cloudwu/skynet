@@ -1,0 +1,4 @@
+thread = 8
+mqueue = 256
+cpath = "./"
+logger = nil

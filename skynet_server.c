@@ -38,7 +38,7 @@ _id_to_hex(char * str, int id) {
 }
 
 struct skynet_context * 
-skynet_context_new(const char * name, char *parm) {
+skynet_context_new(const char * name, const char *parm) {
 	struct skynet_module * mod = skynet_module_query(name);
 
 	if (mod == NULL)
