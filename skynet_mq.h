@@ -6,20 +6,35 @@
 
 struct skynet_message {
 	uint32_t source;
-	uint32_t destination;
 	void * data;
 	size_t sz;
 };
 
 struct message_queue;
 
-uint32_t skynet_mq_pop(struct skynet_message *message);
-void skynet_mq_push(struct skynet_message *message);
+void skynet_globalmq_push(struct message_queue *);
+struct message_queue * skynet_globalmq_pop(void);
 
-struct message_queue * skynet_mq_create(int cap);
-void skynet_mq_release(struct message_queue *q);
-uint32_t skynet_mq_leave(struct message_queue *q, struct skynet_message *message);
-void skynet_mq_enter(struct message_queue *q, struct skynet_message *message);
+struct message_queue * skynet_mq_create(uint32_t handle);
+void skynet_mq_release(struct message_queue *);
+uint32_t skynet_mq_handle(struct message_queue *);
+
+// 0 for success
+int skynet_mq_pop(struct message_queue *q, struct skynet_message *message);
+void skynet_mq_push(struct message_queue *q, struct skynet_message *message);
+
+struct skynet_remote_message {
+	uint32_t destination;
+	struct skynet_message message;
+};
+
+struct message_remote_queue;
+
+struct message_remote_queue * skynet_remotemq_create(void);
+void skynet_remotemq_release(struct message_remote_queue *);
+
+int skynet_remotemq_pop(struct message_remote_queue *q, struct skynet_remote_message *message);
+void skynet_remotemq_push(struct message_remote_queue *q, struct skynet_remote_message *message);
 
 void skynet_mq_init(int cap);
 

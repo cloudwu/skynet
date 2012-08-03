@@ -38,9 +38,8 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 	} else {
 		smsg.source = skynet_context_handle(context);
 	}
-	smsg.destination = logger;
 	smsg.data = strdup(tmp);
 	smsg.sz = len;
-	skynet_mq_push(&smsg);
+	skynet_context_push(logger, &smsg);
 }
 

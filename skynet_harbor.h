@@ -5,7 +5,7 @@
 
 struct skynet_message;
 
-void skynet_harbor_send(const char *name, struct skynet_message * message);
+void skynet_harbor_send(const char *name, uint32_t destination, struct skynet_message * message);
 void skynet_harbor_register(const char *name, uint32_t handle);
 
 // remote message is diffrent from local message.

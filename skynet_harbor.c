@@ -2,6 +2,7 @@
 #include "skynet_mq.h"
 #include "skynet_handle.h"
 #include "skynet_system.h"
+#include "skynet_server.h"
 #include "skynet.h"
 
 #include <zmq.h>
@@ -35,7 +36,7 @@ struct remote_header {
 
 struct remote {
 	void *socket;
-	struct message_queue *queue;
+	struct message_remote_queue *queue;
 };
 
 struct harbor {
@@ -46,7 +47,7 @@ struct harbor {
 	int notice_event;
 	struct hashmap *map;
 	struct remote remote[REMOTE_MAX];
-	struct message_queue *queue;
+	struct message_remote_queue *queue;
 	int harbor;
 
 	int lock;
@@ -150,46 +151,49 @@ send_notice() {
 
 // thread safe function
 void 
-skynet_harbor_send(const char *name, struct skynet_message * message) {
+skynet_harbor_send(const char *name, uint32_t destination, struct skynet_message * msg) {
 	if (name == NULL) {
-		int remote_id = message->destination >> HANDLE_REMOTE_SHIFT;
+		assert(destination!=0);
+		int remote_id = destination >> HANDLE_REMOTE_SHIFT;
 		assert(remote_id > 0 && remote_id <= REMOTE_MAX);
 		--remote_id;
 		struct remote * r = &Z->remote[remote_id];
+		struct skynet_remote_message message;
+		message.destination = destination;
+		message.message = *msg;
 		if (r->socket) {
-			skynet_mq_enter(Z->queue, message);
+			skynet_remotemq_push(Z->queue, &message);
 			send_notice();
 		} else {
-			skynet_mq_enter(r->queue, message);
+			skynet_remotemq_push(r->queue, &message);
 		}
 	} else {
 		_lock();
 		struct keyvalue * node = _hash_search(Z->map, name);
-		printf("send to %s %p\n",name,node);
 		if (node) {
 			uint32_t dest = node->value;
 			_unlock();
 			if (dest == 0) {
-				printf("queue a unknown address %s\n",name);
 				// push message to unknown name service queue
-				skynet_mq_enter(node->queue, message);
+				skynet_mq_push(node->queue, msg);
 			} else {
-				message->destination = dest;
 				if (!skynet_harbor_message_isremote(dest)) {
 					// local message
-					printf("%s is a local adress\n",name);
-					skynet_mq_push(message);
+					if (skynet_context_push(dest, msg)) {
+						skynet_error(NULL, "Drop local message from %u to %s",msg->source, name);
+					}
 					return;
 				}
-				printf("queue remote message %s to global queue\n",name);
-				skynet_mq_enter(Z->queue,message);
+				struct skynet_remote_message message;
+				message.destination = dest;
+				message.message = *msg;
+				skynet_remotemq_push(Z->queue,&message);
 				send_notice();
 			}
 		} else {
-			printf("Create new queue %s\n",name);
 			// never seen name before
-			struct message_queue * queue =  skynet_mq_create(DEFAULT_QUEUE_SIZE);
-			skynet_mq_enter(queue, message);
+			struct message_queue * queue =  skynet_mq_create(0);
+			skynet_mq_push(queue, msg);
 			_hash_insert(Z->map, name, 0, queue);
 			_unlock();
 			// 0 for query
@@ -202,12 +206,13 @@ skynet_harbor_send(const char *name, struct skynet_message * message) {
 //queue a register message (destination = 0)
 void 
 skynet_harbor_register(const char *name, uint32_t handle) {
-	struct skynet_message msg;
-	msg.source = handle;
+	struct skynet_remote_message msg;
 	msg.destination = SKYNET_SYSTEM_NAME;
-	msg.data = strdup(name);
-	msg.sz = 0;
-	skynet_mq_enter(Z->queue,&msg);
+	msg.message.source = handle;
+	msg.message.data = strdup(name);
+
+	msg.message.sz = 0;
+	skynet_remotemq_push(Z->queue,&msg);
 	send_notice();
 }
 
@@ -227,23 +232,29 @@ _register_name(const char *name, uint32_t addr) {
 		_hash_insert(Z->map, name, addr, NULL);
 	}
 
+	if (addr == 0) {
+		_unlock();
+		return;
+	}
+
 	struct skynet_message msg;
 	struct message_queue * queue = node ? node->queue : NULL;
 
 	if (queue) {
 		if (skynet_harbor_message_isremote(addr)) {
-			while (skynet_mq_leave(queue, &msg)) {
-				msg.destination = addr;
-				skynet_mq_enter(Z->queue, &msg);
+			while (!skynet_mq_pop(queue, &msg)) {
+				struct skynet_remote_message message;
+				message.destination = addr;
+				message.message = msg;
+				skynet_remotemq_push(Z->queue, &message);
 			}
 		} else {
-			while (skynet_mq_leave(queue, &msg)) {
-				msg.destination = addr;
-				skynet_mq_push(&msg);
+			while (!skynet_mq_pop(queue, &msg)) {
+				if (skynet_context_push(addr,&msg)) {
+					skynet_error(NULL,"Drop local message from %u to %s",msg.source,name);
+				}
 			}
 		}
-
-		skynet_mq_release(queue);
 
 		node->queue = NULL;
 	}
@@ -272,14 +283,14 @@ _remote_harbor_update(int harbor_id, const char * addr) {
 		if (old_socket) {
 			zmq_close(old_socket);
 		}
-		struct message_queue * queue = r->queue;
+		struct message_remote_queue * queue = r->queue;
 
 		if (queue) {
-			struct skynet_message msg;
-			while (skynet_mq_leave(queue, &msg)) {
-				skynet_mq_enter(Z->queue, &msg);
+			struct skynet_remote_message msg;
+			while (!skynet_remotemq_pop(queue, &msg)) {
+				skynet_remotemq_push(Z->queue, &msg);
 			}
-			skynet_mq_release(queue);
+			skynet_remotemq_release(queue);
 			r->queue = NULL;
 		}
 
@@ -403,13 +414,14 @@ _remote_query_name(const char *name) {
 
 // Always in main harbor thread
 static void 
-free_message (void *data, void *hint) {
+free_message(void *data, void *hint) {
 	free(data);
 }
+
 static void
-remote_socket_send(void * socket, struct skynet_message *msg) {
+remote_socket_send(void * socket, struct skynet_remote_message *msg) {
 	struct remote_header rh;
-	rh.source = msg->source;
+	rh.source = msg->message.source;
 	rh.destination = msg->destination;
 	zmq_msg_t part;
 	zmq_msg_init_size(&part,8);
@@ -418,7 +430,7 @@ remote_socket_send(void * socket, struct skynet_message *msg) {
 	zmq_send(socket, &part, ZMQ_SNDMORE);
 	zmq_msg_close(&part);
 
-	zmq_msg_init_data(&part,msg->data,msg->sz,free_message,NULL);
+	zmq_msg_init_data(&part,msg->message.data,msg->message.sz,free_message,NULL);
 	zmq_send(socket, &part, 0);
 	zmq_msg_close(&part);
 }
@@ -455,43 +467,48 @@ _remote_recv() {
 	zmq_msg_init(data);
 	rc = zmq_recv(Z->zmq_local,data,0);
 	_report_zmq_error(rc);
+
 	struct skynet_message msg;
 	msg.source = rh.source;
-	msg.destination = rh.destination;
 	msg.data = data;
 	msg.sz = zmq_msg_size(data);
 
 	// push remote message to local message queue
-	skynet_mq_push(&msg);
+	if (skynet_context_push(rh.destination, &msg)) {
+		zmq_msg_close(data);
+		free(data);
+		skynet_error(NULL, "Drop remote message from %u to %u",rh.source, rh.destination);
+	}
 }
 
 // Always in main harbor thread
 static void
 _remote_send() {
-	struct skynet_message msg;
-	while (skynet_mq_leave(Z->queue,&msg)) {
+	struct skynet_remote_message msg;
+	while (!skynet_remotemq_pop(Z->queue,&msg)) {
 _goback:
 		if (msg.destination == SKYNET_SYSTEM_NAME) {
 			// register name
-			const char * name = msg.data;
-			if (msg.source) {
-				_remote_register_name(name, msg.source);
+			char * name = msg.message.data;
+
+			if (msg.message.source) {
+				_remote_register_name(name, msg.message.source);
 			} else {
 				_remote_query_name(name);
 			}
 
-			free(msg.data);
+			free(name);
 		} else {
 			int harbor_id = (msg.destination >> HANDLE_REMOTE_SHIFT);
 			assert(harbor_id > 0);
 			struct remote * r = &Z->remote[harbor_id-1];
 			if (r->socket == NULL) {
 				if (r->queue == NULL) {
-					r->queue = skynet_mq_create(DEFAULT_QUEUE_SIZE);
-					skynet_mq_enter(r->queue, &msg);
+					r->queue = skynet_remotemq_create();
+					skynet_remotemq_push(r->queue, &msg);
 					remote_query_harbor(harbor_id);
 				} else {
-					skynet_mq_enter(r->queue, &msg);
+					skynet_remotemq_push(r->queue, &msg);
 				}
 			} else {
 				remote_socket_send(r->socket, &msg);
@@ -500,7 +517,8 @@ _goback:
 	}
 	__sync_lock_release(&Z->notice_event);
 	// double check
-	if (skynet_mq_leave(Z->queue,&msg)) {
+	if (!skynet_remotemq_pop(Z->queue,&msg)) {
+		printf("goback %x\n",msg.destination);
 		goto _goback;
 	}
 }
@@ -600,7 +618,7 @@ skynet_harbor_init(const char * master, const char *local, int harbor) {
 	h->zmq_local = harbor_socket;
 	h->map = _hash_new();
 	h->harbor = harbor;
-	h->queue = skynet_mq_create(DEFAULT_QUEUE_SIZE);
+	h->queue = skynet_remotemq_create();
 	h->zmq_queue_notice = zmq_socket(context, ZMQ_PULL);
 	r = zmq_bind(h->zmq_queue_notice, "inproc://notice");
 	assert(r==0);
