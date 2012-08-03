@@ -42,9 +42,9 @@ _unlock_queue(struct message_queue *q) {
 	__sync_lock_release(&q->lock);
 }
 
-int 
+uint32_t
 skynet_mq_leave(struct message_queue *q, struct skynet_message *message) {
-	int ret = -1;
+	uint32_t ret = 0;
 	_lock_queue(q);
 
 	if (q->head != q->tail) {
@@ -86,7 +86,7 @@ skynet_mq_enter(struct message_queue *q, struct skynet_message *message) {
 	_unlock_queue(q);
 }
 
-int 
+uint32_t 
 skynet_mq_pop(struct skynet_message *message) {
 	return skynet_mq_leave(Q,message);
 }

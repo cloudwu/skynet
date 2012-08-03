@@ -2,3 +2,7 @@ thread = 8
 mqueue = 256
 cpath = "./"
 logger = nil
+harbor = 1
+address = "tcp://127.0.0.1:2525"
+master = "tcp://127.0.0.1:2012"
+start = "main.lua"

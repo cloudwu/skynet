@@ -45,7 +45,7 @@ logger_init(struct logger * inst, struct skynet_context *ctx, const char * parm)
 	}
 	if (inst->handle) {
 		skynet_callback(ctx, inst, _logger);
-		skynet_command(ctx, "REG", "logger");
+		skynet_command(ctx, "REG", ".logger");
 		return 0;
 	}
 	return 1;

@@ -160,7 +160,7 @@ timer_create_timer()
 void 
 skynet_timeout(int handle, int time, int session) {
 	struct skynet_message message;
-	message.source = -1;
+	message.source = SKYNET_SYSTEM_TIMER;
 	message.destination = handle;
 	message.data = NULL;
 	message.sz = (size_t) session;

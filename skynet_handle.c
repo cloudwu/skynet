@@ -10,13 +10,14 @@
 
 struct handle_name {
 	char * name;
-	int handle;
+	uint32_t handle;
 };
 
 struct handle_storage {
 	struct rwlock lock;
 
-	int handle_index;
+	uint32_t harbor;
+	uint32_t handle_index;
 	int slot_size;
 	struct skynet_context ** slot;
 	
@@ -27,7 +28,7 @@ struct handle_storage {
 
 static struct handle_storage *H = NULL;
 
-int 
+uint32_t
 skynet_handle_register(struct skynet_context *ctx) {
 	struct handle_storage *s = H;
 
@@ -39,14 +40,14 @@ skynet_handle_register(struct skynet_context *ctx) {
 			int hash = (i+s->handle_index) & (s->slot_size-1);
 			if (s->slot[hash] == NULL) {
 				s->slot[hash] = ctx;
-				int handle = s->handle_index + i;
+				uint32_t handle = s->handle_index + i ;
 				skynet_context_init(ctx, handle);
 
 				rwlock_wunlock(&s->lock);
 
 				s->handle_index = handle + 1;
 
-				return handle;
+				return (handle & HANDLE_MASK) | s->harbor;
 			}
 		}
 		struct skynet_context ** new_slot = malloc(s->slot_size * 2 * sizeof(struct skynet_context *));
@@ -63,12 +64,12 @@ skynet_handle_register(struct skynet_context *ctx) {
 }
 
 void
-skynet_handle_retire(int handle) {
+skynet_handle_retire(uint32_t handle) {
 	struct handle_storage *s = H;
 
 	rwlock_wlock(&s->lock);
 
-	int hash = handle & (s->slot_size-1);
+	uint32_t hash = handle & (s->slot_size-1);
 	struct skynet_context * ctx = s->slot[hash];
 	if (skynet_context_handle(ctx) == handle) {
 		skynet_context_release(ctx);
@@ -93,13 +94,13 @@ skynet_handle_retire(int handle) {
 }
 
 struct skynet_context * 
-skynet_handle_grab(int handle) {
+skynet_handle_grab(uint32_t handle) {
 	struct handle_storage *s = H;
 	struct skynet_context * result = NULL;
 
 	rwlock_rlock(&s->lock);
 
-	int hash = handle & (s->slot_size-1);
+	uint32_t hash = handle & (s->slot_size-1);
 	struct skynet_context * ctx = s->slot[hash];
 	if (skynet_context_handle(ctx) == handle) {
 		result = ctx;
@@ -111,13 +112,13 @@ skynet_handle_grab(int handle) {
 	return result;
 }
 
-int 
+uint32_t 
 skynet_handle_findname(const char * name) {
 	struct handle_storage *s = H;
 
 	rwlock_rlock(&s->lock);
 
-	int handle = -1;
+	uint32_t handle = 0;
 
 	int begin = 0;
 	int end = s->name_count - 1;
@@ -127,6 +128,7 @@ skynet_handle_findname(const char * name) {
 		int c = strcmp(n->name, name);
 		if (c==0) {
 			handle = n->handle;
+			handle |= s->harbor;
 			break;
 		}
 		if (c<0) {
@@ -142,7 +144,7 @@ skynet_handle_findname(const char * name) {
 }
 
 static void
-_insert_name_before(struct handle_storage *s, char *name, int handle, int before) {
+_insert_name_before(struct handle_storage *s, char *name, uint32_t handle, int before) {
 	if (s->name_count >= s->name_cap) {
 		s->name_cap *= 2;
 		struct handle_name * n = malloc(s->name_cap * sizeof(struct handle_name));
@@ -167,7 +169,7 @@ _insert_name_before(struct handle_storage *s, char *name, int handle, int before
 }
 
 static const char *
-_insert_name(struct handle_storage *s, const char * name, int handle) {
+_insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
 	int begin = 0;
 	int end = s->name_count - 1;
 	while (begin<=end) {
@@ -191,7 +193,7 @@ _insert_name(struct handle_storage *s, const char * name, int handle) {
 }
 
 const char * 
-skynet_handle_namehandle(int handle, const char *name) {
+skynet_handle_namehandle(uint32_t handle, const char *name) {
 	rwlock_wlock(&H->lock);
 
 	const char * ret = _insert_name(H, name, handle);
@@ -202,7 +204,7 @@ skynet_handle_namehandle(int handle, const char *name) {
 }
 
 void 
-skynet_handle_init(void) {
+skynet_handle_init(int harbor) {
 	assert(H==NULL);
 	struct handle_storage * s = malloc(sizeof(*H));
 	s->slot_size = DEFAULT_SLOT_SIZE;
@@ -210,7 +212,9 @@ skynet_handle_init(void) {
 	memset(s->slot, 0, s->slot_size * sizeof(struct handle_slot *));
 
 	rwlock_init(&s->lock);
-	s->handle_index = 0;
+	// reserve 0 for system
+	s->harbor = (uint32_t) (harbor & 0xff) << HANDLE_REMOTE_SHIFT;
+	s->handle_index = 1;
 	s->name_cap = 2;
 	s->name_count = 0;
 	s->name = malloc(s->name_cap * sizeof(struct handle_name));

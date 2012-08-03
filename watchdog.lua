@@ -5,19 +5,19 @@ local command = {}
 function command:open(parm)
 	local fd,addr = string.match(parm,"(%d+) ([^%s]+)")
 	fd = tonumber(fd)
-	print("[watchdog] open",self,fd,addr)
+	skynet.send("LOG",string.format("%d %d %s",self,fd,addr))
 	local agent = skynet.command("LAUNCH","snlua agent.lua ".. self)
 	if agent then
-		skynet.send(".gate","forward ".. self .. " " .. agent)
+		skynet.send("gate","forward ".. self .. " " .. agent)
 	end
 end
 
 function command:close()
-	print("[watchdog] close",self)
+	skynet.send("LOG",string.format("close %d",self))
 end
 
 function command:data(data)
-	print("[watchdog] data",self,#data,data)
+	skynet.send("LOG",string.format("data %d size=%d",self,#data))
 end
 
 skynet.callback(function(from , message)
@@ -27,8 +27,8 @@ skynet.callback(function(from , message)
 	if f then
 		f(id,parm)
 	else
-		skynet.error(string.format("[watchdog] Unknown command : %s %d %s",cmd,id,parm))
+		skynet.error(string.format("[watchdog] Unknown command : %s",message))
 	end
 end)
 
-skynet.command("REG","watchdog")
+skynet.command("REG",".watchdog")

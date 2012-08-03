@@ -2,8 +2,8 @@
 #include "skynet_module.h"
 #include "skynet_handle.h"
 #include "skynet_mq.h"
-#include "skynet_blackhole.h"
 #include "skynet_timer.h"
+#include "skynet_harbor.h"
 #include "skynet.h"
 
 #include <string.h>
@@ -17,7 +17,7 @@
 struct skynet_context {
 	void * instance;
 	struct skynet_module * mod;
-	int handle;
+	uint32_t handle;
 	int calling;
 	int ref;
 	char handle_name[10];
@@ -96,34 +96,20 @@ skynet_context_release(struct skynet_context *ctx) {
 }
 
 static void
-_drop_message(int source, const char * addr , void * data, size_t sz) {
-	struct blackhole * b = malloc(sizeof(*b));
-	b->source = source;
-	b->destination = strdup(addr);
-	b->data = data;
-	b->sz = sz;
-
-	int des = skynet_handle_findname(BLACKHOLE);
-	if (des<0)
-		return;
-
-	struct skynet_message msg;
-	msg.source = source;
-	msg.destination = des;
-	msg.data = b;
-	msg.sz = sizeof(*b);
-	skynet_mq_push(&msg);
-}
-
-static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
-	if (msg->source == -1) {
+	if (msg->source == SKYNET_SYSTEM_TIMER) {
 		ctx->cb(ctx, ctx->cb_ud, NULL, msg->data, msg->sz);
 	} else {
 		char tmp[10];
 		tmp[0] = ':';
 		_id_to_hex(tmp+1, msg->source);
-		ctx->cb(ctx, ctx->cb_ud, tmp, msg->data, msg->sz);
+		if (skynet_harbor_message_isremote(msg->source)) {
+			void * data = skynet_harbor_message_open(msg);
+			ctx->cb(ctx, ctx->cb_ud, tmp, data, msg->sz);
+			skynet_harbor_message_close(msg);
+		} else {
+			ctx->cb(ctx, ctx->cb_ud, tmp, msg->data, msg->sz);
+		}
 
 		free(msg->data);
 	}
@@ -132,16 +118,14 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 int
 skynet_context_message_dispatch(void) {
 	struct skynet_message msg;
-	int handle = skynet_mq_pop(&msg);
-	if (handle < 0) {
+	uint32_t handle = skynet_mq_pop(&msg);
+	if (handle == 0) {
 		return 1;
 	}
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
-		char tmp[10];
-		tmp[0] = ':';
-		_id_to_hex(tmp+1, msg.destination);
-		_drop_message(msg.source, tmp, msg.data, msg.sz);
+		free(msg.data);
+		skynet_error(NULL, "Drop message from %u to %u , size = %d",msg.source, msg.destination, (int)msg.sz);
 		return 0;
 	}
 	if (__sync_lock_test_and_set(&ctx->calling, 1)) {
@@ -149,13 +133,14 @@ skynet_context_message_dispatch(void) {
 		skynet_mq_enter(ctx->queue, &msg);
 	} else {
 		if (ctx->cb == NULL) {
-			char tmp[10];
-			tmp[0] = ':';
-			_id_to_hex(tmp+1, msg.destination);
-			_drop_message(msg.source, tmp, msg.data, msg.sz);
+			if (skynet_harbor_message_isremote(msg.source)) {
+				skynet_harbor_message_close(&msg);
+			}
+			free(msg.data);
+			skynet_error(NULL, "Drop message from %u to %u without callback , size = %d",msg.source, msg.destination, (int)msg.sz);
 		} else {
 			_dispatch_message(ctx, &msg);
-			while(skynet_mq_leave(ctx->queue,&msg) >=0) {
+			while(skynet_mq_leave(ctx->queue,&msg)) {
 				_dispatch_message(ctx,&msg);
 			}
 		}
@@ -188,8 +173,12 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	if (strcmp(cmd,"REG") == 0) {
 		if (parm == NULL || parm[0] == '\0') {
 			return context->handle_name;
+		} else if (parm[0] == '.') {
+			return skynet_handle_namehandle(context->handle, parm + 1);
 		} else {
-			return skynet_handle_namehandle(context->handle, parm);
+			assert(context->handle!=0);
+			skynet_harbor_register(parm, context->handle);
+			return NULL;
 		}
 	}
 
@@ -220,33 +209,47 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 
 void 
 skynet_send(struct skynet_context * context, const char * addr , void * msg, size_t sz) {
-	int des = -1;
+	uint32_t des = 0;
 	if (addr[0] == ':') {
 		des = strtol(addr+1, NULL, 16);
 	} else if (addr[0] == '.') {
 		des = skynet_handle_findname(addr + 1);
-		if (des < 0) {
-			_drop_message(context->handle, addr, (void *)msg, sz);
+		if (des == 0) {
+			free(msg);
+			skynet_error(context, "Drop message to %s, size = %d", addr, (int)sz);
 			return;
 		}
+	} else {
+		struct skynet_message smsg;
+		smsg.source = context->handle;
+		smsg.destination = 0;
+		smsg.data = msg;
+		smsg.sz = sz;
+		skynet_harbor_send(addr, &smsg);
+		return;
 	}
 
-	assert(des >= 0);
+	assert(des > 0);
+
 	struct skynet_message smsg;
 	smsg.source = context->handle;
 	smsg.destination = des;
 	smsg.data = msg;
 	smsg.sz = sz;
-	skynet_mq_push(&smsg);
+	if (skynet_harbor_message_isremote(des)) {
+		skynet_harbor_send(NULL, &smsg);
+	} else {
+		skynet_mq_push(&smsg);
+	}
 }
 
-int 
+uint32_t 
 skynet_context_handle(struct skynet_context *ctx) {
 	return ctx->handle;
 }
 
 void 
-skynet_context_init(struct skynet_context *ctx, int handle) {
+skynet_context_init(struct skynet_context *ctx, uint32_t handle) {
 	ctx->handle = handle;
 }
 

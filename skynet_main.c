@@ -57,6 +57,10 @@ main(int argc, char *argv[]) {
 	config.mqueue_size = optint(L,"mqueue",256);
 	config.module_path = optstring(L,"cpath","./");
 	config.logger = optstring(L,"logger",NULL);
+	config.harbor = optint(L, "harbor", 1);
+	config.master = optstring(L,"master","tcp://127.0.0.1:2012");
+	config.start = optstring(L,"start","main.lua");
+	config.local = optstring(L,"address","tcp://127.0.0.1:2525");
 	lua_close(L);
 
 	skynet_start(&config);
