@@ -128,6 +128,7 @@ _hash_insert(struct hashmap * hash, const char * key, uint32_t handle, struct me
 	hash->node[h & (HASH_SIZE-1)] = node;
 }
 
+// thread safe function
 static void
 send_notice() {
 	if (__sync_lock_test_and_set(&Z->notice_event,1)) {
@@ -147,6 +148,7 @@ send_notice() {
 	zmq_msg_close(&dummy);
 }
 
+// thread safe function
 void 
 skynet_harbor_send(const char *name, struct skynet_message * message) {
 	if (name == NULL) {
@@ -163,23 +165,28 @@ skynet_harbor_send(const char *name, struct skynet_message * message) {
 	} else {
 		_lock();
 		struct keyvalue * node = _hash_search(Z->map, name);
+		printf("send to %s %p\n",name,node);
 		if (node) {
 			uint32_t dest = node->value;
 			_unlock();
 			if (dest == 0) {
+				printf("queue a unknown address %s\n",name);
 				// push message to unknown name service queue
 				skynet_mq_enter(node->queue, message);
 			} else {
 				message->destination = dest;
 				if (!skynet_harbor_message_isremote(dest)) {
 					// local message
+					printf("%s is a local adress\n",name);
 					skynet_mq_push(message);
 					return;
 				}
+				printf("queue remote message %s to global queue\n",name);
 				skynet_mq_enter(Z->queue,message);
 				send_notice();
 			}
 		} else {
+			printf("Create new queue %s\n",name);
 			// never seen name before
 			struct message_queue * queue =  skynet_mq_create(DEFAULT_QUEUE_SIZE);
 			skynet_mq_enter(queue, message);
@@ -191,6 +198,7 @@ skynet_harbor_send(const char *name, struct skynet_message * message) {
 	}
 }
 
+// thread safe function
 //queue a register message (destination = 0)
 void 
 skynet_harbor_register(const char *name, uint32_t handle) {
@@ -203,6 +211,7 @@ skynet_harbor_register(const char *name, uint32_t handle) {
 	send_notice();
 }
 
+// Always in main harbor thread
 static void
 _register_name(const char *name, uint32_t addr) {
 	_lock();
@@ -234,6 +243,8 @@ _register_name(const char *name, uint32_t addr) {
 			}
 		}
 
+		skynet_mq_release(queue);
+
 		node->queue = NULL;
 	}
 
@@ -243,6 +254,8 @@ _register_name(const char *name, uint32_t addr) {
 		skynet_mq_release(queue);
 	}
 }
+
+// Always in main harbor thread
 
 static void
 _remote_harbor_update(int harbor_id, const char * addr) {
@@ -255,15 +268,22 @@ _remote_harbor_update(int harbor_id, const char * addr) {
 		socket = NULL;
 	}
 	if (socket) {
-		for (;;) {
-			void *old_socket = r->socket;
-			if (__sync_bool_compare_and_swap(&r->socket, old_socket, socket)) {
-				if (old_socket) {
-					zmq_close(old_socket);
-				}
-				break;
-			}
+		void *old_socket = r->socket;
+		if (old_socket) {
+			zmq_close(old_socket);
 		}
+		struct message_queue * queue = r->queue;
+
+		if (queue) {
+			struct skynet_message msg;
+			while (skynet_mq_leave(queue, &msg)) {
+				skynet_mq_enter(Z->queue, &msg);
+			}
+			skynet_mq_release(queue);
+			r->queue = NULL;
+		}
+
+		r->socket = socket;
 	}
 }
 
@@ -275,6 +295,7 @@ _report_zmq_error(int rc) {
 	}
 }
 
+// Always in main harbor thread
 static void
 _name_update() {
 	zmq_msg_t content;
@@ -319,6 +340,7 @@ _name_update() {
 	zmq_msg_close(&content);
 }
 
+// Always in main harbor thread
 static void
 remote_query_harbor(int harbor_id) {
 	char tmp[32];
@@ -339,6 +361,69 @@ remote_query_harbor(int harbor_id) {
 	_remote_harbor_update(harbor_id, tmp2);
 	zmq_msg_close(&reply);
 }
+
+// Always in main harbor thread
+static void
+_remote_register_name(const char *name, uint32_t source) {
+	char tmp[strlen(name) + 20];
+	int sz = sprintf(tmp,"%s=%X",name,source);
+	zmq_msg_t msg;
+	zmq_msg_init_size(&msg,sz);
+	memcpy(zmq_msg_data(&msg), tmp , sz);
+	zmq_send(Z->zmq_master_request, &msg,0);
+	zmq_msg_close(&msg);
+	zmq_msg_init(&msg);
+	int rc = zmq_recv(Z->zmq_master_request, &msg,0);
+	_report_zmq_error(rc);
+	zmq_msg_close(&msg);
+}
+
+// Always in main harbor thread
+static void
+_remote_query_name(const char *name) {
+	int sz = strlen(name);
+	zmq_msg_t msg;
+	zmq_msg_init_size(&msg,sz);
+	memcpy(zmq_msg_data(&msg), name , sz);
+	zmq_send(Z->zmq_master_request, &msg,0);
+	zmq_msg_close(&msg);
+	zmq_msg_init(&msg);
+	int rc = zmq_recv(Z->zmq_master_request, &msg,0);
+	_report_zmq_error(rc);
+	sz = zmq_msg_size(&msg);
+	char tmp[sz+1];
+	memcpy(tmp, zmq_msg_data(&msg),sz);
+	tmp[sz] = '\0';
+
+	uint32_t addr = strtoul(tmp,NULL,16);
+	_register_name(name,addr);
+
+	zmq_msg_close(&msg);
+}
+
+// Always in main harbor thread
+static void 
+free_message (void *data, void *hint) {
+	free(data);
+}
+static void
+remote_socket_send(void * socket, struct skynet_message *msg) {
+	struct remote_header rh;
+	rh.source = msg->source;
+	rh.destination = msg->destination;
+	zmq_msg_t part;
+	zmq_msg_init_size(&part,8);
+	uint8_t * buffer = zmq_msg_data(&part);
+	remote_header_to_buffer(&rh,buffer);
+	zmq_send(socket, &part, ZMQ_SNDMORE);
+	zmq_msg_close(&part);
+
+	zmq_msg_init_data(&part,msg->data,msg->sz,free_message,NULL);
+	zmq_send(socket, &part, 0);
+	zmq_msg_close(&part);
+}
+
+// Always in main harbor thread
 
 // remote message has two part
 // when part one is nil (size == 0), part two is name update
@@ -380,80 +465,7 @@ _remote_recv() {
 	skynet_mq_push(&msg);
 }
 
-void * 
-skynet_harbor_message_open(struct skynet_message * message) {
-	return zmq_msg_data(message->data);
-}
-
-void 
-skynet_harbor_message_close(struct skynet_message * message) {
-	zmq_msg_close(message->data);
-}
-
-int 
-skynet_harbor_message_isremote(uint32_t handle) {
-	int harbor_id = handle >> HANDLE_REMOTE_SHIFT;
-	return !(harbor_id == 0 || harbor_id == Z->harbor);
-}
-
-static void
-_remote_register_name(const char *name, uint32_t source) {
-	char tmp[strlen(name) + 20];
-	int sz = sprintf(tmp,"%s=%X",name,source);
-	zmq_msg_t msg;
-	zmq_msg_init_size(&msg,sz);
-	memcpy(zmq_msg_data(&msg), tmp , sz);
-	zmq_send(Z->zmq_master_request, &msg,0);
-	zmq_msg_close(&msg);
-	zmq_msg_init(&msg);
-	int rc = zmq_recv(Z->zmq_master_request, &msg,0);
-	_report_zmq_error(rc);
-	zmq_msg_close(&msg);
-}
-
-static void
-_remote_query_name(const char *name) {
-	int sz = strlen(name);
-	zmq_msg_t msg;
-	zmq_msg_init_size(&msg,sz);
-	memcpy(zmq_msg_data(&msg), name , sz);
-	zmq_send(Z->zmq_master_request, &msg,0);
-	zmq_msg_close(&msg);
-	zmq_msg_init(&msg);
-	int rc = zmq_recv(Z->zmq_master_request, &msg,0);
-	_report_zmq_error(rc);
-	sz = zmq_msg_size(&msg);
-	char tmp[sz+1];
-	memcpy(tmp, zmq_msg_data(&msg),sz);
-	tmp[sz] = '\0';
-
-	uint32_t addr = strtoul(tmp,NULL,16);
-	_register_name(name,addr);
-
-	zmq_msg_close(&msg);
-}
-
-static void 
-free_message (void *data, void *hint) {
-	free(data);
-}
-static void
-remote_socket_send(void * socket, struct skynet_message *msg) {
-	struct remote_header rh;
-	rh.source = msg->source;
-	rh.destination = msg->destination;
-	zmq_msg_t part;
-	zmq_msg_init_size(&part,8);
-	uint8_t * buffer = zmq_msg_data(&part);
-	remote_header_to_buffer(&rh,buffer);
-	zmq_send(socket, &part, ZMQ_SNDMORE);
-	zmq_msg_close(&part);
-
-	zmq_msg_init_data(&part,msg->data,msg->sz,free_message,NULL);
-	zmq_send(socket, &part, 0);
-	zmq_msg_close(&part);
-}
-
+// Always in main harbor thread
 static void
 _remote_send() {
 	struct skynet_message msg;
@@ -493,6 +505,7 @@ _goback:
 	}
 }
 
+// Main harbor thread
 void *
 skynet_harbor_dispatch_thread(void *ud) {
 	zmq_pollitem_t items[2];
@@ -518,6 +531,7 @@ skynet_harbor_dispatch_thread(void *ud) {
 	}
 }
 
+// Call only at init
 static void
 register_harbor(void *request, const char *local, int harbor) {
 	char tmp[1024];
@@ -539,10 +553,8 @@ register_harbor(void *request, const char *local, int harbor) {
 	if (sz > 0) {
 		memcpy(tmp,zmq_msg_data(&reply),sz);
 		tmp[sz] = '\0';
-		if (strcmp(tmp,local) != 0) {
-			fprintf(stderr, "Harbor %d is already registered by %s [%s]\n", harbor, tmp, local);
-			exit(1);
-		}
+		fprintf(stderr, "Harbor %d is already registered by %s\n", harbor, tmp);
+		exit(1);
 	}
 	zmq_msg_close (&reply);
 
@@ -556,18 +568,6 @@ register_harbor(void *request, const char *local, int harbor) {
 	zmq_msg_init (&reply);
 	rc = zmq_recv (request, &reply, 0);
 	_report_zmq_error(rc);
-
-	sz = zmq_msg_size (&reply);
-	if (sz > 0) {
-		char * buffer = zmq_msg_data(&reply);
-		memcpy(tmp,buffer,sz);
-		tmp[sz] = '\0';
-
-		if (strcmp(local,tmp) !=0) {
-			fprintf(stderr, "Harbor %d is already registered by %s (%s)\n", harbor,tmp,local);
-			exit(1);
-		}
-	}
 	zmq_msg_close (&reply);
 }
 
@@ -606,4 +606,21 @@ skynet_harbor_init(const char * master, const char *local, int harbor) {
 	assert(r==0);
 
 	Z = h;
+}
+
+// thread safe api
+void * 
+skynet_harbor_message_open(struct skynet_message * message) {
+	return zmq_msg_data(message->data);
+}
+
+void 
+skynet_harbor_message_close(struct skynet_message * message) {
+	zmq_msg_close(message->data);
+}
+
+int 
+skynet_harbor_message_isremote(uint32_t handle) {
+	int harbor_id = handle >> HANDLE_REMOTE_SHIFT;
+	return !(harbor_id == 0 || harbor_id == Z->harbor);
 }
