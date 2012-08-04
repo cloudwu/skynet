@@ -76,18 +76,17 @@ skynet_handle_retire(uint32_t handle) {
 		s->slot[hash] = NULL;
 
 		int i;
-		int j=0;
-		for (i=0;i<s->name_count;i++,j++) {
+		int j=0, n=s->name_count;
+		for (i=0; i<n; ++i) {
 			if (s->name[i].handle == handle) {
 				free(s->name[i].name);
-				++j;
-				--s->name_count;
-			} else {
-				if (i!=j) {
-					s->name[i] = s->name[j];
-				}
+				continue;
+			} else if (i!=j) {
+				s->name[j] = s->name[i];
 			}
+			++j;
 		}
+		s->name_count = j;
 	}
 
 	rwlock_wunlock(&s->lock);
