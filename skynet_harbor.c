@@ -550,6 +550,7 @@ _goback:
 	// double check
 	if (!skynet_remotemq_pop(Z->queue,&msg)) {
 		printf("goback %x\n",msg.destination);
+		__sync_lock_test_and_set(&Z->notice_event, 1);
 		goto _goback;
 	}
 }
