@@ -32,6 +32,7 @@ struct hashmap {
 struct remote_header {
 	uint32_t source;
 	uint32_t destination;
+	uint32_t session;
 };
 
 struct remote {
@@ -61,6 +62,7 @@ static inline void
 buffer_to_remote_header(uint8_t *buffer, struct remote_header *header) {
 	header->source = buffer[0] | buffer[1] << 8 | buffer[2] << 16 | buffer[3] << 24;
 	header->destination = buffer[4] | buffer[5] << 8 | buffer[6] << 16 | buffer[7] << 24;
+	header->session = buffer[8] | buffer[9] << 8 | buffer[10] << 16 | buffer[11] << 24;
 }
 
 static inline void
@@ -73,6 +75,10 @@ remote_header_to_buffer(struct remote_header *header, uint8_t *buffer) {
 	buffer[5] = (header->destination >>8) & 0xff;
 	buffer[6] = (header->destination >>16) & 0xff;
 	buffer[7] = (header->destination >>24) & 0xff;
+	buffer[8] = (header->session) & 0xff;
+	buffer[9] = (header->session >>8) & 0xff;
+	buffer[10] = (header->session >>16) & 0xff;
+	buffer[11] = (header->session >>24) & 0xff;
 }
 
 static uint32_t
@@ -247,6 +253,7 @@ _register_name(const char *name, uint32_t addr) {
 				message.destination = addr;
 				message.message = msg;
 				skynet_remotemq_push(Z->queue, &message);
+				send_notice();
 			}
 		} else {
 			while (!skynet_mq_pop(queue, &msg)) {
@@ -424,7 +431,7 @@ remote_socket_send(void * socket, struct skynet_remote_message *msg) {
 	rh.source = msg->message.source;
 	rh.destination = msg->destination;
 	zmq_msg_t part;
-	zmq_msg_init_size(&part,8);
+	zmq_msg_init_size(&part,sizeof(struct remote_header));
 	uint8_t * buffer = zmq_msg_data(&part);
 	remote_header_to_buffer(&rh,buffer);
 	zmq_send(socket, &part, ZMQ_SNDMORE);
@@ -447,7 +454,7 @@ _remote_recv() {
 	int rc = zmq_recv(Z->zmq_local,&header,0);
 	_report_zmq_error(rc);
 	size_t s = zmq_msg_size(&header);
-	if (s!=8) {
+	if (s!=sizeof(struct remote_header)) {
 		// s should be 0
 		if (s>0) {
 			char tmp[s+1];

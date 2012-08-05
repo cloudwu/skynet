@@ -23,6 +23,7 @@ struct skynet_context {
 	char result[32];
 	void * cb_ud;
 	skynet_cb cb;
+	int session_id;
 	int in_global_queue;
 	struct message_queue *queue;
 };
@@ -54,6 +55,7 @@ skynet_context_new(const char * name, const char *parm) {
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
 	ctx->in_global_queue = 0;
+	ctx->session_id = 0;
 	char * uid = ctx->handle_name;
 	uid[0] = ':';
 	_id_to_hex(uid+1, ctx->handle);
@@ -70,6 +72,17 @@ skynet_context_new(const char * name, const char *parm) {
 		skynet_handle_retire(ctx->handle);
 		return NULL;
 	}
+}
+
+static int
+_new_session(struct skynet_context *ctx) {
+	int session = ++ctx->session_id;
+	if (session < 0) {
+		ctx->session_id = 1;
+		return 1;
+	}
+
+	return session;
 }
 
 void 
@@ -98,17 +111,17 @@ skynet_context_release(struct skynet_context *ctx) {
 static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	if (msg->source == SKYNET_SYSTEM_TIMER) {
-		ctx->cb(ctx, ctx->cb_ud, NULL, msg->data, msg->sz);
+		ctx->cb(ctx, ctx->cb_ud, msg->session, NULL, msg->data, msg->sz);
 	} else {
 		char tmp[10];
 		tmp[0] = ':';
 		_id_to_hex(tmp+1, msg->source);
 		if (skynet_harbor_message_isremote(msg->source)) {
 			void * data = skynet_harbor_message_open(msg);
-			ctx->cb(ctx, ctx->cb_ud, tmp, data, msg->sz);
+			ctx->cb(ctx, ctx->cb_ud, msg->session, tmp, data, msg->sz);
 			skynet_harbor_message_close(msg);
 		} else {
-			ctx->cb(ctx, ctx->cb_ud, tmp, msg->data, msg->sz);
+			ctx->cb(ctx, ctx->cb_ud, msg->session, tmp, msg->data, msg->sz);
 		}
 
 		free(msg->data);
@@ -171,13 +184,10 @@ skynet_context_message_dispatch(void) {
 }
 
 const char * 
-skynet_command(struct skynet_context * context, const char * cmd , const char * parm) {
+skynet_command(struct skynet_context * context, const char * cmd , int session, const char * parm) {
 	if (strcmp(cmd,"TIMEOUT") == 0) {
 		char * session_ptr = NULL;
 		int ti = strtol(parm, &session_ptr, 10);
-		char sep = session_ptr[0];
-		assert(sep == ':');
-		int session = strtol(session_ptr+1, NULL, 10);
 		skynet_timeout(context->handle, ti, session);
 		return NULL;
 	}
@@ -226,7 +236,10 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 }
 
 void 
-skynet_send(struct skynet_context * context, const char * addr , void * msg, size_t sz) {
+skynet_send(struct skynet_context * context, const char * addr , int session, void * msg, size_t sz) {
+	if (session < 0) {
+		session = _new_session(context);
+	}
 	uint32_t des = 0;
 	if (addr[0] == ':') {
 		des = strtol(addr+1, NULL, 16);
@@ -240,6 +253,7 @@ skynet_send(struct skynet_context * context, const char * addr , void * msg, siz
 	} else {
 		struct skynet_message smsg;
 		smsg.source = context->handle;
+		smsg.session = session;
 		smsg.data = msg;
 		smsg.sz = sz;
 		skynet_harbor_send(addr, 0, &smsg);
@@ -250,6 +264,7 @@ skynet_send(struct skynet_context * context, const char * addr , void * msg, siz
 
 	struct skynet_message smsg;
 	smsg.source = context->handle;
+	smsg.session = session;
 	smsg.data = msg;
 	smsg.sz = sz;
 
@@ -284,6 +299,9 @@ skynet_context_push(uint32_t handle, struct skynet_message *message) {
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
 		return -1;
+	}
+	if (message->session < 0) {
+		message->session = _new_session(ctx);
 	}
 	skynet_mq_push(ctx->queue, message);
 	if (__sync_lock_test_and_set(&ctx->in_global_queue,1) == 0) {

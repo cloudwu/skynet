@@ -25,7 +25,7 @@ logger_release(struct logger * inst) {
 }
 
 static void
-_logger(struct skynet_context * context, void *ud, const char * uid, const void * msg, size_t sz) {
+_logger(struct skynet_context * context, void *ud, int session, const char * uid, const void * msg, size_t sz) {
 	struct logger * inst = ud;
 	fprintf(inst->handle, "[%s] ",uid);
 	fwrite(msg, sz , 1, inst->handle);
@@ -45,7 +45,7 @@ logger_init(struct logger * inst, struct skynet_context *ctx, const char * parm)
 	}
 	if (inst->handle) {
 		skynet_callback(ctx, inst, _logger);
-		skynet_command(ctx, "REG", ".logger");
+		skynet_command(ctx, "REG", 0, ".logger");
 		return 0;
 	}
 	return 1;

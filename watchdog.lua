@@ -5,22 +5,22 @@ local command = {}
 function command:open(parm)
 	local fd,addr = string.match(parm,"(%d+) ([^%s]+)")
 	fd = tonumber(fd)
-	skynet.send("LOG",string.format("%d %d %s",self,fd,addr))
+	skynet.send("LOG", 0, string.format("%d %d %s",self,fd,addr))
 	local agent = skynet.command("LAUNCH","snlua agent.lua ".. self)
 	if agent then
-		skynet.send("gate","forward ".. self .. " " .. agent)
+		skynet.send("gate",0, "forward ".. self .. " " .. agent)
 	end
 end
 
 function command:close()
-	skynet.send("LOG",string.format("close %d",self))
+	skynet.send("LOG",0,string.format("close %d",self))
 end
 
 function command:data(data)
-	skynet.send("LOG",string.format("data %d size=%d",self,#data))
+	skynet.send("LOG",0,string.format("data %d size=%d",self,#data))
 end
 
-skynet.callback(function(from , message)
+skynet.callback(function(session, from , message)
 	local id, cmd , parm = string.match(message, "(%d+) (%w+) ?(.*)")
 	id = tonumber(id)
 	local f = command[cmd]

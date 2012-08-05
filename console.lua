@@ -8,7 +8,7 @@ skynet.callback(function()
 	else
 		print("Lauch:",handle)
 	end
-	skynet.command("TIMEOUT","0:0")
+	skynet.command("TIMEOUT", 0, "0")
 end)
 
-skynet.command("TIMEOUT","0:0")
+skynet.command("TIMEOUT", 0 ,"0")

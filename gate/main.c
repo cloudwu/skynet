@@ -112,7 +112,7 @@ _report(struct skynet_context * ctx, const char * data, ...) {
 		tmp[n] = '\0';
 	}
 
-	skynet_send(ctx, WATCHDOG, strdup(tmp), n);
+	skynet_send(ctx, WATCHDOG, 0, strdup(tmp), n);
 }
 
 static void
@@ -121,7 +121,7 @@ _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_
 	char * tmp = malloc(len + 32);
 	int n = snprintf(tmp,len+32,"%d data ",uid);
 	memcpy(tmp+n,data,len);
-	skynet_send(ctx, agent->agent ? agent->agent : WATCHDOG, tmp, len + n);
+	skynet_send(ctx, agent->agent ? agent->agent : WATCHDOG, 0, tmp, len + n);
 }
 
 static int
@@ -163,7 +163,7 @@ _remove_id(struct gate *g, int uid) {
 }
 
 static void
-_cb(struct skynet_context * ctx, void * ud, const char * uid, const void * msg, size_t sz) {
+_cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const void * msg, size_t sz) {
 	struct gate *g = ud;
 	if (msg) {
 		_ctrl(ctx, g , msg , (int)sz);
@@ -172,7 +172,7 @@ _cb(struct skynet_context * ctx, void * ud, const char * uid, const void * msg, 
 	struct mread_pool * m = g->pool;
 	int connection_id = mread_poll(m,100);	// timeout : 100ms
 	if (connection_id < 0) {
-		skynet_command(ctx, "TIMEOUT","1:0");
+		skynet_command(ctx, "TIMEOUT", 0, "1");
 	} else {
 		int id = g->map[connection_id].uid;
 		if (id == 0) {
@@ -203,7 +203,7 @@ _cb(struct skynet_context * ctx, void * ud, const char * uid, const void * msg, 
 		_forward(ctx, g, id, data, *plen);
 		mread_yield(m);
 _break:
-		skynet_command(ctx, "TIMEOUT","0:0");
+		skynet_command(ctx, "TIMEOUT",0,"0");
 	}
 }
 
@@ -243,8 +243,8 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	}
 
 	skynet_callback(ctx,g,_cb);
-	skynet_command(ctx,"REG","gate");
-	skynet_command(ctx,"TIMEOUT","0:0");
+	skynet_command(ctx,"REG",0,"gate");
+	skynet_command(ctx,"TIMEOUT",0, "0");
 
 	return 0;
 }
