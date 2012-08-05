@@ -313,6 +313,36 @@ _report_zmq_error(int rc) {
 	}
 }
 
+static int
+_isdecimal(int c) {
+	return c>='0' && c<='9';
+}
+
+// Name-updating protocols:
+//
+// 1) harbor_id=harbor_address
+// 2) context_name=context_handle
+static int
+_split_name(uint8_t *buf, int len, int *np) {
+	uint8_t *sep;
+	if (len > 0 && _isdecimal(buf[0])) {
+		int i=0;
+		int n=0;
+		do {
+			n = n*10 + (buf[i]-'0');
+		} while(++i<len && _isdecimal(buf[i]));
+		if (i < len && buf[i] == '=') {
+			buf[i] = '\0';
+			*np = n;
+			return i;
+		}
+	} else if ((sep = memchr(buf, '=', len)) != NULL) {
+		*sep = '\0';
+		return (int)(sep-buf);
+	}
+	return -1;
+}
+
 // Always in main harbor thread
 static void
 _name_update() {
@@ -321,17 +351,11 @@ _name_update() {
 	int rc = zmq_recv(Z->zmq_local,&content,0);
 	_report_zmq_error(rc);
 	int sz = zmq_msg_size(&content);
-	int i;
-	int n = 0;
 	uint8_t * buffer = zmq_msg_data(&content);
-	for (i=0;i<sz;i++) {
-		if (buffer[i] == '=') {
-			buffer[i] = '\0';
-			break;
-		}
-		n = n * 10 + (buffer[i] - '0');
-	}
-	if (i==sz) {
+
+	int n = 0;
+	int i = _split_name(buffer, sz, &n);
+	if (i == -1) {
 		char tmp[sz+1];
 		memcpy(tmp,buffer,sz);
 		tmp[sz] = '\0';
@@ -526,6 +550,7 @@ _goback:
 	// double check
 	if (!skynet_remotemq_pop(Z->queue,&msg)) {
 		printf("goback %x\n",msg.destination);
+		__sync_lock_test_and_set(&Z->notice_event, 1);
 		goto _goback;
 	}
 }
