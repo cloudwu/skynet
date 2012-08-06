@@ -16,7 +16,12 @@ end
 skynet.dispatch(function(message, from, session)
 	print("simpledb",message, from, session)
 	local cmd, key , value = string.match(message, "(%w+) (%w+) ?(.*)")
-	command[cmd](key,value)
+	local f = command[cmd]
+	if f then
+		f(key,value)
+	else
+		skynet.ret("Invalid command : "..message)
+	end
 end)
 
 skynet.register "SIMPLEDB"

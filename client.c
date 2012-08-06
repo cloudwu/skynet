@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -7,6 +8,46 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <errno.h>
+
+struct args {
+	int fd;
+};
+
+static void
+readall(int fd, void * buffer, size_t sz) {
+	for (;;) {
+		int err = recv(fd , buffer, sz, MSG_WAITALL);
+		if (err < 0) {
+			if (errno == EAGAIN || errno == EINTR)
+				continue;
+			break;
+		}
+		return;
+	}
+	perror("Socket error");
+	exit(1);
+}
+
+static void *
+_read(void *ud) {
+	struct args *p = ud;
+	int fd = p->fd;
+	fflush(stdout);
+	for (;;) {
+		uint8_t header[2];
+		fflush(stdout);
+		readall(fd, header, 2);
+		size_t len = header[0] | header[1] << 8;
+		if (len>0) {
+			char tmp[len+1];
+			readall(fd, tmp, len);
+			tmp[len]='\0';
+			printf("%s\n",tmp);
+		}
+	}
+	return NULL;
+}
 
 static void
 test(int fd) {
@@ -50,7 +91,13 @@ main(int argc, char * argv[]) {
 		return 1;
 	}
 
+	struct args arg = { fd };
+	pthread_t pid ;
+	pthread_create(&pid, NULL, _read, &arg);
+
 	test(fd);
+
+	pthread_join(pid, NULL); 
 
 	close(fd);
 

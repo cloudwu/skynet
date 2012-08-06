@@ -65,6 +65,10 @@ function skynet.exit()
 	c.command("EXIT")
 end
 
+function skynet.kill(name)
+	c.command("KILL",name)
+end
+
 skynet.send = c.send
 
 function skynet.call(addr, message)
@@ -83,7 +87,7 @@ function skynet.dispatch(f)
 			co = coroutine.create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = address
-			suspend(co, coroutine.resume(co, message, address, session))
+			suspend(co, coroutine.resume(co, message, session, address))
 		else
 			session_id_coroutine[session] = nil
 			suspend(co, coroutine.resume(co, message))
