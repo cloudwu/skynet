@@ -174,15 +174,6 @@ timer_create_timer()
 
 int
 skynet_timeout(uint32_t handle, int time, int session) {
-	if (session < 0) {
-		struct skynet_context * ctx = skynet_handle_grab(handle);
-		if (ctx == NULL) {
-			return -1;
-		}
-		session = skynet_context_newsession(ctx);
-		skynet_context_release(ctx);
-	}
-
 	if (time == 0) {
 		struct skynet_message message;
 		message.source = SKYNET_SYSTEM_TIMER;

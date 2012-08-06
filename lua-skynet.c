@@ -59,24 +59,13 @@ static int
 _command(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	const char * cmd = luaL_checkstring(L,1);
-	const char * parm = NULL;
-	int session = 0;
 	const char * result;
-	int top = lua_gettop(L);
-	if (top == 2) {
-		if (lua_type(L,2) == LUA_TNUMBER) {
-			session = lua_tointeger(L,2);
-		} else {
-			parm = luaL_checkstring(L,2);
-		}
-	} else if (top == 3) {
-		session = lua_tointeger(L,2);
-		parm = luaL_checkstring(L,3);
-	} else if (top != 1) {
-		luaL_error(L, "skynet.command support only 3 parms (%d)",top);
+	const char * parm = NULL;
+	if (lua_gettop(L) == 2) {
+		parm = luaL_checkstring(L,2);
 	}
 
-	result = skynet_command(context, cmd, session, parm);
+	result = skynet_command(context, cmd, parm);
 	if (result) {
 		lua_pushstring(L, result);
 		return 1;
@@ -87,7 +76,7 @@ _command(lua_State *L) {
 static int
 _send(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	int session = -1;
+	int session = 0;
 	int index = 0;
 	const char * dest = luaL_checkstring(L,1);
 

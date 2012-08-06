@@ -82,13 +82,15 @@ end
 
 function skynet.dispatch(f)
 	c.callback(function(session, address , message)
-		local co = session_id_coroutine[session]
-		if co == nil then
+		if session <= 0 then
+			session = - session
 			co = coroutine.create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = address
 			suspend(co, coroutine.resume(co, message, session, address))
 		else
+			local co = session_id_coroutine[session]
+			assert(co, session)
 			session_id_coroutine[session] = nil
 			suspend(co, coroutine.resume(co, message))
 		end
@@ -96,9 +98,9 @@ function skynet.dispatch(f)
 end
 
 function skynet.start(f)
-	c.command("TIMEOUT",0,"0")
+	local session = c.command("TIMEOUT","0")
 	local co = coroutine.create(f)
-	session_id_coroutine[0] = co
+	session_id_coroutine[tonumber(session)] = co
 end
 
 return skynet

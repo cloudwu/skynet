@@ -178,7 +178,7 @@ _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const
 	struct mread_pool * m = g->pool;
 	int connection_id = mread_poll(m,100);	// timeout : 100ms
 	if (connection_id < 0) {
-		skynet_command(ctx, "TIMEOUT", 0, "1");
+		skynet_command(ctx, "TIMEOUT", "1");
 	} else {
 		int id = g->map[connection_id].uid;
 		if (id == 0) {
@@ -209,7 +209,7 @@ _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const
 		_forward(ctx, g, id, data, *plen);
 		mread_yield(m);
 _break:
-		skynet_command(ctx, "TIMEOUT",0,"0");
+		skynet_command(ctx, "TIMEOUT", "0");
 	}
 }
 
@@ -249,8 +249,8 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	}
 
 	skynet_callback(ctx,g,_cb);
-	skynet_command(ctx,"REG",0,"gate");
-	skynet_command(ctx,"TIMEOUT",0, "0");
+	skynet_command(ctx,"REG","gate");
+	skynet_command(ctx,"TIMEOUT","0");
 
 	return 0;
 }

@@ -5,7 +5,7 @@ skynet.dispatch(function(msg,session)
 	if session == 0 then
 		print("client command",msg)
 		local result = skynet.call("SIMPLEDB",msg)
-		skynet.send(client,0,result)
+		skynet.send(client, result)
 	else
 		print("server command",msg)
 		if msg == "CLOSE" then

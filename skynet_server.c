@@ -197,13 +197,14 @@ skynet_context_message_dispatch(void) {
 }
 
 const char * 
-skynet_command(struct skynet_context * context, const char * cmd , int session, const char * parm) {
+skynet_command(struct skynet_context * context, const char * cmd , const char * parm) {
 	if (strcmp(cmd,"TIMEOUT") == 0) {
 		char * session_ptr = NULL;
 		int ti = strtol(parm, &session_ptr, 10);
-		session = skynet_timeout(context->handle, ti, session);
-		if (session < 0)
+		int session = skynet_context_newsession(context);
+		if (session < 0) 
 			return NULL;
+		skynet_timeout(context->handle, ti, session);
 		sprintf(context->result, "%d", session);
 		return context->result;
 	}
@@ -268,8 +269,10 @@ skynet_command(struct skynet_context * context, const char * cmd , int session, 
 
 int
 skynet_send(struct skynet_context * context, const char * addr , int session, void * msg, size_t sz) {
+	int session_id = session;
 	if (session < 0) {
 		session = skynet_context_newsession(context);
+		session_id = - session;
 	}
 	uint32_t des = 0;
 	if (addr[0] == ':') {
@@ -284,7 +287,7 @@ skynet_send(struct skynet_context * context, const char * addr , int session, vo
 	} else {
 		struct skynet_message smsg;
 		smsg.source = context->handle;
-		smsg.session = session;
+		smsg.session = session_id;
 		smsg.data = msg;
 		smsg.sz = sz;
 		skynet_harbor_send(addr, 0, &smsg);
@@ -295,7 +298,7 @@ skynet_send(struct skynet_context * context, const char * addr , int session, vo
 
 	struct skynet_message smsg;
 	smsg.source = context->handle;
-	smsg.session = session;
+	smsg.session = session_id;
 	smsg.data = msg;
 	smsg.sz = sz;
 
@@ -332,7 +335,6 @@ skynet_context_push(uint32_t handle, struct skynet_message *message) {
 	if (ctx == NULL) {
 		return -1;
 	}
-	assert(message->session >= 0);
 	skynet_mq_push(ctx->queue, message);
 	if (__sync_lock_test_and_set(&ctx->in_global_queue,1) == 0) {
 		skynet_globalmq_push(ctx->queue);
