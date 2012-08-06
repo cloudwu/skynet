@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 
-void skynet_timeout(uint32_t handle, int time, int session);
+int skynet_timeout(uint32_t handle, int time, int session);
 void skynet_updatetime(void);
 uint32_t skynet_gettime(void);
 

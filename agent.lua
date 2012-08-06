@@ -2,6 +2,6 @@ local skynet = require "skynet"
 
 print("agent",...)
 
-skynet.callback(function(session, addr, msg)
-	print("[agent]",session,addr,msg)
+skynet.dispatch(function(msg , addr)
+	print("[agent]",addr,msg)
 end)

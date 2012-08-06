@@ -1,6 +1,7 @@
 #include "skynet_timer.h"
 #include "skynet_mq.h"
 #include "skynet_server.h"
+#include "skynet_handle.h"
 
 #include <time.h>
 #include <assert.h>
@@ -171,8 +172,17 @@ timer_create_timer()
 	return r;
 }
 
-void 
+int
 skynet_timeout(uint32_t handle, int time, int session) {
+	if (session < 0) {
+		struct skynet_context * ctx = skynet_handle_grab(handle);
+		if (ctx == NULL) {
+			return -1;
+		}
+		session = skynet_context_newsession(ctx);
+		skynet_context_release(ctx);
+	}
+
 	if (time == 0) {
 		struct skynet_message message;
 		message.source = SKYNET_SYSTEM_TIMER;
@@ -181,7 +191,7 @@ skynet_timeout(uint32_t handle, int time, int session) {
 		message.sz = 0;
 
 		if (skynet_context_push(handle, &message)) {
-			return;
+			return -1;
 		}
 	} else {
 		struct timer_event event;
@@ -189,6 +199,8 @@ skynet_timeout(uint32_t handle, int time, int session) {
 		event.session = session;
 		timer_add(TI, &event, sizeof(event), time);
 	}
+
+	return session;
 }
 
 static uint32_t

@@ -6,7 +6,7 @@ function command:open(parm)
 	local fd,addr = string.match(parm,"(%d+) ([^%s]+)")
 	fd = tonumber(fd)
 	skynet.send("LOG", 0, string.format("%d %d %s",self,fd,addr))
-	local agent = skynet.command("LAUNCH","snlua agent.lua ".. self)
+	local agent = skynet.launch("snlua","agent.lua",self)
 	if agent then
 		skynet.send("gate",0, "forward ".. self .. " " .. agent)
 	end
@@ -20,7 +20,7 @@ function command:data(data)
 	skynet.send("LOG",0,string.format("data %d size=%d",self,#data))
 end
 
-skynet.callback(function(session, from , message)
+skynet.dispatch(function(message)
 	local id, cmd , parm = string.match(message, "(%d+) (%w+) ?(.*)")
 	id = tonumber(id)
 	local f = command[cmd]
@@ -31,4 +31,4 @@ skynet.callback(function(session, from , message)
 	end
 end)
 
-skynet.command("REG",".watchdog")
+skynet.register ".watchdog"

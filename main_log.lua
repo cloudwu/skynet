@@ -2,7 +2,10 @@ local skynet = require "skynet"
 
 print("Log server start")
 
-local log = skynet.command("LAUNCH","snlua globallog.lua")
+local log = skynet.launch("snlua","globallog.lua")
 print("log",log)
 
-skynet.command("EXIT")
+local db = skynet.launch("snlua","simpledb.lua")
+print("simpledb",db)
+
+skynet.exit()

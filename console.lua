@@ -1,14 +1,16 @@
 local skynet = require "skynet"
 
-skynet.callback(function()
-	local cmd = io.read()
-	local handle = skynet.command("LAUNCH",cmd)
-	if handle == nil then
-		print("Launch error:",cmd)
-	else
-		print("Lauch:",handle)
-	end
-	skynet.command("TIMEOUT", 0, "0")
-end)
+skynet.dispatch()
 
-skynet.command("TIMEOUT", 0 ,"0")
+skynet.start(function()
+	while true do
+		local cmd = io.read()
+		local handle = skynet.launch(cmd)
+		if handle == nil then
+			print("Launch error:",cmd)
+		else
+			print("Lauch:",handle)
+		end
+		skynet.yield()
+	end
+end)

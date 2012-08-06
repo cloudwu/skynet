@@ -1,8 +1,13 @@
 local skynet = require "skynet"
 
-skynet.callback(function(session,addr,content)
-	print("sn:",session)
-	skynet.command("TIMEOUT", -1 , "100")
-end)
+-- register a dummy callback function
+skynet.dispatch()
 
-skynet.command("TIMEOUT",0,"0")
+skynet.start(function()
+	for i = 1, 10 do
+		print(i)
+		skynet.sleep(100)
+	end
+	skynet.exit()
+	print("Test timer exit")
+end)

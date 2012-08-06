@@ -1,7 +1,7 @@
 local skynet = require "skynet"
 
-skynet.callback(function(session, from , message)
+skynet.dispatch(function(message, from, session)
 	print("[GLOBALLOG]",session, from,message)
 end)
 
-skynet.command("REG","LOG")
+skynet.register "LOG"

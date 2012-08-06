@@ -162,17 +162,11 @@ skynet_harbor_send(const char *name, uint32_t destination, struct skynet_message
 		assert(destination!=0);
 		int remote_id = destination >> HANDLE_REMOTE_SHIFT;
 		assert(remote_id > 0 && remote_id <= REMOTE_MAX);
-		--remote_id;
-		struct remote * r = &Z->remote[remote_id];
 		struct skynet_remote_message message;
 		message.destination = destination;
 		message.message = *msg;
-		if (r->socket) {
-			skynet_remotemq_push(Z->queue, &message);
-			send_notice();
-		} else {
-			skynet_remotemq_push(r->queue, &message);
-		}
+		skynet_remotemq_push(Z->queue, &message);
+		send_notice();
 	} else {
 		_lock();
 		struct keyvalue * node = _hash_search(Z->map, name);
@@ -454,6 +448,7 @@ remote_socket_send(void * socket, struct skynet_remote_message *msg) {
 	struct remote_header rh;
 	rh.source = msg->message.source;
 	rh.destination = msg->destination;
+	rh.session = msg->message.session;
 	zmq_msg_t part;
 	zmq_msg_init_size(&part,sizeof(struct remote_header));
 	uint8_t * buffer = zmq_msg_data(&part);
@@ -500,6 +495,7 @@ _remote_recv() {
 	_report_zmq_error(rc);
 
 	struct skynet_message msg;
+	msg.session = (int)rh.session;
 	msg.source = rh.source;
 	msg.data = data;
 	msg.sz = zmq_msg_size(data);
