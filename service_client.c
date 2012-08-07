@@ -29,8 +29,9 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 			case EINTR:
 				continue;
 			}
-			return;
 		}
+		assert(err == sz +2);
+		return;
 	}
 }
 
