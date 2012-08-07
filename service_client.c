@@ -1,6 +1,7 @@
 #include "skynet.h"
 
 #include <sys/uio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
@@ -20,7 +21,17 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	buffer[1].iov_base = (void *)msg;
 	buffer[1].iov_len = sz;
 
-	writev(fd, buffer, 2);
+	for (;;) {
+		int err = writev(fd, buffer, 2);
+		if (err < 0) {
+			switch (errno) {
+			case EAGAIN:
+			case EINTR:
+				continue;
+			}
+			return;
+		}
+	}
 }
 
 int
