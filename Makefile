@@ -9,7 +9,7 @@ logger.so : skynet_logger.c
 snlua.so : service_lua.c
 	gcc -Wall -g -fPIC --shared $^ -o $@ 
 
-gate.so : gate/mread.c gate/ringbuffer.c gate/map.c gate/main.c
+gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
 	gcc -Wall -g -fPIC --shared -o $@ $^ -I. -Igate 
 
 skynet.so : lua-skynet.c

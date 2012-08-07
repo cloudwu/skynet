@@ -28,6 +28,8 @@
 
 #define SOCKET_ALIVE	SOCKET_SUSPEND
 
+#define LISTENSOCKET (void *)((intptr_t)~0)
+
 struct socket {
 	int fd;
 	struct ringbuffer_block * node;
@@ -44,7 +46,6 @@ struct mread_pool {
 	int skip;
 	struct socket * sockets;
 	struct socket * free_socket;
-	struct map * socket_hash;
 	int queue_len;
 	int queue_head;
 	struct epoll_event ev[READQUEUE];
@@ -125,9 +126,11 @@ mread_create(int port , int max , int buffer_size) {
 		close(listen_fd);
 		return NULL;
 	}
+
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
-	ev.data.fd = listen_fd;
+	ev.data.ptr = LISTENSOCKET;
+
 	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listen_fd, &ev) == -1) {
 		close(listen_fd);
 		close(epoll_fd);
@@ -135,6 +138,7 @@ mread_create(int port , int max , int buffer_size) {
 	}
 
 	struct mread_pool * self = malloc(sizeof(*self));
+
 	self->listen_fd = listen_fd;
 	self->epoll_fd = epoll_fd;
 	self->max_connection = max;
@@ -143,7 +147,6 @@ mread_create(int port , int max , int buffer_size) {
 	self->skip = 0;
 	self->sockets = _create_sockets(max);
 	self->free_socket = &self->sockets[0];
-	self->socket_hash = map_new(max * 3 / 2);
 	self->queue_len = 0;
 	self->queue_head = 0;
 	if (buffer_size == 0) {
@@ -172,7 +175,6 @@ mread_close(struct mread_pool *self) {
 	}
 	close(self->epoll_fd);	
 	_release_rb(self->rb);
-	map_delete(self->socket_hash);
 	free(self);
 }
 
@@ -188,12 +190,12 @@ _read_queue(struct mread_pool * self, int timeout) {
 	return n;
 }
 
-inline static int
+inline static struct socket *
 _read_one(struct mread_pool * self) {
 	if (self->queue_head >= self->queue_len) {
-		return -1;
+		return NULL;
 	}
-	return self->ev[self->queue_head ++].data.fd;
+	return self->ev[self->queue_head ++].data.ptr;
 }
 
 static struct socket *
@@ -220,7 +222,7 @@ _add_client(struct mread_pool * self, int fd) {
 	}
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
-	ev.data.fd = fd;
+	ev.data.ptr = s;
 	if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, fd, &ev) == -1) {
 		close(fd);
 		return;
@@ -229,8 +231,6 @@ _add_client(struct mread_pool * self, int fd) {
 	s->fd = fd;
 	s->node = NULL;
 	s->status = SOCKET_SUSPEND;
-	int id = s - self->sockets;
-	map_insert(self->socket_hash , fd , id);
 }
 
 static int
@@ -265,12 +265,12 @@ mread_poll(struct mread_pool * self , int timeout) {
 		}
 	}
 	for (;;) {
-		int fd = _read_one(self);
-		if (fd == -1) {
+		struct socket * s = _read_one(self);
+		if (s == NULL) {
 			self->active = -1;
 			return -1;
 		}
-		if (fd == self->listen_fd) {
+		if (s == LISTENSOCKET) {
 			struct sockaddr_in remote_addr;
 			socklen_t len = sizeof(struct sockaddr_in);
 			int client_fd = accept(self->listen_fd , (struct sockaddr *)&remote_addr ,  &len);
@@ -279,13 +279,11 @@ mread_poll(struct mread_pool * self , int timeout) {
 				_add_client(self, client_fd);
 			}
 		} else {
-			int index = map_search(self->socket_hash , fd);
-			if (index >= 0) {
-				self->active = index;
-				struct socket * s = &self->sockets[index];
-				s->status = SOCKET_POLLIN;
-				return index;
-			}
+			int index = s - self->sockets;
+			assert(index >=0 && index < self->max_connection);
+			self->active = index;
+			s->status = SOCKET_POLLIN;
+			return index;
 		}
 	}
 }
@@ -456,7 +454,6 @@ mread_yield(struct mread_pool * self) {
 	if (s->status == SOCKET_CLOSED && s->node == NULL) {
 		--self->closed;
 		s->status = SOCKET_INVALID;
-		map_erase(self->socket_hash , s->fd);
 		s->fd = self->free_socket - self->sockets;
 		self->free_socket = s;
 		self->skip = 0;
