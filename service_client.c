@@ -15,7 +15,8 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	int fd = (int)(intptr_t)ud;
 
 	struct iovec buffer[2];
-	uint8_t head[2] = { sz & 0xff , sz >> 8 & 0xff };
+	// send big-endian header
+	uint8_t head[2] = { sz >> 8 & 0xff , sz & 0xff };
 	buffer[0].iov_base = head;
 	buffer[0].iov_len = 2;
 	buffer[1].iov_base = (void *)msg;

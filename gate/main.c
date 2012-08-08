@@ -183,7 +183,7 @@ _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const
 			getpeername(fd, (struct sockaddr *)&remote_addr, &len);
 			_report(ctx, "%d open %d %s:%u",id,fd,inet_ntoa(remote_addr.sin_addr),ntohs(remote_addr.sin_port));
 		}
-		uint16_t * plen = mread_pull(m,2);
+		uint8_t * plen = mread_pull(m,2);
 		if (plen == NULL) {
 			if (mread_closed(m)) {
 				_remove_id(g,id);
@@ -191,7 +191,9 @@ _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const
 			}
 			goto _break;
 		}
-		void * data = mread_pull(m, *plen);
+		// big-endian
+		uint16_t len = plen[0] << 8 | plen[1];
+		void * data = mread_pull(m, len);
 		if (data == NULL) {
 			if (mread_closed(m)) {
 				_remove_id(g,id);
@@ -200,7 +202,7 @@ _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const
 			goto _break;
 		}
 
-		_forward(ctx, g, id, data, *plen);
+		_forward(ctx, g, id, data, len);
 		mread_yield(m);
 _break:
 		skynet_command(ctx, "TIMEOUT", "0");

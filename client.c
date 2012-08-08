@@ -38,7 +38,7 @@ _read(void *ud) {
 		uint8_t header[2];
 		fflush(stdout);
 		readall(fd, header, 2);
-		size_t len = header[0] | header[1] << 8;
+		size_t len = header[0] << 8 | header[1];
 		if (len>0) {
 			char tmp[len+1];
 			readall(fd, tmp, len);
@@ -56,8 +56,8 @@ test(int fd) {
 		fgets(tmp,sizeof(tmp),stdin);
 		int n = strlen(tmp) -1;
 		uint8_t head[2];
-		head[0] = n & 0xff;
-		head[1] = (n >> 8) & 0xff;
+		head[0] = (n >> 8) & 0xff;
+		head[1] = n & 0xff;
 		int r;
 		r = send(fd, head, 2, 0);
 		if (r<0) {
