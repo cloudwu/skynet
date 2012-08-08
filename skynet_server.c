@@ -68,7 +68,7 @@ skynet_context_new(const char * name, const char *param) {
 	char * uid = ctx->handle_name;
 	uid[0] = ':';
 	_id_to_hex(uid+1, ctx->handle);
-	ctx->queue = skynet_mq_create(ctx->handle);
+	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
 	// init function maybe use ctx->handle, so it must init at last
 
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
@@ -78,6 +78,9 @@ skynet_context_new(const char * name, const char *param) {
 			ctx->init = 1;
 			skynet_globalmq_push(ctx->queue);
 			return ret;
+		} else {
+			// because of ctx->in_global_queue == 1 , so we should release queue here.
+			skynet_mq_release(queue);
 		}
 		return NULL;
 	} else {
