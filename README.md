@@ -31,5 +31,5 @@ You can type something in nc console.
 
 ## Blog (in Chinese)
 
-http://blog.codingnow.com/2012/08/skynet.html
-http://blog.codingnow.com/2012/08/skynet_harbor_rpc.html
+* http://blog.codingnow.com/2012/08/skynet.html
+* http://blog.codingnow.com/2012/08/skynet_harbor_rpc.html
