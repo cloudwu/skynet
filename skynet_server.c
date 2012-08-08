@@ -29,7 +29,7 @@ struct skynet_context {
 };
 
 static void
-_id_to_hex(char * str, int id) {
+_id_to_hex(char * str, uint32_t id) {
 	int i;
 	static char hex[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
 	for (i=0;i<8;i++) {
@@ -268,7 +268,15 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 }
 
 int
-skynet_send(struct skynet_context * context, const char * addr , int session, void * msg, size_t sz) {
+skynet_send(struct skynet_context * context, const char * addr , int session, void * data, size_t sz, int flags) {
+	char * msg;
+	if ((flags & DONTCOPY) || data == NULL) {
+		msg = data;
+	} else {
+		msg = malloc(sz+1);
+		memcpy(msg, data, sz);
+		msg[sz] = '\0';
+	}
 	int session_id = session;
 	if (session < 0) {
 		session = skynet_context_newsession(context);

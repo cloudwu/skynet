@@ -107,26 +107,20 @@ _report(struct skynet_context * ctx, const char * data, ...) {
 	char tmp[1024];
 	int n = vsnprintf(tmp, sizeof(tmp), data, ap);
 	va_end(ap);
-	if (n>=sizeof(tmp)) {
-		n = sizeof(tmp) - 1;
-		tmp[n] = '\0';
-	}
 
-	skynet_send(ctx, WATCHDOG, 0, strdup(tmp), n);
+	skynet_send(ctx, WATCHDOG, 0, tmp, n, 0);
 }
 
 static void
 _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_t len) {
 	struct connection * agent = _id_to_agent(g,uid);
 	if (agent->agent) {
-		char * tmp = malloc(len);
-		memcpy(tmp,data,len);
-		skynet_send(ctx, agent->agent, 0, tmp, len);
+		skynet_send(ctx, agent->agent, 0, data, len, 0);
 	} else {
 		char * tmp = malloc(len + 32);
 		int n = snprintf(tmp,len+32,"%d data ",uid);
 		memcpy(tmp+n,data,len);
-		skynet_send(ctx, WATCHDOG, 0, tmp, len + n);
+		skynet_send(ctx, WATCHDOG, 0, tmp, len + n, DONTCOPY);
 	}
 }
 

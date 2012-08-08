@@ -20,17 +20,18 @@ traceback (lua_State *L) {
 static void
 _cb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
 	lua_State *L = ud;
-	lua_pushcfunction(L, traceback);
+	lua_rawgetp(L, LUA_REGISTRYINDEX, traceback);
+	int trace = lua_gettop(L);
 	lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
 	int r;
 	if (msg == NULL) {
 		lua_pushinteger(L, session);
-		r = lua_pcall(L, 1, 0 , -3);
+		r = lua_pcall(L, 1, 0 , trace);
 	} else {
 		lua_pushinteger(L, session);
 		lua_pushstring(L, addr);
 		lua_pushlstring(L, msg, sz);
-		r = lua_pcall(L, 3, 0 , -5);
+		r = lua_pcall(L, 3, 0 , trace);
 	}
 	if (r == LUA_OK) 
 		return;
@@ -85,24 +86,20 @@ _send(lua_State *L) {
 		++index;
 	}
 	if (lua_gettop(L) == index + 1) {
-		session = skynet_send(context, dest, session , NULL, 0);
+		session = skynet_send(context, dest, session , NULL, 0, 0);
 	} else {
 		int type = lua_type(L,index+2);
 		if (type == LUA_TSTRING) {
 			size_t len = 0;
 			void * msg = (void *)lua_tolstring(L,index+2,&len);
-			void * message = malloc(len);
-			memcpy(message, msg, len);
-			session = skynet_send(context, dest, session , message, len);
+			session = skynet_send(context, dest, session , msg, len, 0);
 		} else if (type == LUA_TNIL) {
-			session = skynet_send(context, dest, session , NULL, 0);
+			session = skynet_send(context, dest, session , NULL, 0, 0);
 		} else {
+			luaL_checktype(L,index+2, LUA_TLIGHTUSERDATA);
 			void * msg = lua_touserdata(L,index+2);
-			if (msg == NULL) {
-				return luaL_error(L, "skynet.send need userdata or string (%s)", lua_typename(L,type));
-			}
 			int size = luaL_checkinteger(L,index+3);
-			session = skynet_send(context, dest, session, msg, size);
+			session = skynet_send(context, dest, session, msg, size, DONTCOPY);
 		}
 	}
 	if (session < 0) {
@@ -129,6 +126,8 @@ luaopen_skynet_c(lua_State *L) {
 		{ "error", _error },
 		{ NULL, NULL },
 	};
+	lua_pushcfunction(L, traceback);
+	lua_rawsetp(L, LUA_REGISTRYINDEX, traceback);
 
 	luaL_newlibtable(L,l);
 
