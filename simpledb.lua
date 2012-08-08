@@ -13,7 +13,7 @@ function command.SET(key, value)
 	skynet.ret(last)
 end
 
-skynet.dispatch(function(message, from, session)
+skynet.dispatch(function(message, session, from)
 	print("simpledb",message, from, session)
 	local cmd, key , value = string.match(message, "(%w+) (%w+) ?(.*)")
 	local f = command[cmd]

@@ -58,7 +58,7 @@ main(int argc, char *argv[]) {
 		lua_close(L);
 		return 1;
 	} 
-	const char *path = optstring(L,"lua_path","./?.lua");
+	const char *path = optstring(L,"lua_path","./?.lua;./?/init.lua");
 	setenv("LUA_PATH",path,1);
 	const char *cpath = optstring(L,"lua_cpath","./?.so");
 	setenv("LUA_CPATH",cpath,1);

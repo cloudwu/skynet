@@ -9,7 +9,7 @@ skynet.start(function()
 		if handle == nil then
 			print("Launch error:",cmd)
 		else
-			print("Lauch:",handle)
+			print("Launch:",handle,cmd)
 		end
 		skynet.yield()
 	end

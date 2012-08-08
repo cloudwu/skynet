@@ -25,6 +25,9 @@ struct skynet_context {
 	skynet_cb cb;
 	int session_id;
 	int in_global_queue;
+	int init;
+	uint32_t forward;
+	char * forward_address;
 	struct message_queue *queue;
 };
 
@@ -39,7 +42,7 @@ _id_to_hex(char * str, uint32_t id) {
 }
 
 struct skynet_context * 
-skynet_context_new(const char * name, const char *parm) {
+skynet_context_new(const char * name, const char *param) {
 	struct skynet_module * mod = skynet_module_query(name);
 
 	if (mod == NULL)
@@ -54,20 +57,31 @@ skynet_context_new(const char * name, const char *parm) {
 	ctx->ref = 2;
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
-	ctx->in_global_queue = 0;
+	// a trick, global loop can't be dispatch in init process
+	ctx->in_global_queue = 1;
+
+	ctx->forward = 0;
+	ctx->forward_address = NULL;
 	ctx->session_id = 0;
+	ctx->init = 0;
+	ctx->handle = skynet_handle_register(ctx);
 	char * uid = ctx->handle_name;
 	uid[0] = ':';
 	_id_to_hex(uid+1, ctx->handle);
-
-	ctx->handle = skynet_handle_register(ctx);
 	ctx->queue = skynet_mq_create(ctx->handle);
 	// init function maybe use ctx->handle, so it must init at last
 
-	int r = skynet_module_instance_init(mod, inst, ctx, parm);
+	int r = skynet_module_instance_init(mod, inst, ctx, param);
 	if (r == 0) {
-		return skynet_context_release(ctx);
+		struct skynet_context * ret = skynet_context_release(ctx);
+		if (ret) {
+			ctx->init = 1;
+			skynet_globalmq_push(ctx->queue);
+			return ret;
+		}
+		return NULL;
 	} else {
+		ctx->in_global_queue = 0;
 		skynet_context_release(ctx);
 		skynet_handle_retire(ctx->handle);
 		return NULL;
@@ -108,23 +122,55 @@ skynet_context_release(struct skynet_context *ctx) {
 	return ctx;
 }
 
+static int
+_forwarding(struct skynet_context *ctx, struct skynet_message *msg) {
+	if (ctx->forward) {
+		uint32_t des = ctx->forward;
+		ctx->forward = 0;
+		if (skynet_harbor_message_isremote(des)) {
+			skynet_harbor_send(NULL, des, msg);
+		} else {
+			if (skynet_context_push(des, msg)) {
+				free(msg->data);
+				skynet_error(NULL, "Drop message from %x forward to %x (size=%d)", msg->source, des, (int)msg->sz);
+				return 1;
+			}
+		}
+		return 1;
+	}
+	if (ctx->forward_address) {
+		skynet_harbor_send(ctx->forward_address, 0, msg);
+		free(ctx->forward_address);
+		ctx->forward_address = NULL;
+		return 1;
+	}
+	return 0;
+}
+
 static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
+	assert(ctx->init);
 	if (msg->source == SKYNET_SYSTEM_TIMER) {
 		ctx->cb(ctx, ctx->cb_ud, msg->session, NULL, msg->data, msg->sz);
 	} else {
 		char tmp[10];
 		tmp[0] = ':';
+		int not_delete;
 		_id_to_hex(tmp+1, msg->source);
 		if (skynet_harbor_message_isremote(msg->source)) {
 			void * data = skynet_harbor_message_open(msg);
 			ctx->cb(ctx, ctx->cb_ud, msg->session, tmp, data, msg->sz);
-			skynet_harbor_message_close(msg);
+			not_delete = _forwarding(ctx, msg);
+			if (!not_delete) {
+				skynet_harbor_message_close(msg);
+			}
 		} else {
 			ctx->cb(ctx, ctx->cb_ud, msg->session, tmp, msg->data, msg->sz);
+			not_delete = _forwarding(ctx, msg);
 		}
-
-		free(msg->data);
+		if (!not_delete) {
+			free(msg->data);
+		}
 	}
 }
 
@@ -197,10 +243,10 @@ skynet_context_message_dispatch(void) {
 }
 
 const char * 
-skynet_command(struct skynet_context * context, const char * cmd , const char * parm) {
+skynet_command(struct skynet_context * context, const char * cmd , const char * param) {
 	if (strcmp(cmd,"TIMEOUT") == 0) {
 		char * session_ptr = NULL;
-		int ti = strtol(parm, &session_ptr, 10);
+		int ti = strtol(param, &session_ptr, 10);
 		int session = skynet_context_newsession(context);
 		if (session < 0) 
 			return NULL;
@@ -216,13 +262,13 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	}
 
 	if (strcmp(cmd,"REG") == 0) {
-		if (parm == NULL || parm[0] == '\0') {
+		if (param == NULL || param[0] == '\0') {
 			return context->handle_name;
-		} else if (parm[0] == '.') {
-			return skynet_handle_namehandle(context->handle, parm + 1);
+		} else if (param[0] == '.') {
+			return skynet_handle_namehandle(context->handle, param + 1);
 		} else {
 			assert(context->handle!=0);
-			skynet_harbor_register(parm, context->handle);
+			skynet_harbor_register(param, context->handle);
 			return NULL;
 		}
 	}
@@ -234,10 +280,10 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 
 	if (strcmp(cmd,"KILL") == 0) {
 		uint32_t handle = 0;
-		if (parm[0] == ':') {
-			handle = strtoul(parm+1, NULL, 16);
-		} else if (parm[0] == '.') {
-			handle = skynet_handle_findname(parm+1);
+		if (param[0] == ':') {
+			handle = strtoul(param+1, NULL, 16);
+		} else if (param[0] == '.') {
+			handle = skynet_handle_findname(param+1);
 		} else {
 			// todo : kill global service
 		}
@@ -248,14 +294,15 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	}
 
 	if (strcmp(cmd,"LAUNCH") == 0) {
-		size_t sz = strlen(parm);
+		size_t sz = strlen(param);
 		char tmp[sz+1];
-		strcpy(tmp,parm);
-		char * parm = tmp;
-		char * mod = strsep(&parm, " \t\r\n");
-		parm = strsep(&parm, "\r\n");
-		struct skynet_context * inst = skynet_context_new(mod,parm);
+		strcpy(tmp,param);
+		char * args = tmp;
+		char * mod = strsep(&args, " \t\r\n");
+		args = strsep(&args, "\r\n");
+		struct skynet_context * inst = skynet_context_new(mod,args);
 		if (inst == NULL) {
+			fprintf(stderr, "Launch %s %s failed\n",mod,args);
 			return NULL;
 		} else {
 			context->result[0] = ':';
@@ -265,6 +312,26 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	}
 
 	return NULL;
+}
+
+void 
+skynet_forward(struct skynet_context * context, const char * addr) {
+	uint32_t des = 0;
+	assert(context->forward == 0 && context->forward_address == NULL);
+	if (addr[0] == ':') {
+		des = strtol(addr+1, NULL, 16);
+		assert(des != 0);
+	} else if (addr[0] == '.') {
+		des = skynet_handle_findname(addr + 1);
+		if (des == 0) {
+			skynet_error(context, "Drop message forward %s", addr);
+			return;
+		}
+	} else {
+		context->forward_address = strdup(addr);
+		return;
+	}
+	context->forward = des;
 }
 
 int

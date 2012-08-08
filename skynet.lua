@@ -99,7 +99,12 @@ end
 
 function skynet.start(f)
 	local session = c.command("TIMEOUT","0")
-	local co = coroutine.create(f)
+	local co = coroutine.create(
+		function(...)
+			f(...)
+			skynet.send(".launcher",0)
+		end
+	)
 	session_id_coroutine[tonumber(session)] = co
 end
 

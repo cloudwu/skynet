@@ -21,14 +21,13 @@ _load(lua_State *L, char ** filename) {
 
 static int 
 traceback (lua_State *L) {
-  const char *msg = lua_tostring(L, 1);
-  if (msg)
-    luaL_traceback(L, L, msg, 1);
-  else if (!lua_isnoneornil(L, 1)) {  /* is there an error object? */
-    if (!luaL_callmeta(L, 1, "__tostring"))  /* try its 'tostring' metamethod */
-      lua_pushliteral(L, "(no error message)");
-  }
-  return 1;
+	const char *msg = lua_tostring(L, 1);
+	if (msg)
+		luaL_traceback(L, L, msg, 1);
+	else {
+		lua_pushliteral(L, "(no error message)");
+	}
+	return 1;
 }
 
 int
@@ -44,6 +43,7 @@ snlua_init(lua_State *L, struct skynet_context *ctx, const char * args) {
 	strcpy(parm,args);
 
 	lua_pushcfunction(L, traceback);
+	int traceback_index = lua_gettop(L);
 
 	const char * filename = parm;
 	int r = _load(L, &parm);
@@ -59,7 +59,7 @@ snlua_init(lua_State *L, struct skynet_context *ctx, const char * args) {
 			++n;
 		}
 	}
-	r = lua_pcall(L,n,0,-n-2);
+	r = lua_pcall(L,n,0,traceback_index);
 	switch (r) {
 	case LUA_OK:
 		return 0;
@@ -76,6 +76,8 @@ snlua_init(lua_State *L, struct skynet_context *ctx, const char * args) {
 		skynet_error(ctx, "lua gc error : %s",filename);
 		break;
 	};
+
+	lua_pop(L,1);
 
 	return 1;
 }

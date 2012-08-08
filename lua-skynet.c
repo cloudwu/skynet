@@ -7,14 +7,13 @@
 
 static int 
 traceback (lua_State *L) {
-  const char *msg = lua_tostring(L, 1);
-  if (msg)
-    luaL_traceback(L, L, msg, 1);
-  else if (!lua_isnoneornil(L, 1)) {  /* is there an error object? */
-    if (!luaL_callmeta(L, 1, "__tostring"))  /* try its 'tostring' metamethod */
-      lua_pushliteral(L, "(no error message)");
-  }
-  return 1;
+	const char *msg = lua_tostring(L, 1);
+	if (msg) {
+		luaL_traceback(L, L, msg, 1);
+	} else {
+		lua_pushliteral(L, "(no error message)");
+	}
+	return 1;
 }
 
 static void
@@ -25,8 +24,14 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
 	int r;
 	if (msg == NULL) {
-		lua_pushinteger(L, session);
-		r = lua_pcall(L, 1, 0 , trace);
+		if (addr == NULL) {
+			lua_pushinteger(L, session);
+			r = lua_pcall(L, 1, 0 , trace);
+		} else {
+			lua_pushinteger(L, session);
+			lua_pushstring(L, addr);
+			r = lua_pcall(L, 2, 0 , trace);
+		}
 	} else {
 		lua_pushinteger(L, session);
 		lua_pushstring(L, addr);
@@ -35,7 +40,24 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	}
 	if (r == LUA_OK) 
 		return;
-	skynet_error(context, "lua error %s", lua_tostring(L,-1));
+	const char * self = skynet_command(context, "REG", NULL);
+	switch (r) {
+	case LUA_ERRRUN:
+		printf("Lua_ERRRUN %p\n",L);
+		skynet_error(context, "lua call [%s to %s : %d] error : %s", addr , self, session, lua_tostring(L,-1));
+		break;
+	case LUA_ERRMEM:
+		skynet_error(context, "lua memory error : [%s to %s : %d]", addr , self, session);
+		break;
+	case LUA_ERRERR:
+		skynet_error(context, "lua error in error : [%s to %s : %d]", addr , self, session);
+		break;
+	case LUA_ERRGCMM:
+		skynet_error(context, "lua gc error : [%s to %s : %d]", addr , self, session);
+		break;
+	};
+
+	lua_pop(L,1);
 }
 
 static int
