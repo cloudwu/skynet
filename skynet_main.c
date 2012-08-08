@@ -17,6 +17,16 @@ optint(lua_State *L, const char *key, int opt) {
 	return n;
 }
 
+static int
+optboolean(lua_State *L, const char *key, int opt) {
+	lua_getglobal(L, key);
+	int n = lua_toboolean(L,-1);
+	lua_pop(L,1);
+	if (n==0)
+		return opt;
+	return n;
+}
+
 static const char *
 optstring(lua_State *L, const char *key,const char * opt) {
 	lua_getglobal(L, key);
@@ -61,6 +71,7 @@ main(int argc, char *argv[]) {
 	config.master = optstring(L,"master","tcp://127.0.0.1:2012");
 	config.start = optstring(L,"start","main.lua");
 	config.local = optstring(L,"address","tcp://127.0.0.1:2525");
+	config.standalone = optboolean(L,"standalone",0);
 	lua_close(L);
 
 	skynet_start(&config);

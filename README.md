@@ -11,8 +11,7 @@ make
 Run these in different console
 
 ```
-./skynet-master		# Launch master server first
-./skynet config		# Launch first skynet node  (Gate server)
+./skynet config		# Launch first skynet node  (Gate server) and a skynet-master (see config for standalone option)
 ./skynet config_log	# Launch second skynet node (Global logger server)
 ./clinet 127.0.0.1 8888	# Launch a client, and try to input some words.
 ```
@@ -20,8 +19,7 @@ Run these in different console
 ## Test connection server
 
 ```
-./skynet-master		# Launch master server first
-./skynet 		# Launch first skynet node 
+./skynet 		# Launch skynet
 ./nc -l 8000		# Listen on port 8000 
 ```
 

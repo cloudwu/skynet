@@ -1,7 +1,7 @@
 all : skynet snlua.so logger.so skynet.so gate.so client.so connection.so client skynet-master
 
-skynet : skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c skynet_server.c skynet_start.c skynet_timer.c skynet_error.c skynet_harbor.c
-	gcc -Wall -g -Wl,-E -o $@ $^ -lpthread -ldl -lrt -Wl,-E -llua -lm -lzmq
+skynet : skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c skynet_server.c skynet_start.c skynet_timer.c skynet_error.c skynet_harbor.c master/master.c
+	gcc -Wall -g -Wl,-E -o $@ $^ -Imaster -lpthread -ldl -lrt -Wl,-E -llua -lm -lzmq
 
 logger.so : skynet_logger.c
 	gcc -Wall -g -fPIC --shared $^ -o $@
@@ -24,8 +24,8 @@ connection.so : connection/connection.c connection/main.c
 client : client.c
 	gcc -Wall -g $^ -o $@ -lpthread
 
-skynet-master : master/master.c
-	gcc -g -Wall -o $@ $^ -lzmq
+skynet-master : master/master.c master/main.c
+	gcc -g -Wall -Imaster -o $@ $^ -lzmq
 
 clean :
 	rm skynet client skynet-master *.so

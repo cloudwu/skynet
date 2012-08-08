@@ -617,12 +617,11 @@ register_harbor(void *request, const char *local, int harbor) {
 }
 
 void 
-skynet_harbor_init(const char * master, const char *local, int harbor) {
+skynet_harbor_init(void * context, const char * master, const char *local, int harbor) {
 	if (harbor <=0 || harbor>255 || strlen(local) > 512) {
 		fprintf(stderr,"Invalid harbor id\n");
 		exit(1);
 	}
-	void *context = zmq_init (1);
 	void *request = zmq_socket (context, ZMQ_REQ);
 	int r = zmq_connect(request, master);
 	if (r<0) {

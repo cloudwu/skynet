@@ -10,6 +10,7 @@ struct skynet_config {
 	const char * master;
 	const char * local;
 	const char * start;
+	int standalone;
 };
 
 void skynet_start(struct skynet_config * config);

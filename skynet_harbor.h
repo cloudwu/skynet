@@ -16,6 +16,6 @@ void skynet_harbor_message_close(struct skynet_message * message);
 
 // harbor worker thread
 void * skynet_harbor_dispatch_thread(void *ud);
-void skynet_harbor_init(const char * master, const char *local, int harbor);
+void skynet_harbor_init(void * context, const char * master, const char *local, int harbor);
 
 #endif

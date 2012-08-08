@@ -217,22 +217,16 @@ update(void * responder, struct hashmap *map, zmq_msg_t * msg) {
 	query(responder, map, key);
 }
 
-int 
-main (int argc, char * argv[]) {
-	const char * default_port = "tcp://127.0.0.1:2012";
-	if (argc > 1) {
-		default_port = argv[2];
-	}
-
-	void *context = zmq_init (1);
+void 
+skynet_master(void * context, const char * port) {
 	void *responder = zmq_socket (context, ZMQ_REP);
 
-	int r = zmq_bind(responder, default_port);
+	int r = zmq_bind(responder, port);
 	if (r < 0) {
-		fprintf(stderr, "Can't bind to %s\n",default_port);
-		return 1;
+		fprintf(stderr, "Can't bind to %s\n",port);
+		exit(1);
 	}
-	printf("Start master on %s\n",default_port);
+	printf("Start master on %s\n", port);
 
 	struct hashmap *map = _hash_new(context);
 
@@ -245,6 +239,5 @@ main (int argc, char * argv[]) {
 	}
 
 	zmq_close (responder);
-	zmq_term (context);
-	return 0;
 }
+
