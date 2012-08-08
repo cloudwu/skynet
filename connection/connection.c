@@ -296,6 +296,7 @@ _read_block(struct connection_pool * pool, struct connection *c, size_t * id) {
 	assert(c->read_complete == 0);
 	int need_read = c->read_request - c->read_sz;
 	if (need_read <= 0) {
+		c->yield_sz = c->read_request;
 		c->read_complete = 1;
 		return 1;
 	}
@@ -304,6 +305,7 @@ _read_block(struct connection_pool * pool, struct connection *c, size_t * id) {
 	int bytes = _read_buffer(pool,c);
 	if (bytes > 0) {
 		if (c->read_request - c->read_sz <= 0) {
+			c->yield_sz = c->read_request;
 			c->read_complete = 1;
 			return 1;
 		} 
