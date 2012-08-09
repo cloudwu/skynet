@@ -2,6 +2,7 @@ local skynet = require "skynet"
 
 local command = {}
 local agent_all = {}
+local gate = skynet.launch("gate" , skynet.self(), ...)
 
 function command:open(parm)
 	local fd,addr = string.match(parm,"(%d+) ([^%s]+)")
@@ -9,10 +10,10 @@ function command:open(parm)
 	skynet.send("LOG", string.format("%d %d %s",self,fd,addr))
 	local client = skynet.launch("client",fd)
 	skynet.send("LOG", "client " .. client)
-	local agent = skynet.launch("snlua","agent.lua",client)
+	local agent = skynet.launch("snlua","agent",client)
 	if agent then
 		agent_all[self] = agent
-		skynet.send("gate", "forward ".. self .. " " .. agent)
+		skynet.send(gate, "forward ".. self .. " " .. agent)
 	end
 end
 
@@ -43,4 +44,4 @@ skynet.dispatch(function(msg, sz)
 	end
 end)
 
-skynet.register ".watchdog"
+skynet.register(".watchdog")

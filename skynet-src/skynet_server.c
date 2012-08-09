@@ -277,6 +277,26 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		}
 	}
 
+	if (strcmp(cmd,"NAME") == 0) {
+		int size = strlen(param);
+		char name[size+1];
+		char handle[size+1];
+		sscanf(param,"%s %s",name,handle);
+		if (handle[0] != ':') {
+			return NULL;
+		}
+		uint32_t handle_id = strtoul(handle+1, NULL, 16);
+		if (handle_id == 0) {
+			return NULL;
+		}
+		if (name[0] == '.') {
+			return skynet_handle_namehandle(handle_id, name + 1);
+		} else {
+			skynet_harbor_register(name, handle_id);
+		}
+		return NULL;
+	}
+
 	if (strcmp(cmd,"EXIT") == 0) {
 		skynet_handle_retire(context->handle);
 		return NULL;

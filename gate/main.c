@@ -10,8 +10,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#define WATCHDOG ".watchdog"
-
 struct connection {
 	char * agent;
 	int connection_id;
@@ -20,6 +18,7 @@ struct connection {
 
 struct gate {
 	struct mread_pool * pool;
+	const char * watchdog;
 	int id_index;
 	int cap;
 	int max_connection;
@@ -101,14 +100,14 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 }
 
 static void
-_report(struct skynet_context * ctx, const char * data, ...) {
+_report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
 	va_list ap;
 	va_start(ap, data);
 	char tmp[1024];
 	int n = vsnprintf(tmp, sizeof(tmp), data, ap);
 	va_end(ap);
 
-	skynet_send(ctx, WATCHDOG, 0, tmp, n, 0);
+	skynet_send(ctx, g->watchdog, 0, tmp, n, 0);
 }
 
 static void
@@ -120,7 +119,7 @@ _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_
 		char * tmp = malloc(len + 32);
 		int n = snprintf(tmp,len+32,"%d data ",uid);
 		memcpy(tmp+n,data,len);
-		skynet_send(ctx, WATCHDOG, 0, tmp, len + n, DONTCOPY);
+		skynet_send(ctx, g->watchdog, 0, tmp, len + n, DONTCOPY);
 	}
 }
 
@@ -181,13 +180,13 @@ _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const
 			struct sockaddr_in remote_addr;
 			socklen_t len = sizeof(struct sockaddr_in);
 			getpeername(fd, (struct sockaddr *)&remote_addr, &len);
-			_report(ctx, "%d open %d %s:%u",id,fd,inet_ntoa(remote_addr.sin_addr),ntohs(remote_addr.sin_port));
+			_report(g, ctx, "%d open %d %s:%u",id,fd,inet_ntoa(remote_addr.sin_addr),ntohs(remote_addr.sin_port));
 		}
 		uint8_t * plen = mread_pull(m,2);
 		if (plen == NULL) {
 			if (mread_closed(m)) {
 				_remove_id(g,id);
-				_report(ctx, "%d close", id);
+				_report(g, ctx, "%d close", id);
 			}
 			goto _break;
 		}
@@ -197,7 +196,7 @@ _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const
 		if (data == NULL) {
 			if (mread_closed(m)) {
 				_remove_id(g,id);
-				_report(ctx, "%d close", id);
+				_report(g, ctx, "%d close", id);
 			}
 			goto _break;
 		}
@@ -214,8 +213,9 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	int port = 0;
 	int max = 0;
 	int buffer = 0;
-	int n = sscanf(parm, "%d %d %d",&port,&max,&buffer);
-	if (n!=3) {
+	char watchdog[strlen(parm)+1];
+	int n = sscanf(parm, "%s %d %d %d",watchdog, &port,&max,&buffer);
+	if (n!=4) {
 		skynet_error(ctx, "Invalid gate parm %s",parm);
 		return 1;
 	}
@@ -224,7 +224,7 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 		skynet_error(ctx, "Create gate %s failed",parm);
 		return 1;
 	}
-
+	g->watchdog = strdup(watchdog);
 	g->pool = pool;
 	int cap = 1;
 	while (cap < max) {
@@ -245,7 +245,6 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	}
 
 	skynet_callback(ctx,g,_cb);
-	skynet_command(ctx,"REG","gate");
 	skynet_command(ctx,"TIMEOUT","0");
 
 	return 0;

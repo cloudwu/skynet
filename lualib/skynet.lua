@@ -49,6 +49,10 @@ function skynet.register(name)
 	return c.command("REG", name)
 end
 
+function skynet.name(name, handle)
+	c.command("NAME", name .. " " .. handle)
+end
+
 function skynet.self()
 	return c.command("REG")
 end
