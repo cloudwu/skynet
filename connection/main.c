@@ -65,12 +65,12 @@ _connect(struct connection_server *server, const char * ipaddr, size_t sz, int s
 	tmp[sz] = '\0';
 	int id = connection_open(server->pool, ipaddr);
 	if (id == 0) {
-		skynet_send(server->ctx, reply, session, NULL, 0, 0);
+		skynet_send(server->ctx, NULL, reply, session, NULL, 0, 0);
 		return;
 	}
 	char idstring[20];
 	int n = sprintf(idstring, "%d", id);
-	skynet_send(server->ctx, reply, session, idstring, n, 0);
+	skynet_send(server->ctx, NULL, reply, session, idstring, n, 0);
 }
 
 static void
@@ -114,7 +114,7 @@ _read(struct connection_server *server, const char * param, size_t sz, int sessi
 	if (buffer == NULL) {
 		int id = connection_id(server->pool, handle);
 		if (id == 0) {
-			skynet_send(server->ctx, reply, session, NULL, 0, 0);
+			skynet_send(server->ctx, NULL, reply, session, NULL, 0, 0);
 			return;
 		}
 		--id;
@@ -128,7 +128,7 @@ _read(struct connection_server *server, const char * param, size_t sz, int sessi
 			return;
 		}
 	} else {
-		skynet_send(server->ctx, reply, session, buffer, size, 0);
+		skynet_send(server->ctx, NULL, reply, session, buffer, size, 0);
 	}
 }
 
@@ -155,7 +155,7 @@ _readline(struct connection_server *server, const char * param, size_t sz, int s
 	if (buffer == NULL) {
 		int id = connection_id(server->pool, handle);
 		if (id == 0) {
-			skynet_send(server->ctx, reply, session, NULL, 0, 0);
+			skynet_send(server->ctx, NULL, reply, session, NULL, 0, 0);
 			return;
 		}
 		--id;
@@ -169,7 +169,7 @@ _readline(struct connection_server *server, const char * param, size_t sz, int s
 			return;
 		}
 	} else {
-		skynet_send(server->ctx, reply, session, buffer, sz, 0);
+		skynet_send(server->ctx, NULL, reply, session, buffer, sz, 0);
 	}
 }
 
@@ -199,7 +199,7 @@ _poll(struct connection_server *server) {
 				struct reply * r = &server->reply[id];
 				addr[0] = ':';
 				_id_to_hex(addr+1, id);
-				skynet_send(server->ctx, addr , r->session, NULL, 0, 0);
+				skynet_send(server->ctx, NULL, addr , r->session, NULL, 0, 0);
 			} else {
 				assert(server->poll >= 0);
 				if (server->poll > 0) {
@@ -215,7 +215,7 @@ _poll(struct connection_server *server) {
 			struct reply * r = &server->reply[id];
 			addr[0] = ':';
 			_id_to_hex(addr+1, r->dest);
-			skynet_send(server->ctx, addr, r->session, buffer, sz, 0);
+			skynet_send(server->ctx, NULL, addr, r->session, buffer, sz, 0);
 		}
 	}
 }

@@ -110,20 +110,20 @@ _send(lua_State *L) {
 		++index;
 	}
 	if (lua_gettop(L) == index + 1) {
-		session = skynet_send(context, dest, session , NULL, 0, 0);
+		session = skynet_send(context, NULL, dest, session , NULL, 0, 0);
 	} else {
 		int type = lua_type(L,index+2);
 		if (type == LUA_TSTRING) {
 			size_t len = 0;
 			void * msg = (void *)lua_tolstring(L,index+2,&len);
-			session = skynet_send(context, dest, session , msg, len, 0);
+			session = skynet_send(context, NULL, dest, session , msg, len, 0);
 		} else if (type == LUA_TNIL) {
-			session = skynet_send(context, dest, session , NULL, 0, 0);
+			session = skynet_send(context, NULL, dest, session , NULL, 0, 0);
 		} else {
 			luaL_checktype(L,index+2, LUA_TLIGHTUSERDATA);
 			void * msg = lua_touserdata(L,index+2);
 			int size = luaL_checkinteger(L,index+3);
-			session = skynet_send(context, dest, session, msg, size, DONTCOPY);
+			session = skynet_send(context, NULL, dest, session, msg, size, DONTCOPY);
 		}
 	}
 	if (session < 0) {
@@ -131,6 +131,34 @@ _send(lua_State *L) {
 	}
 	lua_pushinteger(L,session);
 	return 1;
+}
+
+static int
+_redirect(lua_State *L) {
+	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+	const char * dest = luaL_checkstring(L,1);
+	const char * source = luaL_checkstring(L,2);
+	int session = luaL_checkinteger(L,3);
+
+	if (lua_gettop(L) == 3) {
+		session = skynet_send(context, source, dest, session , NULL, 0, 0);
+	} else {
+		int type = lua_type(L,4);
+		if (type == LUA_TSTRING) {
+			size_t len = 0;
+			void * msg = (void *)lua_tolstring(L,4,&len);
+			skynet_send(context, source, dest, session , msg, len, 0);
+		} else if (type == LUA_TNIL) {
+			session = skynet_send(context, source, dest, session , NULL, 0, 0);
+		} else {
+			luaL_checktype(L, 4, LUA_TLIGHTUSERDATA);
+			void * msg = lua_touserdata(L,4);
+			int size = luaL_checkinteger(L,5);
+			skynet_send(context, source, dest, session, msg, size, DONTCOPY);
+		}
+	}
+
+	return 0;
 }
 
 static int
@@ -156,6 +184,7 @@ luaopen_skynet_c(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "send" , _send },
+		{ "redirect", _redirect },
 		{ "command" , _command },
 		{ "callback" , _callback },
 		{ "error", _error },

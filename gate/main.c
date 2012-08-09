@@ -12,6 +12,7 @@
 
 struct connection {
 	char * agent;
+	char * client;
 	int connection_id;
 	int uid;
 };
@@ -55,12 +56,16 @@ _parm(char *msg, int sz, int command_sz) {
 }
 
 static void
-_forward_agent(struct gate * g, int id, char * addr) {
+_forward_agent(struct gate * g, int id, const char * agentaddr, const char *clientaddr) {
 	struct connection * agent = _id_to_agent(g,id);
 	if (agent->agent) {
 		free(agent->agent);
 	}
-	agent->agent = strdup(addr);
+	agent->agent = strdup(agentaddr);
+	if (agent->client) {
+		free(agent->client);
+	}
+	agent->client = strdup(clientaddr);
 }
 
 static void
@@ -88,12 +93,17 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 	}
 	if (memcmp(command,"forward",i)==0) {
 		_parm(tmp, sz, i);
-		char * start = tmp;
-		char * data = strsep(&start, " ");
-		int id = strtol(data , NULL, 10);
-		if (start) {
-			_forward_agent(g, id, start);
+		char * client = tmp;
+		char * idstr = strsep(&client, " ");
+		if (client == NULL) {
+			return;
 		}
+		int id = strtol(idstr , NULL, 10);
+		char * agent = strsep(&client, " ");
+		if (client == NULL) {
+			return;
+		}
+		_forward_agent(g, id, agent, client);
 		return;
 	}
 	skynet_error(ctx, "[gate] Unkown command : %s", command);
@@ -107,19 +117,20 @@ _report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
 	int n = vsnprintf(tmp, sizeof(tmp), data, ap);
 	va_end(ap);
 
-	skynet_send(ctx, g->watchdog, 0, tmp, n, 0);
+	skynet_send(ctx, NULL, g->watchdog, 0, tmp, n, 0);
 }
 
 static void
 _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_t len) {
 	struct connection * agent = _id_to_agent(g,uid);
 	if (agent->agent) {
-		skynet_send(ctx, agent->agent, 0, data, len, 0);
+		// todo: client package has not session , send 0
+		skynet_send(ctx, agent->client, agent->agent, 0, data, len, 0);
 	} else {
 		char * tmp = malloc(len + 32);
 		int n = snprintf(tmp,len+32,"%d data ",uid);
 		memcpy(tmp+n,data,len);
-		skynet_send(ctx, g->watchdog, 0, tmp, len + n, DONTCOPY);
+		skynet_send(ctx, NULL, g->watchdog, 0, tmp, len + n, DONTCOPY);
 	}
 }
 

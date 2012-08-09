@@ -63,7 +63,7 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 		_init(b, session, msg, sz);
 		if (b->init == DEFAULT_NUMBER) {
 			skynet_command(context, "REG", b->name);
-			skynet_send(context, LAUNCHER, 0, NULL, 0, 0);
+			skynet_send(context, NULL, LAUNCHER, 0, NULL, 0, 0);
 		}
 	} else {
 		_forward(b, context);
@@ -90,7 +90,7 @@ broker_init(struct broker *b, struct skynet_context *ctx, const char * args) {
 	if (len == 0)
 		return 1;
 	for (i=0;i<DEFAULT_NUMBER;i++) {
-		int id = skynet_send(ctx, LAUNCHER , -1, service , len, 0);
+		int id = skynet_send(ctx, NULL, LAUNCHER , -1, service , len, 0);
 		assert(id > 0 && id <= DEFAULT_NUMBER);
 	}
 

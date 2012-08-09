@@ -81,10 +81,11 @@ function skynet.setenv(key, value)
 	c.command("SETENV",key .. " " ..value)
 end
 
-skynet.send = c.send
-skynet.pack = c.pack
-skynet.tostring = c.tostring
-skynet.unpack = c.unpack
+skynet.send = assert(c.send)
+skynet.redirect = assert(c.redirect)
+skynet.pack = assert(c.pack)
+skynet.tostring = assert(c.tostring)
+skynet.unpack = assert(c.unpack)
 
 function skynet.call(addr, deseri , ...)
 	local t = type(deseri)

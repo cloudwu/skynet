@@ -378,7 +378,15 @@ skynet_forward(struct skynet_context * context, const char * addr) {
 }
 
 int
-skynet_send(struct skynet_context * context, const char * addr , int session, void * data, size_t sz, int flags) {
+skynet_send(struct skynet_context * context, const char * source, const char * addr , int session, void * data, size_t sz, int flags) {
+	uint32_t source_handle;
+	if (source == NULL) {
+		source_handle = context->handle;
+	} else {
+		assert (source[0] == ':');
+		source_handle = strtoul(source+1, NULL, 16);
+	}
+
 	char * msg;
 	if ((flags & DONTCOPY) || data == NULL) {
 		msg = data;
@@ -394,7 +402,7 @@ skynet_send(struct skynet_context * context, const char * addr , int session, vo
 	}
 	uint32_t des = 0;
 	if (addr[0] == ':') {
-		des = strtol(addr+1, NULL, 16);
+		des = strtoul(addr+1, NULL, 16);
 	} else if (addr[0] == '.') {
 		des = skynet_handle_findname(addr + 1);
 		if (des == 0) {
@@ -404,7 +412,7 @@ skynet_send(struct skynet_context * context, const char * addr , int session, vo
 		}
 	} else {
 		struct skynet_message smsg;
-		smsg.source = context->handle;
+		smsg.source = source_handle;
 		smsg.session = session_id;
 		smsg.data = msg;
 		smsg.sz = sz;
@@ -415,7 +423,7 @@ skynet_send(struct skynet_context * context, const char * addr , int session, vo
 	assert(des > 0);
 
 	struct skynet_message smsg;
-	smsg.source = context->handle;
+	smsg.source = source_handle;
 	smsg.session = session_id;
 	smsg.data = msg;
 	smsg.sz = sz;
