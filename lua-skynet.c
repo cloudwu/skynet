@@ -1,4 +1,5 @@
 #include "skynet.h"
+#include "lua-serialize/luaseri.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -35,8 +36,9 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	} else {
 		lua_pushinteger(L, session);
 		lua_pushstring(L, addr);
-		lua_pushlstring(L, msg, sz);
-		r = lua_pcall(L, 3, 0 , trace);
+		lua_pushlightuserdata(L,(void *)msg);
+		lua_pushinteger(L,sz);
+		r = lua_pcall(L, 4, 0 , trace);
 	}
 	if (r == LUA_OK) 
 		return;
@@ -138,6 +140,17 @@ _error(lua_State *L) {
 	return 0;
 }
 
+static int
+_tostring(lua_State *L) {
+	if (lua_isnoneornil(L,1)) {
+		return 0;
+	}
+	char * msg = lua_touserdata(L,1);
+	int sz = luaL_checkinteger(L,2);
+	lua_pushlstring(L,msg,sz);
+	return 1;
+}
+
 int
 luaopen_skynet_c(lua_State *L) {
 	luaL_checkversion(L);
@@ -146,6 +159,9 @@ luaopen_skynet_c(lua_State *L) {
 		{ "command" , _command },
 		{ "callback" , _callback },
 		{ "error", _error },
+		{ "tostring", _tostring },
+		{ "pack", _luaseri_pack },
+		{ "unpack", _luaseri_unpack },
 		{ NULL, NULL },
 	};
 	lua_pushcfunction(L, traceback);

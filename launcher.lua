@@ -3,7 +3,8 @@ local string = string
 
 local instance = {}
 
-skynet.dispatch(function(message, session, address)
+skynet.dispatch(function(msg, sz , session, address)
+	local message = skynet.tostring(msg,sz)
 	if session == 0 then
 		-- init notice
 		local reply = instance[address]

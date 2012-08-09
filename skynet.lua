@@ -9,14 +9,14 @@ local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
 
-local function suspend(co, result, command, param)
+local function suspend(co, result, command, param, size)
 	assert(result, command)
 	if command == "CALL" or command == "SLEEP" then
 		session_id_coroutine[param] = co
 	elseif command == "RETURN" then
 		local co_session = session_coroutine_id[co]
 		local co_address = session_coroutine_address[co]
-		c.send(co_address, co_session, param)
+		c.send(co_address, co_session, param, size)
 	else
 		assert(command == nil, command)
 		session_coroutine_id[co] = nil
@@ -70,29 +70,39 @@ function skynet.kill(name)
 end
 
 skynet.send = c.send
+skynet.pack = c.pack
+skynet.tostring = c.tostring
+skynet.unpack = c.unpack
 
-function skynet.call(addr, message)
-	local session = c.send(addr, -1, message)
-	return coroutine.yield("CALL", session)
+function skynet.call(addr, deseri , ...)
+	local t = type(deseri)
+	if t == "function" then
+		local session = c.send(addr, -1, ...)
+		return deseri(coroutine.yield("CALL", session))
+	else
+		assert(t=="string")
+		local session = c.send(addr, -1, deseri)
+		return c.tostring(coroutine.yield("CALL", session))
+	end
 end
 
-function skynet.ret(message)
-	coroutine.yield("RETURN", message)
+function skynet.ret(...)
+	coroutine.yield("RETURN", ...)
 end
 
 function skynet.dispatch(f)
-	c.callback(function(session, address , message)
+	c.callback(function(session, address , msg, sz)
 		if session <= 0 then
 			session = - session
 			co = coroutine.create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = address
-			suspend(co, coroutine.resume(co, message, session, address))
+			suspend(co, coroutine.resume(co, msg, sz, session, address))
 		else
 			local co = session_id_coroutine[session]
 			assert(co, session)
 			session_id_coroutine[session] = nil
-			suspend(co, coroutine.resume(co, message))
+			suspend(co, coroutine.resume(co, msg, sz))
 		end
 	end)
 end

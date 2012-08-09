@@ -12,7 +12,7 @@ snlua.so : service_lua.c
 gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
 	gcc -Wall -g -fPIC --shared -o $@ $^ -I. -Igate 
 
-skynet.so : lua-skynet.c
+skynet.so : lua-skynet.c lua-serialize/serialize.c
 	gcc -Wall -g -fPIC --shared $^ -o $@
 
 client.so : service_client.c

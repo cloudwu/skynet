@@ -31,7 +31,8 @@ function command:data(data)
 	end
 end
 
-skynet.dispatch(function(message)
+skynet.dispatch(function(msg, sz)
+	local message = skynet.tostring(msg,sz)
 	local id, cmd , parm = string.match(message, "(%d+) (%w+) ?(.*)")
 	id = tonumber(id)
 	local f = command[cmd]
