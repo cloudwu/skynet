@@ -212,24 +212,26 @@ _alloc_socket(struct mread_pool * self) {
 	return s;
 }
 
-static void
+static struct socket *
 _add_client(struct mread_pool * self, int fd) {
 	struct socket * s = _alloc_socket(self);
 	if (s == NULL) {
 		close(fd);
-		return;
+		return NULL;
 	}
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
 	ev.data.ptr = s;
 	if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, fd, &ev) == -1) {
 		close(fd);
-		return;
+		return NULL;
 	}
 
 	s->fd = fd;
 	s->node = NULL;
 	s->status = SOCKET_SUSPEND;
+
+	return s;
 }
 
 static int
@@ -275,7 +277,11 @@ mread_poll(struct mread_pool * self , int timeout) {
 			int client_fd = accept(self->listen_fd , (struct sockaddr *)&remote_addr ,  &len);
 			if (client_fd >= 0) {
 //				printf("MREAD connect %s:%u (fd=%d)\n",inet_ntoa(remote_addr.sin_addr),ntohs(remote_addr.sin_port), client_fd);
-				_add_client(self, client_fd);
+				struct socket * s = _add_client(self, client_fd);
+				if (s) {
+					self->active = -1;
+					return s - self->sockets;
+				}
 			}
 		} else {
 			int index = s - self->sockets;
