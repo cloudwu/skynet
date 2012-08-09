@@ -1,35 +1,56 @@
-all : skynet snlua.so logger.so skynet.so gate.so client.so connection.so broker.so client skynet-master
+all : \
+skynet \
+service/snlua.so \
+service/logger.so \
+lualib/skynet.so \
+service/gate.so \
+service/client.so \
+service/connection.so \
+service/broker.so \
+client \
+skynet-master
 
-skynet : skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c skynet_server.c skynet_start.c skynet_timer.c skynet_error.c skynet_harbor.c master/master.c
-	gcc -Wall -g -Wl,-E -o $@ $^ -Imaster -lpthread -ldl -lrt -Wl,-E -llua -lm -lzmq
+skynet : \
+skynet-src/skynet_main.c \
+skynet-src/skynet_handle.c \
+skynet-src/skynet_module.c \
+skynet-src/skynet_mq.c \
+skynet-src/skynet_server.c \
+skynet-src/skynet_start.c \
+skynet-src/skynet_timer.c \
+skynet-src/skynet_error.c \
+skynet-src/skynet_harbor.c \
+skynet-src/skynet_env.c \
+master/master.c 
+	gcc -Wall -g -Wl,-E -o $@ $^ -Iskynet-src -Imaster -lpthread -ldl -lrt -Wl,-E -llua -lm -lzmq
 
-logger.so : skynet_logger.c
-	gcc -Wall -g -fPIC --shared $^ -o $@
+service/logger.so : skynet-src/skynet_logger.c
+	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
 
-snlua.so : service_lua.c
-	gcc -Wall -g -fPIC --shared $^ -o $@ 
+service/snlua.so : service-src/service_lua.c
+	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
 
-gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
-	gcc -Wall -g -fPIC --shared -o $@ $^ -I. -Igate 
+service/gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
+	gcc -Wall -g -fPIC --shared -o $@ $^ -I. -Igate -Iskynet-src
 
-skynet.so : lua-skynet.c lua-serialize/serialize.c
-	gcc -Wall -g -fPIC --shared $^ -o $@
+lualib/skynet.so : lualib-src/lua-skynet.c lua-serialize/serialize.c
+	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src -Ilua-serialize
 
-client.so : service_client.c
-	gcc -Wall -g -fPIC --shared $^ -o $@
+service/client.so : service-src/service_client.c
+	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
 
-connection.so : connection/connection.c connection/main.c
-	gcc -Wall -g -fPIC --shared -o $@ $^ -I. -Iconnection
+service/connection.so : connection/connection.c connection/main.c
+	gcc -Wall -g -fPIC --shared -o $@ $^ -I. -Iconnection -Iskynet-src
 
-broker.so : service_broker.c
-	gcc -Wall -g -fPIC --shared $^ -o $@
+service/broker.so : service-src/service_broker.c
+	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
 
-client : client.c
+client : client-src/client.c
 	gcc -Wall -g $^ -o $@ -lpthread
 
 skynet-master : master/master.c master/main.c
 	gcc -g -Wall -Imaster -o $@ $^ -lzmq
 
 clean :
-	rm skynet client skynet-master *.so
+	rm skynet client skynet-master lualib/*.so service/*.so
 

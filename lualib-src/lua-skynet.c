@@ -1,5 +1,5 @@
 #include "skynet.h"
-#include "lua-serialize/luaseri.h"
+#include "luaseri.h"
 
 #include <lua.h>
 #include <lauxlib.h>

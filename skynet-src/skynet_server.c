@@ -4,6 +4,7 @@
 #include "skynet_mq.h"
 #include "skynet_timer.h"
 #include "skynet_harbor.h"
+#include "skynet_env.h"
 #include "skynet.h"
 
 #include <string.h>
@@ -312,6 +313,25 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 			_id_to_hex(context->result+1, inst->handle);
 			return context->result;
 		}
+	}
+
+	if (strcmp(cmd,"GETENV") == 0) {
+		return skynet_getenv(param);
+	}
+
+	if (strcmp(cmd,"SETENV") == 0) {
+		size_t sz = strlen(param);
+		char key[sz+1];
+		int i;
+		for (i=0;param[i] == ' ';i++) {
+			key[i] = param[i];
+			break;
+		}
+		key[i] = '\0';
+		param += i+1;
+		
+		skynet_setenv(key,param);
+		return NULL;
 	}
 
 	return NULL;

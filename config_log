@@ -1,8 +1,8 @@
 thread = 2
 mqueue = 256
-cpath = "./"
+cpath = "./service/?.so"
 logger = nil
 harbor = 2
 address = "tcp://127.0.0.1:2526"
 master = "tcp://127.0.0.1:2012"
-start = "main_log.lua"
+start = "main_log"

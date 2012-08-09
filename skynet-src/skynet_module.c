@@ -8,7 +8,6 @@
 #include <stdio.h>
 
 #define MAX_MODULE_TYPE 32
-#define SO ".so"
 
 struct modules {
 	int count;
@@ -21,22 +20,32 @@ static struct modules * M = NULL;
 
 static void *
 _try_open(struct modules *m, const char * name) {
-	size_t path_size = strlen(m->path);
+	const char * path = m->path;
+	size_t path_size = strlen(path);
 	size_t name_size = strlen(name);
-	char tmp[path_size + name_size + sizeof(SO)];
-	memcpy(tmp, m->path, path_size);
-	memcpy(tmp + path_size , name, name_size);
-	memcpy(tmp + path_size + name_size , SO, sizeof(SO));
+
+	int sz = path_size + name_size;
+	char tmp[sz];
+	int i;
+	for (i=0;path[i]!='?' && path[i]!='\0';i++) {
+		tmp[i] = path[i];
+	}
+	memcpy(tmp+i,name,name_size);
+	if (path[i] == '?') {
+		strcpy(tmp+i+name_size,path+i+1);
+	} else {
+		fprintf(stderr,"Invalid C service path\n");
+		exit(1);
+	}
 
 	void * dl = dlopen(tmp, RTLD_NOW | RTLD_GLOBAL);
 
 	if (dl == NULL) {
-		printf("try open %s failed : %s\n",tmp,dlerror());
+		fprintf(stderr, "try open %s failed : %s\n",tmp,dlerror());
 	}
 
 	return dl;
 }
-
 
 static struct skynet_module * 
 _query(const char * name) {

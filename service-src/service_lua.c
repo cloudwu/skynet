@@ -15,7 +15,23 @@ snlua_create(void) {
 static int
 _load(lua_State *L, char ** filename) {
 	const char * name = strsep(filename, " \r\n");
-	int r = luaL_loadfile(L,name);
+	const char * path = skynet_command(NULL, "GETENV", "luaservice");
+	int namesz = strlen(name);
+	int sz = strlen(path) + namesz;
+	char tmp[sz];
+	int i;
+	for (i=0;path[i]!='?' && path[i]!='\0';i++) {
+		tmp[i] = path[i];
+	}
+	memcpy(tmp+i,name,namesz);
+	if (path[i] == '?') {
+		strcpy(tmp+i+namesz,path+i+1);
+	} else {
+		fprintf(stderr,"snlua : Invalid lua service path\n");
+		exit(1);
+	}
+
+	int r = luaL_loadfile(L,tmp);
 	return r != LUA_OK;
 }
 
