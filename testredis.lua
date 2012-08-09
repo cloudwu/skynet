@@ -1,14 +1,12 @@
 local skynet = require "skynet"
+local redis = require "redis"
 
 skynet.dispatch()
 
-local command ="*2\r\n$3\r\nGET\r\n$1\r\nA\r\n"
-
 skynet.start(function()
-	local cli = skynet.call(".launcher","broker redis snlua redis-cli.lua 127.0.0.1:7379")
-	print("redis-cli:", cli)
-	assert(cli)
-	print(skynet.call(cli, skynet.unpack, skynet.pack("GET","A")))
+	print(redis.cmd.EXISTS("A"))
+	print(redis.cmd.GET("A"))
+	print(redis.cmd.SET("A","hello world"))
 	skynet.exit()
 end)
 

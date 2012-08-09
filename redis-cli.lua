@@ -9,13 +9,26 @@ local fd
 local write_fd
 local readline_fd
 local read_fd
+local close_fd
 
 local function init_fd(fdstr)
 	fd = fdstr
 	write_fd = "WRITE "..fd.." "
 	readline_fd = "READLINE ".. fd .." \r\n"
 	read_fd = "READ " .. fd .. " "
+	close_fd = "CLOSE "..fd
 end
+
+local function init()
+	fd = skynet.call(".connection", "CONNECT " .. redis_server)
+	if fd == nil then
+		print("Connect to redis server error : ", redis_server)
+		skynet.exit()
+		return true
+	end
+	init_fd(fd)
+end
+
 
 local function compose_message(msg)
 	local lines = { "*" .. #msg }
@@ -44,7 +57,7 @@ redcmd[42] = function(data)	-- '*'
 		local data = skynet.call(".connection", read_fd .. bytes)
 		table.insert(result, string.sub(data,1,-3))
 	end
-	skynet.ret(skynet.pack(unpack(bulk)))
+	skynet.ret(skynet.pack(true,bulk))
 end
 
 redcmd[36] = function(data) -- '$'
@@ -54,7 +67,7 @@ redcmd[36] = function(data) -- '$'
 		return
 	end
 	local firstline = skynet.call(".connection", read_fd .. (bytes + 2))
-	skynet.ret(skynet.pack(string.sub(firstline,1,-3)))
+	skynet.ret(skynet.pack(true,string.sub(firstline,1,-3)))
 end
 
 redcmd[43] = function(data) -- '+'
@@ -71,21 +84,30 @@ end
 
 skynet.dispatch(function(msg, sz, session, address)
 	local message = { skynet.unpack(msg,sz) }
-	skynet.send(".connection", write_fd .. compose_message(message))
-	local result = skynet.call(".connection", readline_fd)
+	local write_cmd = write_fd .. compose_message(message)
+	local result
+	while true do
+		skynet.send(".connection", write_cmd )
+		result = skynet.call(".connection", readline_fd)
+		if result then
+			break
+		end
+		-- reconnect
+		if init() then
+			skynet.ret(skynet.pack(false , "Disconnected"))
+			return
+		end
+	end
 	local firstchar = string.byte(result)
 	local data = string.sub(result,2)
 	local f = redcmd[firstchar]
-	assert(f)
-	f(data)
+	if f == nil then
+		skynet.ret(skynet.pack(false , "Invalid result"))
+		skynet.send(".connection", close_fd)
+		init()
+	else
+		f(data)
+	end
 end)
 
-skynet.start(function()
-	fd = skynet.call(".connection", "CONNECT " .. redis_server)
-	if fd == nil then
-		print("Connect to redis server error : ", redis_server)
-		skynet.exit()
-		return
-	end
-	init_fd(fd)
-end)
+skynet.start(init)
