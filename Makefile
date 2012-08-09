@@ -8,6 +8,9 @@ service/client.so \
 service/connection.so \
 service/broker.so \
 client \
+lualib/lpeg.so \
+lualib/protobuf.so \
+lualib/int64.so \
 skynet-master
 
 skynet : \
@@ -44,6 +47,29 @@ service/connection.so : connection/connection.c connection/main.c
 
 service/broker.so : service-src/service_broker.c
 	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
+
+lualib/lpeg.so : lpeg/lpeg.c
+	gcc -Wall -O2 -fPIC --shared $^ -o $@ -Ilpeg
+
+lualib/protobuf.so : \
+lua-protobuf/context.c \
+lua-protobuf/varint.c \
+lua-protobuf/array.c \
+lua-protobuf/pattern.c \
+lua-protobuf/register.c \
+lua-protobuf/proto.c \
+lua-protobuf/map.c \
+lua-protobuf/alloc.c \
+lua-protobuf/rmessage.c \
+lua-protobuf/wmessage.c \
+lua-protobuf/bootstrap.c \
+lua-protobuf/stringpool.c \
+lua-protobuf/decode.c \
+lua-protobuf/pbc-lua.c 
+	gcc -O2 -Wall --shared -fPIC -o $@ $^  
+
+lualib/int64.so : lua-int64/int64.c
+	gcc -O2 -Wall --shared -fPIC -o $@ $^  
 
 client : client-src/client.c
 	gcc -Wall -g $^ -o $@ -lpthread
