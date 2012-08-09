@@ -69,6 +69,14 @@ function skynet.kill(name)
 	c.command("KILL",name)
 end
 
+function skynet.getenv(key)
+	return c.command("GETENV",key)
+end
+
+function skynet.setenv(key, value)
+	c.command("SETENV",key .. " " ..value)
+end
+
 skynet.send = c.send
 skynet.pack = c.pack
 skynet.tostring = c.tostring

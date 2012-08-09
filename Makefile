@@ -1,3 +1,5 @@
+.PHONY : all clean install
+
 all : \
 skynet \
 service/snlua.so \
@@ -80,3 +82,31 @@ skynet-master : master/master.c master/main.c
 clean :
 	rm skynet client skynet-master lualib/*.so service/*.so
 
+
+$(SKYNET_PATH) :
+	mkdir $@
+
+install-libs : | $(SKYNET_PATH)
+	cp -R lualib $(SKYNET_PATH)
+
+install-bins : | $(SKYNET_PATH)
+	cp skynet $(SKYNET_PATH)
+
+$(SKYNET_PATH)/service : | $(SKYNET_PATH)
+	mkdir $@
+
+install-services : | $(SKYNET_PATH)/service
+	cp service/connection.so $(SKYNET_PATH)/service/
+	cp service/logger.so $(SKYNET_PATH)/service/
+	cp service/gate.so $(SKYNET_PATH)/service/
+	cp service/broker.so $(SKYNET_PATH)/service/
+	cp service/snlua.so $(SKYNET_PATH)/service/
+	cp service/client.so $(SKYNET_PATH)/service/
+	cp service/launcher.lua $(SKYNET_PATH)/service/
+	cp service/redis-cli.lua $(SKYNET_PATH)/service/
+
+
+install : install-libs install-bins install-services
+	
+	
+	
