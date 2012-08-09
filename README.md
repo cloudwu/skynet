@@ -23,7 +23,7 @@ Run these in different console
 ./nc -l 8000		# Listen on port 8000 
 ```
 
-And then , type 'snlua testconn.lua' in skynet console to launch connection server and a test program.
+And then , type 'snlua testconn' in skynet console to launch connection server and a test program.
 
 You can type something in nc console.
 
