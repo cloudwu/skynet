@@ -3,8 +3,7 @@ local client = ...
 
 local session_id = 0
 skynet.filter(function (session, address , msg, sz)
-	if address == client then
-		assert(session == 0)
+	if session == 0x7fffffff then
 		print("client message",skynet.tostring(msg,sz))
 		-- It's client, there is no session
 		session_id = session_id + 1

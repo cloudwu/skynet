@@ -88,6 +88,10 @@ skynet.tostring = assert(c.tostring)
 skynet.unpack = assert(c.unpack)
 
 function skynet.call(addr, deseri , ...)
+	if deseri == nil then
+		local session = c.send(addr, -1, ...)
+		return coroutine.yield("CALL", session)
+	end
 	local t = type(deseri)
 	if t == "function" then
 		local session = c.send(addr, -1, ...)

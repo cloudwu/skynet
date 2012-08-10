@@ -124,8 +124,8 @@ static void
 _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_t len) {
 	struct connection * agent = _id_to_agent(g,uid);
 	if (agent->agent) {
-		// todo: client package has not session , send 0
-		skynet_send(ctx, agent->client, agent->agent, 0, data, len, 0);
+		// todo: client package has not session , send 0x7fffffff
+		skynet_send(ctx, agent->client, agent->agent, 0x7fffffff, data, len, 0);
 	} else {
 		char * tmp = malloc(len + 32);
 		int n = snprintf(tmp,len+32,"%d data ",uid);

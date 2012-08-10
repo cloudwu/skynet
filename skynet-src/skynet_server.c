@@ -95,7 +95,7 @@ skynet_context_new(const char * name, const char *param) {
 int
 skynet_context_newsession(struct skynet_context *ctx) {
 	int session = ++ctx->session_id;
-	if (session < 0) {
+	if (session >= 0x7fffffff) {
 		ctx->session_id = 1;
 		return 1;
 	}
