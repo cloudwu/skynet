@@ -31,7 +31,8 @@ end
 function command:data(data, session)
 	local agent = agent_all[self]
 	if agent then
-		skynet.redirect(agent[1], agent[2], session, data)
+		-- 0x7fffffff means it's a client
+		skynet.redirect(agent[1], agent[2], 0x7fffffff, data)
 	else
 		skynet.error(string.format("agent data drop %d size=%d",self,#data))
 	end
