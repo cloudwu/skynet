@@ -103,7 +103,7 @@ function skynet.ret(...)
 	coroutine.yield("RETURN", ...)
 end
 
-function skynet.default_dispatch(f)
+local function default_dispatch(f)
 	return function(session, address , msg, sz)
 		if session <= 0 then
 			session = - session
@@ -121,10 +121,15 @@ function skynet.default_dispatch(f)
 end
 
 function skynet.dispatch(f)
-	c.callback(skynet.default_dispatch(f))
+	c.callback(default_dispatch(f))
 end
 
-skynet.filter = assert(c.callback)
+function skynet.filter(filter, f)
+	local func = default_dispatch(f)
+	c.callback(function (...)
+		func(filter(...))
+	end)
+end
 
 function skynet.start(f)
 	local session = c.command("TIMEOUT","0")

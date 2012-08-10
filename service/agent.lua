@@ -1,12 +1,6 @@
 local skynet = require "skynet"
 local client = ...
 
-local dispatch_handler = skynet.default_dispatch(function (msg,sz)
-	local message = skynet.tostring(msg,sz)
-	local result = skynet.call("SIMPLEDB",message)
-	skynet.ret(result)
-end)
-
 local session_id = 0
 skynet.filter(function (session, address , msg, sz)
 	if address == client then
@@ -18,7 +12,11 @@ skynet.filter(function (session, address , msg, sz)
 	else
 		print("skynet message",msg,sz)
 	end
-	dispatch_handler(session,address, msg,sz)
+	return session, address , msg, sz
+end, function (msg,sz)
+	local message = skynet.tostring(msg,sz)
+	local result = skynet.call("SIMPLEDB",message)
+	skynet.ret(result)
 end)
 
 skynet.start(function()
