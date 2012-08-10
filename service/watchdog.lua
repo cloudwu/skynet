@@ -11,6 +11,7 @@ function command:open(parm)
 	fd = tonumber(fd)
 	print("agent open",self,string.format("%d %d %s",self,fd,addr))
 	local client = skynet.launch("client",fd)
+	print("client",client)
 	local agent = skynet.launch("snlua","agent",client)
 	print("watchdog launch agent client:",agent,client)
 	if agent then

@@ -10,7 +10,6 @@
 
 static void
 _cb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
-	assert(session == 0);
 	assert(sz <= 65535);
 	int fd = (int)(intptr_t)ud;
 

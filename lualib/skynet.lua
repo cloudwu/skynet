@@ -103,8 +103,8 @@ function skynet.ret(...)
 	coroutine.yield("RETURN", ...)
 end
 
-function skynet.dispatch(f)
-	c.callback(function(session, address , msg, sz)
+function skynet.default_dispatch(f)
+	return function(session, address , msg, sz)
 		if session <= 0 then
 			session = - session
 			co = coroutine.create(f)
@@ -117,8 +117,14 @@ function skynet.dispatch(f)
 			session_id_coroutine[session] = nil
 			suspend(co, coroutine.resume(co, msg, sz))
 		end
-	end)
+	end
 end
+
+function skynet.dispatch(f)
+	c.callback(skynet.default_dispatch(f))
+end
+
+skynet.filter = assert(c.callback)
 
 function skynet.start(f)
 	local session = c.command("TIMEOUT","0")

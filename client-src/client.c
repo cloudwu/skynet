@@ -14,7 +14,7 @@ struct args {
 	int fd;
 };
 
-static void
+static int
 readall(int fd, void * buffer, size_t sz) {
 	for (;;) {
 		int err = recv(fd , buffer, sz, MSG_WAITALL);
@@ -23,7 +23,7 @@ readall(int fd, void * buffer, size_t sz) {
 				continue;
 			break;
 		}
-		return;
+		return err;
 	}
 	perror("Socket error");
 	exit(1);
@@ -37,7 +37,8 @@ _read(void *ud) {
 	for (;;) {
 		uint8_t header[2];
 		fflush(stdout);
-		readall(fd, header, 2);
+		if (readall(fd, header, 2) == 0)
+			break;
 		size_t len = header[0] << 8 | header[1];
 		if (len>0) {
 			char tmp[len+1];
@@ -49,8 +50,11 @@ _read(void *ud) {
 	return NULL;
 }
 
-static void
-test(int fd) {
+static void *
+test(void *ud) {
+	struct args *p = ud;
+	int fd = p->fd;
+
 	char tmp[1024];
 	while (!feof(stdin)) {
 		fgets(tmp,sizeof(tmp),stdin);
@@ -68,6 +72,7 @@ test(int fd) {
 			perror("send data");
 		}
 	}
+	return NULL;
 }
 
 int 
@@ -94,8 +99,8 @@ main(int argc, char * argv[]) {
 	struct args arg = { fd };
 	pthread_t pid ;
 	pthread_create(&pid, NULL, _read, &arg);
-
-	test(fd);
+	pthread_t pid_stdin;
+	pthread_create(&pid_stdin, NULL, test, &arg);
 
 	pthread_join(pid, NULL); 
 
