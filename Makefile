@@ -53,22 +53,23 @@ service/broker.so : service-src/service_broker.c
 lualib/lpeg.so : lpeg/lpeg.c
 	gcc -Wall -O2 -fPIC --shared $^ -o $@ -Ilpeg
 
-lualib/protobuf.so : \
-lua-protobuf/context.c \
-lua-protobuf/varint.c \
-lua-protobuf/array.c \
-lua-protobuf/pattern.c \
-lua-protobuf/register.c \
-lua-protobuf/proto.c \
-lua-protobuf/map.c \
-lua-protobuf/alloc.c \
-lua-protobuf/rmessage.c \
-lua-protobuf/wmessage.c \
-lua-protobuf/bootstrap.c \
-lua-protobuf/stringpool.c \
-lua-protobuf/decode.c \
-lua-protobuf/pbc-lua.c 
-	gcc -O2 -Wall --shared -fPIC -o $@ $^  
+PROTOBUFSRC = \
+  lua-protobuf/context.c \
+  lua-protobuf/varint.c \
+  lua-protobuf/array.c \
+  lua-protobuf/pattern.c \
+  lua-protobuf/register.c \
+  lua-protobuf/proto.c \
+  lua-protobuf/map.c \
+  lua-protobuf/alloc.c \
+  lua-protobuf/rmessage.c \
+  lua-protobuf/wmessage.c \
+  lua-protobuf/bootstrap.c \
+  lua-protobuf/stringpool.c \
+  lua-protobuf/decode.c
+
+lualib/protobuf.so : $(PROTOBUFSRC) lua-protobuf/pbc-lua.c
+	gcc -O2 -Wall --shared -fPIC -o $@ $^
 
 lualib/int64.so : lua-int64/int64.c
 	gcc -O2 -Wall --shared -fPIC -o $@ $^  
@@ -80,7 +81,7 @@ skynet-master : master/master.c master/main.c
 	gcc -g -Wall -Imaster -o $@ $^ -lzmq
 
 clean :
-	rm skynet client skynet-master lualib/*.so service/*.so
+	rm skynet client skynet-master lua-protobuf/libpb.a lualib/*.so service/*.so
 
 
 $(SKYNET_PATH) :
