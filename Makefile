@@ -81,7 +81,7 @@ skynet-master : master/master.c master/main.c
 	gcc -g -Wall -Imaster -o $@ $^ -lzmq
 
 clean :
-	rm skynet client skynet-master lua-protobuf/libpb.a lualib/*.so service/*.so
+	rm skynet client skynet-master lualib/*.so service/*.so
 
 
 $(SKYNET_PATH) :
