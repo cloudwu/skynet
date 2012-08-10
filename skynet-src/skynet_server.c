@@ -343,10 +343,12 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		size_t sz = strlen(param);
 		char key[sz+1];
 		int i;
-		for (i=0;param[i] == ' ';i++) {
+		for (i=0;param[i] != ' ' && param[i];i++) {
 			key[i] = param[i];
-			break;
 		}
+		if (param[i] == '\0')
+			return NULL;
+
 		key[i] = '\0';
 		param += i+1;
 		
