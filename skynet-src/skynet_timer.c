@@ -234,6 +234,9 @@ skynet_timer_init(void) {
 	TI->current = _gettime();
 
 	struct timespec ti;
-	clock_gettime(CLOCK_MONOTONIC, &ti);
-	TI->starttime = (uint32_t)(ti.tv_sec & 0xff000000);
+	clock_gettime(CLOCK_REALTIME, &ti);
+	uint32_t sec = (uint32_t)ti.tv_sec;
+	uint32_t mono = _gettime() / 100;
+
+	TI->starttime = sec - mono;
 }
