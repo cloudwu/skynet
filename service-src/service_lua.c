@@ -6,6 +6,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 lua_State *
 snlua_create(void) {
@@ -13,26 +14,67 @@ snlua_create(void) {
 }
 
 static int
-_load(lua_State *L, char ** filename) {
-	const char * name = strsep(filename, " \r\n");
-	const char * path = skynet_command(NULL, "GETENV", "luaservice");
-	int namesz = strlen(name);
-	int sz = strlen(path) + namesz;
-	char tmp[sz];
+_try_load(lua_State *L, const char * path, int pathlen, const char * name) {
+	int namelen = strlen(name);
+	char tmp[pathlen + namelen];
 	int i;
-	for (i=0;path[i]!='?' && path[i]!='\0';i++) {
+	for (i=0;i<pathlen;i++) {
+		if (path[i] == '?')
+			break;
 		tmp[i] = path[i];
 	}
-	memcpy(tmp+i,name,namesz);
 	if (path[i] == '?') {
-		strcpy(tmp+i+namesz,path+i+1);
+		memcpy(tmp+i,name,namelen);
+		memcpy(tmp+i+namelen,path+i+1,pathlen - i -1);
 	} else {
 		fprintf(stderr,"snlua : Invalid lua service path\n");
 		exit(1);
 	}
+	tmp[namelen+pathlen-1] = '\0';
+	FILE *f = fopen(tmp,"rb");
+	if (f == NULL) {
+		return -1;
+	} else {
+		fclose(f);
+		int r = luaL_loadfile(L,tmp);
+		if (r == LUA_OK) {
+			lua_getglobal(L,"package");
+			lua_getfield(L,-1,"path");
+			luaL_Buffer b;
+			luaL_buffinit(L, &b);
+			luaL_addlstring(&b, path, pathlen);
+			luaL_addchar(&b,';');
+			luaL_addvalue(&b);
+			luaL_pushresult(&b);
+			lua_setfield(L,-2,"path");
+			lua_pop(L,1);
+			return 0;
+		}
+		return 1;
+	}
+}
 
-	int r = luaL_loadfile(L,tmp);
-	return r != LUA_OK;
+static int
+_load(lua_State *L, char ** filename) {
+	const char * name = strsep(filename, " \r\n");
+	const char * path = skynet_command(NULL, "GETENV", "luaservice");
+	while (path[0]) {
+		int pathlen;
+		char * pathend = strchr(path,';');
+		if (pathend) {
+			pathlen = pathend - path;
+		} else {
+			pathlen = strlen(path);
+		}
+		int r = _try_load(L, path, pathlen, name);
+		if (r >=0) {
+			return r;
+		}
+		path+=pathlen;
+		if (path[0]==';')
+			++path;
+	}
+	return -1;
 }
 
 static int 
@@ -63,8 +105,12 @@ snlua_init(lua_State *L, struct skynet_context *ctx, const char * args) {
 
 	const char * filename = parm;
 	int r = _load(L, &parm);
-	if (r) {
-		skynet_error(ctx, "lua parser [%s] error : %s", filename, lua_tostring(L,-1));
+	if (r != 0) {
+		if (r<0) {
+			skynet_error(ctx, "lua parser [%s] load error", filename);
+		} else {
+			skynet_error(ctx, "lua parser [%s] error : %s", filename, lua_tostring(L,-1));
+		}
 		return 1;
 	}
 	int n=0;
