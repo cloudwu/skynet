@@ -55,7 +55,7 @@ redcmd[42] = function(data)	-- '*'
 		local line = skynet.call(".connection", readline_fd)
 		local bytes = tonumber(string.sub(line,2) + 2)
 		local data = skynet.call(".connection", read_fd .. bytes)
-		table.insert(result, string.sub(data,1,-3))
+		table.insert(bulk, string.sub(data,1,-3))
 	end
 	skynet.ret(skynet.pack(true,bulk))
 end
