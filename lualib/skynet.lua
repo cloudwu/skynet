@@ -65,6 +65,10 @@ function skynet.now()
 	return tonumber(c.command("NOW"))
 end
 
+function skynet.starttime()
+	return tonumber(c.command("STARTTIME"))
+end
+
 function skynet.exit()
 	c.command("EXIT")
 end
