@@ -17,6 +17,7 @@ local function suspend(co, result, command, param, size)
 		local co_session = session_coroutine_id[co]
 		local co_address = session_coroutine_address[co]
 		c.send(co_address, co_session, param, size)
+		return suspend(co, coroutine.resume(co))
 	else
 		assert(command == nil, command)
 		session_coroutine_id[co] = nil
@@ -28,19 +29,31 @@ function skynet.timeout(ti, func, ...)
 	local session = c.command("TIMEOUT",tostring(ti))
 	assert(session)
 	session = tonumber(session)
-	local co = coroutine.create(func)
+	local co
+	if select("#",...) == 0 then
+		co = coroutine.create(func)
+	else
+		local args = { ... }
+		co = coroutine.create(function()
+			func(unpack(args))
+		end)
+	end
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
-	suspend(co, coroutine.resume(co, ...))
 end
 
-function skynet.yield()
-	local session = c.command("TIMEOUT","0")
-	coroutine.yield("SLEEP", tonumber(session))
+function skynet.fork(func,...)
+	skynet.timeout("0", func, ...)
 end
 
 function skynet.sleep(ti)
 	local session = c.command("TIMEOUT",tostring(ti))
+	assert(session)
+	coroutine.yield("SLEEP", tonumber(session))
+end
+
+function skynet.yield()
+	local session = c.command("TIMEOUT","0")
 	assert(session)
 	coroutine.yield("SLEEP", tonumber(session))
 end
