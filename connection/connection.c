@@ -367,10 +367,11 @@ connection_poll(struct connection_pool * pool, int timeout, int *phandle, size_t
 			*phandle = 0;
 			return NULL;
 		}
-		if (c->read_request == 0) {
+		if (c->read_complete) {
 			assert(c->in_epoll);
 			epoll_ctl(pool->epoll_fd, EPOLL_CTL_DEL, c->fd , NULL);
 			c->in_epoll = 0;
+			continue;
 		}
 		int result = _read_request(pool, c, id);
 		switch (result) {
