@@ -356,6 +356,12 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		return NULL;
 	}
 
+	if (strcmp(cmd,"STARTTIME") == 0) {
+		uint32_t sec = skynet_gettime_fixsec();
+		sprintf(context->result,"%u",sec);
+		return context->result;
+	}
+
 	return NULL;
 }
 

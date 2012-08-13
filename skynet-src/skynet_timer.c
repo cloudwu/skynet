@@ -38,6 +38,7 @@ struct timer {
 	int lock;
 	int time;
 	uint32_t current;
+	uint32_t starttime;
 };
 
 static struct timer * TI = NULL;
@@ -217,6 +218,11 @@ skynet_updatetime(void) {
 	}
 }
 
+uint32_t
+skynet_gettime_fixsec(void) {
+	return TI->starttime;
+}
+
 uint32_t 
 skynet_gettime(void) {
 	return TI->current;
@@ -226,4 +232,8 @@ void
 skynet_timer_init(void) {
 	TI = timer_create_timer();
 	TI->current = _gettime();
+
+	struct timespec ti;
+	clock_gettime(CLOCK_MONOTONIC, &ti);
+	TI->starttime = (uint32_t)(ti.tv_sec & 0xff000000);
 }
