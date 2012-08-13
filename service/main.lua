@@ -4,6 +4,8 @@ skynet.dispatch()
 
 skynet.start(function()
 	print("Server start")
+	local lualog = skynet.launch("snlua","lualog")
+	print("lualog",lualog)
 	local launcher = skynet.launch("snlua","launcher")
 	print("launcher", launcher)
 	local console = skynet.launch("snlua","console")
