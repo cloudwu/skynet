@@ -138,27 +138,18 @@ static int
 _gen_id(struct gate * g, int connection_id) {
 	int uid = ++g->id_index;
 	int i;
-	for (;;) {
-		for (i=0;i<g->cap;i++) {
-			int hash = (uid + i) & (g->cap - 1);
-			if (g->agent[hash] == NULL) {
-				uid = uid + i;
-				struct connection * conn = &g->map[connection_id];
-				conn->uid = uid;
-				g->agent[hash] = conn;
-				return uid;
-			}
-		}
-		struct connection ** new_hash = malloc(g->cap * 2 * sizeof(struct connection *));
-		memset(new_hash, 0, sizeof(g->cap * 2 * sizeof(struct connection *)));
-		for (i=0;i<g->max_connection;i++) {
+	for (i=0;i<g->cap;i++) {
+		int hash = (uid + i) & (g->cap - 1);
+		if (g->agent[hash] == NULL) {
+			uid = uid + i;
 			struct connection * conn = &g->map[connection_id];
-			assert(conn->uid == 0);
-			new_hash[conn->uid & (g->cap * 2 -1)] = conn;
+			conn->uid = uid;
+			g->agent[hash] = conn;
+			g->id_index = uid;
+			return uid;
 		}
-		free(g->agent);
-		g->agent = new_hash;
 	}
+	assert(0);
 }
 
 static void
