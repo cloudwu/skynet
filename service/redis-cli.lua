@@ -22,7 +22,6 @@ end
 local function select_db(id)
 	local result , ok = skynet.call(skynet.self(), skynet.unpack, skynet.pack("SELECT", tostring(id)))
 	assert(result and ok == "OK")
-	print("select",id)
 end
 
 local function init()
@@ -56,7 +55,7 @@ local redcmd = {}
 
 redcmd[42] = function(data)	-- '*'
 	local n = tonumber(data)
-	if n < 1 then
+	if n < 0 then
 		response(true, nil)
 		return
 	end
