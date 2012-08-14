@@ -98,6 +98,14 @@ _command(lua_State *L) {
 }
 
 static int
+_genid(lua_State *L) {
+	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+	int session = skynet_send(context, NULL, NULL, -1, NULL, 0 , 0);
+	lua_pushinteger(L, session);
+	return 1;
+}
+
+static int
 _send(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	int session = 0;
@@ -183,6 +191,7 @@ luaopen_skynet_c(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "send" , _send },
+		{ "genid", _genid },
 		{ "redirect", _redirect },
 		{ "command" , _command },
 		{ "callback" , _callback },

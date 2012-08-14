@@ -399,6 +399,9 @@ skynet_send(struct skynet_context * context, const char * source, const char * a
 		session = skynet_context_newsession(context);
 		session_id = - session;
 	}
+	if (addr == NULL) {
+		return session;
+	}
 	uint32_t des = 0;
 	if (addr[0] == ':') {
 		des = strtoul(addr+1, NULL, 16);

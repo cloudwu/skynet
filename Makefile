@@ -7,9 +7,10 @@ service/logger.so \
 lualib/skynet.so \
 service/gate.so \
 service/client.so \
-service/connection.so \
 service/broker.so \
+service/connection.so \
 client \
+lualib/socket.so \
 lualib/lpeg.so \
 lualib/protobuf.so \
 lualib/int64.so \
@@ -36,7 +37,7 @@ service/snlua.so : service-src/service_lua.c
 	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
 
 service/gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
-	gcc -Wall -g -fPIC --shared -o $@ $^ -I. -Igate -Iskynet-src
+	gcc -Wall -g -fPIC --shared -o $@ $^ -Igate -Iskynet-src
 
 lualib/skynet.so : lualib-src/lua-skynet.c lua-serialize/serialize.c
 	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src -Ilua-serialize
@@ -45,7 +46,10 @@ service/client.so : service-src/service_client.c
 	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
 
 service/connection.so : connection/connection.c connection/main.c
-	gcc -Wall -g -fPIC --shared -o $@ $^ -I. -Iconnection -Iskynet-src
+	gcc -Wall -g -fPIC --shared -o $@ $^ -Iconnection -Iskynet-src
+
+lualib/socket.so : connection/lua-socket.c
+	gcc -Wall -g -fPIC --shared -o $@ $^ -Iconnection -Iskynet-src
 
 service/broker.so : service-src/service_broker.c
 	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src

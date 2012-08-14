@@ -275,7 +275,7 @@ _remote_harbor_update(int harbor_id, const char * addr) {
 	void *socket = zmq_socket( Z->zmq_context, ZMQ_PUSH);
 	int rc = zmq_connect(socket, addr);
 	if (rc<0) {
-		skynet_error(NULL, "Can't connect to %d %s",harbor_id,addr);
+		skynet_error(NULL, "Can't connect to harbor %d %s",harbor_id,addr);
 		zmq_close(socket);
 		socket = NULL;
 	}

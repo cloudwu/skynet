@@ -1,30 +1,30 @@
 #include "connection.h"
 #include "skynet.h"
 
+
+#include <sys/types.h>
+#include <sys/socket.h>
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
-struct reply {
-	int session;
-	uint32_t dest;
+#define DEFAULT_BUFFER_SIZE 1024
+#define DEFAULT_CONNECTION 16
+
+struct connection {
+	int fd;
+	char * addr;
 };
 
 struct connection_server {
-	int poll;
 	int max_connection;
+	int current_connection;
 	struct connection_pool *pool;
 	struct skynet_context *ctx;
-	struct reply * reply;
-};
-
-typedef void (*command_func)(struct connection_server *server, const char * param, size_t sz, int session, const char * reply);
-
-struct command {
-	const char * name;
-	command_func func;
+	struct connection * conn;
 };
 
 struct connection_server *
@@ -39,183 +39,86 @@ connection_release(struct connection_server * server) {
 	if (server->pool) {
 		connection_deletepool(server->pool);
 	}
-	free(server->reply);
+	int i;
+	for (i=0;i<server->max_connection;i++) {
+		free(server->conn[i].addr);
+	}
+	free(server->conn);
 	free(server);
 }
 
-static inline const char * 
-_command(const char * cmd, const char * msg, size_t sz) {
+static void
+_expand(struct connection_server * server) {
+	connection_deletepool(server->pool);
+	server->pool = connection_newpool(server->max_connection * 2);
 	int i;
-	for (i=0;i<sz;i++) {
-		if (cmd[i] == '\0') {
-			if (msg[i] != ' ')
-				return NULL;
-			return msg+i+1;
-		}
-		if (cmd[i] != msg[i])
-			return NULL;
+	for (i=0;i<server->max_connection;i++) {
+		struct connection * c = &server->conn[i];
+		connection_add(server->pool, c->fd , c);
 	}
-	return NULL;
+	server->max_connection *= 2;
 }
 
 static void
-_connect(struct connection_server *server, const char * ipaddr, size_t sz, int session, const char * reply) {
-	char tmp[sz+1];
-	memcpy(tmp, ipaddr, sz);
-	tmp[sz] = '\0';
-	int id = connection_open(server->pool, ipaddr);
-	if (id == 0) {
-		skynet_send(server->ctx, NULL, reply, session, NULL, 0, 0);
-		return;
+_add(struct connection_server * server, int fd , char * addr) {
+	++server->current_connection;
+	if (server->current_connection > server->max_connection) {
+		_expand(server);
 	}
-	char idstring[20];
-	int n = sprintf(idstring, "%d", id);
-	skynet_send(server->ctx, NULL, reply, session, idstring, n, 0);
-}
-
-static void
-_close(struct connection_server *server, const char * param, size_t sz, int session, const char * reply) {
-	int handle = strtol(param, NULL, 10);
-	if (handle <= 0) {
-		skynet_error(server->ctx, "[connection] Close invalid handle from %s", reply);
-		return;
-	}
-	connection_close(server->pool, handle);
-}
-
-static void
-_write(struct connection_server *server, const char * param, size_t sz, int session, const char * reply) {
-	char * endptr = NULL;
-	int handle = strtol(param, &endptr, 10);
-	if (handle <= 0 || endptr == NULL || *endptr !=' ') {
-		skynet_error(server->ctx, "[connection] Write invalid handle from %s", reply);
-		return;
-	}
-	++endptr;
-	sz -= endptr - param;
-	connection_write(server->pool, handle, endptr, sz);
-}
-
-static void
-_read(struct connection_server *server, const char * param, size_t sz, int session, const char * reply) {
-	char * endptr = NULL;
-	int handle = strtol(param, &endptr, 10);
-	if (handle <= 0 || endptr == NULL || *endptr !=' ') {
-		skynet_error(server->ctx, "[connection] Read invalid handle from %s", reply);
-		return;
-	}
-	int size = strtol(endptr+1, &endptr, 10);
-
-	if (size <= 0 || endptr == NULL) {
-		skynet_error(server->ctx, "[connection] Read invalid size (%d) from %s", size, reply);
-		return;
-	}
-	void * buffer = connection_read(server->pool, handle, size);
-	if (buffer == NULL) {
-		int id = connection_id(server->pool, handle);
-		if (id == 0) {
-			skynet_send(server->ctx, NULL, reply, session, NULL, 0, 0);
-			return;
-		}
-		--id;
-		assert(id < server->max_connection);
-		assert(reply[0] == ':');
-		server->reply[id].session = session;
-		server->reply[id].dest = strtoul(reply+1, NULL, 16); 
-		++server->poll;
-		if (server->poll == 1) {
-			skynet_command(server->ctx, "TIMEOUT","0");
-			return;
-		}
-	} else {
-		skynet_send(server->ctx, NULL, reply, session, buffer, size, 0);
-	}
-}
-
-static void
-_readline(struct connection_server *server, const char * param, size_t sz, int session, const char * reply) {
-	char * endptr = NULL;
-	int handle = strtol(param, &endptr, 10);
-	if (handle <= 0 || endptr == NULL || *endptr !=' ') {
-		skynet_error(server->ctx, "[connection] Readline invalid handle from %s", reply);
-		return;
-	}
-
-	sz -= endptr - param + 1;
-	if (sz < 1 || sz > 7) {
-		skynet_error(server->ctx, "[connection] Readline invalid sep (size = %d) from %s", sz, reply);
-		return;
-	}
-
-	char sep[sz+1];
-	memcpy(sep, endptr+1, sz);
-	sep[sz] = '\0';
-
-	void * buffer = connection_readline(server->pool, handle, sep, &sz);
-	if (buffer == NULL) {
-		int id = connection_id(server->pool, handle);
-		if (id == 0) {
-			skynet_send(server->ctx, NULL, reply, session, NULL, 0, 0);
-			return;
-		}
-		--id;
-		assert(id < server->max_connection);
-		assert(reply[0] == ':');
-		server->reply[id].session = session;
-		server->reply[id].dest = strtoul(reply+1, NULL, 16); 
-		++server->poll;
-		if (server->poll == 1) {
-			skynet_command(server->ctx, "TIMEOUT","0");
-			return;
-		}
-	} else {
-		skynet_send(server->ctx, NULL, reply, session, buffer, sz, 0);
-	}
-}
-
-static void
-_id_to_hex(char * str, uint32_t id) {
 	int i;
-	static char hex[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
-	for (i=0;i<8;i++) {
-		str[i] = hex[(id >> ((7-i) * 4))&0xf];
+	for (i=0;i<server->max_connection;i++) {
+		struct connection * c = &server->conn[i];
+		if (c->addr == NULL) {
+			c->fd = fd;
+			c->addr = addr;
+			int err = connection_add(server->pool, fd , c);
+			assert(err == 0);
+			return;
+		}
 	}
-	str[8] = '\0';
+	assert(0);
 }
 
 static void
-_poll(struct connection_server *server) {
-	int handle = 0;
-	size_t sz = 0;
+_del(struct connection_server * server, int fd) {
+	int i;
+	for (i=0;i<server->max_connection;i++) {
+		struct connection * c = &server->conn[i];
+		if (c->fd == fd) {
+			free(c->addr);
+			c->addr = NULL;
+			c->fd = 0;
+			connection_del(server->pool, fd);
+			return;
+		}
+	}
+
+	skynet_error(server->ctx, "[connection] Delete invalid handle %d", fd);
+}
+
+static void
+_poll(struct connection_server * server) {
 	int timeout = 100;
-	char addr[10];
 	for (;;) {
-		void * buffer = connection_poll(server->pool, timeout, &handle, &sz);
+		struct connection * c = connection_poll(server->pool, timeout);
+		if (c==NULL) {
+			skynet_command(server->ctx,"TIMEOUT","1");
+			return;
+		}
 		timeout = 0;
-		if (buffer == NULL) {
-			if (handle) {
-				--server->poll;
-				int id = sz;
-				struct reply * r = &server->reply[id];
-				addr[0] = ':';
-				_id_to_hex(addr+1, id);
-				skynet_send(server->ctx, NULL, addr , r->session, NULL, 0, 0);
-			} else {
-				assert(server->poll >= 0);
-				if (server->poll > 0) {
-					skynet_command(server->ctx, "TIMEOUT","1");
-				}
-				return;
-			}
+
+		void * buffer = malloc(DEFAULT_BUFFER_SIZE);
+
+		int size = recv(c->fd, buffer, DEFAULT_BUFFER_SIZE, MSG_DONTWAIT);
+		if (size < 0) {
+			continue;
+		}
+		if (size == 0) {
+			printf("disconnect\n");
+			free(buffer);
+			skynet_send(server->ctx, NULL, c->addr, 0x7fffffff, NULL, 0, DONTCOPY);
 		} else {
-			--server->poll;
-			int id = connection_id(server->pool, handle);
-			assert(id > 0);
-			--id;
-			struct reply * r = &server->reply[id];
-			addr[0] = ':';
-			_id_to_hex(addr+1, r->dest);
-			skynet_send(server->ctx, NULL, addr, r->session, buffer, sz, 0);
+			skynet_send(server->ctx, NULL, c->addr, 0x7fffffff, buffer, size, DONTCOPY);
 		}
 	}
 }
@@ -223,52 +126,49 @@ _poll(struct connection_server *server) {
 static void
 _main(struct skynet_context * ctx, void * ud, int session, const char * uid, const void * msg, size_t sz) {
 	if (msg == NULL) {
-		assert(session >= 0);
 		_poll(ud);
 		return;
 	}
-	if (session > 0) {
-		skynet_error(ctx, "[connection] Invalid response (session = %d) from %s", session, uid);
-		return;
-	}
-	struct command cmd[] = {
-		{ "CONNECT", _connect },
-		{ "CLOSE" , _close },
-		{ "READ" , _read },
-		{ "READLINE", _readline },
-		{ "WRITE", _write },
-		{ NULL, NULL },
-	};
-
-	struct command * p = cmd;
-	while (p->name) {
-		const char * param = _command(p->name, msg, sz);
-		if (param) {
-			p->func(ud, param, sz - (param-(const char *)msg), -session, uid);
+	const char * param = (const char *)msg + 4;
+	if (memcmp(msg, "ADD ", 4)==0) {
+		char * endptr;
+		int fd = strtol(param, &endptr, 10);
+		if (endptr == NULL) {
+			skynet_error(ctx, "[connection] Invalid ADD command from %s (session = %d)", uid, session);
 			return;
 		}
-		++p;
+		int addr_sz = sz - (endptr - (char *)msg);
+		char * addr = malloc(addr_sz);
+		memcpy(addr, endptr+1, addr_sz-1);
+		addr[addr_sz] = '\0';
+		_add(ud, fd, addr);
+	} else if (memcmp(msg, "DEL ", 4)==0) {
+		char * endptr;
+		int fd = strtol(param, &endptr, 10);
+		if (endptr == NULL) {
+			skynet_error(ctx, "[connection] Invalid DEL command from %s (session = %d)", uid, session);
+			return;
+		}
+		_del(ud, fd);
+	} else {
+		skynet_error(ctx, "[connection] Invalid command from %s (session = %d)", uid, session);
 	}
-
-	skynet_error(ctx, "[connection] Invalid command from %s (session = %d)", uid, -session);
 }
 
 int
 connection_init(struct connection_server * server, struct skynet_context * ctx, char * param) {
-	int max = strtol(param, NULL, 10);
-	if (max <=0) {
-		return 1;
-	}
-	server->pool = connection_newpool(max);
+	server->pool = connection_newpool(DEFAULT_CONNECTION);
 	if (server->pool == NULL)
 		return 1;
-	server->max_connection = max;
-	server->reply = malloc(sizeof(struct reply) * max);
-	memset(server->reply, 0, sizeof(struct reply) * max);
+	server->max_connection = DEFAULT_CONNECTION;
+	server->current_connection = 0;
 	server->ctx = ctx;
-	server->poll = 0;
+	server->conn = malloc(server->max_connection * sizeof(struct connection));
+	memset(server->conn, 0, server->max_connection * sizeof(struct connection));
+
 	skynet_callback(ctx, server, _main);
 	skynet_command(ctx,"REG",".connection");
+	skynet_command(ctx,"TIMEOUT","0");
 	return 0;
 }
 

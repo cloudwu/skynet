@@ -18,10 +18,11 @@ local function suspend(co, result, command, param, size)
 		local co_address = session_coroutine_address[co]
 		c.send(co_address, co_session, param, size)
 		return suspend(co, coroutine.resume(co))
-	else
-		assert(command == nil, command)
+	elseif command == nil then
 		session_coroutine_id[co] = nil
 		session_coroutine_address[co] = nil
+	else
+		error("Unknown command : " .. command)
 	end
 end
 
@@ -99,6 +100,7 @@ function skynet.setenv(key, value)
 end
 
 skynet.send = assert(c.send)
+skynet.genid = assert(c.genid)
 skynet.redirect = assert(c.redirect)
 skynet.pack = assert(c.pack)
 skynet.tostring = assert(c.tostring)
@@ -126,6 +128,9 @@ end
 
 local function default_dispatch(f)
 	return function(session, address , msg, sz)
+		if session == nil then
+			return
+		end
 		if session <= 0 then
 			session = - session
 			co = coroutine.create(f)
