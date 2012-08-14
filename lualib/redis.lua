@@ -9,9 +9,14 @@ local command = {}
 
 redis.cmd = command
 
+local function assert_redis(result, err, ...)
+	assert(result, err)
+	return err, ...
+end
+
 setmetatable(command, { __index = function(t,k)
 	local f = function(...)
-		return skynet.call(".redis", skynet.unpack, skynet.pack(k, ...))
+		return assert_redis(skynet.call(".redis", skynet.unpack, skynet.pack(k, ...)))
 	end
 	t[k]  = f
 	return f
@@ -19,8 +24,9 @@ end})
 
 function command.EXISTS(key)
 	local result , exists = skynet.call(".redis", skynet.unpack, skynet.pack("EXISTS", key))
+	assert(result, exists)
 	exists = exists ~= 0
-	return result, exists
+	return exists
 end
 
 local function split(cmd)
