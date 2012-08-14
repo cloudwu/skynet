@@ -45,8 +45,7 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	const char * self = skynet_command(context, "REG", NULL);
 	switch (r) {
 	case LUA_ERRRUN:
-		printf("Lua_ERRRUN %p\n",L);
-		skynet_error(context, "lua call [%s to %s : %d] error : %s", addr , self, session, lua_tostring(L,-1));
+		skynet_error(context, "lua call [%s to %s : %d msgsz = %d] error : %s", addr , self, session, sz, lua_tostring(L,-1));
 		break;
 	case LUA_ERRMEM:
 		skynet_error(context, "lua memory error : [%s to %s : %d]", addr , self, session);
