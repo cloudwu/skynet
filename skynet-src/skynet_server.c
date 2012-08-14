@@ -213,18 +213,11 @@ skynet_context_message_dispatch(void) {
 
 	assert(ctx->in_global_queue);
 
-	int re_q = 1;
 	struct skynet_message msg;
 	if (skynet_mq_pop(q,&msg)) {
-		// empty queue
 		__sync_lock_release(&ctx->in_global_queue);
-		if (skynet_mq_pop(q,&msg)) {
-			skynet_context_release(ctx);
-			return 0;
-		}
-		if (__sync_lock_test_and_set(&ctx->in_global_queue, 1)) {
-			re_q = 0;
-		}
+		skynet_context_release(ctx);
+		return 0;
 	}
 
 	if (ctx->cb == NULL) {
@@ -237,11 +230,9 @@ skynet_context_message_dispatch(void) {
 		_dispatch_message(ctx, &msg);
 	}
 
+	assert(q == ctx->queue);
+	skynet_globalmq_push(q);
 	skynet_context_release(ctx);
-
-	if (re_q) {
-		skynet_globalmq_push(q);
-	}
 
 	return 0;
 }
@@ -470,7 +461,7 @@ skynet_context_push(uint32_t handle, struct skynet_message *message) {
 		return -1;
 	}
 	skynet_mq_push(ctx->queue, message);
-	if (__sync_lock_test_and_set(&ctx->in_global_queue,1) == 0) {
+	if (__sync_lock_test_and_set(&ctx->in_global_queue, 1) == 0)  {
 		skynet_globalmq_push(ctx->queue);
 	}
 	skynet_context_release(ctx);
