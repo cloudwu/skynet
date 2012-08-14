@@ -7,26 +7,6 @@ local ipairs = ipairs
 local unpack = unpack
 local redis_server = ...
 
-local function read(bytes)
-	while true do
-		local result = socket.read(bytes)
-		if result then
-			return result
-		end
-		coroutine.yield()
-	end
-end
-
-local function readline(sep)
-	while true do
-		local result = socket.readline(sep)
-		if result then
-			return result
-		end
-		coroutine.yield()
-	end
-end
-
 local function compose_message(msg)
 	local lines = { "*" .. #msg }
 	for _,v in ipairs(msg) do
