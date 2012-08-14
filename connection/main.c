@@ -114,7 +114,6 @@ _poll(struct connection_server * server) {
 			continue;
 		}
 		if (size == 0) {
-			printf("disconnect\n");
 			free(buffer);
 			skynet_send(server->ctx, NULL, c->addr, 0x7fffffff, NULL, 0, DONTCOPY);
 		} else {
@@ -140,7 +139,7 @@ _main(struct skynet_context * ctx, void * ud, int session, const char * uid, con
 		int addr_sz = sz - (endptr - (char *)msg);
 		char * addr = malloc(addr_sz);
 		memcpy(addr, endptr+1, addr_sz-1);
-		addr[addr_sz] = '\0';
+		addr[addr_sz-1] = '\0';
 		_add(ud, fd, addr);
 	} else if (memcmp(msg, "DEL ", 4)==0) {
 		char * endptr;

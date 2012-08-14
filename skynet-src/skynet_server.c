@@ -263,6 +263,13 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 			return skynet_handle_namehandle(context->handle, param + 1);
 		} else {
 			assert(context->handle!=0);
+			int i;
+			for (i=0;i<param[i];i++) {
+				if (!(param[i] >= '0' && param[i] <= '9')) {
+					break;
+				}
+			}
+			assert(param[i]);
 			skynet_harbor_register(param, context->handle);
 			return NULL;
 		}

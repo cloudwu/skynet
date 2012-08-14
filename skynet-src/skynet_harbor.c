@@ -394,7 +394,11 @@ remote_query_harbor(int harbor_id) {
 	char tmp2[sz+1];
 	memcpy(tmp2,zmq_msg_data(&reply),sz);
 	tmp2[sz] = '\0';
-	_remote_harbor_update(harbor_id, tmp2);
+	if (sz == 0) {
+		skynet_error(NULL,"Request harbor %d failed",harbor_id);
+	} else {
+		_remote_harbor_update(harbor_id, tmp2);
+	}
 	zmq_msg_close(&reply);
 }
 

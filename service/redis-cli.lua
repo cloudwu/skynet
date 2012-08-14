@@ -5,7 +5,7 @@ local table = table
 local tonumber = tonumber
 local ipairs = ipairs
 local unpack = unpack
-local redis_server = ...
+local redis_server, redis_db = ...
 
 local function compose_message(msg)
 	local lines = { "*" .. #msg }
@@ -19,8 +19,17 @@ local function compose_message(msg)
 	return cmd
 end
 
+local function select_db(id)
+	local result , ok = skynet.call(skynet.self(), skynet.unpack, skynet.pack("SELECT", tostring(id)))
+	assert(result and ok == "OK")
+	print("select",id)
+end
+
 local function init()
 	socket.connect(redis_server)
+	if redis_db then
+		select_db(redis_db)
+	end
 end
 
 local request_queue = { head = 1, tail = 1 }
