@@ -9,14 +9,15 @@ function socket.connect(addr)
 	local ip, port = string.match(addr,"([^:]+):(.+)")
 	port = tonumber(port)
 	fd = c.open(ip,port)
+	if fd == nil then
+		return true
+	end
 	skynet.send(".connection","ADD "..fd.." "..skynet.self())
 	object = c.new()
 end
 
 function socket.push(msg,sz)
-	if msg == nil then
-		socket.close()
-	else
+	if msg then
 		c.push(object, msg, sz)
 	end
 end
@@ -33,13 +34,12 @@ function socket.write(...)
 	c.write(fd, ...)
 end
 
-function socket.yield()
-	c.yield(object)
-end
-
 function socket.close()
-	skynet.send(".connection","DEL "..fd)
-	fd = nil
+	if fd then
+		c.close(fd)
+		skynet.send(".connection","DEL "..fd)
+		fd = nil
+	end
 end
 
 return socket

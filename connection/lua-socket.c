@@ -10,6 +10,7 @@
 #include <arpa/inet.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -34,6 +35,13 @@ _open(lua_State *L) {
 
 	lua_pushinteger(L,fd);
 	return 1;
+}
+
+static int
+_close(lua_State *L) {
+	int fd = luaL_checkinteger(L,1);
+	close(fd);
+	return 0;
 }
 
 static int
@@ -101,21 +109,36 @@ _push(lua_State *L) {
 		buf = lua_touserdata(L,2);
 		size = luaL_checkinteger(L,3);
 	}
-	buffer->read = 0;
-	if (size + buffer->size > buffer->cap) {
+	int old_size = buffer->size - buffer->read;
+	if (size + old_size > buffer->cap) {
 		if (buffer->cap == 0) {
 			lua_rawgetp(L, LUA_REGISTRYINDEX, _delete);
 			lua_setmetatable(L, 1);
 		}
 
-		buffer->buffer = realloc(buffer->buffer, buffer->size + size);
+		if (buffer->read == 0) {
+			buffer->buffer = realloc(buffer->buffer, size+old_size);
+			memcpy(buffer->buffer + old_size , buf , size);
+			buffer->size += size;
+		} else {
+			char * new_buffer = malloc(size + old_size);
+			memcpy(new_buffer, buffer->buffer + buffer->read, old_size);
+			memcpy(new_buffer + old_size , buf, size);
+			free(buffer->buffer);
+			buffer->buffer = new_buffer;
+			buffer->read = 0;
+			buffer->size = old_size + size;
+		}
+	} else if (buffer->size + size > buffer->cap) {
+		memmove(buffer->buffer, buffer->buffer + buffer->read, old_size);
+		memcpy(buffer->buffer + old_size, buf, size);
+		buffer->read = 0;
+		buffer->size = old_size + size;
+	} else {
 		memcpy(buffer->buffer + buffer->size, buf, size);
 		buffer->size += size;
-		buffer->cap = buffer->size;
-		return 0;
 	}
-	memcpy(buffer->buffer+buffer->size, buf, size);
-	buffer->size += size;
+
 	return 0;
 }
 
@@ -150,29 +173,16 @@ _readline(lua_State *L) {
 	return 0;
 }
 
-static int
-_yield(lua_State *L) {
-	luaL_checktype(L,1,LUA_TUSERDATA);
-	struct buffer * buffer = lua_touserdata(L,1);
-	if (buffer->read) {
-		int size = buffer->size - buffer->read;
-		memmove(buffer->buffer, buffer->buffer + buffer->read, size);
-		buffer->size -= buffer->read;
-		buffer->read = 0;
-	}
-	return 0;
-}
-
 int
 luaopen_socket_c(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "open", _open },
+		{ "close", _close },
 		{ "write", _write },
 		{ "new", _new },
 		{ "push", _push },
 		{ "read", _read },
 		{ "readline", _readline },
-		{ "yield", _yield },
 		{ NULL, NULL },
 	};
 	luaL_checkversion(L);

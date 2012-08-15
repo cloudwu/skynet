@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <unistd.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,6 +115,7 @@ _poll(struct connection_server * server) {
 			continue;
 		}
 		if (size == 0) {
+			connection_del(server->pool, c->fd);
 			free(buffer);
 			skynet_send(server->ctx, NULL, c->addr, 0x7fffffff, NULL, 0, DONTCOPY);
 		} else {

@@ -24,13 +24,6 @@ local function select_db(id)
 	assert(result and ok == "OK")
 end
 
-local function init()
-	socket.connect(redis_server)
-	if redis_db then
-		select_db(redis_db)
-	end
-end
-
 local request_queue = { head = 1, tail = 1 }
 
 local function push_request_queue(reply)
@@ -51,6 +44,26 @@ local function response(...)
 	skynet.send(reply[2],reply[1],skynet.pack(...))
 end
 
+local function readline(sep)
+	while true do
+		local line = socket.readline(sep)
+		if line then
+			return line
+		end
+		coroutine.yield()
+	end
+end
+
+local function readbytes(bytes)
+	while true do
+		local block = socket.read(bytes)
+		if block then
+			return block
+		end
+		coroutine.yield()
+	end
+end
+
 local redcmd = {}
 
 redcmd[42] = function(data)	-- '*'
@@ -61,15 +74,9 @@ redcmd[42] = function(data)	-- '*'
 	end
 	local bulk = {}
 	for i = 1,n do
-		local line = socket.readline "\r\n"
-		if line == nil then
-			return "BLOCK"
-		end
+		local line = readline "\r\n"
 		local bytes = tonumber(string.sub(line,2) + 2)
-		local data = socket.read(bytes)
-		if data == nil then
-			return "BLOCK"
-		end
+		local data = readbytes(bytes)
 		table.insert(bulk, string.sub(data,1,-3))
 	end
 	response(true, bulk)
@@ -81,10 +88,7 @@ redcmd[36] = function(data) -- '$'
 		response(true,nil)
 		return
 	end
-	local firstline = socket.read(bytes+2)
-	if firstline == nil then
-		return "BLOCK"
-	end
+	local firstline = readbytes(bytes+2)
 	response(true,string.sub(firstline,1,-3))
 end
 
@@ -101,31 +105,51 @@ redcmd[58] = function(data) -- ':'
 end
 
 local function split_package()
-	local result = socket.readline "\r\n"
-	if result == nil then
-		return
+	while true do
+		local result = readline "\r\n"
+		local firstchar = string.byte(result)
+		local data = string.sub(result,2)
+		local f = redcmd[firstchar]
+		assert(f)
+		f(data)
 	end
-	local firstchar = string.byte(result)
-	local data = string.sub(result,2)
-	local f = redcmd[firstchar]
-	assert(f)
-	if f(data) then
-		return
+end
+
+local function init()
+	while socket.connect(redis_server) do
+		print("Connect failed : "..redis_server)
+		skynet.sleep(1000)
 	end
-	socket.yield()
-	return true
+	if redis_db then
+		select_db(redis_db)
+	end
+end
+
+local split_co = coroutine.create(split_package)
+
+local function reconnect()
+	init()
+	for i = request_queue.head, request_queue.tail-1 do
+		local request = request_queue[i]
+		socket.write(request[3])
+	end
+	split_co = coroutine.create(split_package)
 end
 
 skynet.filter(
 	function(session, address , msg, sz)
 		if session == 0x7fffffff then
+			if msg == nil then
+				skynet.timeout(0, reconnect)
+				return
+			end
 			socket.push(msg,sz)
-			while split_package() do end
+			coroutine.resume(split_co)
 		elseif session < 0 then
 			local message = { skynet.unpack(msg,sz) }
 			local cmd = compose_message(message)
 			socket.write(cmd)
-			push_request_queue { -session , address }
+			push_request_queue { -session , address, cmd }
 		else
 			return session, address, msg , sz
 		end

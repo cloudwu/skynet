@@ -68,7 +68,7 @@ _read_queue(struct connection_pool * pool, int timeout) {
 void * 
 connection_poll(struct connection_pool * pool, int timeout) {
 	if (pool->queue_head >= pool->queue_len) {
-		if (_read_queue(pool, timeout) == -1) {
+		if (_read_queue(pool, timeout) <= 0) {
 			return NULL;
 		}
 	}
