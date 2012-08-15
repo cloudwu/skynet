@@ -4,9 +4,10 @@ local redis = require "redis"
 skynet.dispatch()
 
 skynet.start(function()
-	print(redis.cmd.EXISTS("A"))
-	print(redis.cmd.GET("A"))
-	print(redis.cmd.SET("A","hello world"))
+	local db = redis.connect "main"
+	print(db:exists "A")
+	print(db:get "A")
+	print(db:set("A","hello world"))
 	skynet.exit()
 end)
 
