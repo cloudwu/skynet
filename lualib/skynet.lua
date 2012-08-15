@@ -9,14 +9,10 @@ local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
 
-local function create_coroutine(f)
-	return coroutine.create(function(...)
-		assert(xpcall(f,debug.traceback,...))
-	end)
-end
-
 local function suspend(co, result, command, param, size)
-	assert(result, command)
+	if not result then
+		error(debug.traceback(co,command))
+	end
 	if command == "CALL" or command == "SLEEP" then
 		session_id_coroutine[param] = co
 	elseif command == "RETURN" then
@@ -28,7 +24,7 @@ local function suspend(co, result, command, param, size)
 		session_coroutine_id[co] = nil
 		session_coroutine_address[co] = nil
 	else
-		error("Unknown command : " .. command)
+		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
 	end
 end
 
@@ -38,10 +34,10 @@ function skynet.timeout(ti, func, ...)
 	session = tonumber(session)
 	local co
 	if select("#",...) == 0 then
-		co = create_coroutine(func)
+		co = coroutine.create(func)
 	else
 		local args = { ... }
-		co = create_coroutine(function()
+		co = coroutine.create(function()
 			func(unpack(args))
 		end)
 	end
@@ -139,7 +135,7 @@ local function default_dispatch(f)
 		end
 		if session <= 0 then
 			session = - session
-			co = create_coroutine(f)
+			co = coroutine.create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = address
 			suspend(co, coroutine.resume(co, msg, sz, session, address))
@@ -165,7 +161,7 @@ end
 
 function skynet.start(f)
 	local session = c.command("TIMEOUT","0")
-	local co = create_coroutine(
+	local co = coroutine.create(
 		function(...)
 			f(...)
 			skynet.send(".launcher",0)
