@@ -48,7 +48,7 @@ static int
 _write(lua_State *L) {
 	int fd = luaL_checkinteger(L,1);
 	int type = lua_type(L,2);
-	const char * buffer;
+	const char * buffer = NULL;
 	size_t sz;
 	if (type == LUA_TSTRING) {
 		buffer = lua_tolstring(L,2,&sz);
