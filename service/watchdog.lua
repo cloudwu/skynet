@@ -1,10 +1,9 @@
 local skynet = require "skynet"
 
+local port, max_agent, buffer = ...
 local command = {}
 local agent_all = {}
-local gate = skynet.launch("gate" , skynet.self(), ...)
-
-print("gate",gate)
+local gate
 
 function command:open(parm)
 	local fd,addr = string.match(parm,"(%d+) ([^%s]+)")
@@ -50,4 +49,9 @@ skynet.dispatch(function(msg, sz, session, address)
 	end
 end)
 
-skynet.register(".watchdog")
+skynet.start(function()
+	gate = skynet.launch("gate" , skynet.self(), port, max_agent, buffer)
+	print("gate = ", gate)
+	skynet.send(gate,"start")
+	skynet.register(".watchdog")
+end)

@@ -20,6 +20,7 @@ struct connection {
 struct gate {
 	struct mread_pool * pool;
 	const char * watchdog;
+	const char * broker;
 	int id_index;
 	int cap;
 	int max_connection;
@@ -33,6 +34,7 @@ gate_create(void) {
 	g->pool = NULL;
 	g->max_connection = 0;
 	g->agent = NULL;
+	g->broker = NULL;
 	return g;
 }
 
@@ -106,6 +108,15 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 		_forward_agent(g, id, agent, client);
 		return;
 	}
+	if (memcmp(command,"broker",i)==0) {
+		_parm(tmp, sz, i);
+		g->broker = strdup(command);
+		return;
+	}
+	if (memcmp(command,"start",i) == 0) {
+		skynet_command(ctx,"TIMEOUT","0");
+		return;
+	}
 	skynet_error(ctx, "[gate] Unkown command : %s", command);
 }
 
@@ -122,6 +133,10 @@ _report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
 
 static void
 _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_t len) {
+	if (g->broker) {
+		skynet_send(ctx, NULL, g->broker, 0x7fffffff, data, len, 0);
+		return;
+	}
 	struct connection * agent = _id_to_agent(g,uid);
 	if (agent->agent) {
 		// todo: client package has not session , send 0x7fffffff
@@ -247,7 +262,6 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	}
 
 	skynet_callback(ctx,g,_cb);
-	skynet_command(ctx,"TIMEOUT","0");
 
 	return 0;
 }
