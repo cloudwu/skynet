@@ -57,16 +57,17 @@ static void *
 _master_thread(void *ud) {
 	struct master_arg * args = ud;
 	skynet_master(args->context, args->port);
+	free(args);
 	return NULL;
 }
 
 static void
 _start_master(void * context, const char * port) {
 	pthread_t pid;
-	struct master_arg args;
-	args.context = context;
-	args.port = port;
-	pthread_create(&pid, NULL, _master_thread, &args);
+	struct master_arg * args = malloc(sizeof(*args));
+	args->context = context;
+	args->port = port;
+	pthread_create(&pid, NULL, _master_thread, args);
 }
 
 void 
