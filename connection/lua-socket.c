@@ -5,6 +5,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include <sys/uio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -66,6 +67,45 @@ _write(lua_State *L) {
 			}
 		}
 		assert(err == sz);
+		return 0;
+	}
+}
+
+static int
+_writeblock(lua_State *L) {
+	int fd = luaL_checkinteger(L,1);
+	int type = lua_type(L,2);
+	const char * buffer = NULL;
+	size_t sz;
+	if (type == LUA_TSTRING) {
+		buffer = lua_tolstring(L,2,&sz);
+	} else if (type == LUA_TLIGHTUSERDATA) {
+		buffer = lua_touserdata(L,2);
+		sz = luaL_checkinteger(L,3);
+	}
+
+	if (sz > 65535) {
+		luaL_error(L, "Too big package %d", (int)sz);
+	}
+
+	struct iovec buf[2];
+	// send big-endian header
+	uint8_t head[2] = { sz >> 8 & 0xff , sz & 0xff };
+	buf[0].iov_base = head;
+	buf[0].iov_len = 2;
+	buf[1].iov_base = (void *)buffer;
+	buf[1].iov_len = sz;
+
+	for (;;) {
+		int err = writev(fd, buf, 2);
+		if (err < 0) {
+			switch (errno) {
+			case EAGAIN:
+			case EINTR:
+				continue;
+			}
+		}
+		assert(err == sz +2);
 		return 0;
 	}
 }
@@ -221,6 +261,7 @@ luaopen_socket_c(lua_State *L) {
 		{ "read", _read },
 		{ "readline", _readline },
 		{ "readblock", _readblock },
+		{ "writeblock", _writeblock },
 		{ NULL, NULL },
 	};
 	luaL_checkversion(L);

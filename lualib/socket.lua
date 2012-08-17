@@ -38,6 +38,10 @@ function socket.write(...)
 	c.write(fd, ...)
 end
 
+function socket.writeblock(...)
+	c.writeblock(fd, ...)
+end
+
 function socket.close()
 	if fd then
 		c.close(fd)
