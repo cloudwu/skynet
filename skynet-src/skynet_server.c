@@ -15,8 +15,21 @@
 #define BLACKHOLE "blackhole"
 #define DEFAULT_MESSAGE_QUEUE 16 
 
+#ifdef CALLING_CHECK
+
 #define CHECKCALLING_BEGIN(ctx) assert(__sync_lock_test_and_set(&ctx->calling,1) == 0);
 #define CHECKCALLING_END(ctx) __sync_lock_release(&ctx->calling);
+#define CHECKCALLING_INIT(ctx) ctx->calling = 0;
+#define CHECKCALLING_DECL int calling;
+
+#else
+
+#define CHECKCALLING_BEGIN(ctx)
+#define CHECKCALLING_END(ctx)
+#define CHECKCALLING_INIT(ctx)
+#define CHECKCALLING_DECL
+
+#endif
 
 struct skynet_context {
 	void * instance;
@@ -29,10 +42,11 @@ struct skynet_context {
 	skynet_cb cb;
 	int session_id;
 	int init;
-	int calling;
 	uint32_t forward;
 	char forward_address[GLOBALNAME_LENGTH];
 	struct message_queue *queue;
+
+	CHECKCALLING_DECL
 };
 
 static void
@@ -57,16 +71,18 @@ skynet_context_new(const char * name, const char *param) {
 	if (inst == NULL)
 		return NULL;
 	struct skynet_context * ctx = malloc(sizeof(*ctx));
+	CHECKCALLING_INIT(ctx)
+
 	ctx->mod = mod;
 	ctx->instance = inst;
 	ctx->ref = 2;
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
+	ctx->session_id = 0;
 
 	ctx->forward = 0;
 	ctx->forward_address[0] = '\0';
 	ctx->init = 0;
-	ctx->calling =0;
 	ctx->handle = skynet_handle_register(ctx);
 	char * uid = ctx->handle_name;
 	_id_to_hex(uid, ctx->handle);
