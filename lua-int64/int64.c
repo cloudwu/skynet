@@ -35,7 +35,7 @@ _int64(lua_State *L, int index) {
 		break;
 	}
 	default:
-		return luaL_error(L, "argument 1 error type %s",  lua_typename(L,1));
+		return luaL_error(L, "argument %d error type %s", index, lua_typename(L,type));
 	}
 	return n;
 }
