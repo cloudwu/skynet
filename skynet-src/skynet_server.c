@@ -15,6 +15,9 @@
 #define BLACKHOLE "blackhole"
 #define DEFAULT_MESSAGE_QUEUE 16 
 
+#define CHECKCALLING_BEGIN(ctx) assert(__sync_lock_test_and_set(&ctx->calling,1) == 0);
+#define CHECKCALLING_END(ctx) __sync_lock_release(&ctx->calling);
+
 struct skynet_context {
 	void * instance;
 	struct skynet_module * mod;
@@ -26,6 +29,7 @@ struct skynet_context {
 	skynet_cb cb;
 	int session_id;
 	int init;
+	int calling;
 	uint32_t forward;
 	char forward_address[GLOBALNAME_LENGTH];
 	struct message_queue *queue;
@@ -62,13 +66,16 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->forward = 0;
 	ctx->forward_address[0] = '\0';
 	ctx->init = 0;
+	ctx->calling =0;
 	ctx->handle = skynet_handle_register(ctx);
 	char * uid = ctx->handle_name;
 	_id_to_hex(uid, ctx->handle);
 	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
 	// init function maybe use ctx->handle, so it must init at last
 
+	CHECKCALLING_BEGIN(ctx)
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
+	CHECKCALLING_END(ctx)
 	if (r == 0) {
 		struct skynet_context * ret = skynet_context_release(ctx);
 		if (ret) {
@@ -163,6 +170,7 @@ _forwarding(struct skynet_context *ctx, struct skynet_message *msg) {
 static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
+	CHECKCALLING_BEGIN(ctx)
 	if (msg->source == SKYNET_SYSTEM_TIMER) {
 		ctx->cb(ctx, ctx->cb_ud, msg->session, NULL, msg->data, msg->sz);
 	} else {
@@ -174,6 +182,7 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 			free(msg->data);
 		}
 	}
+	CHECKCALLING_END(ctx)
 }
 
 int
