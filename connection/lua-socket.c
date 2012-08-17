@@ -173,6 +173,43 @@ _readline(lua_State *L) {
 	return 0;
 }
 
+/*
+	userdata buffer
+	function (msg, sz, ...)
+	...
+ */
+static int
+_readblock(lua_State *L) {
+	luaL_checktype(L,1,LUA_TUSERDATA);
+	struct buffer * buffer = lua_touserdata(L,1);
+	int top = lua_gettop(L);
+	int size = buffer->size - buffer->read;
+	if (size < 2) {
+		return 0;
+	}
+	uint8_t * buf = (uint8_t *)buffer->buffer + buffer->read;
+	uint16_t len = buf[0] << 8 | buf[1];
+	if (size < 2 + len) {
+		return 0;
+	}
+
+	if (top == 2) {
+		lua_pushlightuserdata(L, buffer->buffer + buffer->read + 2);
+		lua_pushinteger(L, len);
+		lua_call(L,2,LUA_MULTRET);
+	} else {
+		lua_pushlightuserdata(L, buffer->buffer + buffer->read + 2);
+		lua_insert(L,3);
+		lua_pushinteger(L, len);
+		lua_insert(L,4);
+		lua_call(L,top,LUA_MULTRET);
+	}
+
+	buffer->read += size + 2;
+
+	return lua_gettop(L) - 1;
+}
+
 int
 luaopen_socket_c(lua_State *L) {
 	luaL_Reg l[] = {
@@ -183,6 +220,7 @@ luaopen_socket_c(lua_State *L) {
 		{ "push", _push },
 		{ "read", _read },
 		{ "readline", _readline },
+		{ "readblock", _readblock },
 		{ NULL, NULL },
 	};
 	luaL_checkversion(L);

@@ -30,6 +30,10 @@ function socket.readline(sep)
 	return c.readline(object, sep)
 end
 
+function socket.readblock(...)
+	return c.readblock(object,...)
+end
+
 function socket.write(...)
 	c.write(fd, ...)
 end
