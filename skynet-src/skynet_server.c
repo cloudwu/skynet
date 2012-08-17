@@ -102,7 +102,7 @@ skynet_context_grab(struct skynet_context *ctx) {
 static void 
 _delete_context(struct skynet_context *ctx) {
 	skynet_module_instance_release(ctx->mod, ctx->instance);
-	skynet_mq_push(ctx->queue , NULL);
+	skynet_mq_mark_release(ctx->queue);
 	free(ctx);
 }
 
@@ -176,19 +176,6 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	}
 }
 
-static int
-_drop_queue(struct message_queue *q) {
-	// todo: send message back to message source
-	struct skynet_message msg;
-	int s = 0;
-	while(!skynet_mq_pop(q, &msg)) {
-		++s;
-		free(msg.data);
-	}
-	skynet_mq_release(q);
-	return s;
-}
-
 int
 skynet_context_message_dispatch(void) {
 	struct message_queue * q = skynet_globalmq_pop();
@@ -199,7 +186,7 @@ skynet_context_message_dispatch(void) {
 
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
-		int s = _drop_queue(q);
+		int s = skynet_mq_release(q);
 		if (s>0) {
 			skynet_error(NULL, "Drop message queue %x (%d messages)", handle,s);
 		}

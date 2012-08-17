@@ -13,6 +13,7 @@ struct message_queue {
 	int head;
 	int tail;
 	int lock;
+	int release;
 	int in_global;
 	struct skynet_message *queue;
 };
@@ -76,7 +77,7 @@ skynet_globalmq_pop() {
 	}
 
 	UNLOCK(q)
-
+	
 	return ret;
 }
 
@@ -89,13 +90,14 @@ skynet_mq_create(uint32_t handle) {
 	q->tail = 0;
 	q->lock = 0;
 	q->in_global = 1;
+	q->release = 0;
 	q->queue = malloc(sizeof(struct skynet_message) * q->cap);
 
 	return q;
 }
 
-void 
-skynet_mq_release(struct message_queue *q) {
+static void 
+_release(struct message_queue *q) {
 	free(q->queue);
 	free(q);
 }
@@ -154,8 +156,8 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	}
 
 	if (q->in_global == 0) {
-		skynet_globalmq_push(q);
 		q->in_global = 1;
+		skynet_globalmq_push(q);
 	}
 	
 	UNLOCK(q)
@@ -179,4 +181,39 @@ void
 skynet_mq_force_push(struct message_queue * queue) {
 	assert(queue->in_global);
 	skynet_globalmq_push(queue);
+}
+
+void 
+skynet_mq_mark_release(struct message_queue *q) {
+	assert(q->release == 0);
+	q->release = 1;
+}
+
+static int
+_drop_queue(struct message_queue *q) {
+	// todo: send message back to message source
+	struct skynet_message msg;
+	int s = 0;
+	while(!skynet_mq_pop(q, &msg)) {
+		++s;
+		free(msg.data);
+	}
+	_release(q);
+	return s;
+}
+
+int 
+skynet_mq_release(struct message_queue *q) {
+	int ret = 0;
+	LOCK(q)
+	
+	if (q->release) {
+		ret = _drop_queue(q);
+	} else {
+		skynet_mq_force_push(q);
+	}
+	
+	UNLOCK(q)
+
+	return ret;
 }
