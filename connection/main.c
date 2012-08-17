@@ -117,9 +117,9 @@ _poll(struct connection_server * server) {
 		if (size == 0) {
 			connection_del(server->pool, c->fd);
 			free(buffer);
-			skynet_send(server->ctx, NULL, c->addr, 0x7fffffff, NULL, 0, DONTCOPY);
+			skynet_send(server->ctx, NULL, c->addr, SESSION_CLIENT, NULL, 0, DONTCOPY);
 		} else {
-			skynet_send(server->ctx, NULL, c->addr, 0x7fffffff, buffer, size, DONTCOPY);
+			skynet_send(server->ctx, NULL, c->addr, SESSION_CLIENT, buffer, size, DONTCOPY);
 		}
 	}
 }
