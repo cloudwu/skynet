@@ -56,7 +56,7 @@ _forward(struct broker *b, struct skynet_context * context) {
 	b->id = (b->id + 1) % DEFAULT_NUMBER;
 }
 
-static void
+static int
 _cb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
 	struct broker * b = ud;
 	if (b->init < DEFAULT_NUMBER) {
@@ -68,6 +68,8 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	} else {
 		_forward(b, context);
 	}
+
+	return 0;
 }
 
 

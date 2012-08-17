@@ -93,7 +93,7 @@ _set_nonblocking(int fd)
 }
 
 struct mread_pool *
-mread_create(int port , int max , int buffer_size) {
+mread_create(uint32_t addr, int port , int max , int buffer_size) {
 	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (listen_fd == -1) {
 		return NULL;
@@ -109,8 +109,8 @@ mread_create(int port , int max , int buffer_size) {
 	memset(&my_addr, 0, sizeof(struct sockaddr_in));
 	my_addr.sin_family = AF_INET;
 	my_addr.sin_port = htons(port);
-	my_addr.sin_addr.s_addr = htonl(INADDR_ANY); // INADDR_LOOPBACK
-//	printf("MREAD bind %s:%u\n",inet_ntoa(my_addr.sin_addr),ntohs(my_addr.sin_port));
+	my_addr.sin_addr.s_addr = addr;
+	printf("MREAD bind %s:%u\n",inet_ntoa(my_addr.sin_addr),ntohs(my_addr.sin_port));
 	if (bind(listen_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
 		close(listen_fd);
 		return NULL;

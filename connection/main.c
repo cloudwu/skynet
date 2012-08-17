@@ -124,11 +124,11 @@ _poll(struct connection_server * server) {
 	}
 }
 
-static void
+static int
 _main(struct skynet_context * ctx, void * ud, int session, const char * uid, const void * msg, size_t sz) {
 	if (msg == NULL) {
 		_poll(ud);
-		return;
+		return 0;
 	}
 	const char * param = (const char *)msg + 4;
 	if (memcmp(msg, "ADD ", 4)==0) {
@@ -136,7 +136,7 @@ _main(struct skynet_context * ctx, void * ud, int session, const char * uid, con
 		int fd = strtol(param, &endptr, 10);
 		if (endptr == NULL) {
 			skynet_error(ctx, "[connection] Invalid ADD command from %s (session = %d)", uid, session);
-			return;
+			return 0;
 		}
 		int addr_sz = sz - (endptr - (char *)msg);
 		char * addr = malloc(addr_sz);
@@ -148,12 +148,14 @@ _main(struct skynet_context * ctx, void * ud, int session, const char * uid, con
 		int fd = strtol(param, &endptr, 10);
 		if (endptr == NULL) {
 			skynet_error(ctx, "[connection] Invalid DEL command from %s (session = %d)", uid, session);
-			return;
+			return 0;
 		}
 		_del(ud, fd);
 	} else {
 		skynet_error(ctx, "[connection] Invalid command from %s (session = %d)", uid, session);
 	}
+
+	return 0;
 }
 
 int

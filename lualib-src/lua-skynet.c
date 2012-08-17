@@ -5,24 +5,20 @@
 #include <lauxlib.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
-static int 
-traceback (lua_State *L) {
-	const char *msg = lua_tostring(L, 1);
-	if (msg) {
-		luaL_traceback(L, L, msg, 1);
-	} else {
-		lua_pushliteral(L, "(no error message)");
-	}
-	return 1;
-}
-
-static void
+static int
 _cb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
 	lua_State *L = ud;
-	lua_rawgetp(L, LUA_REGISTRYINDEX, traceback);
-	int trace = lua_gettop(L);
-	lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
+	int trace = 1;
+	int top = lua_gettop(L);
+	if (top == 1) {
+		lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
+	} else {
+		assert(top == 2);
+		lua_pushvalue(L,2);
+	}
+
 	int r;
 	if (msg == NULL) {
 		if (addr == NULL) {
@@ -41,7 +37,7 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 		r = lua_pcall(L, 4, 0 , trace);
 	}
 	if (r == LUA_OK) 
-		return;
+		return 0;
 	const char * self = skynet_command(context, "REG", NULL);
 	switch (r) {
 	case LUA_ERRRUN:
@@ -59,6 +55,8 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	};
 
 	lua_pop(L,1);
+
+	return 0;
 }
 
 static int
@@ -201,9 +199,6 @@ luaopen_skynet_c(lua_State *L) {
 		{ "unpack", _luaseri_unpack },
 		{ NULL, NULL },
 	};
-	lua_pushcfunction(L, traceback);
-	lua_rawsetp(L, LUA_REGISTRYINDEX, traceback);
-
 	luaL_newlibtable(L,l);
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");

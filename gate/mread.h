@@ -1,9 +1,11 @@
 #ifndef MREAD_H
 #define MREAD_H
 
+#include <stdint.h>
+
 struct mread_pool;
  
-struct mread_pool * mread_create(int port , int max , int buffer);
+struct mread_pool * mread_create(uint32_t addr, int port , int max , int buffer);
 void mread_close(struct mread_pool *m);
 
 int mread_poll(struct mread_pool *m , int timeout);

@@ -1,4 +1,7 @@
-.PHONY : all clean install
+.PHONY : all clean 
+
+CFLAGS = -g -Wall
+SHARED = -fPIC --shared
 
 all : \
 skynet \
@@ -14,7 +17,8 @@ lualib/socket.so \
 lualib/lpeg.so \
 lualib/protobuf.so \
 lualib/int64.so \
-skynet-master
+service/master.so \
+service/harbor.so
 
 skynet : \
 skynet-src/skynet_main.c \
@@ -26,36 +30,41 @@ skynet-src/skynet_start.c \
 skynet-src/skynet_timer.c \
 skynet-src/skynet_error.c \
 skynet-src/skynet_harbor.c \
-skynet-src/skynet_env.c \
-master/master.c 
-	gcc -Wall -g -Wl,-E -o $@ $^ -Iskynet-src -Imaster -lpthread -ldl -lrt -Wl,-E -llua -lm -lzmq
+skynet-src/skynet_env.c
+	gcc $(CFLAGS) -Wl,-E -o $@ $^ -Iskynet-src -lpthread -ldl -lrt -Wl,-E -llua -lm
+
+service/master.so : service-src/service_master.c
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
+
+service/harbor.so : service-src/service_harbor.c
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 service/logger.so : skynet-src/skynet_logger.c
-	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 service/snlua.so : service-src/service_lua.c
-	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 service/gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
-	gcc -Wall -g -fPIC --shared -o $@ $^ -Igate -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Igate -Iskynet-src
 
 lualib/skynet.so : lualib-src/lua-skynet.c lua-serialize/serialize.c
-	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src -Ilua-serialize
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Ilua-serialize
 
 service/client.so : service-src/service_client.c
-	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 service/connection.so : connection/connection.c connection/main.c
-	gcc -Wall -g -fPIC --shared -o $@ $^ -Iconnection -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iconnection
 
 lualib/socket.so : connection/lua-socket.c
-	gcc -Wall -g -fPIC --shared -o $@ $^ -Iconnection -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iconnection
 
 service/broker.so : service-src/service_broker.c
-	gcc -Wall -g -fPIC --shared $^ -o $@ -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 lualib/lpeg.so : lpeg/lpeg.c
-	gcc -Wall -O2 -fPIC --shared $^ -o $@ -Ilpeg
+	gcc $(CFLAGS) $(SHARED) -O2 $^ -o $@ -Ilpeg
 
 PROTOBUFSRC = \
   lua-protobuf/context.c \
@@ -73,45 +82,14 @@ PROTOBUFSRC = \
   lua-protobuf/decode.c
 
 lualib/protobuf.so : $(PROTOBUFSRC) lua-protobuf/pbc-lua.c
-	gcc -O2 -Wall --shared -fPIC -o $@ $^
+	gcc $(CFLAGS) $(SHARED) -O2 $^ -o $@ 
 
 lualib/int64.so : lua-int64/int64.c
-	gcc -O2 -Wall --shared -fPIC -o $@ $^  
+	gcc $(CFLAGS) $(SHARED) -O2 $^ -o $@ 
 
 client : client-src/client.c
-	gcc -Wall -g $^ -o $@ -lpthread
-
-skynet-master : master/master.c master/main.c
-	gcc -g -Wall -Imaster -o $@ $^ -lzmq
+	gcc $(CFLAGS) $^ -o $@ -lpthread
 
 clean :
-	rm skynet client skynet-master lualib/*.so service/*.so
-
-
-$(SKYNET_PATH) :
-	mkdir $@
-
-install-libs : | $(SKYNET_PATH)
-	cp -R lualib $(SKYNET_PATH)
-
-install-bins : | $(SKYNET_PATH)
-	cp skynet $(SKYNET_PATH)
-
-$(SKYNET_PATH)/service : | $(SKYNET_PATH)
-	mkdir $@
-
-install-services : | $(SKYNET_PATH)/service
-	cp service/connection.so $(SKYNET_PATH)/service/
-	cp service/logger.so $(SKYNET_PATH)/service/
-	cp service/gate.so $(SKYNET_PATH)/service/
-	cp service/broker.so $(SKYNET_PATH)/service/
-	cp service/snlua.so $(SKYNET_PATH)/service/
-	cp service/client.so $(SKYNET_PATH)/service/
-	cp service/launcher.lua $(SKYNET_PATH)/service/
-	cp service/redis-cli.lua $(SKYNET_PATH)/service/
-
-
-install : install-libs install-bins install-services
-	
-	
+	rm skynet client lualib/*.so service/*.so
 	

@@ -24,12 +24,14 @@ logger_release(struct logger * inst) {
 	free(inst);
 }
 
-static void
+static int
 _logger(struct skynet_context * context, void *ud, int session, const char * uid, const void * msg, size_t sz) {
 	struct logger * inst = ud;
 	fprintf(inst->handle, "[%s] ",uid);
 	fwrite(msg, sz , 1, inst->handle);
 	fprintf(inst->handle, "\n");
+
+	return 0;
 }
 
 int

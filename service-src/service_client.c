@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static void
+static int
 _cb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
 	assert(sz <= 65535);
 	int fd = (int)(intptr_t)ud;
@@ -31,7 +31,7 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 			}
 		}
 		assert(err == sz +2);
-		return;
+		return 0;
 	}
 }
 

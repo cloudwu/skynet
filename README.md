@@ -1,6 +1,6 @@
 ## Build
 
-Install zeromq 2.2 and lua 5.2 first.
+Install lua 5.2 first.
 
 ```
 make

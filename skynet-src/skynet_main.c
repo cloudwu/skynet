@@ -20,6 +20,7 @@ optint(const char *key, int opt) {
 	return strtol(str, NULL, 10);
 }
 
+/*
 static int
 optboolean(const char *key, int opt) {
 	const char * str = skynet_getenv(key);
@@ -29,7 +30,7 @@ optboolean(const char *key, int opt) {
 	}
 	return strcmp(str,"true")==0;
 }
-
+*/
 static const char *
 optstring(const char *key,const char * opt) {
 	const char * str = skynet_getenv(key);
@@ -104,10 +105,10 @@ main(int argc, char *argv[]) {
 	config.module_path = optstring("cpath","./service/?.so");
 	config.logger = optstring("logger",NULL);
 	config.harbor = optint("harbor", 1);
-	config.master = optstring("master","tcp://127.0.0.1:2012");
+	config.master = optstring("master","127.0.0.1:2012");
 	config.start = optstring("start","main.lua");
-	config.local = optstring("address","tcp://127.0.0.1:2525");
-	config.standalone = optboolean("standalone",0);
+	config.local = optstring("address","127.0.0.1:2525");
+	config.standalone = optstring("standalone",NULL);
 
 	lua_close(L);
 

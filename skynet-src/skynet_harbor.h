@@ -2,20 +2,30 @@
 #define SKYNET_HARBOR_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
-struct skynet_message;
+#define GLOBALNAME_LENGTH 16
+#define REMOTE_MAX 256
 
-void skynet_harbor_send(const char *name, uint32_t destination, struct skynet_message * message);
-void skynet_harbor_register(const char *name, uint32_t handle);
+// reserve high 8 bits for remote id
+#define HANDLE_MASK 0xffffff
+#define HANDLE_REMOTE_SHIFT 24
 
-// remote message is diffrent from local message.
-// We must use these api to open and close message , see skynet_server.c
+struct remote_name {
+	char name[GLOBALNAME_LENGTH];
+	uint32_t handle;
+};
+
+struct remote_message {
+	struct remote_name destination;
+	const void * message;
+	size_t sz;
+};
+
+void skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session);
+void skynet_harbor_register(struct remote_name *rname);
 int skynet_harbor_message_isremote(uint32_t handle);
-void * skynet_harbor_message_open(struct skynet_message * message);
-void skynet_harbor_message_close(struct skynet_message * message);
-
-// harbor worker thread
-void * skynet_harbor_dispatch_thread(void *ud);
-void skynet_harbor_init(void * context, const char * master, const char *local, int harbor);
+void skynet_harbor_init(int harbor);
+int skynet_harbor_start(const char * master, const char *local);
 
 #endif

@@ -3,10 +3,7 @@
 
 #include <stdint.h>
 
-// reserve high 8 bits for remote id
-// see skynet_harbor.c REMOTE_MAX
-#define HANDLE_MASK 0xffffff
-#define HANDLE_REMOTE_SHIFT 24
+#include "skynet_harbor.h"
 
 struct skynet_context;
 

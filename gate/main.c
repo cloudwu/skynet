@@ -122,6 +122,9 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 
 static void
 _report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
+	if (g->watchdog == NULL) {
+		return;
+	}
 	va_list ap;
 	va_start(ap, data);
 	char tmp[1024];
@@ -134,14 +137,14 @@ _report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
 static void
 _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_t len) {
 	if (g->broker) {
-		skynet_send(ctx, NULL, g->broker, 0x7fffffff, data, len, 0);
+		skynet_send(ctx, NULL, g->broker, SESSION_CLIENT, data, len, 0);
 		return;
 	}
 	struct connection * agent = _id_to_agent(g,uid);
 	if (agent->agent) {
 		// todo: client package has not session , send 0x7fffffff
-		skynet_send(ctx, agent->client, agent->agent, 0x7fffffff, data, len, 0);
-	} else {
+		skynet_send(ctx, agent->client, agent->agent, SESSION_CLIENT, data, len, 0);
+	} else if (g->watchdog) {
 		char * tmp = malloc(len + 32);
 		int n = snprintf(tmp,len+32,"%d data ",uid);
 		memcpy(tmp+n,data,len);
@@ -178,12 +181,12 @@ _remove_id(struct gate *g, int uid) {
 	}
 }
 
-static void
+static int
 _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const void * msg, size_t sz) {
 	struct gate *g = ud;
 	if (msg) {
 		_ctrl(ctx, g , msg , (int)sz);
-		return;
+		return 0;
 	}
 	struct mread_pool * m = g->pool;
 	int connection_id = mread_poll(m,100);	// timeout : 100ms
@@ -223,6 +226,7 @@ _cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const
 _break:
 		skynet_command(ctx, "TIMEOUT", "0");
 	}
+	return 0;
 }
 
 int
@@ -230,18 +234,41 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	int port = 0;
 	int max = 0;
 	int buffer = 0;
-	char watchdog[strlen(parm)+1];
-	int n = sscanf(parm, "%s %d %d %d",watchdog, &port,&max,&buffer);
+	int sz = strlen(parm)+1;
+	char watchdog[sz];
+	char binding[sz];
+	int n = sscanf(parm, "%s %s %d %d",watchdog, binding,&max,&buffer);
 	if (n!=4) {
 		skynet_error(ctx, "Invalid gate parm %s",parm);
 		return 1;
 	}
-	struct mread_pool * pool = mread_create(port, max, buffer);
+	char * portstr = strchr(binding,':');
+	uint32_t addr = INADDR_ANY;
+	if (portstr == NULL) {
+		port = strtol(binding, NULL, 10);
+		if (port <= 0) {
+			skynet_error(ctx, "Invalid gate address %s",parm);
+			return 1;
+		}
+	} else {
+		port = strtol(portstr + 1, NULL, 10);
+		if (port <= 0) {
+			skynet_error(ctx, "Invalid gate address %s",parm);
+			return 1;
+		}
+		portstr[0] = '\0';
+		addr=inet_addr(binding);
+	}
+	struct mread_pool * pool = mread_create(addr, port, max, buffer);
 	if (pool == NULL) {
 		skynet_error(ctx, "Create gate %s failed",parm);
 		return 1;
 	}
-	g->watchdog = strdup(watchdog);
+	if (watchdog[0] == '!') {
+		g->watchdog = NULL;
+	} else {
+		g->watchdog = strdup(watchdog);
+	}
 	g->pool = pool;
 	int cap = 1;
 	while (cap < max) {
