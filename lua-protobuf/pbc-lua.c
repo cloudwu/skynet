@@ -872,7 +872,8 @@ push_value(lua_State *L, int type, const char * typename, union pbc_value *v) {
 		lua_call(L, 2 , 1);
 		break;
 	case PBC_FIXED64:
-		lua_pushlstring(L, (const char *)&(v->i), 8);
+		// in 64 bit arch, push pointer
+		lua_pushlightuserdata(L,(void *)(uintptr_t)((uint64_t)v->i.low | (uint64_t)v->i.hi << 32));		
 		break;
 	case PBC_FIXED32:
 		lua_pushlightuserdata(L,(void *)(intptr_t)v->i.low);
