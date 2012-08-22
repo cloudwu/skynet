@@ -158,6 +158,7 @@ _push(lua_State *L) {
 
 		if (buffer->read == 0) {
 			buffer->buffer = realloc(buffer->buffer, size+old_size);
+			buffer->cap = size + old_size;
 			memcpy(buffer->buffer + old_size , buf , size);
 			buffer->size += size;
 		} else {
@@ -245,7 +246,7 @@ _readblock(lua_State *L) {
 		lua_call(L,top,LUA_MULTRET);
 	}
 
-	buffer->read += size + 2;
+	buffer->read += len + 2;
 
 	return lua_gettop(L) - 1;
 }
