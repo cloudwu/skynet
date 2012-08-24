@@ -128,7 +128,12 @@ function skynet.ret(...)
 	coroutine.yield("RETURN", ...)
 end
 
-local function default_dispatch(f)
+local function default_dispatch(f, unknown)
+	unknown = unknown or function (session, msg, sz)
+		local self = skynet.self()
+		print(self, session,msg,sz)
+		error(string.format("%s Unknown session %d", self, session))
+	end
 	return function(session, address , msg, sz)
 		if session == nil then
 			return
@@ -141,19 +146,22 @@ local function default_dispatch(f)
 			suspend(co, coroutine.resume(co, msg, sz, session, address))
 		else
 			local co = session_id_coroutine[session]
-			assert(co, session)
-			session_id_coroutine[session] = nil
-			suspend(co, coroutine.resume(co, msg, sz))
+			if co == nil then
+				unknown(session,msg,sz)
+			else
+				session_id_coroutine[session] = nil
+				suspend(co, coroutine.resume(co, msg, sz))
+			end
 		end
 	end
 end
 
-function skynet.dispatch(f)
-	c.callback(default_dispatch(f))
+function skynet.dispatch(f,unknown)
+	c.callback(default_dispatch(f,unknown))
 end
 
-function skynet.filter(filter, f)
-	local func = default_dispatch(f)
+function skynet.filter(filter, f, unknown)
+	local func = default_dispatch(f, unknown)
 	c.callback(function (...)
 		func(filter(...))
 	end)
@@ -168,6 +176,12 @@ function skynet.start(f)
 		end
 	)
 	session_id_coroutine[tonumber(session)] = co
+end
+
+function skynet.newservice(name, ...)
+	local args = { "snlua" , name , ... }
+	local handle = skynet.call(".launcher", table.concat(args," "))
+	return handle
 end
 
 return skynet
