@@ -3,29 +3,54 @@ local tostring = tostring
 local tonumber = tonumber
 local coroutine = coroutine
 local assert = assert
+local pairs = pairs
 
 local skynet = {}
 local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
 
-local function suspend(co, result, command, param, size)
+local wakeup_session = {}
+local sleep_session = {}
+
+-- suspend is function
+local suspend
+
+local function dispatch_wakeup()
+	local co = next(wakeup_session)
+	if co then
+		wakeup_session[co] = nil
+		local session = sleep_session[co]
+		if session then
+			session_id_coroutine[session] = "BREAK"
+			return suspend(co, coroutine.resume(co, true))
+		end
+	end
+end
+
+-- suspend is local function
+function suspend(co, result, command, param, size)
 	if not result then
 		error(debug.traceback(co,command))
 	end
-	if command == "CALL" or command == "SLEEP" then
+	if command == "CALL" then
 		session_id_coroutine[param] = co
+	elseif command == "SLEEP" then
+		session_id_coroutine[param] = co
+		sleep_session[co] = param
 	elseif command == "RETURN" then
 		local co_session = session_coroutine_id[co]
 		local co_address = session_coroutine_address[co]
 		c.send(co_address, co_session, param, size)
 		return suspend(co, coroutine.resume(co))
 	elseif command == nil then
+		-- coroutine exit
 		session_coroutine_id[co] = nil
 		session_coroutine_address[co] = nil
 	else
 		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
 	end
+	dispatch_wakeup()
 end
 
 function skynet.timeout(ti, func, ...)
@@ -52,13 +77,16 @@ end
 function skynet.sleep(ti)
 	local session = c.command("TIMEOUT",tostring(ti))
 	assert(session)
-	coroutine.yield("SLEEP", tonumber(session))
+	local ret = coroutine.yield("SLEEP", tonumber(session))
+	sleep_session[coroutine.running()] = nil
+	return ret
 end
 
 function skynet.yield()
 	local session = c.command("TIMEOUT","0")
 	assert(session)
 	coroutine.yield("SLEEP", tonumber(session))
+	sleep_session[coroutine.running()] = nil
 end
 
 function skynet.register(name)
@@ -146,13 +174,22 @@ local function default_dispatch(f, unknown)
 			suspend(co, coroutine.resume(co, msg, sz, session, address))
 		else
 			local co = session_id_coroutine[session]
-			if co == nil then
+			if co == "BREAK" then
+				session_id_coroutine[session] = nil
+			elseif co == nil then
 				unknown(session,msg,sz)
 			else
 				session_id_coroutine[session] = nil
 				suspend(co, coroutine.resume(co, msg, sz))
 			end
 		end
+	end
+end
+
+function skynet.wakeup(co)
+	if sleep_session[co] and wakeup_session[co] == nil then
+		wakeup_session[co] = true
+		return true
 	end
 end
 
