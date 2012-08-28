@@ -208,7 +208,7 @@ skynet_handle_init(int harbor) {
 	struct handle_storage * s = malloc(sizeof(*H));
 	s->slot_size = DEFAULT_SLOT_SIZE;
 	s->slot = malloc(s->slot_size * sizeof(struct skynet_context *));
-	memset(s->slot, 0, s->slot_size * sizeof(struct handle_slot *));
+	memset(s->slot, 0, s->slot_size * sizeof(struct skynet_context *));
 
 	rwlock_init(&s->lock);
 	// reserve 0 for system
