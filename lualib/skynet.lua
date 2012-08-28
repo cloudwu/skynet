@@ -53,25 +53,20 @@ function suspend(co, result, command, param, size)
 	dispatch_wakeup()
 end
 
-function skynet.timeout(ti, func, ...)
+function skynet.timeout(ti, func)
 	local session = c.command("TIMEOUT",tostring(ti))
 	assert(session)
 	session = tonumber(session)
-	local co
-	if select("#",...) == 0 then
-		co = coroutine.create(func)
-	else
-		local args = { ... }
-		co = coroutine.create(function()
-			func(unpack(args))
-		end)
-	end
+	local co = coroutine.create(func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
 end
 
 function skynet.fork(func,...)
-	skynet.timeout("0", func, ...)
+	local args = { ... }
+	skynet.timeout("0", function()
+		func(unpack(args))
+	end)
 end
 
 function skynet.sleep(ti)
