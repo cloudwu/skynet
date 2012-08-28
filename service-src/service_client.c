@@ -30,6 +30,10 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 				continue;
 			}
 		}
+		if (err < 0) {
+			skynet_error(context, "Client socket error : Drop message from %s session = %d", addr, session);
+			return 0;
+		}
 		assert(err == sz +2);
 		return 0;
 	}
