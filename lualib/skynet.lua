@@ -216,4 +216,78 @@ function skynet.newservice(name, ...)
 	return handle
 end
 
+------ remote object --------
+
+do
+	local remote_query, remote_alloc, remote_bind = c.remote_init(skynet.self())
+	local weak_meta = { __mode = "kv" }
+	local meta = getmetatable(c.unpack(c.pack({ __remote = 0 })))
+	local remote_call_func = setmetatable({}, weak_meta)
+	setmetatable(meta, weak_meta)
+
+	local _send = assert(c.send)
+	local _yield = coroutine.yield
+	local _pack = assert(c.pack)
+	local _unpack = assert(c.unpack)
+	local _local = skynet.self()
+
+	function meta__index(t, method)
+		local f = remote_call_func[method]
+		if f == nil then
+			f = function(...)
+				local addr = remote_query(t.__remote)
+				local session = _send(addr, -1, _pack(t,method,...))
+				local msg, sz = _yield("CALL", session)
+				return select(2,assert(_unpack(msg,sz)))
+			end
+			remote_call_func[method] = f
+		end
+		rawset(t,method,f)
+		return f
+	end
+
+	-- prevent gc
+	meta.__index = meta__index
+
+	meta.__newindex = error
+
+	function skynet.remote_create(t, handle)
+		t = t or {}
+		if handle then
+			remote_bind(handle)
+		else
+			handle = remote_alloc()
+		end
+		rawset(t, "__remote" , handle)
+		rawset(meta, handle, t)
+		return t
+	end
+
+	function skynet.remote_bind(handle)
+		return setmetatable( { __remote = handle } , meta)
+	end
+
+	local function remote_call(obj, method, ...)
+		if type(obj) ~= "table" or type(method) ~= "string" then
+			return _yield("RETURN", _pack(false, "Invalid call"))
+		end
+		local f = obj[method]
+		if type(f) ~= "function" then
+			return _yield("RETURN", _pack(false, "Object has not method " .. method))
+		end
+		return _yield("RETURN", _pack(pcall(f,...)))
+	end
+
+	function skynet.remote_service(unknown)
+		local function f(msg,sz)
+			return remote_call(_unpack(msg,sz))
+		end
+		c.callback(default_dispatch(f,unknown))
+	end
+
+	function skynet.remote_root()
+		return skynet.remote_bind(0)
+	end
+end
+
 return skynet

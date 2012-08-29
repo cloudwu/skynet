@@ -48,8 +48,8 @@ service/snlua.so : service-src/service_lua.c
 service/gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Igate -Iskynet-src
 
-lualib/skynet.so : lualib-src/lua-skynet.c lua-serialize/serialize.c
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Ilua-serialize
+lualib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/lua-remoteobj.c
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 service/client.so : service-src/service_client.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src

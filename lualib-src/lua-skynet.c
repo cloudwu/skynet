@@ -1,5 +1,5 @@
 #include "skynet.h"
-#include "luaseri.h"
+#include "lua-seri.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -184,9 +184,19 @@ _tostring(lua_State *L) {
 	return 1;
 }
 
+// define in lua-remoteobj.c
+int remoteobj_init(lua_State *L);
+
 int
 luaopen_skynet_c(lua_State *L) {
 	luaL_checkversion(L);
+	
+	luaL_Reg pack[] = {
+		{ "pack", _luaseri_pack },
+		{ "unpack", _luaseri_unpack },
+		{ NULL, NULL },
+	};
+
 	luaL_Reg l[] = {
 		{ "send" , _send },
 		{ "genid", _genid },
@@ -195,11 +205,13 @@ luaopen_skynet_c(lua_State *L) {
 		{ "callback" , _callback },
 		{ "error", _error },
 		{ "tostring", _tostring },
-		{ "pack", _luaseri_pack },
-		{ "unpack", _luaseri_unpack },
 		{ NULL, NULL },
 	};
-	luaL_newlibtable(L,l);
+
+	lua_createtable(L, 0, (sizeof(pack) + sizeof(l))/sizeof(luaL_Reg)-2);
+	lua_newtable(L);
+	lua_pushstring(L,"__remote");
+	luaL_setfuncs(L,pack,2);
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
 	struct skynet_context * ctx = lua_touserdata(L,-1);
@@ -208,6 +220,9 @@ luaopen_skynet_c(lua_State *L) {
 	}
 
 	luaL_setfuncs(L,l,1);
+
+	lua_pushcfunction(L, remoteobj_init);
+	lua_setfield(L, -2, "remote_init");
 
 	return 1;
 }
