@@ -4,36 +4,36 @@ CFLAGS = -g -Wall
 SHARED = -fPIC --shared
 
 all : \
-skynet \
-service/snlua.so \
-service/logger.so \
-lualib/skynet.so \
-service/gate.so \
-service/client.so \
-service/broker.so \
-service/connection.so \
-client \
-lualib/socket.so \
-lualib/lpeg.so \
-lualib/protobuf.so \
-lualib/int64.so \
-service/master.so \
-service/multicast.so \
-service/harbor.so
+  skynet \
+  service/snlua.so \
+  service/logger.so \
+  lualib/skynet.so \
+  service/gate.so \
+  service/client.so \
+  service/broker.so \
+  service/connection.so \
+  client \
+  lualib/socket.so \
+  lualib/lpeg.so \
+  lualib/protobuf.so \
+  lualib/int64.so \
+  service/master.so \
+  service/multicast.so \
+  service/harbor.so
 
 skynet : \
-skynet-src/skynet_main.c \
-skynet-src/skynet_handle.c \
-skynet-src/skynet_module.c \
-skynet-src/skynet_mq.c \
-skynet-src/skynet_server.c \
-skynet-src/skynet_start.c \
-skynet-src/skynet_timer.c \
-skynet-src/skynet_error.c \
-skynet-src/skynet_harbor.c \
-skynet-src/skynet_multicast.c \
-skynet-src/skynet_group.c \
-skynet-src/skynet_env.c
+  skynet-src/skynet_main.c \
+  skynet-src/skynet_handle.c \
+  skynet-src/skynet_module.c \
+  skynet-src/skynet_mq.c \
+  skynet-src/skynet_server.c \
+  skynet-src/skynet_start.c \
+  skynet-src/skynet_timer.c \
+  skynet-src/skynet_error.c \
+  skynet-src/skynet_harbor.c \
+  skynet-src/skynet_multicast.c \
+  skynet-src/skynet_group.c \
+  skynet-src/skynet_env.c
 	gcc $(CFLAGS) -Wl,-E -o $@ $^ -Iskynet-src -lpthread -ldl -lrt -Wl,-E -llua -lm
 
 service/multicast.so : service-src/service_multicast.c
