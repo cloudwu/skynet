@@ -10,8 +10,11 @@
 #include <stdlib.h>
 
 static const char *
-_concat_name(struct _stringpool *p , const char *prefix ,  int prefix_sz , const char *name , int name_sz) {
+_concat_name(struct _stringpool *p , const char *prefix ,  int prefix_sz , const char *name , int name_sz, int *sz) {
 	if (prefix_sz == 0) {
+		if (sz) {
+			*sz = name_sz;
+		}
 		return _pbcS_build(p , name, name_sz);
 	}
 	char temp[name_sz + prefix_sz + 2];
@@ -19,7 +22,9 @@ _concat_name(struct _stringpool *p , const char *prefix ,  int prefix_sz , const
 	temp[prefix_sz] = '.';
 	memcpy(temp+prefix_sz+1,name,name_sz);
 	temp[name_sz + prefix_sz + 1] = '\0';
-
+	if (sz) {
+		*sz = name_sz + prefix_sz + 1;
+	}
 	return _pbcS_build(p , temp, name_sz + prefix_sz + 1);
 }
 
@@ -37,7 +42,7 @@ _register_enum(struct pbc_env *p, struct _stringpool *pool, struct pbc_rmessage 
 	}
 	int name_sz;
 	const char * name = pbc_rmessage_string(enum_type, "name", 0 , &name_sz);
-	const char *temp = _concat_name(pool, prefix , prefix_sz , name , name_sz);
+	const char *temp = _concat_name(pool, prefix , prefix_sz , name , name_sz, NULL);
 
 	_pbcP_push_enum(p,temp,table,field_count);
 	free(table);
@@ -147,7 +152,7 @@ _register_extension(struct pbc_env *p, struct _stringpool *pool , const char * p
 		int field_name_sz = 0;
 		struct _field f;
 		const char * field_name = pbc_rmessage_string(extension , "name" , 0, &field_name_sz);
-		f.name =  _concat_name(pool, prefix, prefix_sz, field_name, field_name_sz);
+		f.name =  _concat_name(pool, prefix, prefix_sz, field_name, field_name_sz, NULL);
 
 		_register_field(extension, &f , pool);
 
@@ -169,7 +174,8 @@ static void
 _register_message(struct pbc_env *p, struct _stringpool *pool, struct pbc_rmessage * message_type, const char *prefix, int prefix_sz, pbc_array queue) {
 	int name_sz;
 	const char * name = pbc_rmessage_string(message_type, "name", 0 , &name_sz);
-	const char *temp = _concat_name(pool, prefix , prefix_sz , name , name_sz);
+	int sz = 0;
+	const char *temp = _concat_name(pool, prefix , prefix_sz , name , name_sz, &sz);
 
 	int field_count = pbc_rmessage_size(message_type, "field");
 	int i;
@@ -187,7 +193,7 @@ _register_message(struct pbc_env *p, struct _stringpool *pool, struct pbc_rmessa
 
 	_pbcP_init_message(p, temp);
 
-	_register_extension(p, pool, temp, prefix_sz + name_sz + 1,message_type, queue);
+	_register_extension(p, pool, temp, sz,message_type, queue);
 
 	// nested enum
 
@@ -195,14 +201,14 @@ _register_message(struct pbc_env *p, struct _stringpool *pool, struct pbc_rmessa
 
 	for (i=0;i<enum_count;i++) {
 		struct pbc_rmessage * enum_type = pbc_rmessage_message(message_type, "enum_type", i);
-		_register_enum(p, pool, enum_type, temp, name_sz + prefix_sz + 1);
+		_register_enum(p, pool, enum_type, temp, sz);
 	}
 	
 	// nested type
 	int message_count = pbc_rmessage_size(message_type, "nested_type");
 	for (i=0;i<message_count;i++) {
 		struct pbc_rmessage * nested_type = pbc_rmessage_message(message_type, "nested_type", i);
-		_register_message(p, pool, nested_type, temp, name_sz + prefix_sz + 1, queue);
+		_register_message(p, pool, nested_type, temp, sz, queue);
 	}
 }
 
