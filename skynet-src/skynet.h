@@ -6,6 +6,8 @@
 
 #define DONTCOPY 1
 #define SESSION_CLIENT 0x7fffffff
+#define SESSION_MULTICAST 0x7ffffffe
+#define SESSION_MAX 0x7ffffff0
 
 struct skynet_context;
 

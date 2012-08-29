@@ -5,6 +5,7 @@
 #include "skynet_module.h"
 #include "skynet_timer.h"
 #include "skynet_harbor.h"
+#include "skynet_group.h"
 
 #include <pthread.h>
 #include <unistd.h>
@@ -55,6 +56,7 @@ _start_master(const char * master) {
 
 void 
 skynet_start(struct skynet_config * config) {
+	skynet_group_init();
 	skynet_harbor_init(config->harbor);
 	skynet_handle_init(config->harbor);
 	skynet_mq_init(config->mqueue_size);

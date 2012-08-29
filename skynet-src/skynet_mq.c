@@ -1,4 +1,6 @@
+#include "skynet.h"
 #include "skynet_mq.h"
+#include "skynet_multicast.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,11 +29,6 @@ struct global_queue {
 };
 
 static struct global_queue *Q = NULL;
-
-static inline void
-_lock_global_queue() {
-	while (__sync_lock_test_and_set(&Q->lock,1)) {}
-}
 
 #define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
 #define UNLOCK(q) __sync_lock_release(&(q)->lock);
@@ -196,7 +193,12 @@ _drop_queue(struct message_queue *q) {
 	int s = 0;
 	while(!skynet_mq_pop(q, &msg)) {
 		++s;
-		free(msg.data);
+		if (msg.session == SESSION_MULTICAST) {
+			assert(msg.sz == 0);
+			skynet_multicast_dispatch((struct skynet_multicast_message *)msg.data, NULL, NULL);
+		} else {
+			free(msg.data);
+		}
 	}
 	_release(q);
 	return s;

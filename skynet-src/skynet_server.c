@@ -6,6 +6,8 @@
 #include "skynet_harbor.h"
 #include "skynet_env.h"
 #include "skynet.h"
+#include "skynet_multicast.h"
+#include "skynet_group.h"
 
 #include <string.h>
 #include <assert.h>
@@ -109,7 +111,7 @@ skynet_context_new(const char * name, const char *param) {
 int
 skynet_context_newsession(struct skynet_context *ctx) {
 	int session = ++ctx->session_id;
-	if (session >= SESSION_CLIENT) {
+	if (session >= SESSION_MAX) {
 		ctx->session_id = 1;
 		return 1;
 	}
@@ -137,6 +139,12 @@ skynet_context_release(struct skynet_context *ctx) {
 	}
 	return ctx;
 }
+
+int 
+skynet_context_ref(struct skynet_context *ctx) {
+	return ctx->ref;
+}
+
 
 int
 skynet_context_push(uint32_t handle, struct skynet_message *message) {
@@ -184,11 +192,20 @@ _forwarding(struct skynet_context *ctx, struct skynet_message *msg) {
 }
 
 static void
+_mc(void *ud, const char * source, const void * msg, size_t sz) {
+	struct skynet_context * ctx = ud;
+	ctx->cb(ctx, ctx->cb_ud, 0, source, msg, sz);
+}
+
+static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
 	CHECKCALLING_BEGIN(ctx)
 	if (msg->source == SKYNET_SYSTEM_TIMER) {
 		ctx->cb(ctx, ctx->cb_ud, msg->session, NULL, msg->data, msg->sz);
+	} else if (msg->session == SESSION_MULTICAST) {
+		assert(msg->sz == 0);
+		skynet_multicast_dispatch((struct skynet_multicast_message *)msg->data, ctx, _mc);
 	} else {
 		char tmp[10];
 		_id_to_hex(tmp, msg->source);
@@ -247,6 +264,32 @@ _copy_name(char name[GLOBALNAME_LENGTH], const char * addr) {
 	for (;i<GLOBALNAME_LENGTH;i++) {
 		name[i] = '\0';
 	}
+}
+
+static const char *
+_group_command(struct skynet_context * ctx, const char * cmd, int handle) {
+	uint32_t self = ctx->handle;
+	if (strcmp(cmd, "ENTER") == 0) {
+		skynet_group_enter(handle, self);
+		return NULL;
+	}
+	if (strcmp(cmd, "LEAVE") == 0) {
+		skynet_group_leave(handle, self);
+		return NULL;
+	}
+	if (strcmp(cmd, "QUERY") == 0) {
+		uint32_t addr = skynet_group_query(handle);
+		if (addr == 0) {
+			return NULL;
+		}
+		_id_to_hex(ctx->result, addr);
+		return ctx->result;
+	}
+	if (strcmp(cmd, "CLEAR") == 0) {
+		skynet_group_clear(handle);
+		return NULL;
+	}
+	return NULL;
 }
 
 const char * 
@@ -368,6 +411,17 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		uint32_t sec = skynet_gettime_fixsec();
 		sprintf(context->result,"%u",sec);
 		return context->result;
+	}
+
+	if (strcmp(cmd,"GROUP") == 0) {
+		int sz = strlen(param);
+		char tmp[sz+1];
+		strcpy(tmp,param);
+		tmp[sz] = '\0';
+		char cmd[sz+1];
+		int handle=0;
+		sscanf(tmp, "%s %d",cmd,&handle);
+		return _group_command(context, cmd, handle);
 	}
 
 	return NULL;

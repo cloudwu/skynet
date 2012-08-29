@@ -18,6 +18,7 @@ lualib/lpeg.so \
 lualib/protobuf.so \
 lualib/int64.so \
 service/master.so \
+service/multicast.so \
 service/harbor.so
 
 skynet : \
@@ -30,8 +31,13 @@ skynet-src/skynet_start.c \
 skynet-src/skynet_timer.c \
 skynet-src/skynet_error.c \
 skynet-src/skynet_harbor.c \
+skynet-src/skynet_multicast.c \
+skynet-src/skynet_group.c \
 skynet-src/skynet_env.c
 	gcc $(CFLAGS) -Wl,-E -o $@ $^ -Iskynet-src -lpthread -ldl -lrt -Wl,-E -llua -lm
+
+service/multicast.so : service-src/service_multicast.c
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 service/master.so : service-src/service_master.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src

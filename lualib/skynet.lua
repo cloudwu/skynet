@@ -216,6 +216,22 @@ function skynet.newservice(name, ...)
 	return handle
 end
 
+function skynet.enter_group(handle)
+	c.command("GROUP", "ENTER " .. tostring(handle))
+end
+
+function skynet.leave_group(handle)
+	c.command("GROUP", "LEAVE " .. tostring(handle))
+end
+
+function skynet.clear_group(handle)
+	c.command("GROUP", "CLEAR " .. tostring(handle))
+end
+
+function skynet.query_group(handle)
+	return c.command("GROUP","QUERY " .. tostring(handle))
+end
+
 ------ remote object --------
 
 do
