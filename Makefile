@@ -10,7 +10,6 @@ all : \
   lualib/skynet.so \
   service/gate.so \
   service/client.so \
-  service/broker.so \
   service/connection.so \
   client \
   lualib/socket.so \
@@ -65,9 +64,6 @@ service/connection.so : connection/connection.c connection/main.c
 
 lualib/socket.so : connection/lua-socket.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iconnection
-
-service/broker.so : service-src/service_broker.c
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 lualib/lpeg.so : lpeg/lpeg.c
 	gcc $(CFLAGS) $(SHARED) -O2 $^ -o $@ -Ilpeg

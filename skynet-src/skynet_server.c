@@ -250,8 +250,17 @@ _copy_name(char name[GLOBALNAME_LENGTH], const char * addr) {
 }
 
 static const char *
-_group_command(struct skynet_context * ctx, const char * cmd, int handle) {
-	uint32_t self = ctx->handle;
+_group_command(struct skynet_context * ctx, const char * cmd, int handle, uint32_t v) {
+	uint32_t self;
+	if (v != 0) {
+		if (skynet_harbor_message_isremote(v)) {
+			skynet_error(ctx, "Can't add remote handle %x",v);
+			return NULL;
+		}
+		self = v;
+	} else {
+		self = ctx->handle;
+	}
 	if (strcmp(cmd, "ENTER") == 0) {
 		skynet_group_enter(handle, self);
 		return NULL;
@@ -417,8 +426,9 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		tmp[sz] = '\0';
 		char cmd[sz+1];
 		int handle=0;
-		sscanf(tmp, "%s %d",cmd,&handle);
-		return _group_command(context, cmd, handle);
+		uint32_t addr=0;
+		sscanf(tmp, "%s %d :%x",cmd,&handle,&addr);
+		return _group_command(context, cmd, handle,addr);
 	}
 
 	return NULL;

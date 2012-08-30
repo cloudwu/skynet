@@ -8,5 +8,4 @@ end
 
 skynet.start(function()
 	print("start",id)
-	skynet.enter_group(1)
 end)

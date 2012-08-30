@@ -223,17 +223,24 @@ function skynet.start(f)
 end
 
 function skynet.newservice(name, ...)
-	local args = { "snlua" , name , ... }
-	local handle = skynet.call(".launcher", table.concat(args," "))
+	local handle = skynet.call(".launcher", skynet.unpack, skynet.pack("snlua", name, ...))
 	return handle
 end
 
-function skynet.enter_group(handle)
-	c.command("GROUP", "ENTER " .. tostring(handle))
+local function group_command(cmd, handle, address)
+	if address then
+		return string.format("%s %d :%x",cmd, handle, address)
+	else
+		return string.format("%s %d",cmd,handle)
+	end
 end
 
-function skynet.leave_group(handle)
-	c.command("GROUP", "LEAVE " .. tostring(handle))
+function skynet.enter_group(handle , address)
+	c.command("GROUP", group_command("ENTER", handle, address))
+end
+
+function skynet.leave_group(handle , address)
+	c.command("GROUP", group_command("LEAVE", handle, address))
 end
 
 function skynet.clear_group(handle)
