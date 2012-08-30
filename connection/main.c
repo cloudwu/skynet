@@ -95,6 +95,7 @@ _del(struct connection_server * server, int fd) {
 static void
 _poll(struct connection_server * server) {
 	int timeout = 100;
+	void * buffer = NULL;
 	for (;;) {
 		struct connection * c = connection_poll(server->pool, timeout);
 		if (c==NULL) {
@@ -103,7 +104,9 @@ _poll(struct connection_server * server) {
 		}
 		timeout = 0;
 
-		void * buffer = malloc(DEFAULT_BUFFER_SIZE);
+		if (buffer == NULL) {
+			buffer = malloc(DEFAULT_BUFFER_SIZE);
+		}
 
 		int size = recv(c->fd, buffer, DEFAULT_BUFFER_SIZE, MSG_DONTWAIT);
 		if (size < 0) {
@@ -112,9 +115,11 @@ _poll(struct connection_server * server) {
 		if (size == 0) {
 			connection_del(server->pool, c->fd);
 			free(buffer);
+			buffer = NULL;
 			skynet_send(server->ctx, 0, c->address, SESSION_CLIENT, NULL, 0, DONTCOPY);
 		} else {
 			skynet_send(server->ctx, 0, c->address, SESSION_CLIENT, buffer, size, DONTCOPY);
+			buffer = NULL;
 		}
 	}
 }
@@ -137,8 +142,8 @@ _main(struct skynet_context * ctx, void * ud, int session, uint32_t source, cons
 		char addr [addr_sz];
 		memcpy(addr, endptr+1, addr_sz-1);
 		addr[addr_sz-1] = '\0';
-		uint32_t address = strtoul(addr, NULL, 16);
-		if (address != 0) {
+		uint32_t address = strtoul(addr+1, NULL, 16);
+		if (address == 0) {
 			skynet_error(ctx, "[connection] Invalid ADD command from %x (session = %d)", source, session);
 			return 0;
 		}

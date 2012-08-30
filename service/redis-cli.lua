@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local socket = require "socket"
+local int64 = require "int64"
 local string = string
 local table = table
 local tonumber = tonumber
@@ -10,6 +11,12 @@ local redis_server, redis_db = ...
 local function compose_message(msg)
 	local lines = { "*" .. #msg }
 	for _,v in ipairs(msg) do
+		local t = type(v)
+		if t == "number" then
+			v = tostring(v)
+		elseif t == "userdata" then
+			v = int64.tostring(int64.new(v),10)
+		end
 		table.insert(lines,"$"..#v)
 		table.insert(lines,v)
 	end
@@ -101,6 +108,7 @@ redcmd[45] = function(data) -- '-'
 end
 
 redcmd[58] = function(data) -- ':'
+	-- todo: return string later
 	response(true, tonumber(data))
 end
 
@@ -117,7 +125,6 @@ end
 
 local function init()
 	while socket.connect(redis_server) do
-		print("Connect failed : "..redis_server)
 		skynet.sleep(1000)
 	end
 	if redis_db then

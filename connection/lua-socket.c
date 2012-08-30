@@ -65,6 +65,7 @@ _write(lua_State *L) {
 			case EINTR:
 				continue;
 			}
+			return 0;
 		}
 		assert(err == sz);
 		return 0;
@@ -104,6 +105,7 @@ _writeblock(lua_State *L) {
 			case EINTR:
 				continue;
 			}
+			return 0;
 		}
 		assert(err == sz +2);
 		return 0;

@@ -12,7 +12,9 @@ function socket.connect(addr)
 	if fd == nil then
 		return true
 	end
-	skynet.send(".connection","ADD "..fd.." "..skynet.self())
+	print("connect to " .. addr)
+	local command = "ADD "..fd.." ".. skynet.address(skynet.self())
+	skynet.send(".connection", command )
 	object = c.new()
 end
 

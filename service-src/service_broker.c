@@ -56,10 +56,9 @@ _cb(struct skynet_context * context, void * ud, int session, uint32_t source, co
 	if (b->init < DEFAULT_NUMBER) {
 		if (source != b->launcher)
 			return 0;
-		assert(sz == 9);
-		char addr[10];
-		memcpy(addr, msg, 9);
-		addr[9] = '\0';
+		char addr[sz+1];
+		memcpy(addr, msg, sz);
+		addr[sz] = '\0';
 		uint32_t address = strtoul(addr+1, NULL, 16);
 		assert(address != 0);
 		_init(b, session, address);

@@ -9,7 +9,7 @@ skynet.dispatch(function(msg, sz , session, address)
 		-- init notice
 		local reply = instance[address]
 		if reply then
-			skynet.send(reply[2] , reply[1], address)
+			skynet.send(reply[2] , reply[1], skynet.address(address))
 			instance[address] = nil
 		end
 	else

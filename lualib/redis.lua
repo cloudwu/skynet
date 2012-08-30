@@ -30,8 +30,8 @@ local meta = {
 }
 
 function redis.connect(dbname)
-	local handle = skynet.call(".redis-manager",dbname)
-	assert(handle ~= "")
+	local handle = skynet.call(".redis-manager",skynet.unpack, skynet.pack(dbname))
+	assert(handle ~= nil)
 	return setmetatable({ __handle = handle } , meta)
 end
 
