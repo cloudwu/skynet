@@ -78,27 +78,6 @@ _query(struct remote_objects *r, int handle) {
 	return 0;
 }
 
-static uint32_t
-_getaddr(lua_State *L, int index) {
-	size_t sz;
-	const char * addr = luaL_checklstring(L,index,&sz);
-	if (addr[0] != ':') {
-		luaL_error(L, "Invalid address %s",addr);
-	}
-	return strtoul(addr+1, NULL, 16);
-}
-
-static void
-_id_to_hex(char * str, uint32_t id) {
-	int i;
-	static char hex[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
-	str[0] = ':';
-	for (i=0;i<8;i++) {
-		str[i+1] = hex[(id >> ((7-i) * 4))&0xf];
-	}
-	str[9] = '\0';
-}
-
 static int
 lbind(lua_State *L) {
 	uint32_t addr = lua_tounsigned(L,lua_upvalueindex(1));
@@ -107,9 +86,7 @@ lbind(lua_State *L) {
 	if (old == 0) {
 		luaL_error(L, "handle %d is not exist", handle);
 	}
-	char tmp[10];
-	_id_to_hex(tmp, old);
-	lua_pushlstring(L,tmp,9);
+	lua_pushnumber(L, old);
 	return 1;
 }
 
@@ -138,9 +115,7 @@ lquery(lua_State *L) {
 	if (addr == 0) {
 		return 0;
 	}
-	char tmp[10];
-	_id_to_hex(tmp, addr);
-	lua_pushlstring(L,tmp,9);
+	lua_pushnumber(L, addr);
 	return 1;
 }
 
@@ -153,7 +128,7 @@ remoteobj_init(lua_State *L) {
 		}
 	}
 
-	uint32_t address = _getaddr(L, -1);
+	uint32_t address = luaL_checkunsigned(L, -1);
 	lua_pushcfunction(L, lquery);
 	lua_pushnumber(L, address);
 

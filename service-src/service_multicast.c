@@ -16,9 +16,8 @@ multicast_release(struct skynet_multicast_group *g) {
 }
 
 static int
-_maincb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
+_maincb(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
 	struct skynet_multicast_group *g = ud;
-	uint32_t source = strtoul(addr+1, NULL, 16);
 	if (source == 0) {
 		char cmd = '\0';
 		uint32_t handle = 0;

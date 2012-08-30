@@ -10,12 +10,13 @@
 
 struct worker {
 	int init;
-	char * name;
+	uint32_t address;
 };
 
 struct broker {
 	int init;
 	int id;
+	uint32_t launcher;
 	char * name;
 	struct worker w[DEFAULT_NUMBER];
 };
@@ -29,41 +30,42 @@ broker_create(void) {
 
 void
 broker_release(struct broker * b) {
-	int i;
-	for (i=0;i<DEFAULT_NUMBER;i++) {
-		free(b->w[i].name);
-	}
 	free(b->name);
 	free(b);
 }
 
 static void
-_init(struct broker *b, int session, const char * msg, size_t sz) {
+_init(struct broker *b, int session, uint32_t address) {
 	assert(session > 0 && session <= DEFAULT_NUMBER);
-	assert(msg);
 	int id = session - 1;
 	assert(b->w[id].init == 0);
-	b->w[id].name = malloc(sz+1);
-	memcpy(b->w[id].name, msg, sz);
-	b->w[id].name[sz] = '\0';
+	b->w[id].address = address;
 	b->w[id].init = 1;
 	++b->init;
 }
 
 static void
 _forward(struct broker *b, struct skynet_context * context) {
-	skynet_forward(context, b->w[b->id].name);
+	skynet_forward(context, b->w[b->id].address);
 	b->id = (b->id + 1) % DEFAULT_NUMBER;
 }
 
 static int
-_cb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
+_cb(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
 	struct broker * b = ud;
 	if (b->init < DEFAULT_NUMBER) {
-		_init(b, session, msg, sz);
+		if (source != b->launcher)
+			return 0;
+		assert(sz == 9);
+		char addr[10];
+		memcpy(addr, msg, 9);
+		addr[9] = '\0';
+		uint32_t address = strtoul(addr+1, NULL, 16);
+		assert(address != 0);
+		_init(b, session, address);
 		if (b->init == DEFAULT_NUMBER) {
 			skynet_command(context, "REG", b->name);
-			skynet_send(context, NULL, LAUNCHER, 0, NULL, 0, 0);
+			skynet_send(context, 0, b->launcher, 0, NULL, 0, 0);
 		}
 	} else {
 		_forward(b, context);
@@ -75,6 +77,12 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 
 int
 broker_init(struct broker *b, struct skynet_context *ctx, const char * args) {
+	b->launcher = skynet_queryname(ctx, LAUNCHER);
+	if (b->launcher == 0) {
+		skynet_error(ctx, "Can't query %s", LAUNCHER);
+		return 1;
+	}
+
 	char * service = strchr(args,' ');
 	if (service == NULL) {
 		return 1;
@@ -92,7 +100,7 @@ broker_init(struct broker *b, struct skynet_context *ctx, const char * args) {
 	if (len == 0)
 		return 1;
 	for (i=0;i<DEFAULT_NUMBER;i++) {
-		int id = skynet_send(ctx, NULL, LAUNCHER , -1, service , len, 0);
+		int id = skynet_send(ctx, 0, b->launcher , -1, service , len, 0);
 		assert(id > 0 && id <= DEFAULT_NUMBER);
 	}
 

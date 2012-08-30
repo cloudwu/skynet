@@ -85,19 +85,31 @@ function skynet.yield()
 end
 
 function skynet.register(name)
-	return c.command("REG", name)
+	c.command("REG", name)
 end
 
 function skynet.name(name, handle)
 	c.command("NAME", name .. " " .. handle)
 end
 
+local function string_to_handle(str)
+	return tonumber("0x" .. string.sub(str , 2))
+end
+
+local self_handle
 function skynet.self()
-	return c.command("REG")
+	if self_handle then
+		return self_handle
+	end
+	self_handle = string_to_handle(c.command("REG"))
+	return self_handle
 end
 
 function skynet.launch(...)
-	return c.command("LAUNCH", table.concat({...}," "))
+	local addr = c.command("LAUNCH", table.concat({...}," "))
+	if addr then
+		return string_to_handle(addr)
+	end
 end
 
 function skynet.now()
@@ -230,6 +242,10 @@ end
 
 function skynet.query_group(handle)
 	return c.command("GROUP","QUERY " .. tostring(handle))
+end
+
+function skynet.address(addr)
+	return string.format(":%x",addr)
 end
 
 ------ remote object --------

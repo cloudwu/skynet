@@ -10,12 +10,10 @@ function command:open(parm)
 	fd = tonumber(fd)
 	print("agent open",self,string.format("%d %d %s",self,fd,addr))
 	local client = skynet.launch("client",fd)
-	print("client",client)
-	local agent = skynet.launch("snlua","agent",client)
-	print("watchdog launch agent client:",agent,client)
+	local agent = skynet.launch("snlua","agent",skynet.address(client))
 	if agent then
 		agent_all[self] = { agent , client }
-		skynet.send(gate, "forward ".. self .. " " .. agent .. " " .. client)
+		skynet.send(gate, "forward ".. self .. " " .. skynet.address(agent) .. " " .. skynet.address(client))
 	end
 end
 
@@ -50,8 +48,7 @@ skynet.dispatch(function(msg, sz, session, address)
 end)
 
 skynet.start(function()
-	gate = skynet.launch("gate" , skynet.self(), port, max_agent, buffer)
-	print("gate = ", gate)
+	gate = skynet.launch("gate" , skynet.address(skynet.self()), port, max_agent, buffer)
 	skynet.send(gate,"start")
 	skynet.register(".watchdog")
 end)

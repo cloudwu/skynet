@@ -10,19 +10,8 @@ struct skynet_multicast_message {
 	int ref;
 	const void * msg;
 	size_t sz;
-	char source[10];
+	uint32_t source;
 };
-
-static void
-_id_to_hex(char * str, uint32_t id) {
-	int i;
-	static char hex[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
-	str[0] = ':';
-	for (i=0;i<8;i++) {
-		str[i+1] = hex[(id >> ((7-i) * 4))&0xf];
-	}
-	str[9] = '\0';
-}
 
 struct skynet_multicast_message * 
 skynet_multicast_create(const void * msg, size_t sz, uint32_t source) {
@@ -30,7 +19,7 @@ skynet_multicast_create(const void * msg, size_t sz, uint32_t source) {
 	mc->ref = 0;
 	mc->msg = msg;
 	mc->sz = sz;
-	_id_to_hex(mc->source, source);
+	mc->source = source;
 	return mc;
 }
 

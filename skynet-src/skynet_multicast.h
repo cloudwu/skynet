@@ -2,12 +2,13 @@
 #define SKYNET_MULTICAST_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 struct skynet_multicast_message;
 struct skynet_multicast_group;
 struct skynet_context;
 
-typedef void (*skynet_multicast_func)(void *ud, const char * source, const void * msg, size_t sz);
+typedef void (*skynet_multicast_func)(void *ud, uint32_t source, const void * msg, size_t sz);
 
 struct skynet_multicast_message * skynet_multicast_create(const void * msg, size_t sz, uint32_t source);
 void skynet_multicast_copy(struct skynet_multicast_message *, int copy);

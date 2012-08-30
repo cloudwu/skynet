@@ -231,7 +231,7 @@ _update_address(struct skynet_context * context, struct master *m, int harbor_id
  */
 
 static int
-_mainloop(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
+_mainloop(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
 	struct master *m = ud;
 	assert(session == SESSION_CLIENT);
 	uint32_t handle = 0;
@@ -256,15 +256,20 @@ int
 master_init(struct master *m, struct skynet_context *ctx, const char * args) {
 	char tmp[strlen(args) + 32];
 	sprintf(tmp,"gate ! %s %d 0",args,REMOTE_MAX);
-	const char * self_addr = skynet_command(ctx, "REG", NULL);
 	const char * gate_addr = skynet_command(ctx, "LAUNCH", tmp);
 	if (gate_addr == NULL) {
 		skynet_error(ctx, "Master : launch gate failed");
 		return 1;
 	}
+	uint32_t gate = strtoul(gate_addr+1, NULL, 16);
+	if (gate == 0) {
+		skynet_error(ctx, "Master : launch gate invalid %s", gate_addr);
+		return 1;
+	}
+	const char * self_addr = skynet_command(ctx, "REG", NULL);
 	int n = sprintf(tmp,"broker %s",self_addr);
-	skynet_send(ctx, NULL, gate_addr, 0, tmp, n, 0);
-	skynet_send(ctx, NULL, gate_addr, 0, "start", 5, 0);
+	skynet_send(ctx, 0, gate, 0, tmp, n, 0);
+	skynet_send(ctx, 0, gate, 0, "start", 5, 0);
 
 	skynet_callback(ctx, m, _mainloop);
 

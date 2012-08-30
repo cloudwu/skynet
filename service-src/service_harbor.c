@@ -291,17 +291,22 @@ _send_package(int fd, const void * buffer, size_t sz) {
 
 static int
 _send_remote(int fd, const char * buffer, size_t sz, struct remote_message_header * cookie) {
-	struct iovec part[2];
-	part[0].iov_base = (char *)buffer;
-	part[0].iov_len = sz;
+	uint16_t sz_header = htons(sz+sizeof(*cookie));
+	struct iovec part[3];
+
+	part[0].iov_base = &sz_header;
+	part[0].iov_len = 2;
+
+	part[1].iov_base = (char *)buffer;
+	part[1].iov_len = sz;
 
 	uint32_t header[3];
 	_header_to_message(cookie, header);
 
-	part[1].iov_base = header;
-	part[1].iov_len = sizeof(header);
+	part[2].iov_base = header;
+	part[2].iov_len = sizeof(header);
 	for (;;) {
-		int err = writev(fd, part, 2);
+		int err = writev(fd, part, 3);
 		if (err < 0) {
 			switch (errno) {
 			case EAGAIN:
@@ -309,7 +314,7 @@ _send_remote(int fd, const char * buffer, size_t sz, struct remote_message_heade
 				continue;
 			}
 		}
-		if (err != sz+sizeof(*cookie)) {
+		if (err != sz+sizeof(*cookie)+2) {
 			return 1;
 		}
 		return 0;
@@ -405,28 +410,13 @@ _request_master(struct harbor *h, struct skynet_context * context, const char na
 	n bytes string (name)
  */
 
-static void
-_id_to_hex(char *str, uint32_t id) {
-	int i;
-	static char hex[16] = { '0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F' };
-	str[0] = ':';
-	for (i=0;i<8;i++) {
-		str[i+1] = hex[(id >> ((7-i) * 4))&0xf];
-	}
-	str[9] = '\0';
-}
-
 static int
 _remote_send_handle(struct harbor *h, struct skynet_context * context, uint32_t source, uint32_t destination, int session, const char * msg, size_t sz) {
 	int harbor_id = destination >> HANDLE_REMOTE_SHIFT;
 	assert(harbor_id != 0);
 	if (harbor_id == h->id) {
 		// local message
-		char srcstr[10];
-		char desstr[10];
-		_id_to_hex(srcstr, source);
-		_id_to_hex(desstr, destination);
-		skynet_send(context, srcstr, desstr , session, (void *)msg, sz, DONTCOPY);
+		skynet_send(context, source, destination , session, (void *)msg, sz, DONTCOPY);
 		return 1;
 	}
 
@@ -491,7 +481,7 @@ _report_local_address(struct harbor *h, struct skynet_context * context, const c
 }
 
 static int
-_mainloop(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
+_mainloop(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
 	struct harbor * h = ud;
 	if (session == SESSION_CLIENT) {
 		const char * cookie = msg;
@@ -517,11 +507,7 @@ _mainloop(struct skynet_context * context, void * ud, int session, const char * 
 				_update_remote_name(h, context, msg, header.destination);
 			}
 		} else {
-			char srcstr[10];
-			char desstr[10];
-			_id_to_hex(srcstr, header.source);
-			_id_to_hex(desstr, header.destination);
-			skynet_send(context, srcstr, desstr, (int)header.session, (void *)msg, sz-12, DONTCOPY);
+			skynet_send(context, header.source, header.destination, (int)header.session, (void *)msg, sz-12, DONTCOPY);
 			return 1;
 		}
 	} else {
@@ -531,13 +517,12 @@ _mainloop(struct skynet_context * context, void * ud, int session, const char * 
 			return 0;
 		}
 		assert(sz == sizeof(*rmsg));
-		uint32_t source_handle = strtoul(addr+1, NULL, 16);
 		if (rmsg->destination.handle == 0) {
-			if (_remote_send_name(h, context, source_handle , rmsg->destination.name, session, rmsg->message, rmsg->sz)) {
+			if (_remote_send_name(h, context, source , rmsg->destination.name, session, rmsg->message, rmsg->sz)) {
 				return 0;
 			}
 		} else {
-			if (_remote_send_handle(h, context, source_handle , rmsg->destination.handle, session, rmsg->message, rmsg->sz)) {
+			if (_remote_send_handle(h, context, source , rmsg->destination.handle, session, rmsg->message, rmsg->sz)) {
 				return 0;
 			}
 		}
@@ -563,7 +548,6 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 	h->master_addr = strdup(master_addr);
 	h->master_fd = master_fd;
 
-	const char * self_addr = skynet_command(ctx, "REG", NULL);
 	char tmp[128];
 	sprintf(tmp,"gate ! %s %d 0",local_addr,REMOTE_MAX);
 	const char * gate_addr = skynet_command(ctx, "LAUNCH", tmp);
@@ -571,9 +555,15 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 		skynet_error(ctx, "Harbor : launch gate failed");
 		return 1;
 	}
+	uint32_t gate = strtoul(gate_addr+1 , NULL, 16);
+	if (gate == 0) {
+		skynet_error(ctx, "Harbor : launch gate invalid %s", gate_addr);
+		return 1;
+	}
+	const char * self_addr = skynet_command(ctx, "REG", NULL);
 	int n = sprintf(tmp,"broker %s",self_addr);
-	skynet_send(ctx, NULL, gate_addr, 0, tmp, n, 0);
-	skynet_send(ctx, NULL, gate_addr, 0, "start", 5, 0);
+	skynet_send(ctx, 0, gate, 0, tmp, n, 0);
+	skynet_send(ctx, 0, gate, 0, "start", 5, 0);
 
 	h->id = harbor_id;
 	skynet_callback(ctx, h, _mainloop);

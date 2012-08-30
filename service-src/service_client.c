@@ -9,7 +9,7 @@
 #include <string.h>
 
 static int
-_cb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
+_cb(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
 	assert(sz <= 65535);
 	int fd = (int)(intptr_t)ud;
 
@@ -31,7 +31,7 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 			}
 		}
 		if (err < 0) {
-			skynet_error(context, "Client socket error : Drop message from %s session = %d", addr, session);
+			skynet_error(context, "Client socket error : Drop message from %x session = %d", source, session);
 			return 0;
 		}
 		assert(err == sz +2);

@@ -8,7 +8,7 @@
 #include <assert.h>
 
 static int
-_cb(struct skynet_context * context, void * ud, int session, const char * addr, const void * msg, size_t sz) {
+_cb(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
 	lua_State *L = ud;
 	int trace = 1;
 	int top = lua_gettop(L);
@@ -21,17 +21,17 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 
 	int r;
 	if (msg == NULL) {
-		if (addr == NULL) {
+		if (source == 0) {
 			lua_pushinteger(L, session);
 			r = lua_pcall(L, 1, 0 , trace);
 		} else {
 			lua_pushinteger(L, session);
-			lua_pushstring(L, addr);
+			lua_pushnumber(L, source);
 			r = lua_pcall(L, 2, 0 , trace);
 		}
 	} else {
 		lua_pushinteger(L, session);
-		lua_pushstring(L, addr);
+		lua_pushnumber(L, source);
 		lua_pushlightuserdata(L,(void *)msg);
 		lua_pushinteger(L,sz);
 		r = lua_pcall(L, 4, 0 , trace);
@@ -41,16 +41,16 @@ _cb(struct skynet_context * context, void * ud, int session, const char * addr, 
 	const char * self = skynet_command(context, "REG", NULL);
 	switch (r) {
 	case LUA_ERRRUN:
-		skynet_error(context, "lua call [%s to %s : %d msgsz = %d] error : %s", addr , self, session, sz, lua_tostring(L,-1));
+		skynet_error(context, "lua call [%x to %s : %d msgsz = %d] error : %s", source , self, session, sz, lua_tostring(L,-1));
 		break;
 	case LUA_ERRMEM:
-		skynet_error(context, "lua memory error : [%s to %s : %d]", addr , self, session);
+		skynet_error(context, "lua memory error : [%x to %s : %d]", source , self, session);
 		break;
 	case LUA_ERRERR:
-		skynet_error(context, "lua error in error : [%s to %s : %d]", addr , self, session);
+		skynet_error(context, "lua error in error : [%x to %s : %d]", source , self, session);
 		break;
 	case LUA_ERRGCMM:
-		skynet_error(context, "lua gc error : [%s to %s : %d]", addr , self, session);
+		skynet_error(context, "lua gc error : [%x to %s : %d]", source , self, session);
 		break;
 	};
 
@@ -98,8 +98,38 @@ _command(lua_State *L) {
 static int
 _genid(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	int session = skynet_send(context, NULL, NULL, -1, NULL, 0 , 0);
+	int session = skynet_send(context, 0, 0, -1, NULL, 0 , 0);
 	lua_pushinteger(L, session);
+	return 1;
+}
+
+static int
+_sendname(lua_State *L, struct skynet_context * context, const char * dest) {
+	int session = 0;
+	int index = 0;
+
+	if (lua_type(L,2) == LUA_TNUMBER) {
+		session = lua_tointeger(L,2);
+		++index;
+	}
+	if (lua_gettop(L) == index + 1) {
+		session = skynet_sendname(context, dest, session , NULL, 0, 0);
+	} else {
+		int type = lua_type(L,index+2);
+		if (type == LUA_TSTRING) {
+			size_t len = 0;
+			void * msg = (void *)lua_tolstring(L,index+2,&len);
+			session = skynet_sendname(context, dest, session , msg, len, 0);
+		} else if (type == LUA_TNIL) {
+			session = skynet_sendname(context, dest, session , NULL, 0, 0);
+		} else {
+			luaL_checktype(L,index+2, LUA_TLIGHTUSERDATA);
+			void * msg = lua_touserdata(L,index+2);
+			int size = luaL_checkinteger(L,index+3);
+			session = skynet_sendname(context, dest, session, msg, size, DONTCOPY);
+		}
+	}
+	lua_pushinteger(L,session);
 	return 1;
 }
 
@@ -107,28 +137,48 @@ static int
 _send(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	int session = 0;
-	int index = 0;
-	const char * dest = luaL_checkstring(L,1);
+	int addr_type = lua_type(L,1);
+	uint32_t dest = 0;
+	switch(addr_type) {
+	case LUA_TNUMBER:
+		dest = lua_tounsigned(L,1);
+		break;
+	case LUA_TSTRING: {
+		const char * addrname = lua_tostring(L,1);
+		if (addrname[0] == '.' || addrname[0] == ':') {
+			dest = skynet_queryname(context, addrname);
+			if (dest == 0) {
+				luaL_error(L, "Invalid name %s", addrname);
+			}
+		} else {
+			return _sendname(L, context, addrname);
+		}
+		break;
+	}
+	default:
+		return luaL_error(L, "address must be number or string, got %s",lua_typename(L,addr_type));
+	}
 
+	int index = 0;
 	if (lua_type(L,2) == LUA_TNUMBER) {
 		session = lua_tointeger(L,2);
 		++index;
 	}
 	if (lua_gettop(L) == index + 1) {
-		session = skynet_send(context, NULL, dest, session , NULL, 0, 0);
+		session = skynet_send(context, 0, dest, session , NULL, 0, 0);
 	} else {
 		int type = lua_type(L,index+2);
 		if (type == LUA_TSTRING) {
 			size_t len = 0;
 			void * msg = (void *)lua_tolstring(L,index+2,&len);
-			session = skynet_send(context, NULL, dest, session , msg, len, 0);
+			session = skynet_send(context, 0, dest, session , msg, len, 0);
 		} else if (type == LUA_TNIL) {
-			session = skynet_send(context, NULL, dest, session , NULL, 0, 0);
+			session = skynet_send(context, 0, dest, session , NULL, 0, 0);
 		} else {
 			luaL_checktype(L,index+2, LUA_TLIGHTUSERDATA);
 			void * msg = lua_touserdata(L,index+2);
 			int size = luaL_checkinteger(L,index+3);
-			session = skynet_send(context, NULL, dest, session, msg, size, DONTCOPY);
+			session = skynet_send(context, 0, dest, session, msg, size, DONTCOPY);
 		}
 	}
 	if (session < 0) {
@@ -141,8 +191,8 @@ _send(lua_State *L) {
 static int
 _redirect(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	const char * dest = luaL_checkstring(L,1);
-	const char * source = luaL_checkstring(L,2);
+	uint32_t dest = luaL_checkunsigned(L,1);
+	uint32_t source = luaL_checkunsigned(L,2);
 	int session = luaL_checkinteger(L,3);
 
 	if (lua_gettop(L) == 3) {

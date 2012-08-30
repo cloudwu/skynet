@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 struct logger {
 	FILE * handle;
@@ -25,9 +26,9 @@ logger_release(struct logger * inst) {
 }
 
 static int
-_logger(struct skynet_context * context, void *ud, int session, const char * uid, const void * msg, size_t sz) {
+_logger(struct skynet_context * context, void *ud, int session, uint32_t source, const void * msg, size_t sz) {
 	struct logger * inst = ud;
-	fprintf(inst->handle, "[%s] ",uid);
+	fprintf(inst->handle, "[%x] ",source);
 	fwrite(msg, sz , 1, inst->handle);
 	fprintf(inst->handle, "\n");
 

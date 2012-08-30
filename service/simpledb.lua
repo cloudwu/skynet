@@ -15,7 +15,7 @@ end
 
 skynet.dispatch(function(msg, sz , session, from)
 	local message = skynet.tostring(msg,sz)
-	print("simpledb",message, from, session)
+	print("simpledb",message, skynet.address(from), session)
 	local cmd, key , value = string.match(message, "(%w+) (%w+) ?(.*)")
 	local f = command[cmd]
 	if f then

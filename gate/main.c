@@ -11,16 +11,16 @@
 #include <stdarg.h>
 
 struct connection {
-	char * agent;
-	char * client;
+	uint32_t agent;
+	uint32_t client;
 	int connection_id;
 	int uid;
 };
 
 struct gate {
 	struct mread_pool * pool;
-	const char * watchdog;
-	const char * broker;
+	uint32_t watchdog;
+	uint32_t broker;
 	int id_index;
 	int cap;
 	int max_connection;
@@ -31,10 +31,7 @@ struct gate {
 struct gate *
 gate_create(void) {
 	struct gate * g = malloc(sizeof(*g));
-	g->pool = NULL;
-	g->max_connection = 0;
-	g->agent = NULL;
-	g->broker = NULL;
+	memset(g,0,sizeof(*g));
 	return g;
 }
 
@@ -58,16 +55,10 @@ _parm(char *msg, int sz, int command_sz) {
 }
 
 static void
-_forward_agent(struct gate * g, int id, const char * agentaddr, const char *clientaddr) {
+_forward_agent(struct gate * g, int id, uint32_t agentaddr, uint32_t clientaddr) {
 	struct connection * agent = _id_to_agent(g,id);
-	if (agent->agent) {
-		free(agent->agent);
-	}
-	agent->agent = strdup(agentaddr);
-	if (agent->client) {
-		free(agent->client);
-	}
-	agent->client = strdup(clientaddr);
+	agent->agent = agentaddr;
+	agent->client = clientaddr;
 }
 
 static void
@@ -105,12 +96,14 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 		if (client == NULL) {
 			return;
 		}
-		_forward_agent(g, id, agent, client);
+		uint32_t agent_handle = strtoul(agent+1, NULL, 16);
+		uint32_t client_handle = strtoul(client+1, NULL, 16);
+		_forward_agent(g, id, agent_handle, client_handle);
 		return;
 	}
 	if (memcmp(command,"broker",i)==0) {
 		_parm(tmp, sz, i);
-		g->broker = strdup(command);
+		g->broker = skynet_queryname(ctx, command);
 		return;
 	}
 	if (memcmp(command,"start",i) == 0) {
@@ -122,7 +115,7 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 
 static void
 _report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
-	if (g->watchdog == NULL) {
+	if (g->watchdog == 0) {
 		return;
 	}
 	va_list ap;
@@ -131,13 +124,13 @@ _report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
 	int n = vsnprintf(tmp, sizeof(tmp), data, ap);
 	va_end(ap);
 
-	skynet_send(ctx, NULL, g->watchdog, 0, tmp, n, 0);
+	skynet_send(ctx, 0, g->watchdog, 0, tmp, n, 0);
 }
 
 static void
 _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_t len) {
 	if (g->broker) {
-		skynet_send(ctx, NULL, g->broker, SESSION_CLIENT, data, len, 0);
+		skynet_send(ctx, 0, g->broker, SESSION_CLIENT, data, len, 0);
 		return;
 	}
 	struct connection * agent = _id_to_agent(g,uid);
@@ -148,7 +141,7 @@ _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_
 		char * tmp = malloc(len + 32);
 		int n = snprintf(tmp,len+32,"%d data ",uid);
 		memcpy(tmp+n,data,len);
-		skynet_send(ctx, NULL, g->watchdog, 0, tmp, len + n, DONTCOPY);
+		skynet_send(ctx, 0, g->watchdog, 0, tmp, len + n, DONTCOPY);
 	}
 }
 
@@ -175,14 +168,11 @@ _remove_id(struct gate *g, int uid) {
 	struct connection * conn = _id_to_agent(g,uid);
 	assert(conn->uid == uid);
 	conn->uid = 0;
-	if (conn->agent) {
-		free(conn->agent);
-		conn->agent = NULL;
-	}
+	conn->agent = 0;
 }
 
 static int
-_cb(struct skynet_context * ctx, void * ud, int session, const char * uid, const void * msg, size_t sz) {
+_cb(struct skynet_context * ctx, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
 	struct gate *g = ud;
 	if (msg) {
 		_ctrl(ctx, g , msg , (int)sz);
@@ -265,10 +255,15 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 		return 1;
 	}
 	if (watchdog[0] == '!') {
-		g->watchdog = NULL;
+		g->watchdog = 0;
 	} else {
-		g->watchdog = strdup(watchdog);
+		g->watchdog = skynet_queryname(ctx, watchdog);
+		if (g->watchdog == 0) {
+			skynet_error(ctx, "Invalid watchdog %s",watchdog);
+			return 1;
+		}
 	}
+
 	g->pool = pool;
 	int cap = 1;
 	while (cap < max) {

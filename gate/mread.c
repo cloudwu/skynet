@@ -110,7 +110,7 @@ mread_create(uint32_t addr, int port , int max , int buffer_size) {
 	my_addr.sin_family = AF_INET;
 	my_addr.sin_port = htons(port);
 	my_addr.sin_addr.s_addr = addr;
-	printf("MREAD bind %s:%u\n",inet_ntoa(my_addr.sin_addr),ntohs(my_addr.sin_port));
+//	printf("MREAD bind %s:%u\n",inet_ntoa(my_addr.sin_addr),ntohs(my_addr.sin_port));
 	if (bind(listen_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
 		close(listen_fd);
 		return NULL;

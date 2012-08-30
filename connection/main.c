@@ -17,7 +17,7 @@
 
 struct connection {
 	int fd;
-	char * addr;
+	uint32_t address;
 };
 
 struct connection_server {
@@ -40,10 +40,6 @@ connection_release(struct connection_server * server) {
 	if (server->pool) {
 		connection_deletepool(server->pool);
 	}
-	int i;
-	for (i=0;i<server->max_connection;i++) {
-		free(server->conn[i].addr);
-	}
 	free(server->conn);
 	free(server);
 }
@@ -61,7 +57,7 @@ _expand(struct connection_server * server) {
 }
 
 static void
-_add(struct connection_server * server, int fd , char * addr) {
+_add(struct connection_server * server, int fd , uint32_t address) {
 	++server->current_connection;
 	if (server->current_connection > server->max_connection) {
 		_expand(server);
@@ -69,9 +65,9 @@ _add(struct connection_server * server, int fd , char * addr) {
 	int i;
 	for (i=0;i<server->max_connection;i++) {
 		struct connection * c = &server->conn[i];
-		if (c->addr == NULL) {
+		if (c->address == 0) {
 			c->fd = fd;
-			c->addr = addr;
+			c->address = address;
 			int err = connection_add(server->pool, fd , c);
 			assert(err == 0);
 			return;
@@ -86,8 +82,7 @@ _del(struct connection_server * server, int fd) {
 	for (i=0;i<server->max_connection;i++) {
 		struct connection * c = &server->conn[i];
 		if (c->fd == fd) {
-			free(c->addr);
-			c->addr = NULL;
+			c->address = 0;
 			c->fd = 0;
 			connection_del(server->pool, fd);
 			return;
@@ -117,15 +112,15 @@ _poll(struct connection_server * server) {
 		if (size == 0) {
 			connection_del(server->pool, c->fd);
 			free(buffer);
-			skynet_send(server->ctx, NULL, c->addr, SESSION_CLIENT, NULL, 0, DONTCOPY);
+			skynet_send(server->ctx, 0, c->address, SESSION_CLIENT, NULL, 0, DONTCOPY);
 		} else {
-			skynet_send(server->ctx, NULL, c->addr, SESSION_CLIENT, buffer, size, DONTCOPY);
+			skynet_send(server->ctx, 0, c->address, SESSION_CLIENT, buffer, size, DONTCOPY);
 		}
 	}
 }
 
 static int
-_main(struct skynet_context * ctx, void * ud, int session, const char * uid, const void * msg, size_t sz) {
+_main(struct skynet_context * ctx, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
 	if (msg == NULL) {
 		_poll(ud);
 		return 0;
@@ -135,24 +130,29 @@ _main(struct skynet_context * ctx, void * ud, int session, const char * uid, con
 		char * endptr;
 		int fd = strtol(param, &endptr, 10);
 		if (endptr == NULL) {
-			skynet_error(ctx, "[connection] Invalid ADD command from %s (session = %d)", uid, session);
+			skynet_error(ctx, "[connection] Invalid ADD command from %x (session = %d)", source, session);
 			return 0;
 		}
 		int addr_sz = sz - (endptr - (char *)msg);
-		char * addr = malloc(addr_sz);
+		char addr [addr_sz];
 		memcpy(addr, endptr+1, addr_sz-1);
 		addr[addr_sz-1] = '\0';
-		_add(ud, fd, addr);
+		uint32_t address = strtoul(addr, NULL, 16);
+		if (address != 0) {
+			skynet_error(ctx, "[connection] Invalid ADD command from %x (session = %d)", source, session);
+			return 0;
+		}
+		_add(ud, fd, address);
 	} else if (memcmp(msg, "DEL ", 4)==0) {
 		char * endptr;
 		int fd = strtol(param, &endptr, 10);
 		if (endptr == NULL) {
-			skynet_error(ctx, "[connection] Invalid DEL command from %s (session = %d)", uid, session);
+			skynet_error(ctx, "[connection] Invalid DEL command from %x (session = %d)", source, session);
 			return 0;
 		}
 		_del(ud, fd);
 	} else {
-		skynet_error(ctx, "[connection] Invalid command from %s (session = %d)", uid, session);
+		skynet_error(ctx, "[connection] Invalid command from %x (session = %d)", source, session);
 	}
 
 	return 0;
