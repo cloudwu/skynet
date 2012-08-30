@@ -234,6 +234,18 @@ _tostring(lua_State *L) {
 	return 1;
 }
 
+static int
+_harbor(lua_State *L) {
+	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+	uint32_t handle = luaL_checkunsigned(L,1);
+	int harbor = 0;
+	int remote = skynet_isremote(context, handle, &harbor);
+	lua_pushinteger(L,harbor);
+	lua_pushboolean(L, remote);
+
+	return 2;
+}
+
 // define in lua-remoteobj.c
 int remoteobj_init(lua_State *L);
 
@@ -255,6 +267,7 @@ luaopen_skynet_c(lua_State *L) {
 		{ "callback" , _callback },
 		{ "error", _error },
 		{ "tostring", _tostring },
+		{ "harbor", _harbor },
 		{ NULL, NULL },
 	};
 

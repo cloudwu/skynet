@@ -153,6 +153,15 @@ skynet_context_push(uint32_t handle, struct skynet_message *message) {
 	return 0;
 }
 
+int 
+skynet_isremote(struct skynet_context * ctx, uint32_t handle, int * harbor) {
+	int ret = skynet_harbor_message_isremote(handle);
+	if (harbor) {
+		*harbor = (int)(handle >> HANDLE_REMOTE_SHIFT);
+	}
+	return ret;
+}
+
 static int
 _forwarding(struct skynet_context *ctx, struct skynet_message *msg) {
 	if (ctx->forward) {

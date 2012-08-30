@@ -255,6 +255,10 @@ function skynet.address(addr)
 	return string.format(":%x",addr)
 end
 
+function skynet.harbor(addr)
+	return c.harbor(addr)
+end
+
 ------ remote object --------
 
 do

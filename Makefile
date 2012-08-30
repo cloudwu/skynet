@@ -18,6 +18,7 @@ all : \
   lualib/int64.so \
   service/master.so \
   service/multicast.so \
+  service/tunnel.so \
   service/harbor.so
 
 skynet : \
@@ -34,6 +35,9 @@ skynet : \
   skynet-src/skynet_group.c \
   skynet-src/skynet_env.c
 	gcc $(CFLAGS) -Wl,-E -o $@ $^ -Iskynet-src -lpthread -ldl -lrt -Wl,-E -llua -lm
+
+service/tunnel.so : service-src/service_tunnel.c
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 service/multicast.so : service-src/service_multicast.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src

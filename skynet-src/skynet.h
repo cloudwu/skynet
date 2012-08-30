@@ -18,6 +18,7 @@ int skynet_send(struct skynet_context * context, uint32_t source, uint32_t desti
 int skynet_sendname(struct skynet_context * context, const char * destination , int session, void * msg, size_t sz, int flags);
 
 void skynet_forward(struct skynet_context *, uint32_t destination);
+int skynet_isremote(struct skynet_context *, uint32_t handle, int * harbor);
 
 typedef int (*skynet_cb)(struct skynet_context * context, void *ud, int session, uint32_t source , const void * msg, size_t sz);
 void skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb);
