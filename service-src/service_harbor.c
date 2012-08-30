@@ -442,6 +442,19 @@ _remote_send_handle(struct harbor *h, struct skynet_context * context, uint32_t 
 	return 0;
 }
 
+static void
+_remote_register_name(struct harbor *h, struct skynet_context * context, const char name[GLOBALNAME_LENGTH], uint32_t handle) {
+	int i;
+	for (i=0;i<GLOBALNAME_LENGTH;i++) {
+		if (name[i] == '\0')
+			break;
+	}
+	if (handle != 0) {
+		_update_remote_name(h, context, name, handle);
+	}
+	_request_master(h,context,name,i,handle);
+}
+
 static int
 _remote_send_name(struct harbor *h, struct skynet_context * context, uint32_t source, const char name[GLOBALNAME_LENGTH], int session, const char * msg, size_t sz) {
 	struct keyvalue * node = _hash_search(h->map, name);
@@ -457,21 +470,12 @@ _remote_send_name(struct harbor *h, struct skynet_context * context, uint32_t so
 		header.destination = 0;
 		header.session = (uint32_t)session;
 		_push_queue(node->queue, msg, sz, &header);
+		// 0 for request
+		_remote_register_name(h, context, name, 0);
 		return 1;
 	} else {
 		return _remote_send_handle(h, context, source, node->value, session, msg, sz);
 	}
-}
-
-static void
-_remote_register_name(struct harbor *h, struct skynet_context * context, const char name[GLOBALNAME_LENGTH], uint32_t handle) {
-	int i;
-	for (i=0;i<GLOBALNAME_LENGTH;i++) {
-		if (name[i] == '\0')
-			break;
-	}
-	_update_remote_name(h, context, name, handle);
-	_request_master(h,context,name,i,handle);
 }
 
 static void

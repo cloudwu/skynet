@@ -1,4 +1,4 @@
-thread = 2
+thread = 8
 mqueue = 256
 cpath = "./service/?.so"
 logger = nil

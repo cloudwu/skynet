@@ -1,11 +1,14 @@
 local skynet = require "skynet"
-local id = ...
+local group = require "mcgroup"
+local id, g = ...
 
 skynet.dispatch(function (msg,sz)
-	print(id, skynet.tostring(msg,sz))
+	print("===>",id, skynet.tostring(msg,sz))
 end
 )
 
 skynet.start(function()
-	print("start",id)
+	if g then
+		group.enter(tonumber(g))
+	end
 end)

@@ -248,7 +248,7 @@ function skynet.clear_group(handle)
 end
 
 function skynet.query_group(handle)
-	return c.command("GROUP","QUERY " .. tostring(handle))
+	return string_to_handle(c.command("GROUP","QUERY " .. tostring(handle)))
 end
 
 function skynet.address(addr)

@@ -135,7 +135,7 @@ _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_
 	}
 	struct connection * agent = _id_to_agent(g,uid);
 	if (agent->agent) {
-		// todo: client package has not session , send 0x7fffffff
+		// client package has not session , send 0x7fffffff
 		skynet_send(ctx, agent->client, agent->agent, SESSION_CLIENT, data, len, 0);
 	} else if (g->watchdog) {
 		char * tmp = malloc(len + 32);
@@ -202,6 +202,7 @@ _cb(struct skynet_context * ctx, void * ud, int session, uint32_t source, const 
 		}
 		// big-endian
 		uint16_t len = plen[0] << 8 | plen[1];
+
 		void * data = mread_pull(m, len);
 		if (data == NULL) {
 			if (mread_closed(m)) {

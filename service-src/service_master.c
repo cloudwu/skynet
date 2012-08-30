@@ -220,6 +220,17 @@ _update_address(struct skynet_context * context, struct master *m, int harbor_id
 	}
 	m->remote_fd[harbor_id] = fd;
 	_broadcast(context, m, addr, sz, harbor_id);
+
+	int i;
+	for (i=1;i<REMOTE_MAX;i++) {
+		if (i == harbor_id)
+			continue;
+		const char * addr = m->remote_addr[i];
+		if (addr == NULL) {
+			continue;
+		}
+		_send_to(fd, addr, strlen(addr), i);
+	}
 }
 
 

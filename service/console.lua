@@ -8,8 +8,6 @@ skynet.start(function()
 		local handle = skynet.launch(cmd)
 		if handle == nil then
 			print("Launch error:",cmd)
-		else
-			print("Launch:",handle,cmd)
 		end
 		skynet.yield()
 	end

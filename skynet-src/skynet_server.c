@@ -17,6 +17,8 @@
 #define BLACKHOLE "blackhole"
 #define DEFAULT_MESSAGE_QUEUE 16 
 
+#define CALLING_CHECK
+
 #ifdef CALLING_CHECK
 
 #define CHECKCALLING_BEGIN(ctx) assert(__sync_lock_test_and_set(&ctx->calling,1) == 0);
@@ -162,24 +164,28 @@ skynet_isremote(struct skynet_context * ctx, uint32_t handle, int * harbor) {
 	return ret;
 }
 
+static void
+_send_message(uint32_t des, struct skynet_message *msg) {
+	if (skynet_harbor_message_isremote(des)) {
+			struct remote_message * rmsg = malloc(sizeof(*rmsg));
+			rmsg->destination.handle = des;
+			rmsg->message = msg->data;
+			rmsg->sz = msg->sz;
+			skynet_harbor_send(rmsg, msg->source, msg->session);
+	} else {
+		if (skynet_context_push(des, msg)) {
+			free(msg->data);
+			skynet_error(NULL, "Drop message from %x forward to %x (size=%d)", msg->source, des, (int)msg->sz);
+		}
+	}
+}
+
 static int
 _forwarding(struct skynet_context *ctx, struct skynet_message *msg) {
 	if (ctx->forward) {
 		uint32_t des = ctx->forward;
 		ctx->forward = 0;
-		if (skynet_harbor_message_isremote(des)) {
-				struct remote_message * rmsg = malloc(sizeof(*rmsg));
-				rmsg->destination.handle = des;
-				rmsg->message = msg->data;
-				rmsg->sz = msg->sz;
-				skynet_harbor_send(rmsg, msg->source, msg->session);
-		} else {
-			if (skynet_context_push(des, msg)) {
-				free(msg->data);
-				skynet_error(NULL, "Drop message from %x forward to %x (size=%d)", msg->source, des, (int)msg->sz);
-				return 1;
-			}
-		}
+		_send_message(des, msg);
 		return 1;
 	}
 	return 0;
@@ -189,6 +195,17 @@ static void
 _mc(void *ud, uint32_t source, const void * msg, size_t sz) {
 	struct skynet_context * ctx = ud;
 	ctx->cb(ctx, ctx->cb_ud, 0, source, msg, sz);
+	if (ctx->forward) {
+		uint32_t des = ctx->forward;
+		ctx->forward = 0;
+		struct skynet_message message;
+		message.source = source;
+		message.session = 0;
+		message.data = malloc(sz);
+		memcpy(message.data, msg, sz);
+		message.sz = sz;
+		_send_message(des, &message);
+	}
 }
 
 static void

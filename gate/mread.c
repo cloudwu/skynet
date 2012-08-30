@@ -276,7 +276,7 @@ mread_poll(struct mread_pool * self , int timeout) {
 			socklen_t len = sizeof(struct sockaddr_in);
 			int client_fd = accept(self->listen_fd , (struct sockaddr *)&remote_addr ,  &len);
 			if (client_fd >= 0) {
-//				printf("MREAD connect %s:%u (fd=%d)\n",inet_ntoa(remote_addr.sin_addr),ntohs(remote_addr.sin_port), client_fd);
+//				printf("MREAD(%p) connect %s:%u (fd=%d)\n",self, inet_ntoa(remote_addr.sin_addr),ntohs(remote_addr.sin_port), client_fd);
 				struct socket * s = _add_client(self, client_fd);
 				if (s) {
 					self->active = -1;
@@ -390,6 +390,14 @@ mread_pull(struct mread_pool * self , int size) {
 	for (;;) {
 		int bytes = recv(s->fd, buffer, rd, MSG_DONTWAIT); 
 		if (bytes > 0) {
+/*
+			printf("recv: [%d] ",s->fd);
+			int i;
+			for (i=0;i<bytes;i++) {
+				printf("%02x ",(uint8_t*)buffer[i]);
+			}
+			printf("\n");
+*/
 			ringbuffer_resize(rb, blk , bytes);
 			if (bytes < sz) {
 				_link_node(rb, self->active, s , blk);
