@@ -242,9 +242,12 @@ _update_address(struct skynet_context * context, struct master *m, int harbor_id
  */
 
 static int
-_mainloop(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
+_mainloop(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
+	if (type != PTYPE_HARBOR) {
+		skynet_error(context, "None harbor message recv from %x (type = %d)", source, type);
+		return 0;
+	}
 	struct master *m = ud;
-	assert(session == SESSION_CLIENT);
 	uint32_t handle = 0;
 	memcpy(&handle, msg, 4);
 	handle = ntohl(handle);
@@ -266,7 +269,7 @@ _mainloop(struct skynet_context * context, void * ud, int session, uint32_t sour
 int
 master_init(struct master *m, struct skynet_context *ctx, const char * args) {
 	char tmp[strlen(args) + 32];
-	sprintf(tmp,"gate ! %s %d 0",args,REMOTE_MAX);
+	sprintf(tmp,"gate ! %s %d %d 0",args,PTYPE_HARBOR,REMOTE_MAX);
 	const char * gate_addr = skynet_command(ctx, "LAUNCH", tmp);
 	if (gate_addr == NULL) {
 		skynet_error(ctx, "Master : launch gate failed");
@@ -279,8 +282,8 @@ master_init(struct master *m, struct skynet_context *ctx, const char * args) {
 	}
 	const char * self_addr = skynet_command(ctx, "REG", NULL);
 	int n = sprintf(tmp,"broker %s",self_addr);
-	skynet_send(ctx, 0, gate, 0, tmp, n, 0);
-	skynet_send(ctx, 0, gate, 0, "start", 5, 0);
+	skynet_send(ctx, 0, gate, PTYPE_TEXT, 0, tmp, n);
+	skynet_send(ctx, 0, gate, PTYPE_TEXT, 0, "start", 5);
 
 	skynet_callback(ctx, m, _mainloop);
 

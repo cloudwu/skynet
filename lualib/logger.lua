@@ -22,7 +22,7 @@ logger.CRITICAL = 50
 logger.FATAL = 60
 
 local function log_to_disk(...)
-	Skynet.send(".lualog" , Skynet.pack(...))
+	Skynet.send(".lualog" , "lua" , ...)
 end
 
 local function dump_log_to_disk(t)

@@ -1,7 +1,5 @@
 local skynet = require "skynet"
 
-skynet.remote_service()
-
 local obj = { id = 0 }
 
 function obj.hello()
@@ -21,4 +19,5 @@ skynet.start(function()
 	local qobj = root.query "test"
 	print(qobj.hello())
 	print(qobj:inc())
+	skynet.exit()
 end)

@@ -17,8 +17,6 @@
 #define BLACKHOLE "blackhole"
 #define DEFAULT_MESSAGE_QUEUE 16 
 
-#define CALLING_CHECK
-
 #ifdef CALLING_CHECK
 
 #define CHECKCALLING_BEGIN(ctx) assert(__sync_lock_test_and_set(&ctx->calling,1) == 0);
@@ -108,11 +106,6 @@ skynet_context_new(const char * name, const char *param) {
 int
 skynet_context_newsession(struct skynet_context *ctx) {
 	int session = ++ctx->session_id;
-	if (session >= SESSION_MAX) {
-		ctx->session_id = 1;
-		return 1;
-	}
-
 	return session;
 }
 
@@ -194,7 +187,9 @@ _forwarding(struct skynet_context *ctx, struct skynet_message *msg) {
 static void
 _mc(void *ud, uint32_t source, const void * msg, size_t sz) {
 	struct skynet_context * ctx = ud;
-	ctx->cb(ctx, ctx->cb_ud, 0, source, msg, sz);
+	int type = sz >> 24;
+	sz &= 0xffffff;
+	ctx->cb(ctx, ctx->cb_ud, type, 0, source, msg, sz);
 	if (ctx->forward) {
 		uint32_t des = ctx->forward;
 		ctx->forward = 0;
@@ -203,7 +198,7 @@ _mc(void *ud, uint32_t source, const void * msg, size_t sz) {
 		message.session = 0;
 		message.data = malloc(sz);
 		memcpy(message.data, msg, sz);
-		message.sz = sz;
+		message.sz = sz  | (type << 24);
 		_send_message(des, &message);
 	}
 }
@@ -212,13 +207,12 @@ static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
 	CHECKCALLING_BEGIN(ctx)
-	if (msg->source == SKYNET_SYSTEM_TIMER) {
-		ctx->cb(ctx, ctx->cb_ud, msg->session, 0, msg->data, msg->sz);
-	} else if (msg->session == SESSION_MULTICAST) {
-		assert(msg->sz == 0);
+	int type = msg->sz >> 24;
+	size_t sz = msg->sz & 0xffffff;
+	if (type == PTYPE_MULTICAST) {
 		skynet_multicast_dispatch((struct skynet_multicast_message *)msg->data, ctx, _mc);
 	} else {
-		int reserve = ctx->cb(ctx, ctx->cb_ud, msg->session, msg->source, msg->data, msg->sz);
+		int reserve = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
 		reserve |= _forwarding(ctx, msg);
 		if (!reserve) {
 			free(msg->data);
@@ -413,7 +407,7 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 			return NULL;
 		} else {
 			_id_to_hex(context->result, inst->handle);
-			printf("launch %s : %x\n",param, inst->handle);
+			printf("[:%x] launch %s\n",inst->handle, param);
 			return context->result;
 		}
 	}
@@ -466,43 +460,57 @@ skynet_forward(struct skynet_context * context, uint32_t destination) {
 	context->forward = destination;
 }
 
-int
-skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int session, void * data, size_t sz, int flags) {
-	int session_id = session;
-	if (source == 0) {
-		source = context->handle;
-		if (session < 0) {
-			session = skynet_context_newsession(context);
-			session_id = - session;
-		}
-	} 
+static void
+_filter_args(struct skynet_context * context, int type, int *session, void ** data, size_t * sz) {
+	int dontcopy = type & PTYPE_TAG_DONTCOPY;
+	int allocsession = type & PTYPE_TAG_ALLOCSESSION;
+	type &= 0xff;
+
+	if (allocsession) {
+		assert(*session == 0);
+		*session = skynet_context_newsession(context);
+	}
 
 	char * msg;
-	if ((flags & DONTCOPY) || data == NULL) {
-		msg = data;
+	if (dontcopy || *data == NULL) {
+		msg = *data;
 	} else {
-		msg = malloc(sz+1);
-		memcpy(msg, data, sz);
-		msg[sz] = '\0';
+		msg = malloc(*sz+1);
+		memcpy(msg, *data, *sz);
+		msg[*sz] = '\0';
 	}
+	*data = msg;
+
+	assert((*sz & 0xffffff) == *sz);
+	*sz |= type << 24;
+}
+
+int
+skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
+	_filter_args(context, type, &session, (void **)&data, &sz);
+
+	if (source == 0) {
+		source = context->handle;
+	}
+
 	if (destination == 0) {
 		return session;
 	}
 	if (skynet_harbor_message_isremote(destination)) {
 		struct remote_message * rmsg = malloc(sizeof(*rmsg));
 		rmsg->destination.handle = destination;
-		rmsg->message = msg;
+		rmsg->message = data;
 		rmsg->sz = sz;
-		skynet_harbor_send(rmsg, source, session_id);
+		skynet_harbor_send(rmsg, source, session);
 	} else {
 		struct skynet_message smsg;
 		smsg.source = source;
-		smsg.session = session_id;
-		smsg.data = msg;
+		smsg.session = session;
+		smsg.data = data;
 		smsg.sz = sz;
 
 		if (skynet_context_push(destination, &smsg)) {
-			free(msg);
+			free(data);
 			skynet_error(NULL, "Drop message from %x to %x (size=%d)", source, destination, (int)sz);
 			return -1;
 		}
@@ -511,67 +519,32 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 }
 
 int
-skynet_sendname(struct skynet_context * context, const char * addr , int session, void * data, size_t sz, int flags) {
-	int session_id = session;
-	uint32_t source_handle = context->handle;
-	if (session < 0) {
-		session = skynet_context_newsession(context);
-		session_id = - session;
-	}
-
-	char * msg;
-	if ((flags & DONTCOPY) || data == NULL) {
-		msg = data;
-	} else {
-		msg = malloc(sz+1);
-		memcpy(msg, data, sz);
-		msg[sz] = '\0';
-	}
-	if (addr == NULL) {
-		return session;
-	}
+skynet_sendname(struct skynet_context * context, const char * addr , int type, int session, void * data, size_t sz) {
+	uint32_t source = context->handle;
 	uint32_t des = 0;
 	if (addr[0] == ':') {
 		des = strtoul(addr+1, NULL, 16);
 	} else if (addr[0] == '.') {
 		des = skynet_handle_findname(addr + 1);
 		if (des == 0) {
-			free(msg);
-			skynet_error(context, "Drop message to %s, size = %d", addr, (int)sz);
+			free(data);
+			skynet_error(context, "Drop message to %s", addr);
 			return session;
 		}
 	} else {
+		_filter_args(context, type, &session, (void **)&data, &sz);
+
 		struct remote_message * rmsg = malloc(sizeof(*rmsg));
 		_copy_name(rmsg->destination.name, addr);
 		rmsg->destination.handle = 0;
-		rmsg->message = msg;
+		rmsg->message = data;
 		rmsg->sz = sz;
-		skynet_harbor_send(rmsg, source_handle, session_id);
+
+		skynet_harbor_send(rmsg, source, session);
 		return session;
 	}
 
-	assert(des > 0);
-
-	if (skynet_harbor_message_isremote(des)) {
-		struct remote_message * rmsg = malloc(sizeof(*rmsg));
-		rmsg->destination.handle = des;
-		rmsg->message = msg;
-		rmsg->sz = sz;
-		skynet_harbor_send(rmsg, source_handle, session_id);
-	} else {
-		struct skynet_message smsg;
-		smsg.source = source_handle;
-		smsg.session = session_id;
-		smsg.data = msg;
-		smsg.sz = sz;
-
-		if (skynet_context_push(des, &smsg)) {
-			free(msg);
-			skynet_error(NULL, "Drop message from %x to %s (size=%d)", smsg.source, addr, (int)sz);
-			return -1;
-		}
-	}
-	return session;
+	return skynet_send(context, source, des, type, session, data, sz);
 }
 
 uint32_t 
@@ -592,12 +565,12 @@ skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb) {
 }
 
 void
-skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t source, int session) {
+skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t source, int type, int session) {
 	struct skynet_message smsg;
 	smsg.source = source;
 	smsg.session = session;
 	smsg.data = msg;
-	smsg.sz = sz;
+	smsg.sz = sz | type << 24;
 
 	skynet_mq_push(ctx->queue, &smsg);
 }

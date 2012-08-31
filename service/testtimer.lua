@@ -1,8 +1,5 @@
 local skynet = require "skynet"
 
--- register a dummy callback function
-skynet.dispatch()
-
 local function timeout(t)
 	print(t)
 end

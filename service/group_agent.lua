@@ -46,13 +46,11 @@ function command.CLEAR(id)
 	end
 end
 
-skynet.dispatch(function (msg,sz)
-	local cmd , id , handle = skynet.unpack(msg,sz)
-	local f = command[cmd]
-	assert(f, cmd)
-	f(id,handle)
-end)
-
 skynet.start(function()
-	skynet.send("GROUPMGR" , 0, skynet.pack("MASTER", skynet.self()))
+	skynet.dispatch("lua", function(session, address, cmd , id , handle)
+		local f = command[cmd]
+		assert(f, cmd)
+		f(id,handle)
+	end)
+	skynet.send("GROUPMGR" , "lua", "MASTER", skynet.self())
 end)

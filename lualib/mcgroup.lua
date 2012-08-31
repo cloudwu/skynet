@@ -5,7 +5,7 @@ local SERVICE = "GROUPMGR"
 local group = {}
 
 function group.create()
-	return skynet.call(SERVICE, skynet.unpack, skynet.pack("NEW" , skynet.self()))
+	return skynet.call(SERVICE, "lua", "NEW" , skynet.self())
 end
 
 function group.address(id)
@@ -15,16 +15,16 @@ end
 
 function group.enter(id, handle)
 	handle = handle or skynet.self()
-	skynet.send(SERVICE, 0 , skynet.pack("ENTER", handle, id))
+	skynet.send(SERVICE, "lua" , "ENTER", handle, id)
 end
 
 function group.leave(id, handle)
 	handle = handle or skynet.self()
-	skynet.send(SERVICE, 0 , skynet.pack("LEAVE", handle, id))
+	skynet.send(SERVICE, "lua" , "LEAVE", handle, id)
 end
 
 function group.release(id)
-	skynet.send(SERVICE, 0 , skynet.pack("CLEAR", skynet.self(), id))
+	skynet.send(SERVICE, "lua" , "CLEAR", skynet.self(), id)
 end
 
 return group

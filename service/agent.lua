@@ -1,23 +1,19 @@
 local skynet = require "skynet"
 local client = ...
 
-local session_id = 0
-skynet.filter(function (session, address , msg, sz)
-	if session == 0x7fffffff then
-		skynet.send("LOG", "client message :" .. skynet.tostring(msg,sz))
+skynet.register_protocol {
+	name = "client",
+	id = 3,
+	pack = function(...) return ... end,
+	unpack = skynet.tostring,
+	dispatch = function (session, address, text)
 		-- It's client, there is no session
-		session_id = session_id + 1
-		session = - session_id
-	else
-		skynet.send("LOG", "skynet message")
+		skynet.send("LOG", "text", "client message :" .. text)
+		local result = skynet.call("SIMPLEDB", "text", text)
+		skynet.ret(result)
 	end
-	return session, address , msg, sz
-end, function (msg,sz)
-	local message = skynet.tostring(msg,sz)
-	local result = skynet.call("SIMPLEDB",message)
-	skynet.ret(result)
-end)
+}
 
 skynet.start(function()
-	skynet.send(client,"Welcome to skynet")
+	skynet.send(client,"text","Welcome to skynet")
 end)

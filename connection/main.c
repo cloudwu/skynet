@@ -116,20 +116,22 @@ _poll(struct connection_server * server) {
 			connection_del(server->pool, c->fd);
 			free(buffer);
 			buffer = NULL;
-			skynet_send(server->ctx, 0, c->address, SESSION_CLIENT, NULL, 0, DONTCOPY);
+			// todo: support user defined type
+			skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, NULL, 0);
 		} else {
-			skynet_send(server->ctx, 0, c->address, SESSION_CLIENT, buffer, size, DONTCOPY);
+			skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, buffer, size);
 			buffer = NULL;
 		}
 	}
 }
 
 static int
-_main(struct skynet_context * ctx, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
-	if (msg == NULL) {
+_main(struct skynet_context * ctx, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
+	if (type == PTYPE_RESPONSE) {
 		_poll(ud);
 		return 0;
 	}
+	assert(type == PTYPE_TEXT);
 	const char * param = (const char *)msg + 4;
 	if (memcmp(msg, "ADD ", 4)==0) {
 		char * endptr;

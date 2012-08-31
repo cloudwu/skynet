@@ -5,7 +5,18 @@ local coroutine = coroutine
 local assert = assert
 local pairs = pairs
 
+local proto = {}
 local skynet = {}
+
+function skynet.register_protocol(class)
+	local name = class.name
+	local id = class.id
+	assert(proto[name] == nil)
+	assert(type(name) == "string" and type(id) == "number" and id >=0 and id <=255)
+	proto[name] = class
+	proto[id] = class
+end
+
 local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
@@ -41,7 +52,11 @@ function suspend(co, result, command, param, size)
 	elseif command == "RETURN" then
 		local co_session = session_coroutine_id[co]
 		local co_address = session_coroutine_address[co]
-		c.send(co_address, co_session, param, size)
+		-- PTYPE_RESPONSE = 1 , see skynet.h
+		if param == nil then
+			error(debug.traceback(co))
+		end
+		c.send(co_address, 1, co_session, param, size)
 		return suspend(co, coroutine.resume(co))
 	elseif command == nil then
 		-- coroutine exit
@@ -74,7 +89,9 @@ function skynet.sleep(ti)
 	assert(session)
 	local ret = coroutine.yield("SLEEP", tonumber(session))
 	sleep_session[coroutine.running()] = nil
-	return ret
+	if ret == true then
+		return "BREAK"
+	end
 end
 
 function skynet.yield()
@@ -136,61 +153,30 @@ function skynet.setenv(key, value)
 	c.command("SETENV",key .. " " ..value)
 end
 
-skynet.send = assert(c.send)
+function skynet.send(addr, typename, ...)
+	local p = proto[typename]
+	return c.send(addr, p.id, 0 , p.pack(...))
+end
+
 skynet.genid = assert(c.genid)
-skynet.redirect = assert(c.redirect)
+
+skynet.redirect = function(dest,source,typename,...)
+	return c.redirect(dest, source, proto[typename].id, ...)
+end
+
 skynet.pack = assert(c.pack)
-skynet.tostring = assert(c.tostring)
 skynet.unpack = assert(c.unpack)
+skynet.tostring = assert(c.tostring)
 
-function skynet.call(addr, deseri , ...)
-	if deseri == nil then
-		local session = c.send(addr, -1, ...)
-		return coroutine.yield("CALL", session)
-	end
-	local t = type(deseri)
-	if t == "function" then
-		local session = c.send(addr, -1, ...)
-		return deseri(coroutine.yield("CALL", session))
-	else
-		assert(t=="string")
-		local session = c.send(addr, -1, deseri)
-		return c.tostring(coroutine.yield("CALL", session))
-	end
+function skynet.call(addr, typename, ...)
+	local p = proto[typename]
+	local session = c.send(addr, p.id , nil , p.pack(...))
+	return p.unpack(coroutine.yield("CALL", session))
 end
 
-function skynet.ret(...)
-	coroutine.yield("RETURN", ...)
-end
-
-local function default_dispatch(f, unknown)
-	unknown = unknown or function (session, msg, sz)
-		local self = skynet.self()
-		print(self, session,msg,sz)
-		error(string.format("%s Unknown session %d", self, session))
-	end
-	return function(session, address , msg, sz)
-		if session == nil then
-			return
-		end
-		if session <= 0 then
-			session = - session
-			co = coroutine.create(f)
-			session_coroutine_id[co] = session
-			session_coroutine_address[co] = address
-			suspend(co, coroutine.resume(co, msg, sz, session, address))
-		else
-			local co = session_id_coroutine[session]
-			if co == "BREAK" then
-				session_id_coroutine[session] = nil
-			elseif co == nil then
-				unknown(session,msg,sz)
-			else
-				session_id_coroutine[session] = nil
-				suspend(co, coroutine.resume(co, msg, sz))
-			end
-		end
-	end
+function skynet.ret(msg, sz)
+	msg = msg or ""
+	coroutine.yield("RETURN", msg, sz)
 end
 
 function skynet.wakeup(co)
@@ -200,30 +186,54 @@ function skynet.wakeup(co)
 	end
 end
 
-function skynet.dispatch(f,unknown)
-	c.callback(default_dispatch(f,unknown))
+function skynet.dispatch(typename, func)
+	local p = assert(proto[typename],tostring(typename))
+	assert(p.dispatch == nil, tostring(typename))
+	p.dispatch = func
 end
 
-function skynet.filter(filter, f, unknown)
-	local func = default_dispatch(f, unknown)
-	c.callback(function (...)
-		func(filter(...))
+local function unknown_response(session, address, msg, sz)
+	print("Response message :" , c.tostring(msg,sz))
+	error(string.format("Unknown session : %d from %x", session, address))
+end
+
+function skynet.dispatch_unknown_response(unknown)
+	local prev = unknown_response
+	unknown_response = unknown
+	return prev
+end
+
+local function start_skynet()
+	c.callback(function(prototype, msg, sz, session, source)
+		-- PTYPE_RESPONSE = 1, read skynet.h
+		if prototype == 1 then
+			local co = session_id_coroutine[session]
+			if co == "BREAK" then
+				session_id_coroutine[session] = nil
+			elseif co == nil then
+				unknown_response(session, source, msg, sz)
+			else
+				session_id_coroutine[session] = nil
+				suspend(co, coroutine.resume(co, msg, sz))
+			end
+		else
+			local p = assert(proto[prototype], prototype)
+			local f = p.dispatch
+			if f then
+				local co = coroutine.create(f)
+				session_coroutine_id[co] = session
+				session_coroutine_address[co] = source
+				suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz)))
+			else
+				print("Unknown request :" , p.unpack(msg,sz))
+				error(string.format("Can't dispatch type %s : ", p.name))
+			end
+		end
 	end)
 end
 
-function skynet.start(f)
-	local session = c.command("TIMEOUT","0")
-	local co = coroutine.create(
-		function(...)
-			f(...)
-			skynet.send(".launcher",0)
-		end
-	)
-	session_id_coroutine[tonumber(session)] = co
-end
-
 function skynet.newservice(name, ...)
-	local handle = skynet.call(".launcher", skynet.unpack, skynet.pack("snlua", name, ...))
+	local handle = skynet.call(".launcher", "lua" , "snlua", name, ...)
 	return handle
 end
 
@@ -262,6 +272,8 @@ end
 ------ remote object --------
 
 do
+	-- proto is 11
+
 	local remote_query, remote_alloc, remote_bind = c.remote_init(skynet.self())
 	local weak_meta = { __mode = "kv" }
 	local meta = getmetatable(c.unpack(c.pack({ __remote = 0 })))
@@ -279,7 +291,8 @@ do
 		if f == nil then
 			f = function(...)
 				local addr = remote_query(t.__remote)
-				local session = _send(addr, -1, _pack(t,method,...))
+				-- the proto is 11 (lua is 10)
+				local session = _send(addr, 11 , nil, _pack(t,method,...))
 				local msg, sz = _yield("CALL", session)
 				return select(2,assert(_unpack(msg,sz)))
 			end
@@ -321,16 +334,59 @@ do
 		return _yield("RETURN", _pack(pcall(f,...)))
 	end
 
-	function skynet.remote_service(unknown)
-		local function f(msg,sz)
-			return remote_call(_unpack(msg,sz))
-		end
-		c.callback(default_dispatch(f,unknown))
-	end
-
 	function skynet.remote_root()
 		return skynet.remote_bind(0)
 	end
+
+	skynet.register_protocol {
+		name = "remoteobj",
+		id = 11,
+		unpack = c.unpack,
+		dispatch = function (session, source, ...)
+			remote_call(...)
+		end
+	}
+end
+
+----- register protocol
+do
+	local REG = skynet.register_protocol
+
+	REG {
+		name = "text",
+		id = 0,
+		pack = function (...)
+			local n = select ("#" , ...)
+			if n == 0 then
+				return ""
+			elseif n == 1 then
+				return tostring(...)
+			else
+				return table.concat({...}," ")
+			end
+		end,
+		unpack = c.tostring
+	}
+
+	REG {
+		name = "lua",
+		id = 10,
+		pack = skynet.pack,
+		unpack = skynet.unpack,
+	}
+
+	REG {
+		name = "response",
+		id = 1,
+	}
+end
+
+function skynet.start(f)
+	start_skynet()
+	skynet.timeout(0, function()
+		f()
+		skynet.send(".launcher","lua", nil)
+	end)
 end
 
 return skynet

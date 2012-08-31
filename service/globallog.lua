@@ -1,8 +1,8 @@
 local skynet = require "skynet"
 
-skynet.dispatch(function(msg, sz , session , from)
-	local message = skynet.tostring(msg,sz)
-	print("[GLOBALLOG]", skynet.address(from),message)
+skynet.start(function()
+	skynet.dispatch("text", function(session, address, text)
+		print("[GLOBALLOG]", skynet.address(address),text)
+	end)
+	skynet.register "LOG"
 end)
-
-skynet.register "LOG"

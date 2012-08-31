@@ -2,7 +2,6 @@
 #include "skynet_handle.h"
 #include "skynet_mq.h"
 #include "skynet_server.h"
-#include "skynet_system.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -34,13 +33,13 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 
 	struct skynet_message smsg;
 	if (context == NULL) {
-		smsg.source = SKYNET_SYSTEM_LOGGER;
+		smsg.source = 0;
 	} else {
 		smsg.source = skynet_context_handle(context);
 	}
 	smsg.session = 0;
 	smsg.data = strdup(tmp);
-	smsg.sz = len;
+	smsg.sz = len | (PTYPE_TEXT << 24);
 	skynet_context_push(logger, &smsg);
 }
 

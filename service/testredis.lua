@@ -1,8 +1,6 @@
 local skynet = require "skynet"
 local redis = require "redis"
 
-skynet.dispatch()
-
 skynet.start(function()
 	local db = redis.connect "main"
 	print(db:exists "A")

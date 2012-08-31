@@ -17,4 +17,5 @@ end
 
 skynet.remote_create(root,0)
 
-skynet.remote_service()
+skynet.start(function() end)
+

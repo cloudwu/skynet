@@ -1,12 +1,9 @@
 local skynet = require "skynet"
 
--- register a dummy callback function
-skynet.dispatch()
-
 skynet.start(function()
-	local result = skynet.call("SIMPLEDB","SET foobar hello")
+	local result = skynet.call("SIMPLEDB","text","SET","foobar","hello")
 	print(result)
-	result = skynet.call("SIMPLEDB","GET foobar")
+	result = skynet.call("SIMPLEDB","text","GET","foobar")
 	print(result)
 	skynet.exit()
 end)

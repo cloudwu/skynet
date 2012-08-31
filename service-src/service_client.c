@@ -9,7 +9,7 @@
 #include <string.h>
 
 static int
-_cb(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
+_cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	assert(sz <= 65535);
 	int fd = (int)(intptr_t)ud;
 

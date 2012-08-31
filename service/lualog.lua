@@ -37,8 +37,9 @@ local function log(name, modname, level, timestamp, msg, src, tags)
 	})
 end
 
-skynet.dispatch(function(msg, sz , session , from)
-	log(skynet.unpack(msg,sz))
+skynet.start(function()
+	skynet.dispatch("lua",function(session, from, ...)
+		log(...)
+	end)
+	skynet.register ".lualog"
 end)
-
-skynet.register ".lualog"

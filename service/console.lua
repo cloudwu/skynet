@@ -1,7 +1,5 @@
 local skynet = require "skynet"
 
-skynet.dispatch()
-
 skynet.start(function()
 	while true do
 		local cmd = io.read()

@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 static int
-_cb(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
+_cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	uint32_t dest = (uint32_t)(uintptr_t)ud;
 	skynet_forward(context, dest);
 	return 0;

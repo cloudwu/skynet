@@ -1,11 +1,9 @@
 local skynet = require "skynet"
 
-skynet.dispatch()
-
 skynet.start(function()
 	print("Server start")
-	local lualog = skynet.launch("snlua","lualog")
 	local launcher = skynet.launch("snlua","launcher")
+	local lualog = skynet.launch("snlua","lualog")
 	local group_mgr = skynet.launch("snlua", "group_mgr")
 	local group_agent = skynet.launch("snlua", "group_agent")
 	local remoteroot = skynet.launch("snlua","remote_root")
@@ -15,5 +13,6 @@ skynet.start(function()
 	local connection = skynet.launch("connection","256")
 	local redis = skynet.launch("snlua","redis-mgr")
 --	skynet.launch("snlua","testgroup")
+
 	skynet.exit()
 end)

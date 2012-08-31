@@ -27,7 +27,7 @@ local function compose_message(msg)
 end
 
 local function select_db(id)
-	local result , ok = skynet.call(skynet.self(), skynet.unpack, skynet.pack("SELECT", tostring(id)))
+	local result , ok = skynet.call(skynet.self(), "lua", "SELECT", tostring(id))
 	assert(result and ok == "OK")
 end
 
@@ -48,7 +48,7 @@ end
 
 local function response(...)
 	local reply = pop_request_queue()
-	skynet.send(reply[2],reply[1],skynet.pack(...))
+	skynet.redirect(reply.address,0, "response", reply.session, skynet.pack(...))
 end
 
 local function readline(sep)
@@ -143,24 +143,28 @@ local function reconnect()
 	split_co = coroutine.create(split_package)
 end
 
-skynet.filter(
-	function(session, address , msg, sz)
-		if session == 0x7fffffff then
-			if msg == nil then
-				skynet.timeout(0, reconnect)
-				return
-			end
-			socket.push(msg,sz)
-			coroutine.resume(split_co)
-		elseif session < 0 then
-			local message = { skynet.unpack(msg,sz) }
-			local cmd = compose_message(message)
-			socket.write(cmd)
-			push_request_queue { -session , address, cmd }
-		else
-			return session, address, msg , sz
+skynet.register_protocol {
+	name = "client",
+	id = 3,
+	pack = function(...) return ... end,
+	unpack = function(msg,sz)
+		if msg == nil then
+			skynet.timeout(0, reconnect)
+			return
 		end
-	end
-)
+		socket.push(msg,sz)
+		assert(coroutine.resume(split_co))
+	end,
+	dispatch = function () end
+}
 
-skynet.start(init)
+skynet.start(function()
+	skynet.dispatch("lua", function(session, address, ...)
+		local message = { ... }
+		local cmd = compose_message(message)
+		socket.write(cmd)
+		push_request_queue { session = session , address = address, cmd = cmd }
+	end)
+	init()
+end)
+

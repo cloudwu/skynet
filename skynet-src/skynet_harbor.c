@@ -1,3 +1,4 @@
+#include "skynet.h"
 #include "skynet_harbor.h"
 #include "skynet_server.h"
 
@@ -10,7 +11,10 @@ static int HARBOR = 0;
 
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
-	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg), source, session);
+	int type = rmsg->sz >> 24;
+	rmsg->sz &= 0xffffff;
+	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR);
+	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg) , source, type , session);
 }
 
 void 
@@ -25,7 +29,7 @@ skynet_harbor_register(struct remote_name *rname) {
 		}
 	}
 	assert(number == 0);
-	skynet_context_send(REMOTE, rname, sizeof(*rname), 0, 0);
+	skynet_context_send(REMOTE, rname, sizeof(*rname), 0, PTYPE_SYSTEM , 0);
 }
 
 int 

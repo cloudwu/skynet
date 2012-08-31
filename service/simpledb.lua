@@ -13,16 +13,18 @@ function command.SET(key, value)
 	skynet.ret(last)
 end
 
-skynet.dispatch(function(msg, sz , session, from)
-	local message = skynet.tostring(msg,sz)
-	print("simpledb",message, skynet.address(from), session)
-	local cmd, key , value = string.match(message, "(%w+) (%w+) ?(.*)")
-	local f = command[cmd]
-	if f then
-		f(key,value)
-	else
-		skynet.ret("Invalid command : "..message)
-	end
+skynet.start(function()
+	skynet.dispatch("text", function(session, address, message)
+		print("simpledb",message, skynet.address(address), session)
+		local cmd, key , value = string.match(message, "(%w+) (%w+) ?(.*)")
+		local f = command[cmd]
+		if f then
+			f(key,value)
+		else
+			skynet.ret("Invalid command : "..message)
+		end
+	end)
+	skynet.register "SIMPLEDB"
 end)
 
-skynet.register "SIMPLEDB"
+

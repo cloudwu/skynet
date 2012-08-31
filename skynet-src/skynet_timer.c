@@ -2,6 +2,7 @@
 #include "skynet_mq.h"
 #include "skynet_server.h"
 #include "skynet_handle.h"
+#include "skynet.h"
 
 #include <time.h>
 #include <assert.h>
@@ -111,10 +112,10 @@ timer_execute(struct timer *T)
 		do {
 			struct timer_event * event = (struct timer_event *)(current+1);
 			struct skynet_message message;
-			message.source = SKYNET_SYSTEM_TIMER;
+			message.source = 0;
 			message.session = event->session;
 			message.data = NULL;
-			message.sz = 0;
+			message.sz = PTYPE_RESPONSE << 24;
 
 			skynet_context_push(event->handle, &message);
 			
@@ -177,10 +178,10 @@ int
 skynet_timeout(uint32_t handle, int time, int session) {
 	if (time == 0) {
 		struct skynet_message message;
-		message.source = SKYNET_SYSTEM_TIMER;
+		message.source = 0;
 		message.session = session;
 		message.data = NULL;
-		message.sz = 0;
+		message.sz = PTYPE_RESPONSE << 24;
 
 		if (skynet_context_push(handle, &message)) {
 			return -1;

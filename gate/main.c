@@ -24,6 +24,7 @@ struct gate {
 	int id_index;
 	int cap;
 	int max_connection;
+	int client_tag;
 	struct connection ** agent;
 	struct connection * map;
 };
@@ -124,24 +125,23 @@ _report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
 	int n = vsnprintf(tmp, sizeof(tmp), data, ap);
 	va_end(ap);
 
-	skynet_send(ctx, 0, g->watchdog, 0, tmp, n, 0);
+	skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT,  0, tmp, n);
 }
 
 static void
 _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_t len) {
 	if (g->broker) {
-		skynet_send(ctx, 0, g->broker, SESSION_CLIENT, data, len, 0);
+		skynet_send(ctx, 0, g->broker, g->client_tag, 0, data, len);
 		return;
 	}
 	struct connection * agent = _id_to_agent(g,uid);
 	if (agent->agent) {
-		// client package has not session , send 0x7fffffff
-		skynet_send(ctx, agent->client, agent->agent, SESSION_CLIENT, data, len, 0);
+		skynet_send(ctx, agent->client, agent->agent, g->client_tag, 0 , data, len);
 	} else if (g->watchdog) {
 		char * tmp = malloc(len + 32);
 		int n = snprintf(tmp,len+32,"%d data ",uid);
 		memcpy(tmp+n,data,len);
-		skynet_send(ctx, 0, g->watchdog, 0, tmp, len + n, DONTCOPY);
+		skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT | PTYPE_TAG_DONTCOPY, 0, tmp, len + n);
 	}
 }
 
@@ -172,12 +172,13 @@ _remove_id(struct gate *g, int uid) {
 }
 
 static int
-_cb(struct skynet_context * ctx, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
+_cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct gate *g = ud;
-	if (msg) {
+	if (type == PTYPE_TEXT) {
 		_ctrl(ctx, g , msg , (int)sz);
 		return 0;
 	}
+	assert(type == PTYPE_RESPONSE);
 	struct mread_pool * m = g->pool;
 	int connection_id = mread_poll(m,100);	// timeout : 100ms
 	if (connection_id < 0) {
@@ -228,10 +229,14 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	int sz = strlen(parm)+1;
 	char watchdog[sz];
 	char binding[sz];
-	int n = sscanf(parm, "%s %s %d %d",watchdog, binding,&max,&buffer);
-	if (n!=4) {
+	int client_tag = 0;
+	int n = sscanf(parm, "%s %s %d %d %d",watchdog, binding,&client_tag , &max,&buffer);
+	if (n<3) {
 		skynet_error(ctx, "Invalid gate parm %s",parm);
 		return 1;
+	}
+	if (client_tag == 0) {
+		client_tag = PTYPE_CLIENT;
 	}
 	char * portstr = strchr(binding,':');
 	uint32_t addr = INADDR_ANY;
@@ -273,6 +278,7 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	g->cap = cap;
 	g->max_connection = max;
 	g->id_index = 0;
+	g->client_tag = client_tag;
 
 	g->agent = malloc(cap * sizeof(struct connection *));
 	memset(g->agent, 0, cap * sizeof(struct connection *));

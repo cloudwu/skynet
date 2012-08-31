@@ -13,7 +13,7 @@ function command:open(parm)
 	local agent = skynet.launch("snlua","agent",skynet.address(client))
 	if agent then
 		agent_all[self] = { agent , client }
-		skynet.send(gate, "forward ".. self .. " " .. skynet.address(agent) .. " " .. skynet.address(client))
+		skynet.send(gate, "text", "forward" , self, skynet.address(agent) , skynet.address(client))
 	end
 end
 
@@ -28,27 +28,31 @@ end
 function command:data(data, session)
 	local agent = agent_all[self]
 	if agent then
-		-- 0x7fffffff means it's a client
-		skynet.redirect(agent[1], agent[2], 0x7fffffff, data)
+		-- PTYPE_CLIENT = 3 , read skynet.h
+		skynet.redirect(agent[1], agent[2], "client", 0, data)
 	else
 		skynet.error(string.format("agent data drop %d size=%d",self,#data))
 	end
 end
 
-skynet.dispatch(function(msg, sz, session, address)
-	local message = skynet.tostring(msg,sz)
-	local id, cmd , parm = string.match(message, "(%d+) (%w+) ?(.*)")
-	id = tonumber(id)
-	local f = command[cmd]
-	if f then
-		f(id,parm,session)
-	else
-		skynet.error(string.format("[watchdog] Unknown command : %s",message))
-	end
-end)
+skynet.register_protocol {
+	name = "client",
+	id = 3,
+}
 
 skynet.start(function()
-	gate = skynet.launch("gate" , skynet.address(skynet.self()), port, max_agent, buffer)
-	skynet.send(gate,"start")
+	skynet.dispatch("text", function(session, from, message)
+		local id, cmd , parm = string.match(message, "(%d+) (%w+) ?(.*)")
+		id = tonumber(id)
+		local f = command[cmd]
+		if f then
+			f(id,parm,session)
+		else
+			error(string.format("[watchdog] Unknown command : %s",message))
+		end
+	end)
+	-- 0 for default client tag
+	gate = skynet.launch("gate" , skynet.address(skynet.self()), port, 0, max_agent, buffer)
+	skynet.send(gate,"text", "start")
 	skynet.register(".watchdog")
 end)

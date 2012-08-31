@@ -16,9 +16,9 @@ multicast_release(struct skynet_multicast_group *g) {
 }
 
 static int
-_maincb(struct skynet_context * context, void * ud, int session, uint32_t source, const void * msg, size_t sz) {
+_maincb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct skynet_multicast_group *g = ud;
-	if (source == 0) {
+	if (type == PTYPE_SYSTEM) {
 		char cmd = '\0';
 		uint32_t handle = 0;
 		sscanf(msg,"%c %x",&cmd,&handle);
@@ -42,6 +42,7 @@ _maincb(struct skynet_context * context, void * ud, int session, uint32_t source
 		}
 		return 0;		
 	} else {
+		sz |= type << 24;
 		struct skynet_multicast_message * mc = skynet_multicast_create(msg, sz, source);
 		skynet_multicast_castgroup(context, g, mc);
 		return 1;

@@ -10,7 +10,7 @@ local command = {}
 setmetatable(command, { __index = function(t,k)
 	local cmd = string.upper(k)
 	local f = function(self, ...)
-		local err, result = skynet.call( self.__handle, skynet.unpack, skynet.pack(cmd, ...))
+		local err, result = skynet.call( self.__handle, "lua", cmd, ...)
 		assert(err, result)
 		return result
 	end
@@ -19,7 +19,7 @@ setmetatable(command, { __index = function(t,k)
 end})
 
 function command:exists(key)
-	local result , exists = skynet.call( self.__handle, skynet.unpack, skynet.pack("EXISTS", key))
+	local result , exists = skynet.call( self.__handle, "lua" , "EXISTS", key)
 	assert(result, exists)
 	exists = exists ~= 0
 	return exists
@@ -30,7 +30,7 @@ local meta = {
 }
 
 function redis.connect(dbname)
-	local handle = skynet.call(".redis-manager",skynet.unpack, skynet.pack(dbname))
+	local handle = skynet.call(".redis-manager", "lua", dbname)
 	assert(handle ~= nil)
 	return setmetatable({ __handle = handle } , meta)
 end

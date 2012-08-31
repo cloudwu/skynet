@@ -193,7 +193,8 @@ _drop_queue(struct message_queue *q) {
 	int s = 0;
 	while(!skynet_mq_pop(q, &msg)) {
 		++s;
-		if (msg.session == SESSION_MULTICAST) {
+		int type = msg.sz >> 24;
+		if (type == PTYPE_MULTICAST) {
 			assert(msg.sz == 0);
 			skynet_multicast_dispatch((struct skynet_multicast_message *)msg.data, NULL, NULL);
 		} else {

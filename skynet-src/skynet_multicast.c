@@ -214,7 +214,7 @@ skynet_multicast_castgroup(struct skynet_context * from, struct skynet_multicast
 	int release = 0;
 	for (i=0;i<group->number;i++) {
 		struct pair * p = &group->data[i];
-		skynet_context_send(p->ctx, msg, 0 , source, SESSION_MULTICAST);
+		skynet_context_send(p->ctx, msg, 0 , source, PTYPE_MULTICAST , 0);
 		int ref = skynet_context_ref(p->ctx);
 		if (ref == 1) {
 			skynet_context_release(p->ctx);
