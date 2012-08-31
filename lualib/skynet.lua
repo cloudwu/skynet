@@ -174,6 +174,12 @@ function skynet.call(addr, typename, ...)
 	return p.unpack(coroutine.yield("CALL", session))
 end
 
+function skynet.rawcall(addr, typename, msg, sz)
+	local p = proto[typename]
+	local session = c.send(addr, p.id , nil , msg, sz)
+	return coroutine.yield("CALL", session)
+end
+
 function skynet.ret(msg, sz)
 	msg = msg or ""
 	coroutine.yield("RETURN", msg, sz)
@@ -203,32 +209,40 @@ function skynet.dispatch_unknown_response(unknown)
 	return prev
 end
 
-local function start_skynet()
-	c.callback(function(prototype, msg, sz, session, source)
-		-- PTYPE_RESPONSE = 1, read skynet.h
-		if prototype == 1 then
-			local co = session_id_coroutine[session]
-			if co == "BREAK" then
-				session_id_coroutine[session] = nil
-			elseif co == nil then
-				unknown_response(session, source, msg, sz)
-			else
-				session_id_coroutine[session] = nil
-				suspend(co, coroutine.resume(co, msg, sz))
-			end
+local function dispatch_message(prototype, msg, sz, session, source, ...)
+	-- PTYPE_RESPONSE = 1, read skynet.h
+	if prototype == 1 then
+		local co = session_id_coroutine[session]
+		if co == "BREAK" then
+			session_id_coroutine[session] = nil
+		elseif co == nil then
+			unknown_response(session, source, msg, sz)
 		else
-			local p = assert(proto[prototype], prototype)
-			local f = p.dispatch
-			if f then
-				local co = coroutine.create(f)
-				session_coroutine_id[co] = session
-				session_coroutine_address[co] = source
-				suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz)))
-			else
-				print("Unknown request :" , p.unpack(msg,sz))
-				error(string.format("Can't dispatch type %s : ", p.name))
-			end
+			session_id_coroutine[session] = nil
+			suspend(co, coroutine.resume(co, msg, sz))
 		end
+	else
+		local p = assert(proto[prototype], prototype)
+		local f = p.dispatch
+		if f then
+			local co = coroutine.create(f)
+			session_coroutine_id[co] = session
+			session_coroutine_address[co] = source
+			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
+		else
+			print("Unknown request :" , p.unpack(msg,sz))
+			error(string.format("Can't dispatch type %s : ", p.name))
+		end
+	end
+end
+
+function skynet.filter(f ,start)
+	c.callback(function(...)
+		dispatch_message(f(...))
+	end)
+	skynet.timeout(0, function()
+		start()
+		skynet.send(".launcher","lua", nil)
 	end)
 end
 
@@ -382,7 +396,7 @@ do
 end
 
 function skynet.start(f)
-	start_skynet()
+	c.callback(dispatch_message)
 	skynet.timeout(0, function()
 		f()
 		skynet.send(".launcher","lua", nil)
