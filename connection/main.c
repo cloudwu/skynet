@@ -51,7 +51,8 @@ _expand(struct connection_server * server) {
 	int i;
 	for (i=0;i<server->max_connection;i++) {
 		struct connection * c = &server->conn[i];
-		connection_add(server->pool, c->fd , c);
+		int err = connection_add(server->pool, c->fd , c);
+		assert(err == 0);
 	}
 	server->max_connection *= 2;
 }
@@ -108,7 +109,7 @@ _poll(struct connection_server * server) {
 			buffer = malloc(DEFAULT_BUFFER_SIZE);
 		}
 
-		int size = recv(c->fd, buffer, DEFAULT_BUFFER_SIZE, MSG_DONTWAIT);
+		int size = read(c->fd, buffer, DEFAULT_BUFFER_SIZE);
 		if (size < 0) {
 			continue;
 		}
@@ -126,7 +127,7 @@ _poll(struct connection_server * server) {
 }
 
 static int
-_main(struct skynet_context * ctx, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
+_connection_main(struct skynet_context * ctx, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	if (type == PTYPE_RESPONSE) {
 		_poll(ud);
 		return 0;
@@ -141,6 +142,10 @@ _main(struct skynet_context * ctx, void * ud, int type, int session, uint32_t so
 			return 0;
 		}
 		int addr_sz = sz - (endptr - (char *)msg);
+		if (addr_sz <= 1) {
+			skynet_error(ctx, "[connection] Invalid ADD command from %x (session = %d)", source, session);
+			return 0;
+		}
 		char addr [addr_sz];
 		memcpy(addr, endptr+1, addr_sz-1);
 		addr[addr_sz-1] = '\0';
@@ -170,13 +175,16 @@ connection_init(struct connection_server * server, struct skynet_context * ctx, 
 	server->pool = connection_newpool(DEFAULT_CONNECTION);
 	if (server->pool == NULL)
 		return 1;
-	server->max_connection = DEFAULT_CONNECTION;
+	server->max_connection = strtol(param, NULL, 10);
+	if (server->max_connection == 0) {
+		server->max_connection = DEFAULT_CONNECTION;
+	}
 	server->current_connection = 0;
 	server->ctx = ctx;
 	server->conn = malloc(server->max_connection * sizeof(struct connection));
 	memset(server->conn, 0, server->max_connection * sizeof(struct connection));
 
-	skynet_callback(ctx, server, _main);
+	skynet_callback(ctx, server, _connection_main);
 	skynet_command(ctx,"REG",".connection");
 	skynet_command(ctx,"TIMEOUT","0");
 	return 0;

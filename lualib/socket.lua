@@ -16,6 +16,11 @@ function socket.connect(addr)
 	object = c.new()
 end
 
+function socket.stdin()
+	skynet.send(".connection", "text", "ADD", 1 , skynet.address(skynet.self()))
+	object = c.new()
+end
+
 function socket.push(msg,sz)
 	if msg then
 		c.push(object, msg, sz)
