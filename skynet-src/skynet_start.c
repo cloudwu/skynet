@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <assert.h>
+#include <stdio.h>
 
 static void *
 _timer(void *p) {
@@ -25,7 +26,7 @@ _worker(void *p) {
 	for (;;) {
 		if (skynet_context_message_dispatch()) {
 			usleep(1000);
-		}
+		} 
 	}
 	return NULL;
 }
@@ -37,6 +38,7 @@ _start(int thread) {
 	pthread_create(&pid[0], NULL, _timer, NULL);
 
 	int i;
+
 	for (i=1;i<thread+1;i++) {
 		pthread_create(&pid[i], NULL, _worker, NULL);
 	}
@@ -70,6 +72,7 @@ skynet_start(struct skynet_config * config) {
 	}
 	// harbor must be init first
 	if (skynet_harbor_start(config->master , config->local)) {
+		fprintf(stderr, "Init fail : no master");
 		return;
 	}
 
@@ -78,6 +81,8 @@ skynet_start(struct skynet_config * config) {
 	if (ctx == NULL) {
 		return;
 	}
+	ctx = skynet_context_new("snlua", "launcher");
+	assert(ctx);
 	ctx = skynet_context_new("snlua", config->start);
 
 	_start(config->thread);

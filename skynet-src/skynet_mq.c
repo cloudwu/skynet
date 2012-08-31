@@ -211,12 +211,12 @@ skynet_mq_release(struct message_queue *q) {
 	LOCK(q)
 	
 	if (q->release) {
+		UNLOCK(q)
 		ret = _drop_queue(q);
 	} else {
 		skynet_mq_force_push(q);
+		UNLOCK(q)
 	}
 	
-	UNLOCK(q)
-
 	return ret;
 }
