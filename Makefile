@@ -13,8 +13,6 @@ all : \
   service/connection.so \
   client \
   lualib/socket.so \
-  lualib/lpeg.so \
-  lualib/protobuf.so \
   lualib/int64.so \
   service/master.so \
   service/multicast.so \
@@ -68,27 +66,6 @@ service/connection.so : connection/connection.c connection/main.c
 
 lualib/socket.so : connection/lua-socket.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iconnection
-
-lualib/lpeg.so : lpeg/lpeg.c
-	gcc $(CFLAGS) $(SHARED) -O2 $^ -o $@ -Ilpeg
-
-PROTOBUFSRC = \
-  lua-protobuf/context.c \
-  lua-protobuf/varint.c \
-  lua-protobuf/array.c \
-  lua-protobuf/pattern.c \
-  lua-protobuf/register.c \
-  lua-protobuf/proto.c \
-  lua-protobuf/map.c \
-  lua-protobuf/alloc.c \
-  lua-protobuf/rmessage.c \
-  lua-protobuf/wmessage.c \
-  lua-protobuf/bootstrap.c \
-  lua-protobuf/stringpool.c \
-  lua-protobuf/decode.c
-
-lualib/protobuf.so : $(PROTOBUFSRC) lua-protobuf/pbc-lua.c
-	gcc $(CFLAGS) $(SHARED) -O2 $^ -o $@ 
 
 lualib/int64.so : lua-int64/int64.c
 	gcc $(CFLAGS) $(SHARED) -O2 $^ -o $@ 
