@@ -16,17 +16,6 @@ Run these in different console
 ./client 127.0.0.1 8888	# Launch a client, and try to input some words.
 ```
 
-## Test connection server
-
-```
-./skynet 		# Launch skynet
-./nc -l 8000		# Listen on port 8000 
-```
-
-And then , type 'snlua testconn' in skynet console to launch connection server and a test program.
-
-You can type something in nc console.
-
 ## Blog (in Chinese)
 
 * http://blog.codingnow.com/2012/09/the_design_of_skynet.html
