@@ -14,9 +14,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define BLACKHOLE "blackhole"
-#define DEFAULT_MESSAGE_QUEUE 16 
-
 #ifdef CALLING_CHECK
 
 #define CHECKCALLING_BEGIN(ctx) assert(__sync_lock_test_and_set(&ctx->calling,1) == 0);
