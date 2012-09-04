@@ -1,4 +1,5 @@
 #include "skynet.h"
+#include "skynet_handle.h"
 #include "skynet_multicast.h"
 
 #include <stdlib.h>
@@ -42,7 +43,7 @@ _maincb(struct skynet_context * context, void * ud, int type, int session, uint3
 		}
 		return 0;		
 	} else {
-		sz |= type << 24;
+		sz |= type << HANDLE_REMOTE_SHIFT;
 		struct skynet_multicast_message * mc = skynet_multicast_create(msg, sz, source);
 		skynet_multicast_castgroup(context, g, mc);
 		return 1;

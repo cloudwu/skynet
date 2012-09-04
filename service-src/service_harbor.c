@@ -358,7 +358,7 @@ _dispatch_queue(struct harbor *h, struct skynet_context * context, struct msg_qu
 	struct msg * m = _pop_queue(queue);
 	while (m) {
 		struct remote_message_header * cookie = (struct remote_message_header *)(m->buffer + m->size - sizeof(*cookie));
-		cookie->destination |= (handle & 0xffffff);
+		cookie->destination |= (handle & HANDLE_MASK);
 		_header_to_message(cookie, (uint32_t *)cookie);
 		int err = _send_package(fd, m->buffer, m->size);
 		if (err) {
@@ -428,7 +428,7 @@ _remote_send_handle(struct harbor *h, struct skynet_context * context, uint32_t 
 	if (fd >= 0) {
 		struct remote_message_header cookie;
 		cookie.source = source;
-		cookie.destination = (destination & 0xffffff) | ((uint32_t)type << 24);
+		cookie.destination = (destination & HANDLE_MASK) | ((uint32_t)type << HANDLE_REMOTE_SHIFT);
 		cookie.session = (uint32_t)session;
 		int err = _send_remote(fd, msg,sz,&cookie);
 		if (err) {
@@ -471,7 +471,7 @@ _remote_send_name(struct harbor *h, struct skynet_context * context, uint32_t so
 		}
 		struct remote_message_header header;
 		header.source = source;
-		header.destination = type << 24;
+		header.destination = type << HANDLE_REMOTE_SHIFT;
 		header.session = (uint32_t)session;
 		_push_queue(node->queue, msg, sz, &header);
 		// 0 for request
@@ -518,8 +518,8 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 			}
 		} else {
 			uint32_t destination = header.destination;
-			int type = (destination >> 24) | PTYPE_TAG_DONTCOPY;
-			destination = (destination & 0xffffff) | ((uint32_t)h->id << 24);
+			int type = (destination >> HANDLE_REMOTE_SHIFT) | PTYPE_TAG_DONTCOPY;
+			destination = (destination & HANDLE_MASK) | ((uint32_t)h->id << HANDLE_REMOTE_SHIFT);
 			skynet_send(context, header.source, destination, type, (int)header.session, (void *)msg, sz-12);
 			return 1;
 		}

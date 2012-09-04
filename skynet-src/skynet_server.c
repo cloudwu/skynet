@@ -184,8 +184,8 @@ _forwarding(struct skynet_context *ctx, struct skynet_message *msg) {
 static void
 _mc(void *ud, uint32_t source, const void * msg, size_t sz) {
 	struct skynet_context * ctx = ud;
-	int type = sz >> 24;
-	sz &= 0xffffff;
+	int type = sz >> HANDLE_REMOTE_SHIFT;
+	sz &= HANDLE_MASK;
 	ctx->cb(ctx, ctx->cb_ud, type, 0, source, msg, sz);
 	if (ctx->forward) {
 		uint32_t des = ctx->forward;
@@ -195,7 +195,7 @@ _mc(void *ud, uint32_t source, const void * msg, size_t sz) {
 		message.session = 0;
 		message.data = malloc(sz);
 		memcpy(message.data, msg, sz);
-		message.sz = sz  | (type << 24);
+		message.sz = sz  | (type << HANDLE_REMOTE_SHIFT);
 		_send_message(des, &message);
 	}
 }
@@ -204,8 +204,8 @@ static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
 	CHECKCALLING_BEGIN(ctx)
-	int type = msg->sz >> 24;
-	size_t sz = msg->sz & 0xffffff;
+	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
+	size_t sz = msg->sz & HANDLE_MASK;
 	if (type == PTYPE_MULTICAST) {
 		skynet_multicast_dispatch((struct skynet_multicast_message *)msg->data, ctx, _mc);
 	} else {
@@ -478,8 +478,8 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 	}
 	*data = msg;
 
-	assert((*sz & 0xffffff) == *sz);
-	*sz |= type << 24;
+	assert((*sz & HANDLE_MASK) == *sz);
+	*sz |= type << HANDLE_REMOTE_SHIFT;
 }
 
 int
@@ -567,7 +567,7 @@ skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t
 	smsg.source = source;
 	smsg.session = session;
 	smsg.data = msg;
-	smsg.sz = sz | type << 24;
+	smsg.sz = sz | type << HANDLE_REMOTE_SHIFT;
 
 	skynet_mq_push(ctx->queue, &smsg);
 }

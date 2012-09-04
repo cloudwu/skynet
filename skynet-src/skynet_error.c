@@ -39,7 +39,7 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 	}
 	smsg.session = 0;
 	smsg.data = strdup(tmp);
-	smsg.sz = len | (PTYPE_TEXT << 24);
+	smsg.sz = len | (PTYPE_TEXT << HANDLE_REMOTE_SHIFT);
 	skynet_context_push(logger, &smsg);
 }
 

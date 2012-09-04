@@ -11,8 +11,8 @@ static int HARBOR = 0;
 
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
-	int type = rmsg->sz >> 24;
-	rmsg->sz &= 0xffffff;
+	int type = rmsg->sz >> HANDLE_REMOTE_SHIFT;
+	rmsg->sz &= HANDLE_MASK;
 	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR);
 	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg) , source, type , session);
 }
