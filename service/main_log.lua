@@ -2,7 +2,7 @@ local skynet = require "skynet"
 
 skynet.start(function()
 	print("Log server start")
-	local launcher = skynet.launch("snlua","launcher")
+	local connection = skynet.launch("connection","256")
 	local lualog = skynet.launch("snlua","lualog")
 	local group_agent = skynet.launch("snlua", "group_agent")
 	local console = skynet.launch("snlua","console")

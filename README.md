@@ -13,7 +13,7 @@ Run these in different console
 ```
 ./skynet config		# Launch first skynet node  (Gate server) and a skynet-master (see config for standalone option)
 ./skynet config_log	# Launch second skynet node (Global logger server)
-./clinet 127.0.0.1 8888	# Launch a client, and try to input some words.
+./client 127.0.0.1 8888	# Launch a client, and try to input some words.
 ```
 
 ## Test connection server
