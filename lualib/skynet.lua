@@ -174,6 +174,13 @@ function skynet.call(addr, typename, ...)
 	return p.unpack(coroutine.yield("CALL", session))
 end
 
+function skynet.blockcall(addr, typename , ...)
+	local p = proto[typename]
+	local session = c.send(addr, p.id , nil , p.pack(...))
+	c.command("LOCK",tostring(session))
+	return p.unpack(coroutine.yield("CALL", session))
+end
+
 function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , msg, sz)

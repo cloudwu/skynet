@@ -23,7 +23,10 @@ uint32_t skynet_mq_handle(struct message_queue *);
 // 0 for success
 int skynet_mq_pop(struct message_queue *q, struct skynet_message *message);
 void skynet_mq_push(struct message_queue *q, struct skynet_message *message);
+void skynet_mq_lock(struct message_queue *q, int session);
+
 void skynet_mq_force_push(struct message_queue *q);
+void skynet_mq_pushglobal(struct message_queue *q);
 
 void skynet_mq_init(int cap);
 

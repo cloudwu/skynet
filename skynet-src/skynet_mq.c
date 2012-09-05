@@ -17,6 +17,7 @@ struct message_queue {
 	int tail;
 	int lock;
 	int release;
+	int lock_session;
 	int in_global;
 	struct skynet_message *queue;
 };
@@ -89,6 +90,7 @@ skynet_mq_create(uint32_t handle) {
 	q->lock = 0;
 	q->in_global = 1;
 	q->release = 0;
+	q->lock_session = 0;
 	q->queue = malloc(sizeof(struct skynet_message) * q->cap);
 
 	return q;
@@ -128,36 +130,75 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 	return ret;
 }
 
+static void
+expand_queue(struct message_queue *q) {
+	struct skynet_message *new_queue = malloc(sizeof(struct skynet_message) * q->cap * 2);
+	int i;
+	for (i=0;i<q->cap;i++) {
+		new_queue[i] = q->queue[(q->head + i) % q->cap];
+	}
+	q->head = 0;
+	q->tail = q->cap;
+	q->cap *= 2;
+	
+	free(q->queue);
+	q->queue = new_queue;
+}
+
+static void 
+_pushhead(struct message_queue *q, struct skynet_message *message) {
+	int head = q->head - 1;
+	if (head < 0) {
+		head = q->cap - 1;
+	}
+	if (head == q->tail) {
+		expand_queue(q);
+		--q->tail;
+		head = q->cap - 1;
+	}
+
+	q->queue[head] = *message;
+	q->head = head;
+
+	// this api use in push a unlock message, so the in_global flags must be 1 , but the q is not exist in global queue.
+	assert(q->in_global);
+	skynet_globalmq_push(q);
+}
+
 void 
 skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
+	assert(message);
 	LOCK(q)
-
-	if (message) {
+	
+	if (q->lock_session !=0 && message->session == q->lock_session) {
+		_pushhead(q,message);
+		q->lock_session = 0;
+	} else {
 		q->queue[q->tail] = *message;
 		if (++ q->tail >= q->cap) {
 			q->tail = 0;
 		}
 
 		if (q->head == q->tail) {
-			struct skynet_message *new_queue = malloc(sizeof(struct skynet_message) * q->cap * 2);
-			int i;
-			for (i=0;i<q->cap;i++) {
-				new_queue[i] = q->queue[(q->head + i) % q->cap];
+			expand_queue(q);
+		}
+
+		if (q->lock_session == 0) {
+			if (q->in_global == 0) {
+				q->in_global = 1;
+				skynet_globalmq_push(q);
 			}
-			q->head = 0;
-			q->tail = q->cap;
-			q->cap *= 2;
-			
-			free(q->queue);
-			q->queue = new_queue;
 		}
 	}
-
-	if (q->in_global == 0) {
-		q->in_global = 1;
-		skynet_globalmq_push(q);
-	}
 	
+	UNLOCK(q)
+}
+
+void
+skynet_mq_lock(struct message_queue *q, int session) {
+	LOCK(q)
+	assert(q->lock_session == 0);
+	q->lock_session = session;
 	UNLOCK(q)
 }
 
@@ -179,6 +220,14 @@ void
 skynet_mq_force_push(struct message_queue * queue) {
 	assert(queue->in_global);
 	skynet_globalmq_push(queue);
+}
+
+void 
+skynet_mq_pushglobal(struct message_queue *queue) {
+	assert(queue->in_global);
+	if (queue->lock_session == 0) {
+		skynet_globalmq_push(queue);
+	}
 }
 
 void 

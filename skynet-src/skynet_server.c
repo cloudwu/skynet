@@ -249,7 +249,7 @@ skynet_context_message_dispatch(void) {
 	}
 
 	assert(q == ctx->queue);
-	skynet_mq_force_push(q);
+	skynet_mq_pushglobal(q);
 	skynet_context_release(ctx);
 
 	return 0;
@@ -324,6 +324,16 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		skynet_timeout(context->handle, ti, session);
 		sprintf(context->result, "%d", session);
 		return context->result;
+	}
+
+	if (strcmp(cmd,"LOCK") == 0) {
+		if (context->init == 0) {
+			return NULL;
+		}
+		int session = strtol(param, NULL, 10);
+		assert(session);
+		skynet_mq_lock(context->queue, session);
+		return NULL;
 	}
 
 	if (strcmp(cmd,"REG") == 0) {
