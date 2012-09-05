@@ -363,6 +363,7 @@ _pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 			lua_pop(L,1);
 			wb_integer(b, handle, TYPE_REMOTE);
 		} else {
+			lua_pop(L,1);
 			wb_table(L, b, index, depth+1);
 		}
 		break;
