@@ -96,7 +96,7 @@ main(int argc, char *argv[]) {
 
 	const char *path = optstring("lua_path","./lualib/?.lua;./lualib/?/init.lua");
 	setenv("LUA_PATH",path,1);
-	const char *cpath = optstring("lua_cpath","./lualib/?.so");
+	const char *cpath = optstring("lua_cpath","./luaclib/?.so");
 	setenv("LUA_CPATH",cpath,1);
 	optstring("luaservice","./service/?.lua");
 
