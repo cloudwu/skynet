@@ -75,25 +75,38 @@ _write(lua_State *L) {
 static int
 _writeblock(lua_State *L) {
 	int fd = luaL_checkinteger(L,1);
-	int type = lua_type(L,2);
+	int header = luaL_checkinteger(L,2);
+	int type = lua_type(L,3);
 	const char * buffer = NULL;
 	size_t sz;
 	if (type == LUA_TSTRING) {
-		buffer = lua_tolstring(L,2,&sz);
+		buffer = lua_tolstring(L,3,&sz);
 	} else if (type == LUA_TLIGHTUSERDATA) {
-		buffer = lua_touserdata(L,2);
-		sz = luaL_checkinteger(L,3);
+		buffer = lua_touserdata(L,3);
+		sz = luaL_checkinteger(L,4);
 	}
 
-	if (sz > 65535) {
-		luaL_error(L, "Too big package %d", (int)sz);
+	if (header == 2) {
+		if (sz > 65535) {
+			luaL_error(L, "Too big package %d", (int)sz);
+		}
+	} else {
+		if (header != 4) {
+			luaL_error(L, "block header must be 2 or 4 bytes");
+		}
 	}
 
 	struct iovec buf[2];
-	// send big-endian header
-	uint8_t head[2] = { sz >> 8 & 0xff , sz & 0xff };
-	buf[0].iov_base = head;
-	buf[0].iov_len = 2;
+	if (header == 2) {
+		// send big-endian header
+		uint8_t head[2] = { sz >> 8 & 0xff , sz & 0xff };
+		buf[0].iov_base = head;
+		buf[0].iov_len = 2;
+	} else {
+		uint8_t head[4] = { sz >> 24 & 0xff, sz >> 16 & 0xff, sz >> 8 & 0xff , sz & 0xff };
+		buf[0].iov_base = head;
+		buf[0].iov_len = 4;
+	}
 	buf[1].iov_base = (void *)buffer;
 	buf[1].iov_len = sz;
 
@@ -107,7 +120,7 @@ _writeblock(lua_State *L) {
 			}
 			return 0;
 		}
-		assert(err == sz +2);
+		assert(err == sz + header);
 		return 0;
 	}
 }

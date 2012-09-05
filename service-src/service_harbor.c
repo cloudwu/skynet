@@ -270,10 +270,10 @@ _message_to_header(const uint32_t *message, struct remote_message_header *header
 
 static int
 _send_package(int fd, const void * buffer, size_t sz) {
-	uint16_t header = htons(sz);
+	uint32_t header = htonl(sz);
 	struct iovec part[2];
 	part[0].iov_base = &header;
-	part[0].iov_len = 2;
+	part[0].iov_len = 4;
 	part[1].iov_base = (void*)buffer;
 	part[1].iov_len = sz;
 
@@ -286,7 +286,7 @@ _send_package(int fd, const void * buffer, size_t sz) {
 				continue;
 			}
 		}
-		if (err != sz+2) {
+		if (err != sz+4) {
 			return 1;
 		}
 		return 0;
@@ -295,11 +295,11 @@ _send_package(int fd, const void * buffer, size_t sz) {
 
 static int
 _send_remote(int fd, const char * buffer, size_t sz, struct remote_message_header * cookie) {
-	uint16_t sz_header = htons(sz+sizeof(*cookie));
+	uint32_t sz_header = htonl(sz+sizeof(*cookie));
 	struct iovec part[3];
 
 	part[0].iov_base = &sz_header;
-	part[0].iov_len = 2;
+	part[0].iov_len = 4;
 
 	part[1].iov_base = (char *)buffer;
 	part[1].iov_len = sz;
@@ -318,7 +318,7 @@ _send_remote(int fd, const char * buffer, size_t sz, struct remote_message_heade
 				continue;
 			}
 		}
-		if (err != sz+sizeof(*cookie)+2) {
+		if (err != sz+sizeof(*cookie)+4) {
 			return 1;
 		}
 		return 0;
@@ -568,7 +568,7 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 	h->master_fd = master_fd;
 
 	char tmp[128];
-	sprintf(tmp,"gate ! %s %d %d 0",local_addr, PTYPE_HARBOR, REMOTE_MAX);
+	sprintf(tmp,"gate L ! %s %d %d 0",local_addr, PTYPE_HARBOR, REMOTE_MAX);
 	const char * gate_addr = skynet_command(ctx, "LAUNCH", tmp);
 	if (gate_addr == NULL) {
 		skynet_error(ctx, "Harbor : launch gate failed");

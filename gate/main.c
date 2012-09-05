@@ -25,6 +25,7 @@ struct gate {
 	int cap;
 	int max_connection;
 	int client_tag;
+	int header_size;
 	struct connection ** agent;
 	struct connection * map;
 };
@@ -193,7 +194,7 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 			getpeername(fd, (struct sockaddr *)&remote_addr, &len);
 			_report(g, ctx, "%d open %d %s:%u",id,fd,inet_ntoa(remote_addr.sin_addr),ntohs(remote_addr.sin_port));
 		}
-		uint8_t * plen = mread_pull(m,2);
+		uint8_t * plen = mread_pull(m,g->header_size);
 		if (plen == NULL) {
 			if (mread_closed(m)) {
 				_remove_id(g,id);
@@ -202,7 +203,12 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 			goto _break;
 		}
 		// big-endian
-		uint16_t len = plen[0] << 8 | plen[1];
+		uint16_t len ;
+		if (g->header_size == 2) {
+			len = plen[0] << 8 | plen[1];
+		} else {
+			len = plen[0] << 24 | plen[1] << 16 | plen[2] << 8 | plen[3];
+		}
 
 		void * data = mread_pull(m, len);
 		if (data == NULL) {
@@ -230,9 +236,14 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	char watchdog[sz];
 	char binding[sz];
 	int client_tag = 0;
-	int n = sscanf(parm, "%s %s %d %d %d",watchdog, binding,&client_tag , &max,&buffer);
-	if (n<3) {
+	char header;
+	int n = sscanf(parm, "%c %s %s %d %d %d",&header,watchdog, binding,&client_tag , &max,&buffer);
+	if (n<4) {
 		skynet_error(ctx, "Invalid gate parm %s",parm);
+		return 1;
+	}
+	if (header != 'S' && header !='L') {
+		skynet_error(ctx, "Invalid data header style");
 		return 1;
 	}
 	if (client_tag == 0) {
@@ -279,6 +290,7 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	g->max_connection = max;
 	g->id_index = 0;
 	g->client_tag = client_tag;
+	g->header_size = header=='S' ? 2 : 4;
 
 	g->agent = malloc(cap * sizeof(struct connection *));
 	memset(g->agent, 0, cap * sizeof(struct connection *));

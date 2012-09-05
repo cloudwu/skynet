@@ -52,7 +52,7 @@ skynet.start(function()
 		end
 	end)
 	-- 0 for default client tag
-	gate = skynet.launch("gate" , skynet.address(skynet.self()), port, 0, max_agent, buffer)
+	gate = skynet.launch("gate" , "S" , skynet.address(skynet.self()), port, 0, max_agent, buffer)
 	skynet.send(gate,"text", "start")
 	skynet.register(".watchdog")
 end)

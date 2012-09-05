@@ -131,18 +131,18 @@ _connect_to(const char *ipaddress) {
 
 static int
 _send_to(int fd, const void * buf, size_t sz, uint32_t handle) {
-	char buffer[2 + sz + 12];
-	uint16_t header = htons(sz+12);
-	memcpy(buffer, &header, 2);
-	memcpy(buffer+2, buf, sz);
+	char buffer[4 + sz + 12];
+	uint32_t header = htonl(sz+12);
+	memcpy(buffer, &header, 4);
+	memcpy(buffer+4, buf, sz);
 	uint32_t u32 = 0;
-	memcpy(buffer+2+sz,&u32,4);
+	memcpy(buffer+4+sz,&u32,4);
 	u32 = htonl(handle);
-	memcpy(buffer+2+sz+4,&u32,4);
+	memcpy(buffer+4+sz+4,&u32,4);
 	u32 = 0;
-	memcpy(buffer+2+sz+8,&u32,4);
+	memcpy(buffer+4+sz+8,&u32,4);
 
-	sz += 2 + 12;
+	sz += 4 + 12;
 
 	for (;;) {
 		int err = send(fd, buffer, sz, 0);
@@ -269,7 +269,7 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 int
 master_init(struct master *m, struct skynet_context *ctx, const char * args) {
 	char tmp[strlen(args) + 32];
-	sprintf(tmp,"gate ! %s %d %d 0",args,PTYPE_HARBOR,REMOTE_MAX);
+	sprintf(tmp,"gate L ! %s %d %d 0",args,PTYPE_HARBOR,REMOTE_MAX);
 	const char * gate_addr = skynet_command(ctx, "LAUNCH", tmp);
 	if (gate_addr == NULL) {
 		skynet_error(ctx, "Master : launch gate failed");
