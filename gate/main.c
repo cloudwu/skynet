@@ -166,10 +166,12 @@ _gen_id(struct gate * g, int connection_id) {
 
 static void
 _remove_id(struct gate *g, int uid) {
-	struct connection * conn = _id_to_agent(g,uid);
+	struct connection ** pconn = &g->agent[uid & (g->cap - 1)];
+	struct connection * conn = *pconn;
 	assert(conn->uid == uid);
 	conn->uid = 0;
 	conn->agent = 0;
+	*pconn = NULL;
 }
 
 static int
