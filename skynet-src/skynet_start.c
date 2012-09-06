@@ -79,10 +79,14 @@ skynet_start(struct skynet_config * config) {
 	struct skynet_context *ctx;
 	ctx = skynet_context_new("logger", config->logger);
 	if (ctx == NULL) {
-		return;
+		fprintf(stderr,"launch logger error");
+		exit(1);
 	}
 	ctx = skynet_context_new("snlua", "launcher");
-	assert(ctx);
+	if (ctx == NULL) {
+		fprintf(stderr,"launch launcher error");
+		exit(1);
+	}
 	ctx = skynet_context_new("snlua", config->start);
 
 	_start(config->thread);

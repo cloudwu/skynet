@@ -92,6 +92,7 @@ skynet_context_new(const char * name, const char *param) {
 			ctx->init = 1;
 		}
 		skynet_mq_force_push(queue);
+		printf("[:%x] launch %s %s\n",ret->handle, name, param ? param : "");
 		return ret;
 	} else {
 		skynet_context_release(ctx);
@@ -414,7 +415,6 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 			return NULL;
 		} else {
 			_id_to_hex(context->result, inst->handle);
-			printf("[:%x] launch %s\n",inst->handle, param);
 			return context->result;
 		}
 	}

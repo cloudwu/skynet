@@ -203,7 +203,7 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 			goto _break;
 		}
 		// big-endian
-		uint16_t len ;
+		int len ;
 		if (g->header_size == 2) {
 			len = plen[0] << 8 | plen[1];
 		} else {
