@@ -136,7 +136,7 @@ ringbuffer_resize(struct ringbuffer * rb, struct ringbuffer_block * blk, int siz
 	}
 	int align_length = ALIGN(sizeof(struct ringbuffer_block) + size);
 	int old_length = ALIGN(blk->length);
-	assert(align_length < old_length);
+	assert(align_length <= old_length);
 	blk->length = size + sizeof(struct ringbuffer_block);
 	if (align_length == old_length) {
 		return;
