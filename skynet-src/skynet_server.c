@@ -518,7 +518,7 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 
 		if (skynet_context_push(destination, &smsg)) {
 			free(data);
-			skynet_error(NULL, "Drop message from %x to %x (size=%d)", source, destination, (int)sz);
+			skynet_error(NULL, "Drop message from %x to %x (type=%d)(size=%d)", source, destination, type, (int)(sz & HANDLE_MASK));
 			return -1;
 		}
 	}

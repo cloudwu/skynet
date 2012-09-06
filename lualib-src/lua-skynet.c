@@ -155,6 +155,8 @@ _send(lua_State *L) {
 			if (dest == 0) {
 				luaL_error(L, "Invalid name %s", addrname);
 			}
+		} else if ('0' <= addrname[0] && addrname[0] <= '9') {
+			luaL_error(L, "Invalid name %s: must not start with a digit", addrname);
 		} else {
 			return _sendname(L, context, addrname);
 		}
