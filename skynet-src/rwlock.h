@@ -29,7 +29,7 @@ rwlock_rlock(struct rwlock *lock) {
 
 static inline void
 rwlock_wlock(struct rwlock *lock) {
-	__sync_lock_test_and_set(&lock->write,1);
+	while (__sync_lock_test_and_set(&lock->write,1)) {}
 	while(lock->read) {
 		__sync_synchronize();
 	}
