@@ -244,6 +244,10 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 		skynet_error(ctx, "Invalid gate parm %s",parm);
 		return 1;
 	}
+	if (max <=0 ) {
+		skynet_error(ctx, "Need max conntection");
+		return 1;
+	}
 	if (header != 'S' && header !='L') {
 		skynet_error(ctx, "Invalid data header style");
 		return 1;
