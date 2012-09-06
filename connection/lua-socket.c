@@ -231,6 +231,7 @@ _readline(lua_State *L) {
 
 /*
 	userdata buffer
+	intteger header
 	function (msg, sz, ...)
 	...
  */
@@ -243,27 +244,40 @@ _readblock(lua_State *L) {
 	if (size < 2) {
 		return 0;
 	}
+	int header_size = luaL_checkinteger(L,2);
 	uint8_t * buf = (uint8_t *)buffer->buffer + buffer->read;
-	uint16_t len = buf[0] << 8 | buf[1];
-	if (size < 2 + len) {
+	uint16_t len;
+	if (header_size == 2) {
+		len	= buf[0] << 8 | buf[1];
+	} else {
+		if (header_size != 4) {
+			return luaL_error(L, "header size must be 2 or 4");
+		}
+		len	= buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
+	}
+	if (size < header_size + len) {
 		return 0;
 	}
 
-	if (top == 2) {
-		lua_pushlightuserdata(L, buffer->buffer + buffer->read + 2);
+	if (top == 3) {
+		lua_pushlightuserdata(L, buffer->buffer + buffer->read + header_size);
 		lua_pushinteger(L, len);
 		lua_call(L,2,LUA_MULTRET);
+
+		buffer->read += len + header_size;
+		return lua_gettop(L) - 2;
 	} else {
-		lua_pushlightuserdata(L, buffer->buffer + buffer->read + 2);
-		lua_insert(L,3);
+		lua_pushvalue(L,3);
+		lua_replace(L,1);
+		lua_pushlightuserdata(L, buffer->buffer + buffer->read + header_size);
+		lua_replace(L,2);
 		lua_pushinteger(L, len);
-		lua_insert(L,4);
-		lua_call(L,top,LUA_MULTRET);
+		lua_replace(L,3);
+		lua_call(L,top-1,LUA_MULTRET);
+
+		buffer->read += len + header_size;
+		return lua_gettop(L);
 	}
-
-	buffer->read += len + 2;
-
-	return lua_gettop(L) - 1;
 }
 
 int
