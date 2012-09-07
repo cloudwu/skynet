@@ -3,6 +3,8 @@ local string = string
 local table =  table
 local unpack = unpack
 
+local redis_manager
+
 local redis = {}
 
 local command = {}
@@ -30,9 +32,13 @@ local meta = {
 }
 
 function redis.connect(dbname)
-	local handle = skynet.call(".redis-manager", "lua", dbname)
+	local handle = skynet.call(redis_manager, "lua", dbname)
 	assert(handle ~= nil)
 	return setmetatable({ __handle = handle } , meta)
 end
+
+skynet.init(function()
+	redis_manager = skynet.call(".service", "lua", "redis-mgr")
+end, "redis")
 
 return redis

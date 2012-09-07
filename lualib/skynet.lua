@@ -402,9 +402,34 @@ do
 	}
 end
 
+local init_func = {}
+
+function skynet.init(f, name)
+	assert(type(f) == "function")
+	if init_func == nil then
+		f()
+	else
+		if name == nil then
+			table.insert(init_func, f)
+		else
+			assert(init_func[name] == nil)
+			init_func[name] = f
+		end
+	end
+end
+
+local function init_all()
+	local funcs = init_func
+	init_func = nil
+	for k,v in pairs(funcs) do
+		v()
+	end
+end
+
 function skynet.start(f)
 	c.callback(dispatch_message)
 	skynet.timeout(0, function()
+		init_all()
 		f()
 		skynet.send(".launcher","lua", nil)
 	end)

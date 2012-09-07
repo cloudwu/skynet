@@ -81,9 +81,10 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 		_parm(tmp, sz, i);
 		int uid = strtol(command , NULL, 10);
 		struct connection * agent = _id_to_agent(g,uid);
-		int connection_id = agent->connection_id;
-
-		mread_close_client(g->pool,connection_id);
+		if (agent) {
+			int connection_id = agent->connection_id;
+			mread_close_client(g->pool,connection_id);
+		}
 		return;
 	}
 	if (memcmp(command,"forward",i)==0) {
@@ -168,10 +169,12 @@ static void
 _remove_id(struct gate *g, int uid) {
 	struct connection ** pconn = &g->agent[uid & (g->cap - 1)];
 	struct connection * conn = *pconn;
-	assert(conn->uid == uid);
-	conn->uid = 0;
-	conn->agent = 0;
-	*pconn = NULL;
+	if (conn) {
+		assert(conn->uid == uid);
+		conn->uid = 0;
+		conn->agent = 0;
+		*pconn = NULL;
+	}
 }
 
 static int

@@ -22,6 +22,5 @@ skynet.start(function()
 		connection[dbname] = redis_cli
 		skynet.ret(skynet.pack(redis_cli))
 	end)
-	skynet.register ".redis-manager"
 end)
 

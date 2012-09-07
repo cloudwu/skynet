@@ -1,6 +1,6 @@
 local skynet = require "skynet"
 
-local SERVICE = "GROUPMGR"
+local SERVICE
 
 local group = {}
 
@@ -26,5 +26,10 @@ end
 function group.release(id)
 	skynet.send(SERVICE, "lua" , "CLEAR", skynet.self(), id)
 end
+
+skynet.init(function()
+	SERVICE = skynet.call("SERVICE", "lua", "group_mgr")
+	skynet.call(".service","lua","group_agent")
+end, "group")
 
 return group
