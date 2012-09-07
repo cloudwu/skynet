@@ -59,8 +59,10 @@ _parm(char *msg, int sz, int command_sz) {
 static void
 _forward_agent(struct gate * g, int id, uint32_t agentaddr, uint32_t clientaddr) {
 	struct connection * agent = _id_to_agent(g,id);
-	agent->agent = agentaddr;
-	agent->client = clientaddr;
+	if (agent) {
+		agent->agent = agentaddr;
+		agent->client = clientaddr;
+	}
 }
 
 static void
@@ -137,6 +139,8 @@ _forward(struct skynet_context * ctx,struct gate *g, int uid, void * data, size_
 		return;
 	}
 	struct connection * agent = _id_to_agent(g,uid);
+	if (agent == NULL)
+		return;
 	if (agent->agent) {
 		skynet_send(ctx, agent->client, agent->agent, g->client_tag, 0 , data, len);
 	} else if (g->watchdog) {
