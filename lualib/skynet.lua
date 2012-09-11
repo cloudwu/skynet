@@ -244,16 +244,6 @@ local function dispatch_message(prototype, msg, sz, session, source, ...)
 	end
 end
 
-function skynet.filter(f ,start)
-	c.callback(function(...)
-		dispatch_message(f(...))
-	end)
-	skynet.timeout(0, function()
-		start()
-		skynet.send(".launcher","lua", nil)
-	end)
-end
-
 function skynet.newservice(name, ...)
 	local handle = skynet.call(".launcher", "lua" , "snlua", name, ...)
 	return handle
@@ -427,11 +417,27 @@ local function init_all()
 	end
 end
 
-function skynet.start(f)
+local function init_template(start)
+    init_all()
+    init_func = {}
+    start()
+    init_all()
+end
+
+function skynet.start(start_func)
 	c.callback(dispatch_message)
 	skynet.timeout(0, function()
-		init_all()
-		f()
+        init_template(start_func)
+		skynet.send(".launcher","lua", nil)
+	end)
+end
+
+function skynet.filter(f ,start_func)
+	c.callback(function(...)
+		dispatch_message(f(...))
+	end)
+	skynet.timeout(0, function()
+        init_template(start_func)
 		skynet.send(".launcher","lua", nil)
 	end)
 end
