@@ -3,6 +3,7 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include "luacompat52.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -90,6 +91,7 @@ traceback (lua_State *L) {
 
 int
 snlua_init(lua_State *L, struct skynet_context *ctx, const char * args) {
+	luaL_init(L);
 	lua_gc(L, LUA_GCSTOP, 0);
 	luaL_openlibs(L);
 	lua_pushlightuserdata(L, ctx);

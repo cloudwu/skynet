@@ -1,5 +1,6 @@
 #include "skynet_imp.h"
 #include "skynet_env.h"
+#include "luacompat52.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +46,7 @@ optstring(const char *key,const char * opt) {
 
 static void
 _init_env(lua_State *L) {
-	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
+	lua_pushglobaltable(L);
 	lua_pushnil(L);  /* first key */
 	while (lua_next(L, -2) != 0) {
 		int keyt = lua_type(L, -2);
@@ -85,6 +86,7 @@ main(int argc, char *argv[]) {
 	lua_close(L);
 
 	L = luaL_newstate();
+	luaL_init(L);
 
 	int err = luaL_dofile(L, config_file);
 	if (err) {
