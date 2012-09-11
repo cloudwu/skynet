@@ -230,6 +230,15 @@ _redirect(lua_State *L) {
 }
 
 static int
+_forward(lua_State *L) {
+	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+	uint32_t dest = luaL_checkunsigned(L,1);
+	skynet_forward(context, dest);
+
+	return 0;
+}
+
+static int
 _error(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	skynet_error(context, "%s", luaL_checkstring(L,1));
@@ -276,6 +285,7 @@ luaopen_skynet_c(lua_State *L) {
 		{ "send" , _send },
 		{ "genid", _genid },
 		{ "redirect", _redirect },
+		{ "forward", _forward },
 		{ "command" , _command },
 		{ "callback" , _callback },
 		{ "error", _error },

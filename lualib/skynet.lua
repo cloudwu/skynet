@@ -159,6 +159,7 @@ function skynet.send(addr, typename, ...)
 end
 
 skynet.genid = assert(c.genid)
+skynet.forward = assert(c.forward)
 
 skynet.redirect = function(dest,source,typename,...)
 	return c.redirect(dest, source, proto[typename].id, ...)
