@@ -86,7 +86,6 @@ main(int argc, char *argv[]) {
 	lua_close(L);
 
 	L = luaL_newstate();
-	luaL_init(L);
 
 	int err = luaL_dofile(L, config_file);
 	if (err) {
@@ -96,9 +95,9 @@ main(int argc, char *argv[]) {
 	} 
 	_init_env(L);
 
-	const char *path = optstring("lua_path","./lualib/?.lua;./lualib/?/init.lua");
+	const char *path = optstring("lua_path","./build/lua/?.lua;./lualib/?.lua;./lualib/?/init.lua");
 	setenv("LUA_PATH",path,1);
-	const char *cpath = optstring("lua_cpath","./luaclib/?.so");
+	const char *cpath = optstring("lua_cpath","./build/lua/?.so");
 	setenv("LUA_CPATH",cpath,1);
 	optstring("luaservice","./service/?.lua");
 
