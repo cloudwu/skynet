@@ -1,3 +1,5 @@
+require "loadx"
+
 local function config(path , pre)
 	assert(path)
 	local env = pre or {}
