@@ -19,14 +19,14 @@ cookie = "local function __setenv() end;"
 local load = load
 
 function _G.load(ld, chunkname, mode, env)
-	local f
+	local f,err
 	if type(ld) == "string" then
-		f = load(cookie .. ld, chunkname, mode, env)
+		f,err = load(cookie .. ld, chunkname, mode, env)
 	else
-		f = load(make_ld(ld), chunkname)
+		f,err = load(make_ld(ld), chunkname)
 	end
 
-	return f
+	return f,err
 end
 
 function _G.loadfile(filename, mode, env)
@@ -59,11 +59,14 @@ end
 cookie = "local _ENV,__setenv = __getenv();"
 
 function _G.load(ld, chunkname, mode, env)
-	local f
+	local f,err
 	if type(ld) == "string" then
-		f = loadstring(cookie .. ld, chunkname)
+		f,err = loadstring(cookie .. ld, chunkname)
 	else
-		f = load(make_ld(ld), chunkname)
+		f,err = load(make_ld(ld), chunkname)
+	end
+	if f == nil then
+		return f, err
 	end
 	env = env or getfenv(1)
 	setfenv(f, { __getenv = function()
@@ -71,7 +74,7 @@ function _G.load(ld, chunkname, mode, env)
 		return env, __setenv
 	end })
 
-	return f
+	return f,err
 end
 
 function _G.loadfile(filename, mode, env)
