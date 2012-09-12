@@ -6,6 +6,8 @@
 LUALIB_API void 
 luaL_init(lua_State *L) {
 	lua_pushglobaltable(L);
+	lua_setglobal(L, "_ENV");
+	lua_pushglobaltable(L);
 	lua_rawseti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
 	int mt = lua_pushthread(L);
 	if (mt == 0) {
