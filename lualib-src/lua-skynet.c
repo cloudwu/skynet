@@ -9,9 +9,31 @@
 #include <string.h>
 #include <assert.h>
 
+struct stat {
+	lua_State *L;
+	int count;
+};
+
+static int
+_stat(lua_State *L) {
+	lua_rawgetp(L, LUA_REGISTRYINDEX, _stat);
+	struct stat *S = lua_touserdata(L,-1);
+	if (S==NULL) {
+		luaL_error(L, "set callback first");
+	}
+	const char * what = luaL_checkstring(L,1);
+	if (strcmp(what,"count")==0) {
+		lua_pushinteger(L, S->count);
+		return 1;
+	}
+	return 0;
+}
+
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
-	lua_State *L = ud;
+	struct stat *S = ud;
+	lua_State *L = S->L;
+	++S->count;
 	int trace = 1;
 	int top = lua_gettop(L);
 	if (top == 1) {
@@ -61,10 +83,16 @@ _callback(lua_State *L) {
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);
 	lua_rawsetp(L, LUA_REGISTRYINDEX, _cb);
+
 	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
 	lua_State *gL = lua_tothread(L,-1);
 
-	skynet_callback(context, gL, _cb);
+	struct stat * S = lua_newuserdata(L, sizeof(*S));
+	S->L = gL;
+	S->count = 0;
+	lua_rawsetp(L, LUA_REGISTRYINDEX, _stat);
+
+	skynet_callback(context, S, _cb);
 
 	return 0;
 }
@@ -309,8 +337,14 @@ luaopen_skynet_c(lua_State *L) {
 
 	luaL_setfuncs(L,l,1);
 
-	lua_pushcfunction(L, remoteobj_init);
-	lua_setfield(L, -2, "remote_init");
+	luaL_Reg l2[] = {
+		{ "stat", _stat },
+		{ "remote_init", remoteobj_init },
+		{ NULL, NULL },
+	};
+
+
+	luaL_setfuncs(L,l2,0);
 
 	return 1;
 }

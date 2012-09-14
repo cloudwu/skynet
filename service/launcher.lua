@@ -13,6 +13,19 @@ function command.LIST()
 	skynet.ret(skynet.pack(list))
 end
 
+function command.STAT()
+	local list = {}
+	for k,v in pairs(services) do
+		local stat = skynet.call(k,"debug","STAT")
+		local result = {}
+		for k,v in pairs(stat) do
+			table.insert(result, string.format("%s = %s", k, tostring(v)))
+		end
+		list[skynet.address(k)] = table.concat(result,",") .. " (" .. v .. ")"
+	end
+	skynet.ret(skynet.pack(list))
+end
+
 function command.KILL(handle)
 	skynet.kill(handle)
 	skynet.ret( skynet.pack({ [handle] = tostring(services[handle]) }))

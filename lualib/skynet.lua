@@ -383,6 +383,16 @@ function dbgcmd.GC()
 	collectgarbage "collect"
 end
 
+local function query_state(stat, what)
+	stat[what] = c.stat(what)
+end
+
+function dbgcmd.STAT()
+	local stat = {}
+	query_state(stat, "count")
+	skynet.ret(skynet.pack(stat))
+end
+
 local function _debug_dispatch(session, address, cmd, ...)
 	local f = dbgcmd[cmd]
 	assert(f, cmd)
