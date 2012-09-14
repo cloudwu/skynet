@@ -18,7 +18,7 @@ skynet.start(function()
 			return
 		end
 
-		local redis_cli = skynet.launch("snlua", "redis-cli", name[dbname])
+		local redis_cli = skynet.newservice("redis-cli", name[dbname])
 		connection[dbname] = redis_cli
 		skynet.ret(skynet.pack(redis_cli))
 	end)
