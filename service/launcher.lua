@@ -49,7 +49,7 @@ skynet.start(function()
 			-- init notice
 			local reply = instance[address]
 			if reply then
-				skynet.redirect(reply.address , 0, "response", reply.session, skynet.pack(address))
+				skynet.redirect(reply.address , 0, "response", reply.session, skynet.address(address))
 				instance[address] = nil
 			end
 		else
@@ -60,7 +60,7 @@ skynet.start(function()
 				services[inst] = cmd
 				instance[inst] = { session = session, address = address }
 			else
-				skynet.ret(skynet.pack(nil))
+				skynet.ret("")
 			end
 		end
 	end)

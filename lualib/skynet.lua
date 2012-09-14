@@ -251,7 +251,11 @@ end
 function skynet.newservice(name, ...)
 	local param =  table.concat({"snlua", name, ...}, " ")
 	local handle = skynet.call(".launcher", "text" , param)
-	return handle
+	if handle == "" then
+		return nil
+	else
+		return string_to_handle(handle)
+	end
 end
 
 local function group_command(cmd, handle, address)
