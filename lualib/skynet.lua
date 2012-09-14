@@ -138,10 +138,14 @@ function skynet.starttime()
 end
 
 function skynet.exit()
+	skynet.send(".launcher","lua","REMOVE",skynet.self())
 	c.command("EXIT")
 end
 
 function skynet.kill(name)
+	if type(name) == "number" then
+		name = skynet.address(name)
+	end
 	c.command("KILL",name)
 end
 
@@ -245,7 +249,8 @@ local function dispatch_message(prototype, msg, sz, session, source, ...)
 end
 
 function skynet.newservice(name, ...)
-	local handle = skynet.call(".launcher", "lua" , "snlua", name, ...)
+	local param =  table.concat({"snlua", name, ...}, " ")
+	local handle = skynet.call(".launcher", "text" , param)
 	return handle
 end
 
@@ -360,6 +365,25 @@ do
 	}
 end
 
+----- debug
+
+local dbgcmd = {}
+
+function dbgcmd.MEM()
+	local kb, bytes = collectgarbage "count"
+	skynet.ret(skynet.pack(kb,bytes))
+end
+
+function dbgcmd.GC()
+	collectgarbage "collect"
+end
+
+local function _debug_dispatch(session, address, cmd, ...)
+	local f = dbgcmd[cmd]
+	assert(f, cmd)
+	f(...)
+end
+
 ----- register protocol
 do
 	local REG = skynet.register_protocol
@@ -390,6 +414,14 @@ do
 	REG {
 		name = "response",
 		id = 1,
+	}
+
+	REG {
+		name = "debug",
+		id = 9,
+		pack = skynet.pack,
+		unpack = skynet.unpack,
+		dispatch = _debug_dispatch,
 	}
 end
 
@@ -428,7 +460,7 @@ function skynet.start(start_func)
 	c.callback(dispatch_message)
 	skynet.timeout(0, function()
         init_template(start_func)
-		skynet.send(".launcher","lua", nil)
+		skynet.send(".launcher","text", "")
 	end)
 end
 
@@ -438,7 +470,7 @@ function skynet.filter(f ,start_func)
 	end)
 	skynet.timeout(0, function()
         init_template(start_func)
-		skynet.send(".launcher","lua", nil)
+		skynet.send(".launcher","text", "")
 	end)
 end
 

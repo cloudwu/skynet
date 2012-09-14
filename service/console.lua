@@ -15,10 +15,7 @@ local function split_package()
 	while true do
 		local cmd = readline "\n"
 		if cmd ~= "" then
-			local handle = skynet.launch("snlua", cmd)
-			if handle == nil then
-				print("Launch error:",cmd)
-			end
+			skynet.send(skynet.self(), "text", cmd)
 		end
 	end
 end
@@ -39,5 +36,11 @@ skynet.register_protocol {
 
 
 skynet.start(function()
+	skynet.dispatch("text", function (session, address, cmd)
+		local handle = skynet.newservice(cmd)
+		if handle == nil then
+			print("Launch error:",cmd)
+		end
+	end)
 	socket.stdin()
 end)

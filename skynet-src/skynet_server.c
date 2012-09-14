@@ -394,6 +394,7 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		} else if (param[0] == '.') {
 			handle = skynet_handle_findname(param+1);
 		} else {
+			skynet_error(context, "Can't kill %s",param);
 			// todo : kill global service
 		}
 		if (handle) {
