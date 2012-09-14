@@ -144,6 +144,7 @@ end
 
 function skynet.kill(name)
 	if type(name) == "number" then
+		skynet.send(".launcher","lua","REMOVE",name)
 		name = skynet.address(name)
 	end
 	c.command("KILL",name)
