@@ -390,6 +390,7 @@ end
 function dbgcmd.STAT()
 	local stat = {}
 	query_state(stat, "count")
+	query_state(stat, "time")
 	skynet.ret(skynet.pack(stat))
 end
 

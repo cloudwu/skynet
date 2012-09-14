@@ -8,11 +8,41 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
+
+#define NANOSEC 1000000000
 
 struct stat {
 	lua_State *L;
 	int count;
+	uint32_t ti_sec;
+	uint32_t ti_nsec;
 };
+
+static void
+_stat_begin(struct stat *S, struct timespec *ti) {
+	S->count++;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, ti);
+}
+
+static void
+_stat_end(struct stat *S, struct timespec *ti) {
+	struct timespec end;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
+	int diffsec = end.tv_sec - ti->tv_sec;
+	assert(diffsec>=0);
+	int diffnsec = end.tv_nsec - ti->tv_nsec;
+	if (diffnsec < 0) {
+		--diffsec;
+		diffnsec += NANOSEC;
+	}
+	S->ti_nsec += diffnsec;
+	if (S->ti_nsec > NANOSEC) {
+		++S->ti_sec;
+		S->ti_nsec -= NANOSEC;
+	}
+	S->ti_sec += diffsec;
+}
 
 static int
 _stat(lua_State *L) {
@@ -26,6 +56,11 @@ _stat(lua_State *L) {
 		lua_pushinteger(L, S->count);
 		return 1;
 	}
+	if (strcmp(what,"time")==0) {
+		double t = (double)S->ti_sec + (double)S->ti_nsec / NANOSEC;
+		lua_pushnumber(L, t);
+		return 1;
+	}
 	return 0;
 }
 
@@ -33,7 +68,8 @@ static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct stat *S = ud;
 	lua_State *L = S->L;
-	++S->count;
+	struct timespec ti;
+	_stat_begin(S, &ti);
 	int trace = 1;
 	int top = lua_gettop(L);
 	if (top == 1) {
@@ -50,6 +86,8 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	lua_pushnumber(L, source);
 
 	int r = lua_pcall(L, 5, 0 , trace);
+
+	_stat_end(S, &ti);
 	if (r == LUA_OK) 
 		return 0;
 	const char * self = skynet_command(context, "REG", NULL);
@@ -88,8 +126,9 @@ _callback(lua_State *L) {
 	lua_State *gL = lua_tothread(L,-1);
 
 	struct stat * S = lua_newuserdata(L, sizeof(*S));
+	memset(S, 0, sizeof(*S));
 	S->L = gL;
-	S->count = 0;
+
 	lua_rawsetp(L, LUA_REGISTRYINDEX, _stat);
 
 	skynet_callback(context, S, _cb);
