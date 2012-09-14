@@ -77,13 +77,6 @@ function skynet.timeout(ti, func)
 	session_id_coroutine[session] = co
 end
 
-function skynet.fork(func,...)
-	local args = { ... }
-	skynet.timeout("0", function()
-		func(unpack(args))
-	end)
-end
-
 function skynet.sleep(ti)
 	local session = c.command("TIMEOUT",tostring(ti))
 	assert(session)
@@ -222,6 +215,16 @@ function skynet.dispatch_unknown_response(unknown)
 	return prev
 end
 
+local fork_queue = {}
+
+function skynet.fork(func,...)
+	local args = { ... }
+	local co = coroutine.create(function()
+		func(unpack(args))
+	end)
+	table.insert(fork_queue, co)
+end
+
 local function dispatch_message(prototype, msg, sz, session, source, ...)
 	-- PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
@@ -246,6 +249,14 @@ local function dispatch_message(prototype, msg, sz, session, source, ...)
 			print("Unknown request :" , p.unpack(msg,sz))
 			error(string.format("Can't dispatch type %s : ", p.name))
 		end
+	end
+	while true do
+		local key,co = next(fork_queue)
+		if co == nil then
+			return
+		end
+		fork_queue[key] = nil
+		suspend(co,coroutine.resume(co))
 	end
 end
 
