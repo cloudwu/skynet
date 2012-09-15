@@ -26,6 +26,15 @@ function command.STAT()
 	skynet.ret(skynet.pack(list))
 end
 
+function command.INFO(handle)
+	if services[handle] == nil then
+		skynet.ret(skynet.pack(nil))
+	else
+		local result = skynet.call(handle,"debug","INFO")
+		skynet.ret(skynet.pack(result))
+	end
+end
+
 function command.KILL(handle)
 	skynet.kill(handle)
 	skynet.ret( skynet.pack({ [handle] = tostring(services[handle]) }))

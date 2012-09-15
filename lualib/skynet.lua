@@ -394,6 +394,12 @@ end
 
 ----- debug
 
+local internal_info_func
+
+function skynet.info_func(func)
+	internal_info_func = func
+end
+
 local dbgcmd = {}
 
 function dbgcmd.MEM()
@@ -414,6 +420,14 @@ function dbgcmd.STAT()
 	query_state(stat, "count")
 	query_state(stat, "time")
 	skynet.ret(skynet.pack(stat))
+end
+
+function dbgcmd.INFO()
+	if internal_info_func then
+		skynet.ret(skynet.pack(internal_info_func()))
+	else
+		skynet.ret(skynet.pack(nil))
+	end
 end
 
 local function _debug_dispatch(session, address, cmd, ...)
