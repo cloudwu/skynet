@@ -483,8 +483,11 @@ local function init_template(start)
     init_all()
 end
 
+local trace_handle
+
 function skynet.start(start_func)
 	c.callback(dispatch_message)
+	trace_handle = assert(c.stat "trace")
 	skynet.timeout(0, function()
         init_template(start_func)
 		skynet.send(".launcher","text", "")
@@ -495,10 +498,31 @@ function skynet.filter(f ,start_func)
 	c.callback(function(...)
 		dispatch_message(f(...))
 	end)
+	trace_handle = assert(c.stat "trace")
 	skynet.timeout(0, function()
         init_template(start_func)
 		skynet.send(".launcher","text", "")
 	end)
+end
+
+function skynet.trace_new()
+	return c.trace_new(trace_handle)
+end
+
+function skynet.trace_delete(info)
+	return c.trace_delete(info)
+end
+
+function skynet.trace_switch(session)
+	return c.trace_switch(trace_handle, session)
+end
+
+function skynet.trace_yield()
+	return c.trace_yield(trace_handle)
+end
+
+function skynet.trace_register(session)
+	return c.trace_register(trace_handle, session)
 end
 
 return skynet

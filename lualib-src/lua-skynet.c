@@ -129,7 +129,7 @@ _callback(lua_State *L) {
 
 	lua_createtable(L,0,1);
 	lua_pushcfunction(L, _delete_stat);
-	lua_setfield(L,-1,"__gc");
+	lua_setfield(L,-2,"__gc");
 	lua_setmetatable(L, -2);
 
 	lua_rawsetp(L, LUA_REGISTRYINDEX, _stat);
