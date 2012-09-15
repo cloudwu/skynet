@@ -5,6 +5,7 @@
 #include <lauxlib.h>
 #include "luacompat52.h"
 
+#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,12 +40,23 @@ _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
 		fclose(f);
 		int r = luaL_loadfile(L,tmp);
 		if (r == LUA_OK) {
+			int i;
+			for (i=namelen+pathlen-2;i>=0;i--) {
+				if (tmp[i] == '/') {
+					lua_pushlstring(L,tmp,i+1);
+					lua_setglobal(L,"SERVICE_PATH");
+					break;
+				}
+			}
+			if (i<0) {
+				return 0;
+			}
 			lua_getglobal(L,"package");
 			lua_getfield(L,-1,"path");
 			luaL_Buffer b;
 			luaL_buffinit(L, &b);
-			luaL_addlstring(&b, path, pathlen);
-			luaL_addchar(&b,';');
+			luaL_addlstring(&b, tmp, i+1);
+			luaL_addstring(&b, "?.lua;");
 			luaL_addvalue(&b);
 			luaL_pushresult(&b);
 			lua_setfield(L,-2,"path");
@@ -104,6 +116,7 @@ snlua_init(lua_State *L, struct skynet_context *ctx, const char * args) {
 
 	lua_pushcfunction(L, traceback);
 	int traceback_index = lua_gettop(L);
+	assert(traceback_index == 1);
 
 	const char * filename = parm;
 	int r = _load(L, &parm);
