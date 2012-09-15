@@ -1,4 +1,5 @@
 #include "trace_service.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -82,6 +83,9 @@ trace_new(struct trace_pool *p) {
 void 
 trace_register(struct trace_pool *p, int session) {
 	struct trace_info *t = p->current;
+	if (t == NULL) {
+		return;
+	}
 	int hash = session % HASH_SIZE;
 	assert(t->session == 0);
 	t->session = session;
@@ -97,13 +101,13 @@ trace_yield(struct trace_pool *p) {
 	struct trace_info *t = p->current;
 	if (t == NULL)
 		return NULL;
-	p->current = NULL;
 
 	diff_time(&t->ti,&t->ti_sec,&t->ti_nsec);
 
 	if (t->session == 0) {
 		return t;
 	} else {
+		p->current = NULL;
 		return NULL;
 	}
 }

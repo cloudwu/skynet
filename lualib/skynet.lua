@@ -24,6 +24,9 @@ local session_coroutine_address = {}
 local wakeup_session = {}
 local sleep_session = {}
 
+local trace_handle
+local trace_func = function() end
+
 -- suspend is function
 local suspend
 
@@ -45,8 +48,10 @@ function suspend(co, result, command, param, size)
 		error(debug.traceback(co,command))
 	end
 	if command == "CALL" then
+		c.trace_register(trace_handle, param)
 		session_id_coroutine[param] = co
 	elseif command == "SLEEP" then
+		c.trace_register(trace_handle, param)
 		session_id_coroutine[param] = co
 		sleep_session[co] = param
 	elseif command == "RETURN" then
@@ -228,6 +233,7 @@ end
 local function dispatch_message(prototype, msg, sz, session, source, ...)
 	-- PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
+		c.trace_switch(trace_handle, session)
 		local co = session_id_coroutine[session]
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
@@ -249,6 +255,11 @@ local function dispatch_message(prototype, msg, sz, session, source, ...)
 			print("Unknown request :" , p.unpack(msg,sz))
 			error(string.format("Can't dispatch type %s : ", p.name))
 		end
+	end
+	local info = c.trace_yield(trace_handle)
+	if info then
+		local ti = c.trace_delete(trace_handle, info)
+		trace_func(info, ti)
 	end
 	while true do
 		local key,co = next(fork_queue)
@@ -483,8 +494,6 @@ local function init_template(start)
     init_all()
 end
 
-local trace_handle
-
 function skynet.start(start_func)
 	c.callback(dispatch_message)
 	trace_handle = assert(c.stat "trace")
@@ -505,24 +514,12 @@ function skynet.filter(f ,start_func)
 	end)
 end
 
-function skynet.trace_new()
+function skynet.trace()
 	return c.trace_new(trace_handle)
 end
 
-function skynet.trace_delete(info)
-	return c.trace_delete(info)
-end
-
-function skynet.trace_switch(session)
-	return c.trace_switch(trace_handle, session)
-end
-
-function skynet.trace_yield()
-	return c.trace_yield(trace_handle)
-end
-
-function skynet.trace_register(session)
-	return c.trace_register(trace_handle, session)
+function skynet.trace_callback(func)
+	trace_func = func
 end
 
 return skynet
