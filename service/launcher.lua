@@ -5,6 +5,10 @@ local services = {}
 
 local command = {}
 
+local function handle_to_address(handle)
+	return tonumber("0x" .. string.sub(handle , 2))
+end
+
 function command.LIST()
 	local list = {}
 	for k,v in pairs(services) do
@@ -27,6 +31,7 @@ function command.STAT()
 end
 
 function command.INFO(handle)
+	handle = handle_to_address(handle)
 	if services[handle] == nil then
 		skynet.ret(skynet.pack(nil))
 	else
@@ -36,6 +41,7 @@ function command.INFO(handle)
 end
 
 function command.KILL(handle)
+	handle = handle_to_address(handle)
 	skynet.kill(handle)
 	skynet.ret( skynet.pack({ [handle] = tostring(services[handle]) }))
 	services[handle] = nil
