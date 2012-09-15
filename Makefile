@@ -60,8 +60,8 @@ service/snlua.so : service-src/service_lua.c
 service/gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Igate -Iskynet-src
 
-luaclib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/lua-remoteobj.c | luaclib
-	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src
+luaclib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/lua-remoteobj.c lualib-src/trace_service.c | luaclib
+	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Ilualib-src
 
 service/client.so : service-src/service_client.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src

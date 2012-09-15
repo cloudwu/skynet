@@ -1,4 +1,5 @@
 #include "skynet.h"
+#include "trace_service.h"
 #include "lua-seri.h"
 
 #include "luacompat52.h"
@@ -10,13 +11,12 @@
 #include <assert.h>
 #include <time.h>
 
-#define NANOSEC 1000000000
-
 struct stat {
 	lua_State *L;
 	int count;
 	uint32_t ti_sec;
 	uint32_t ti_nsec;
+	struct trace_pool *trace;
 };
 
 static void
@@ -25,23 +25,9 @@ _stat_begin(struct stat *S, struct timespec *ti) {
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, ti);
 }
 
-static void
+inline static void
 _stat_end(struct stat *S, struct timespec *ti) {
-	struct timespec end;
-	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
-	int diffsec = end.tv_sec - ti->tv_sec;
-	assert(diffsec>=0);
-	int diffnsec = end.tv_nsec - ti->tv_nsec;
-	if (diffnsec < 0) {
-		--diffsec;
-		diffnsec += NANOSEC;
-	}
-	S->ti_nsec += diffnsec;
-	if (S->ti_nsec > NANOSEC) {
-		++S->ti_sec;
-		S->ti_nsec -= NANOSEC;
-	}
-	S->ti_sec += diffsec;
+	diff_time(ti, &S->ti_sec, &S->ti_nsec);
 }
 
 static int
@@ -59,6 +45,10 @@ _stat(lua_State *L) {
 	if (strcmp(what,"time")==0) {
 		double t = (double)S->ti_sec + (double)S->ti_nsec / NANOSEC;
 		lua_pushnumber(L, t);
+		return 1;
+	}
+	if (strcmp(what,"trace")==0) {
+		lua_pushlightuserdata(L, S->trace);
 		return 1;
 	}
 	return 0;
@@ -112,6 +102,13 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 }
 
 static int
+_delete_stat(lua_State *L) {
+	struct stat * S = lua_touserdata(L,1);
+	trace_release(S->trace);
+	return 0;
+}
+
+static int
 _callback(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	if (context == NULL) {
@@ -128,6 +125,12 @@ _callback(lua_State *L) {
 	struct stat * S = lua_newuserdata(L, sizeof(*S));
 	memset(S, 0, sizeof(*S));
 	S->L = gL;
+	S->trace = trace_create();
+
+	lua_createtable(L,0,1);
+	lua_pushcfunction(L, _delete_stat);
+	lua_setfield(L,-1,"__gc");
+	lua_setmetatable(L, -2);
 
 	lua_rawsetp(L, LUA_REGISTRYINDEX, _stat);
 
@@ -337,6 +340,51 @@ _harbor(lua_State *L) {
 	return 2;
 }
 
+// trace api
+static int
+_trace_new(lua_State *L) {
+	struct trace_pool *p = lua_touserdata(L,1);
+	struct trace_info *t = trace_new(p);
+	lua_pushlightuserdata(L,t);
+	return 1;
+}
+
+static int
+_trace_delete(lua_State *L) {
+	struct trace_pool *p = lua_touserdata(L,1);
+	struct trace_info *t = lua_touserdata(L,2);
+	double ti = trace_delete(p,t);
+	lua_pushnumber(L, ti);
+	return 1;
+}
+
+static int
+_trace_switch(lua_State *L) {
+	struct trace_pool *p = lua_touserdata(L,1);
+	int session = luaL_checkinteger(L,2);
+	trace_switch(p, session);
+	return 0;
+}
+
+static int
+_trace_yield(lua_State *L) {
+	struct trace_pool *p = lua_touserdata(L,1);
+	struct trace_info * t = trace_yield(p);
+	if (t) {
+		lua_pushlightuserdata(L,t);
+		return 1;
+	}
+	return 0;
+}
+
+static int
+_trace_register(lua_State *L) {
+	struct trace_pool *p = lua_touserdata(L,1);
+	int session = luaL_checkinteger(L,2);
+	trace_register(p, session);
+	return 0;
+}
+
 // define in lua-remoteobj.c
 int remoteobj_init(lua_State *L);
 
@@ -379,9 +427,13 @@ luaopen_skynet_c(lua_State *L) {
 	luaL_Reg l2[] = {
 		{ "stat", _stat },
 		{ "remote_init", remoteobj_init },
+		{ "trace_new", _trace_new },
+		{ "trace_delete", _trace_delete },
+		{ "trace_switch", _trace_switch },
+		{ "trace_yield", _trace_yield },
+		{ "trace_register", _trace_register },
 		{ NULL, NULL },
 	};
-
 
 	luaL_setfuncs(L,l2,0);
 
