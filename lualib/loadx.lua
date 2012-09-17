@@ -14,11 +14,12 @@ local io = io
 function _G.load(ld, chunkname, mode, env)
 	local f,err
 	if type(ld) == "string" then
-		f,err = loadstring(cookie .. ld, chunkname)
+		f,err = loadstring(ld, chunkname)
 	else
-		f,err = load(make_ld(ld), chunkname)
+		f,err = load(ld, chunkname)
 	end
 	if f == nil then
+        assert(f, err)
 		return f, err
 	end
 	if env then
@@ -37,4 +38,3 @@ function _G.loadfile(filename, mode, env)
 end
 
 _G.loadstring = _G.load
-
