@@ -87,7 +87,7 @@ trace_register(struct trace_pool *p, int session) {
 		return;
 	}
 	int hash = session % HASH_SIZE;
-	assert(t->session == 0);
+	assert(t->session == 0 && session !=0);
 	t->session = session;
 	t->prev = NULL;
 	t->next = p->slot[hash];
