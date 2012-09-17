@@ -198,6 +198,9 @@ _sendname(lua_State *L, struct skynet_context * context, const char * dest) {
 	default:
 		luaL_error(L, "skynet.send invalid param %s", lua_type(L,4));
 	}
+	if (session < 0) {
+		luaL_error(L, "skynet.send session (%d) < 0", session);
+	}
 	lua_pushinteger(L,session);
 	return 1;
 }
@@ -265,6 +268,9 @@ _send(lua_State *L) {
 	}
 	default:
 		luaL_error(L, "skynet.send invalid param %s", lua_type(L,4));
+	}
+	if (session < 0) {
+		luaL_error(L, "skynet.send session (%d) < 0", session);
 	}
 	lua_pushinteger(L,session);
 	return 1;

@@ -87,7 +87,7 @@ trace_register(struct trace_pool *p, int session) {
 		return;
 	}
 	int hash = session % HASH_SIZE;
-	assert(t->session == 0 && session !=0);
+	assert(t->session == 0 && session > 0);
 	t->session = session;
 	t->prev = NULL;
 	t->next = p->slot[hash];
@@ -114,7 +114,7 @@ trace_yield(struct trace_pool *p) {
 
 void 
 trace_switch(struct trace_pool *p, int session) {
-	assert(p->current == NULL);
+	assert(p->current == NULL && session > 0);
 	struct trace_info *t = p->slot[session % HASH_SIZE];
 	struct trace_info *prev = NULL;
 	while (t) {
