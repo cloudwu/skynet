@@ -1,5 +1,9 @@
 local skynet = require "skynet"
 
+local group_mgr = ...
+
+group_mgr = tonumber(group_mgr)
+
 local command = {}
 local group = {}
 
@@ -52,5 +56,5 @@ skynet.start(function()
 		assert(f, cmd)
 		f(id,handle)
 	end)
-	skynet.send("GROUPMGR" , "lua", "MASTER", skynet.self())
+	skynet.send(group_mgr , "lua", "MASTER", skynet.self())
 end)

@@ -24,12 +24,12 @@ function group.leave(id, handle)
 end
 
 function group.release(id)
-	skynet.send(SERVICE, "lua" , "CLEAR", skynet.self(), id)
+	skynet.send(SERVICE, "lua" , "DELETE", skynet.self(), id)
 end
 
 skynet.init(function()
 	SERVICE = skynet.call("SERVICE", "lua", "group_mgr")
-	skynet.call(".service","lua","group_agent")
-end, "group")
+	skynet.call(".service","lua","group_agent", SERVICE)
+end, "mcgroup")
 
 return group

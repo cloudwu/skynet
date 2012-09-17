@@ -12,9 +12,12 @@ end
 local function create_group_in(harbor, id)
 	local local_ctrl = assert(harbor_ctrl[harbor])
 	local g = multicast[id]
+	g[harbor] = false
 	local local_mc = skynet.call(local_ctrl, "lua", "CREATE", id)
 	for _,mc in pairs(g) do
-		skynet.send(local_ctrl, "lua", "AGENT", id, mc)
+		if mc then
+			skynet.send(local_ctrl, "lua", "AGENT", id, mc)
+		end
 	end
 	for harbor_id,ctrl in pairs(harbor_ctrl) do
 		if harbor_id ~= harbor then
@@ -42,15 +45,13 @@ function command.ENTER(address, harbor, id)
 end
 
 function command.LEAVE(address, harbor, id)
-	local g = multicast[id]
-	assert(g,id)
+	assert(multicast[id], id)
 	local local_ctrl = assert(harbor_ctrl[harbor])
 	skynet.send(local_ctrl, "lua", "LEAVE", id, address)
 end
 
 function command.DELETE(_,_, id)
-	local g = multicast[id]
-	assert(g,id)
+	assert(multicast[id], id)
 	multicast[id] = nil
 
 	for harbor_id,_ in pairs(g) do
@@ -59,12 +60,11 @@ function command.DELETE(_,_, id)
 end
 
 skynet.start(function()
-	skynet.dispatch("lua", function(_, _, cmd , address, param)
+	skynet.dispatch("lua", function(_, _, cmd, address, param)
 		local f = command[cmd]
 		assert(f, cmd, param)
 		local harbor = skynet.harbor(address)
 		f(address, harbor, param)
 	end)
-	skynet.register("GROUPMGR")
 end)
 
