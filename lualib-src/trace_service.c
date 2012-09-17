@@ -94,6 +94,7 @@ trace_register(struct trace_pool *p, int session) {
 	if (p->slot[hash]) {
 		p->slot[hash]->prev = t;
 	}
+	p->slot[hash] = t;
 }
 
 struct trace_info * 
@@ -129,6 +130,7 @@ trace_switch(struct trace_pool *p, int session) {
 			if (t->next) {
 				t->next->prev = prev;
 			}
+			clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t->ti);
 			return;
 		}
 		prev = t;

@@ -42,14 +42,18 @@ local function dispatch_wakeup()
 	end
 end
 
--- suspend is local function
-function suspend(co, result, command, param, size)
+local function trace_count()
 	local info = c.trace_yield(trace_handle)
 	if info then
 		local ti = c.trace_delete(trace_handle, info)
 		trace_func(info, ti)
 	end
+end
+
+-- suspend is local function
+function suspend(co, result, command, param, size)
 	if not result then
+		trace_count()
 		error(debug.traceback(co,command))
 	end
 	if command == "CALL" then
@@ -64,6 +68,7 @@ function suspend(co, result, command, param, size)
 		local co_address = session_coroutine_address[co]
 		-- PTYPE_RESPONSE = 1 , see skynet.h
 		if param == nil then
+			trace_count()
 			error(debug.traceback(co))
 		end
 		c.send(co_address, 1, co_session, param, size)
@@ -73,8 +78,10 @@ function suspend(co, result, command, param, size)
 		session_coroutine_id[co] = nil
 		session_coroutine_address[co] = nil
 	else
+		trace_count()
 		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
 	end
+	trace_count()
 	dispatch_wakeup()
 end
 
@@ -90,9 +97,11 @@ end
 function skynet.sleep(ti)
 	local session = c.command("TIMEOUT",tostring(ti))
 	assert(session)
-	local ret = coroutine.yield("SLEEP", tonumber(session))
+	session = tonumber(session)
+	local ret = coroutine.yield("SLEEP", session)
 	sleep_session[coroutine.running()] = nil
 	if ret == true then
+		c.trace_switch(trace_handle, session)
 		return "BREAK"
 	end
 end
@@ -238,13 +247,14 @@ end
 local function dispatch_message(prototype, msg, sz, session, source, ...)
 	-- PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
-		c.trace_switch(trace_handle, session)
 		local co = session_id_coroutine[session]
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
 		elseif co == nil then
+			c.trace_switch(trace_handle, session)
 			unknown_response(session, source, msg, sz)
 		else
+			c.trace_switch(trace_handle, session)
 			session_id_coroutine[session] = nil
 			suspend(co, coroutine.resume(co, msg, sz))
 		end
@@ -530,6 +540,10 @@ end
 
 function skynet.trace()
 	return c.trace_new(trace_handle)
+end
+
+function skynet.trace_session(session)
+	return c.trace_register(trace_handle, session)
 end
 
 function skynet.trace_callback(func)
