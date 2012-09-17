@@ -44,6 +44,11 @@ end
 
 -- suspend is local function
 function suspend(co, result, command, param, size)
+	local info = c.trace_yield(trace_handle)
+	if info then
+		local ti = c.trace_delete(trace_handle, info)
+		trace_func(info, ti)
+	end
 	if not result then
 		error(debug.traceback(co,command))
 	end
@@ -255,11 +260,6 @@ local function dispatch_message(prototype, msg, sz, session, source, ...)
 			print("Unknown request :" , p.unpack(msg,sz))
 			error(string.format("Can't dispatch type %s : ", p.name))
 		end
-	end
-	local info = c.trace_yield(trace_handle)
-	if info then
-		local ti = c.trace_delete(trace_handle, info)
-		trace_func(info, ti)
 	end
 	while true do
 		local key,co = next(fork_queue)
