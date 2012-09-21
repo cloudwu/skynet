@@ -212,7 +212,7 @@ skynet_mq_init(int n) {
 	}
 	
 	q->cap = cap;
-	q->queue = malloc(cap * sizeof(struct skynet_message*));
+	q->queue = malloc(cap * sizeof(struct message_queue *));
 	Q=q;
 }
 
