@@ -48,7 +48,7 @@ master_release(struct master * m) {
 	int i;
 	for (i=0;i<REMOTE_MAX;i++) {
 		int fd = m->remote_fd[i];
-		if (fd < 0) {
+		if (fd >= 0) {
 			close(fd);
 		}
 		free(m->remote_addr[i]);
