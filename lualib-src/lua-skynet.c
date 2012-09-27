@@ -4,6 +4,9 @@
 
 #include "luacompat52.h"
 
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <stdlib.h>
@@ -83,7 +86,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	const char * self = skynet_command(context, "REG", NULL);
 	switch (r) {
 	case LUA_ERRRUN:
-		skynet_error(context, "lua call [%x to %s : %d msgsz = %d] error : %s", source , self, session, sz, lua_tostring(L,-1));
+		skynet_error(context, "lua call [%x to %s : %d msgsz = %d] error : " KRED "%s" KNRM, source , self, session, sz, lua_tostring(L,-1));
 		break;
 	case LUA_ERRMEM:
 		skynet_error(context, "lua memory error : [%x to %s : %d]", source , self, session);
