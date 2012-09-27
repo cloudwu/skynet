@@ -15,7 +15,7 @@ void ringbuffer_delete(struct ringbuffer * rb);
 void ringbuffer_link(struct ringbuffer *rb , struct ringbuffer_block * prev, struct ringbuffer_block * next);
 struct ringbuffer_block * ringbuffer_alloc(struct ringbuffer * rb, int size);
 int ringbuffer_collect(struct ringbuffer * rb);
-void ringbuffer_resize(struct ringbuffer * rb, struct ringbuffer_block * blk, int size);
+void ringbuffer_shrink(struct ringbuffer * rb, struct ringbuffer_block * blk, int size);
 void ringbuffer_free(struct ringbuffer * rb, struct ringbuffer_block * blk);
 int ringbuffer_data(struct ringbuffer * rb, struct ringbuffer_block * blk, int size, int skip, void **ptr);
 void * ringbuffer_copy(struct ringbuffer * rb, struct ringbuffer_block * from, int skip, struct ringbuffer_block * to);
