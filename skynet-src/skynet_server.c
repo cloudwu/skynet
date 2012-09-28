@@ -14,6 +14,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #ifdef CALLING_CHECK
 
@@ -40,9 +41,10 @@ struct skynet_context {
 	void * cb_ud;
 	skynet_cb cb;
 	int session_id;
-	int init;
 	uint32_t forward;
 	struct message_queue *queue;
+	bool init;
+	bool endless;
 
 	CHECKCALLING_DECL
 };
@@ -79,7 +81,8 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->session_id = 0;
 
 	ctx->forward = 0;
-	ctx->init = 0;
+	ctx->init = false;
+	ctx->endless = false;
 	ctx->handle = skynet_handle_register(ctx);
 	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
 	// init function maybe use ctx->handle, so it must init at last
@@ -90,7 +93,7 @@ skynet_context_new(const char * name, const char *param) {
 	if (r == 0) {
 		struct skynet_context * ret = skynet_context_release(ctx);
 		if (ret) {
-			ctx->init = 1;
+			ctx->init = true;
 		}
 		skynet_mq_force_push(queue);
 		printf("[:%x] launch %s %s\n",ret->handle, name, param ? param : "");
@@ -145,6 +148,16 @@ skynet_context_push(uint32_t handle, struct skynet_message *message) {
 	skynet_context_release(ctx);
 
 	return 0;
+}
+
+void 
+skynet_context_endless(uint32_t handle) {
+	struct skynet_context * ctx = skynet_handle_grab(handle);
+	if (ctx == NULL) {
+		return;
+	}
+	ctx->endless = true;
+	skynet_context_release(ctx);
 }
 
 int 
@@ -333,7 +346,7 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	}
 
 	if (strcmp(cmd,"LOCK") == 0) {
-		if (context->init == 0) {
+		if (context->init == false) {
 			return NULL;
 		}
 		int session = strtol(param, NULL, 10);
@@ -462,6 +475,15 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		uint32_t addr=0;
 		sscanf(tmp, "%s %d :%x",cmd,&handle,&addr);
 		return _group_command(context, cmd, handle,addr);
+	}
+
+	if (strcmp(cmd,"ENDLESS") == 0) {
+		if (context->endless) {
+			strcpy(context->result, "1");
+			context->endless = false;
+			return context->result;
+		}
+		return NULL;
 	}
 
 	return NULL;

@@ -512,17 +512,17 @@ local function init_all()
 end
 
 local function init_template(start)
-    init_all()
-    init_func = {}
-    start()
-    init_all()
+	init_all()
+	init_func = {}
+	start()
+	init_all()
 end
 
 function skynet.start(start_func)
 	c.callback(dispatch_message)
 	trace_handle = assert(c.stat "trace")
 	skynet.timeout(0, function()
-        init_template(start_func)
+		init_template(start_func)
 		skynet.send(".launcher","text", "")
 	end)
 end
@@ -533,7 +533,7 @@ function skynet.filter(f ,start_func)
 	end)
 	trace_handle = assert(c.stat "trace")
 	skynet.timeout(0, function()
-        init_template(start_func)
+	init_template(start_func)
 		skynet.send(".launcher","text", "")
 	end)
 end
@@ -548,6 +548,10 @@ end
 
 function skynet.trace_callback(func)
 	trace_func = func
+end
+
+function skynet.endless()
+	return c.command("ENDLESS")~=nil
 end
 
 return skynet

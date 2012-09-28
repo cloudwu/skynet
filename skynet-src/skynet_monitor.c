@@ -1,4 +1,5 @@
 #include "skynet_monitor.h"
+#include "skynet_server.h"
 #include "skynet.h"
 
 #include <stdlib.h>
@@ -34,6 +35,7 @@ void
 skynet_monitor_check(struct skynet_monitor *sm) {
 	if (sm->version == sm->check_version) {
 		if (sm->destination) {
+			skynet_context_endless(sm->destination);
 			skynet_error(NULL, "A message from [ :%08x ] to [ :%08x ] maybe in an endless loop", sm->source , sm->destination);
 		}
 	} else {
