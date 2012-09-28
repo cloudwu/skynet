@@ -73,7 +73,7 @@ skynet_handle_retire(uint32_t handle) {
 	uint32_t hash = handle & (s->slot_size-1);
 	struct skynet_context * ctx = s->slot[hash];
 
-	if (skynet_context_handle(ctx) == handle) {
+	if (ctx != NULL && skynet_context_handle(ctx) == handle) {
 		skynet_context_release(ctx);
 		s->slot[hash] = NULL;
 		int i;
