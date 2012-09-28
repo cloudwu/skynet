@@ -8,6 +8,7 @@
 #include "skynet.h"
 #include "skynet_multicast.h"
 #include "skynet_group.h"
+#include "skynet_monitor.h"
 
 #include <string.h>
 #include <assert.h>
@@ -220,7 +221,7 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 }
 
 int
-skynet_context_message_dispatch(void) {
+skynet_context_message_dispatch(struct skynet_monitor *sm) {
 	struct message_queue * q = skynet_globalmq_pop();
 	if (q==NULL)
 		return 1;
@@ -242,6 +243,8 @@ skynet_context_message_dispatch(void) {
 		return 0;
 	}
 
+	skynet_monitor_trigger(sm, msg.source , handle);
+
 	if (ctx->cb == NULL) {
 		free(msg.data);
 		skynet_error(NULL, "Drop message from %x to %x without callback , size = %d",msg.source, handle, (int)msg.sz);
@@ -252,6 +255,8 @@ skynet_context_message_dispatch(void) {
 	assert(q == ctx->queue);
 	skynet_mq_pushglobal(q);
 	skynet_context_release(ctx);
+
+	skynet_monitor_trigger(sm, 0,0);
 
 	return 0;
 }

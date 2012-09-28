@@ -33,6 +33,7 @@ skynet : \
   skynet-src/skynet_multicast.c \
   skynet-src/skynet_group.c \
   skynet-src/skynet_env.c \
+  skynet-src/skynet_monitor.c \
   luacompat/compat52.c
 	gcc $(CFLAGS) -Iluacompat -Wl,-E -o $@ $^ -Iskynet-src -lpthread -ldl -lrt -Wl,-E $(LUALIB) -lm
 
