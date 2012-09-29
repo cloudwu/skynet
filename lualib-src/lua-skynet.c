@@ -369,8 +369,10 @@ _trace_delete(lua_State *L) {
 
 static int
 _trace_switch(lua_State *L) {
-	struct trace_pool *p = lua_touserdata(L,1);
 	int session = luaL_checkinteger(L,2);
+	if (session <=0)
+		return 0;
+	struct trace_pool *p = lua_touserdata(L,1);
 	trace_switch(p, session);
 	return 0;
 }
@@ -388,8 +390,10 @@ _trace_yield(lua_State *L) {
 
 static int
 _trace_register(lua_State *L) {
-	struct trace_pool *p = lua_touserdata(L,1);
 	int session = luaL_checkinteger(L,2);
+	if (session <=0)
+		return 0;
+	struct trace_pool *p = lua_touserdata(L,1);
 	trace_register(p, session);
 	return 0;
 }
