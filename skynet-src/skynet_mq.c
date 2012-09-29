@@ -245,7 +245,7 @@ _drop_queue(struct message_queue *q) {
 		++s;
 		int type = msg.sz >> HANDLE_REMOTE_SHIFT;
 		if (type == PTYPE_MULTICAST) {
-			assert(msg.sz == 0);
+			assert((msg.sz & HANDLE_MASK) == 0);
 			skynet_multicast_dispatch((struct skynet_multicast_message *)msg.data, NULL, NULL);
 		} else {
 			free(msg.data);
