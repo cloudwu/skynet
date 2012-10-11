@@ -41,11 +41,13 @@ static struct global_queue *Q = NULL;
 
 static void 
 skynet_globalmq_push(struct message_queue * queue) {
-
 	struct global_queue *q= Q;
-	uint32_t tail = __sync_fetch_and_add(&q->tail,1);
-	assert(GP(tail+1) != GP(q->head));
-	tail = GP(tail);
+
+    uint32_t head = q->head;
+	__sync_synchronize();
+    uint32_t tail = q->tail;
+	assert(GP(tail+1) != GP(head));
+	tail = GP(__sync_fetch_and_add(&q->tail,1));
 	q->queue[tail] = queue;
 	__sync_synchronize();
 	q->flag[tail] = true;
@@ -54,10 +56,18 @@ skynet_globalmq_push(struct message_queue * queue) {
 struct message_queue * 
 skynet_globalmq_pop() {
 	struct global_queue *q = Q;
-	if (GP(q->head) == GP(q->tail)) {
-		return NULL;
-	}
-	uint32_t head = __sync_add_and_fetch(&q->head,1);
+    uint32_t head = 0;
+    for(;;) {
+        head =  q->head;
+        if (GP(head) == GP(q->tail)) {
+            return NULL;
+        }
+        assert(head < q->tail);
+        if (__sync_bool_compare_and_swap(&q->head, head, head+1)) {
+            break;
+        }
+    }
+
 	head = GP(head);
 
 	while(!q->flag[head]) {
