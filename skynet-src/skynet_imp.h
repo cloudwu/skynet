@@ -3,7 +3,6 @@
 
 struct skynet_config {
 	int thread;
-	int mqueue_size;
 	int harbor;
 	const char * logger;
 	const char * module_path;

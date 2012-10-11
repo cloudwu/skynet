@@ -1,6 +1,5 @@
 root = "./"
 thread = 8
-mqueue = 256
 logger = nil
 harbor = 1
 address = "127.0.0.1:2525"

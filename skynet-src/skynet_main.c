@@ -102,7 +102,6 @@ main(int argc, char *argv[]) {
 	optstring("luaservice","./service/?.lua");
 
 	config.thread =  optint("thread",8);
-	config.mqueue_size = optint("mqueue",256);
 	config.module_path = optstring("cpath","./service/?.so");
 	config.logger = optstring("logger",NULL);
 	config.harbor = optint("harbor", 1);

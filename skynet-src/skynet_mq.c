@@ -7,8 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #define DEFAULT_QUEUE_SIZE 64;
+#define MAX_GLOBAL_MQ 0x10000
 
 struct message_queue {
 	uint32_t handle;
@@ -23,11 +25,11 @@ struct message_queue {
 };
 
 struct global_queue {
-	int cap;
-	int head;
-	int tail;
-	int lock;
+	uint32_t head;
+	uint32_t tail;
 	struct message_queue ** queue;
+	bool * flag;
+
 };
 
 static struct global_queue *Q = NULL;
@@ -35,49 +37,36 @@ static struct global_queue *Q = NULL;
 #define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
 #define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
+#define GP(p) ((p) % (MAX_GLOBAL_MQ-1))
+
 static void 
 skynet_globalmq_push(struct message_queue * queue) {
+
 	struct global_queue *q= Q;
-	LOCK(q)
-
-	q->queue[q->tail] = queue;
-	if (++ q->tail >= q->cap) {
-		q->tail = 0;
-	}
-
-	if (q->head == q->tail) {
-		struct message_queue **new_queue = malloc(sizeof(struct message_queue *) * q->cap * 2);
-		int i;
-		for (i=0;i<q->cap;i++) {
-			new_queue[i] = q->queue[(q->head + i) % q->cap];
-		}
-		q->head = 0;
-		q->tail = q->cap;
-		q->cap *= 2;
-		
-		free(q->queue);
-		q->queue = new_queue;
-	}
-
-	UNLOCK(q)
+	uint32_t tail = __sync_fetch_and_add(&q->tail,1);
+	assert(GP(tail+1) != GP(q->head));
+	tail = GP(tail);
+	q->queue[tail] = queue;
+	__sync_synchronize();
+	q->flag[tail] = true;
 }
 
 struct message_queue * 
 skynet_globalmq_pop() {
 	struct global_queue *q = Q;
-	struct message_queue * ret = NULL;
-	LOCK(q)
+	if (GP(q->head) == GP(q->tail)) {
+		return NULL;
+	}
+	uint32_t head = __sync_add_and_fetch(&q->head,1);
+	head = GP(head);
 
-	if (q->head != q->tail) {
-		ret = q->queue[q->head];
-		if ( ++ q->head >= q->cap) {
-			q->head = 0;
-		}
+	while(!q->flag[head]) {
+		__sync_synchronize();
 	}
 
-	UNLOCK(q)
-	
-	return ret;
+	q->flag[head] = false;
+
+	return q->queue[head];
 }
 
 struct message_queue * 
@@ -203,16 +192,12 @@ skynet_mq_lock(struct message_queue *q, int session) {
 }
 
 void 
-skynet_mq_init(int n) {
+skynet_mq_init() {
 	struct global_queue *q = malloc(sizeof(*q));
 	memset(q,0,sizeof(*q));
-	int cap = 2;
-	while (cap < n) {
-		cap *=2;
-	}
-	
-	q->cap = cap;
-	q->queue = malloc(cap * sizeof(struct message_queue *));
+	q->queue = malloc(MAX_GLOBAL_MQ * sizeof(struct message_queue *));
+	q->flag = malloc(MAX_GLOBAL_MQ * sizeof(bool));
+	memset(q->flag, 0, sizeof(bool) * MAX_GLOBAL_MQ);
 	Q=q;
 }
 

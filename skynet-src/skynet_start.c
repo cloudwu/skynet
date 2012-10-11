@@ -1,3 +1,4 @@
+#include "skynet.h"
 #include "skynet_server.h"
 #include "skynet_imp.h"
 #include "skynet_mq.h"
@@ -96,7 +97,7 @@ skynet_start(struct skynet_config * config) {
 	skynet_group_init();
 	skynet_harbor_init(config->harbor);
 	skynet_handle_init(config->harbor);
-	skynet_mq_init(config->mqueue_size);
+	skynet_mq_init();
 	skynet_module_init(config->module_path);
 	skynet_timer_init();
 
