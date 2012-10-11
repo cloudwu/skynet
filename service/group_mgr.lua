@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 
-local id = 0
+-- read group_local for id 10000
+local id = 10000
 local harbor_ctrl = {}
 local multicast = {}
 local command = {}

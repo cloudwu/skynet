@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local group = require "mcgroup"
+--local group = require "localgroup"
 local id, g = ...
 
 skynet.start(function()
