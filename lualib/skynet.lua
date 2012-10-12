@@ -306,7 +306,7 @@ function skynet.uniqueservice(global, ...)
 		else
 			handle = skynet.call(".service", "lua", global, ...)
 		end
-		if handle then
+		if handle ~= false then
 			return handle
 		end
 		skynet.sleep(t)
