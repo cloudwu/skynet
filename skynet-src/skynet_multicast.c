@@ -23,9 +23,13 @@ skynet_multicast_create(const void * msg, size_t sz, uint32_t source) {
 	return mc;
 }
 
-void 
+void
 skynet_multicast_copy(struct skynet_multicast_message *mc, int copy) {
-	__sync_fetch_and_add(&mc->ref, copy);
+	int r = __sync_add_and_fetch(&mc->ref, copy);
+	if (r == 0) {
+		free((void *)mc->msg);
+		free(mc);
+	}
 }
 
 void 
@@ -46,17 +50,12 @@ struct array {
 	uint32_t *data;
 };
 
-struct pair {
-	uint32_t handle;
-	struct skynet_context * ctx;
-};
-
 struct skynet_multicast_group {
 	struct array enter_queue;
 	struct array leave_queue;
 	int cap;
 	int number;
-	struct pair * data;
+	uint32_t * data;
 };
 
 struct skynet_multicast_group * 
@@ -68,12 +67,6 @@ skynet_multicast_newgroup() {
 
 void 
 skynet_multicast_deletegroup(struct skynet_multicast_group * g) {
-	int i;
-	for (i=0;i<g->number;i++) {
-		if (g->data[i].ctx) {
-			skynet_context_release(g->data[i].ctx);
-		}
-	}
 	free(g->data);
 	free(g->enter_queue.data);
 	free(g->leave_queue.data);
@@ -120,7 +113,7 @@ combine_queue(struct skynet_context * from, struct skynet_multicast_group * grou
 
 	int new_size = group->number + enter;
 	if (new_size > group->cap) {
-		group->data = realloc(group->data, new_size * sizeof(struct pair));
+		group->data = realloc(group->data, new_size * sizeof(uint32_t));
 		group->cap = new_size;
 	}
 
@@ -132,19 +125,14 @@ combine_queue(struct skynet_context * from, struct skynet_multicast_group * grou
 		if (handle == last)
 			continue;
 		last = handle;
-		struct skynet_context * ctx = skynet_handle_grab(handle);
-		if (ctx == NULL)
-			continue;
 		if (old_index < 0) {
-			group->data[new_index].handle = handle;
-			group->data[new_index].ctx = ctx;
+			group->data[new_index] = handle;
 		} else {
-			struct pair * p = &group->data[old_index];
-			if (handle == p->handle)
+			uint32_t p = group->data[old_index];
+			if (handle == p)
 				continue;
-			if (handle > p->handle) {
-				group->data[new_index].handle = handle;
-				group->data[new_index].ctx = ctx;
+			if (handle > p) {
+				group->data[new_index] = handle;
 			} else {
 				group->data[new_index] = group->data[old_index];
 				--old_index;
@@ -174,14 +162,11 @@ combine_queue(struct skynet_context * from, struct skynet_multicast_group * grou
 			break;
 		}
 		uint32_t handle = group->leave_queue.data[i];
-		struct pair * p = &group->data[old_index];
-		if (handle == p->handle) {
+		uint32_t p = group->data[old_index];
+		if (handle == p) {
 			--count;
 			++old_index;
-			if (p->ctx) {
-				skynet_context_release(p->ctx);
-			}
-		} else if ( handle > p->handle) {
+		} else if ( handle > p) {
 			group->data[new_index] = group->data[old_index];
 			++new_index;
 			++old_index;
@@ -204,28 +189,45 @@ combine_queue(struct skynet_context * from, struct skynet_multicast_group * grou
 int 
 skynet_multicast_castgroup(struct skynet_context * from, struct skynet_multicast_group * group, struct skynet_multicast_message *msg) {
 	combine_queue(from, group);
-	if (group->number == 0) {
-		skynet_multicast_dispatch(msg, NULL, NULL);
-		return 0;
-	}
-	uint32_t source = skynet_context_handle(from);
-	skynet_multicast_copy(msg, group->number);
-	int i;
 	int release = 0;
-	for (i=0;i<group->number;i++) {
-		struct pair * p = &group->data[i];
-		skynet_context_send(p->ctx, msg, 0 , source, PTYPE_MULTICAST , 0);
-		int ref = skynet_context_ref(p->ctx);
-		if (ref == 1) {
-			skynet_context_release(p->ctx);
-			struct skynet_context * ctx = skynet_handle_grab(p->handle);
-			if (ctx == NULL) {
-				p->ctx = NULL;
-				skynet_multicast_leavegroup(group, p->handle);
+	if (group->number > 0) {
+		uint32_t source = skynet_context_handle(from);
+		skynet_multicast_copy(msg, group->number);
+		int i;
+		for (i=0;i<group->number;i++) {
+			uint32_t p = group->data[i];
+			struct skynet_context * ctx = skynet_handle_grab(p);
+			if (ctx) {
+				skynet_context_send(ctx, msg, 0 , source, PTYPE_MULTICAST , 0);
+				skynet_context_release(ctx);
+			} else {
+				skynet_multicast_leavegroup(group, p);
 				++release;
 			}
 		}
 	}
 	
+	skynet_multicast_copy(msg, -release);
+	
 	return group->number - release;
+}
+
+void 
+skynet_multicast_cast(struct skynet_context * from, struct skynet_multicast_message *msg, uint32_t *dests, int n) {
+	uint32_t source = skynet_context_handle(from);
+	skynet_multicast_copy(msg, n);
+	int i;
+	int release = 0;
+	for (i=0;i<n;i++) {
+		uint32_t p = dests[i];
+		struct skynet_context * ctx = skynet_handle_grab(p);
+		if (ctx) {
+			skynet_context_send(ctx, msg, 0 , source, PTYPE_MULTICAST , 0);
+			skynet_context_release(ctx);
+		} else {
+			++release;
+		}
+	}
+
+	skynet_multicast_copy(msg, -release);
 }

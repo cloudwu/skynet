@@ -132,12 +132,6 @@ skynet_context_release(struct skynet_context *ctx) {
 	return ctx;
 }
 
-int 
-skynet_context_ref(struct skynet_context *ctx) {
-	return ctx->ref;
-}
-
-
 int
 skynet_context_push(uint32_t handle, struct skynet_message *message) {
 	struct skynet_context * ctx = skynet_handle_grab(handle);
