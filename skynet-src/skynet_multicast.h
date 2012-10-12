@@ -13,7 +13,7 @@ typedef void (*skynet_multicast_func)(void *ud, uint32_t source, const void * ms
 struct skynet_multicast_message * skynet_multicast_create(const void * msg, size_t sz, uint32_t source);
 void skynet_multicast_copy(struct skynet_multicast_message *, int copy);
 void skynet_multicast_dispatch(struct skynet_multicast_message * msg, void * ud, skynet_multicast_func func);
-void skynet_multicast_cast(struct skynet_context * from, struct skynet_multicast_message *msg, uint32_t *dests, int n);
+void skynet_multicast_cast(struct skynet_context * from, struct skynet_multicast_message *msg, const uint32_t *dests, int n);
 
 struct skynet_multicast_group * skynet_multicast_newgroup();
 void skynet_multicast_deletegroup(struct skynet_multicast_group * group);

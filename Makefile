@@ -15,9 +15,11 @@ all : \
   service/multicast.so \
   service/tunnel.so \
   service/harbor.so \
+  service/localcast.so \
   luaclib/skynet.so \
   luaclib/socket.so \
   luaclib/int64.so \
+  luaclib/mcast.so \
   client
 
 skynet : \
@@ -61,6 +63,9 @@ service/snlua.so : service-src/service_lua.c
 service/gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Igate -Iskynet-src
 
+service/localcast.so : service-src/service_localcast.c
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iservice -Iskynet-src
+
 luaclib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/lua-remoteobj.c lualib-src/trace_service.c | luaclib
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Ilualib-src
 
@@ -75,6 +80,9 @@ luaclib/socket.so : connection/lua-socket.c | luaclib
 
 luaclib/int64.so : lua-int64/int64.c | luaclib
 	gcc $(CFLAGS) $(SHARED) -Iluacompat -O2 $^ -o $@ 
+
+luaclib/mcast.so : lualib-src/lua-localcast.c | luaclib
+	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Iservice-src
 
 client : client-src/client.c
 	gcc $(CFLAGS) $^ -o $@ -lpthread

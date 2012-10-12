@@ -118,6 +118,11 @@ skynet_start(struct skynet_config * config) {
 		fprintf(stderr,"launch logger error");
 		exit(1);
 	}
+	ctx = skynet_context_new("localcast", NULL);
+	if (ctx == NULL) {
+		fprintf(stderr,"launch local cast error");
+		exit(1);
+	}
 	ctx = skynet_context_new("snlua", "launcher");
 	if (ctx) {
 		ctx = skynet_context_new("snlua", config->start);

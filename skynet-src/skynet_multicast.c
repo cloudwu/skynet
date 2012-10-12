@@ -213,7 +213,7 @@ skynet_multicast_castgroup(struct skynet_context * from, struct skynet_multicast
 }
 
 void 
-skynet_multicast_cast(struct skynet_context * from, struct skynet_multicast_message *msg, uint32_t *dests, int n) {
+skynet_multicast_cast(struct skynet_context * from, struct skynet_multicast_message *msg, const uint32_t *dests, int n) {
 	uint32_t source = skynet_context_handle(from);
 	skynet_multicast_copy(msg, n);
 	int i;

@@ -1,4 +1,5 @@
 local c = require "skynet.c"
+local mc = require "mcast.c"
 local tostring = tostring
 local tonumber = tonumber
 local coroutine = coroutine
@@ -173,6 +174,11 @@ end
 function skynet.send(addr, typename, ...)
 	local p = proto[typename]
 	return c.send(addr, p.id, 0 , p.pack(...))
+end
+
+function skynet.cast(group, typename, ...)
+	local p = proto[typename]
+	return c.send(".cast", p.id, 0, mc(group, p.pack(...)))
 end
 
 skynet.genid = assert(c.genid)
