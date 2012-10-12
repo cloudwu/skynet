@@ -297,6 +297,23 @@ function skynet.newservice(name, ...)
 	end
 end
 
+function skynet.uniqueservice(global, ...)
+	local t = 0
+	while true do
+		local handle
+		if global == true then
+			handle = skynet.call("SERVICE", "lua", ...)
+		else
+			handle = skynet.call(".service", "lua", global, ...)
+		end
+		if handle then
+			return handle
+		end
+		skynet.sleep(t)
+		t=t+1
+	end
+end
+
 local function group_command(cmd, handle, address)
 	if address then
 		return string.format("%s %d :%x",cmd, handle, address)

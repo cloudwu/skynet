@@ -28,8 +28,8 @@ function group.release(id)
 end
 
 skynet.init(function()
-	SERVICE = skynet.call("SERVICE", "lua", "group_mgr")
-	skynet.call(".service","lua","group_agent", SERVICE)
+	SERVICE = skynet.uniqueservice(true, "group_mgr")
+	skynet.uniqueservice("group_agent", SERVICE)
 end, "mcgroup")
 
 return group

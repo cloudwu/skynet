@@ -17,7 +17,7 @@ function group.release(id)
 end
 
 skynet.init(function()
-	lg = skynet.call(".service","lua","group_local")
+	lg = skynet.uniqueservice("group_local")
 	assert(lg)
 end, "localgroup")
 

@@ -38,7 +38,7 @@ function redis.connect(dbname)
 end
 
 skynet.init(function()
-	redis_manager = skynet.call(".service", "lua", "redis-mgr")
+	redis_manager = skynet.uniqueservice("redis-mgr")
 end, "redis")
 
 return redis
