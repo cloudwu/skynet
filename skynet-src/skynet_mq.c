@@ -60,10 +60,8 @@ skynet_globalmq_pop() {
 		return NULL;
 	}
 
-	__sync_synchronize();
-
 	if(!q->flag[head_ptr]) {
-        return NULL;
+		return NULL;
 	}
 
 	struct message_queue * mq = q->queue[head_ptr];
