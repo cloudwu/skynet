@@ -19,6 +19,7 @@ end
 function socket.connect(addr)
 	local ip, port = string.match(addr,"([^:]+):(.+)")
 	port = tonumber(port)
+	socket.close()
 	fd = c.open(ip,port)
 	if fd == nil then
 		return true
@@ -54,6 +55,7 @@ end
 function socket.write(...)
 	local str = c.write(fd, ...)
 	if str then
+		socket.close()
 		table.insert(data, str)
 	end
 end
@@ -61,6 +63,7 @@ end
 function socket.writeblock(...)
 	local str = c.write(fd, ...)
 	if str then
+		socket.close()
 		table.insert(data, str)
 	end
 end

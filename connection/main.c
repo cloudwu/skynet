@@ -18,6 +18,7 @@
 struct connection {
 	int fd;
 	uint32_t address;
+	int close;
 };
 
 struct connection_server {
@@ -69,6 +70,7 @@ _add(struct connection_server * server, int fd , uint32_t address) {
 		if (c->address == 0) {
 			c->fd = fd;
 			c->address = address;
+			c->close = 0;
 			int err = connection_add(server->pool, fd , c);
 			assert(err == 0);
 			return;
@@ -83,8 +85,12 @@ _del(struct connection_server * server, int fd) {
 	for (i=0;i<server->max_connection;i++) {
 		struct connection * c = &server->conn[i];
 		if (c->fd == fd) {
+			if (c->close == 0) {
+				skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, NULL, 0);
+			}
 			c->address = 0;
 			c->fd = 0;
+			c->close = 0;
 			connection_del(server->pool, fd);
 			return;
 		}
@@ -114,11 +120,12 @@ _poll(struct connection_server * server) {
 			continue;
 		}
 		if (size == 0) {
-			connection_del(server->pool, c->fd);
 			free(buffer);
 			buffer = NULL;
-			// todo: support user defined type
-			skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, NULL, 0);
+			if (c->close == 0) {
+				c->close = 1;
+				skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, NULL, 0);
+			}
 		} else {
 			skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, buffer, size);
 			buffer = NULL;

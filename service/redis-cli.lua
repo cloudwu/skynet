@@ -138,7 +138,7 @@ local function reconnect()
 	init()
 	for i = request_queue.head, request_queue.tail-1 do
 		local request = request_queue[i]
-		socket.write(request[3])
+		socket.write(request.cmd)
 	end
 	split_co = coroutine.create(split_package)
 end

@@ -49,7 +49,10 @@ _close(lua_State *L) {
 
 static int
 _write(lua_State *L) {
-	int fd = luaL_checkinteger(L,1);
+	int fd = -1;
+	if (!lua_isnil(L,1)) {
+		fd = luaL_checkinteger(L,1);
+	}
 	int type = lua_type(L,2);
 	const char * buffer = NULL;
 	size_t sz;
@@ -60,37 +63,37 @@ _write(lua_State *L) {
 		buffer = lua_touserdata(L,2);
 		sz = luaL_checkinteger(L,3);
 	}
-	for (;;) {
-		int err = send(fd, buffer, sz, 0);
-		if (err < 0) {
-			switch (errno) {
-			case EAGAIN:
-			case EINTR:
-				continue;
+	if (fd >= 0) {
+		for (;;) {
+			int err = send(fd, buffer, sz, 0);
+			if (err < 0) {
+				switch (errno) {
+				case EAGAIN:
+				case EINTR:
+					continue;
+				}
+				break;
 			}
-			if (type == LUA_TSTRING) {
-				lua_settop(L,2);
-			} else {
-				lua_pushlstring(L, buffer, sz);
+			if (err != sz) {
+				break;
 			}
-			return 1;
+			return 0;
 		}
-		if (err == 0) {
-			if (type == LUA_TSTRING) {
-				lua_settop(L,2);
-			} else {
-				lua_pushlstring(L, buffer, sz);
-			}
-			return 1;
-		}
-		assert(err == sz);
-		return 0;
 	}
+	if (type == LUA_TSTRING) {
+		lua_settop(L,2);
+	} else {
+		lua_pushlstring(L, buffer, sz);
+	}
+	return 1;
 }
 
 static int
 _writeblock(lua_State *L) {
-	int fd = luaL_checkinteger(L,1);
+	int fd = -1;
+	if (!lua_isnil(L,1)) {
+		fd = luaL_checkinteger(L,1);
+	}
 	int header = luaL_checkinteger(L,2);
 	int type = lua_type(L,3);
 	const char * buffer = NULL;
@@ -127,21 +130,22 @@ _writeblock(lua_State *L) {
 	buf[1].iov_base = (void *)buffer;
 	buf[1].iov_len = sz;
 
-	for (;;) {
-		int err = writev(fd, buf, 2);
-		if (err < 0) {
-			switch (errno) {
-			case EAGAIN:
-			case EINTR:
-				continue;
+	if (fd >= 0) {
+		for (;;) {
+			int err = writev(fd, buf, 2);
+			if (err < 0) {
+				switch (errno) {
+				case EAGAIN:
+				case EINTR:
+					continue;
+				}
+				break;
 			}
-			break;
+			if (err != sz + header) {
+				break;
+			}
+			return 0;
 		}
-		if (err == 0) {
-			break;
-		}
-		assert(err == sz + header);
-		return 0;
 	}
 	luaL_Buffer b;
 	luaL_buffinitsize(L,&b, buf[0].iov_len + buf[1].iov_len);
