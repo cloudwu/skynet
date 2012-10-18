@@ -48,6 +48,25 @@ _close(lua_State *L) {
 }
 
 static int
+_blockwrite(int fd, const char * buffer, size_t sz) {
+	while (sz > 0) {
+		int bytes = send(fd, buffer, sz, 0);
+		if (bytes < 0) {
+			switch (errno) {
+			case EAGAIN:
+			case EINTR:
+				continue;
+			}
+			return -1;
+		}
+		sz -= bytes;
+		buffer += sz;
+		sleep(0);
+	}
+	return 0;
+}
+
+static int
 _write(lua_State *L) {
 	int fd = -1;
 	if (!lua_isnil(L,1)) {
@@ -64,19 +83,7 @@ _write(lua_State *L) {
 		sz = luaL_checkinteger(L,3);
 	}
 	if (fd >= 0) {
-		for (;;) {
-			int err = send(fd, buffer, sz, 0);
-			if (err < 0) {
-				switch (errno) {
-				case EAGAIN:
-				case EINTR:
-					continue;
-				}
-				break;
-			}
-			if (err != sz) {
-				break;
-			}
+		if (_blockwrite(fd, buffer, sz) == 0) {
 			return 0;
 		}
 	}
@@ -90,6 +97,7 @@ _write(lua_State *L) {
 
 static int
 _writeblock(lua_State *L) {
+	luaL_Buffer b;
 	int fd = -1;
 	if (!lua_isnil(L,1)) {
 		fd = luaL_checkinteger(L,1);
@@ -116,41 +124,32 @@ _writeblock(lua_State *L) {
 		}
 	}
 
-	struct iovec buf[2];
+	uint8_t head[4];
 	if (header == 2) {
 		// send big-endian header
-		uint8_t head[2] = { sz >> 8 & 0xff , sz & 0xff };
-		buf[0].iov_base = head;
-		buf[0].iov_len = 2;
+		head[0] =  sz >> 8 & 0xff;
+		head[1] = sz & 0xff ;
 	} else {
-		uint8_t head[4] = { sz >> 24 & 0xff, sz >> 16 & 0xff, sz >> 8 & 0xff , sz & 0xff };
-		buf[0].iov_base = head;
-		buf[0].iov_len = 4;
+		head[0] = sz >> 24 & 0xff;
+		head[1] = sz >> 16 & 0xff;
+		head[2] = sz >> 8 & 0xff;
+		head[3] = sz & 0xff;
+		header = 4;
 	}
-	buf[1].iov_base = (void *)buffer;
-	buf[1].iov_len = sz;
 
 	if (fd >= 0) {
-		for (;;) {
-			int err = writev(fd, buf, 2);
-			if (err < 0) {
-				switch (errno) {
-				case EAGAIN:
-				case EINTR:
-					continue;
-				}
-				break;
-			}
-			if (err != sz + header) {
-				break;
-			}
-			return 0;
+		if (_blockwrite(fd, (const char * )head, header)) {
+			goto _error;
 		}
+		if (_blockwrite(fd , buffer, sz)) {
+			goto _error;
+		}
+		return 0;
 	}
-	luaL_Buffer b;
-	luaL_buffinitsize(L,&b, buf[0].iov_len + buf[1].iov_len);
-	luaL_addlstring(&b, buf[0].iov_base, buf[0].iov_len);
-	luaL_addlstring(&b, buf[1].iov_base, buf[1].iov_len);
+_error:
+	luaL_buffinitsize(L,&b, header + sz);
+	luaL_addlstring(&b, (const char *)head, header);
+	luaL_addlstring(&b, buffer, sz);
 	luaL_pushresult(&b);
 	return 1;
 }
