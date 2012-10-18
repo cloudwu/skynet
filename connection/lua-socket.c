@@ -60,7 +60,7 @@ _blockwrite(int fd, const char * buffer, size_t sz) {
 			return -1;
 		}
 		sz -= bytes;
-		buffer += sz;
+		buffer += bytes;
 		sleep(0);
 	}
 	return 0;
