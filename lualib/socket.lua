@@ -61,7 +61,7 @@ function socket.write(...)
 end
 
 function socket.writeblock(...)
-	local str = c.write(fd, ...)
+	local str = c.writeblock(fd, ...)
 	if str then
 		socket.close()
 		table.insert(data, str)
