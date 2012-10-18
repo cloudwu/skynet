@@ -55,7 +55,8 @@ _write(lua_State *L) {
 	size_t sz;
 	if (type == LUA_TSTRING) {
 		buffer = lua_tolstring(L,2,&sz);
-	} else if (type == LUA_TLIGHTUSERDATA) {
+	} else {
+		luaL_checktype(L,2, LUA_TLIGHTUSERDATA);
 		buffer = lua_touserdata(L,2);
 		sz = luaL_checkinteger(L,3);
 	}
@@ -67,7 +68,20 @@ _write(lua_State *L) {
 			case EINTR:
 				continue;
 			}
-			return 0;
+			if (type == LUA_TSTRING) {
+				lua_settop(L,2);
+			} else {
+				lua_pushlstring(L, buffer, sz);
+			}
+			return 1;
+		}
+		if (err == 0) {
+			if (type == LUA_TSTRING) {
+				lua_settop(L,2);
+			} else {
+				lua_pushlstring(L, buffer, sz);
+			}
+			return 1;
 		}
 		assert(err == sz);
 		return 0;
@@ -83,7 +97,8 @@ _writeblock(lua_State *L) {
 	size_t sz;
 	if (type == LUA_TSTRING) {
 		buffer = lua_tolstring(L,3,&sz);
-	} else if (type == LUA_TLIGHTUSERDATA) {
+	} else {
+		luaL_checktype(L, 3, LUA_TLIGHTUSERDATA);
 		buffer = lua_touserdata(L,3);
 		sz = luaL_checkinteger(L,4);
 	}
@@ -120,11 +135,20 @@ _writeblock(lua_State *L) {
 			case EINTR:
 				continue;
 			}
-			return 0;
+			break;
+		}
+		if (err == 0) {
+			break;
 		}
 		assert(err == sz + header);
 		return 0;
 	}
+	luaL_Buffer b;
+	luaL_buffinitsize(L,&b, buf[0].iov_len + buf[1].iov_len);
+	luaL_addlstring(&b, buf[0].iov_base, buf[0].iov_len);
+	luaL_addlstring(&b, buf[1].iov_base, buf[1].iov_len);
+	luaL_pushresult(&b);
+	return 1;
 }
 
 struct buffer {

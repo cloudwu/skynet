@@ -4,6 +4,17 @@ local c = require "socket.c"
 local socket = {}
 local fd
 local object
+local data = {}
+
+local function presend()
+	if next(data) then
+		local tmp = data
+		data = {}
+		for _,v in ipairs(tmp) do
+			socket.write(fd, v)
+		end
+	end
+end
 
 function socket.connect(addr)
 	local ip, port = string.match(addr,"([^:]+):(.+)")
@@ -14,6 +25,7 @@ function socket.connect(addr)
 	end
 	skynet.send(".connection", "text", "ADD", fd , skynet.address(skynet.self()))
 	object = c.new()
+	presend()
 end
 
 function socket.stdin()
@@ -40,11 +52,17 @@ function socket.readblock(...)
 end
 
 function socket.write(...)
-	c.write(fd, ...)
+	local str = c.write(fd, ...)
+	if str then
+		table.insert(data, str)
+	end
 end
 
 function socket.writeblock(...)
-	c.writeblock(fd, ...)
+	local str = c.write(fd, ...)
+	if str then
+		table.insert(data, str)
+	end
 end
 
 function socket.close()
