@@ -216,6 +216,8 @@ void
 skynet_multicast_cast(struct skynet_context * from, struct skynet_multicast_message *msg, const uint32_t *dests, int n) {
 	uint32_t source = skynet_context_handle(from);
 	skynet_multicast_copy(msg, n);
+	if (n == 0)
+		return;
 	int i;
 	int release = 0;
 	for (i=0;i<n;i++) {

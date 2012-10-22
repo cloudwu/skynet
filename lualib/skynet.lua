@@ -178,7 +178,9 @@ end
 
 function skynet.cast(group, typename, ...)
 	local p = proto[typename]
-	return c.send(".cast", p.id, 0, mc(group, p.pack(...)))
+	if #group > 0 then
+		return c.send(".cast", p.id, 0, mc(group, p.pack(...)))
+	end
 end
 
 skynet.genid = assert(c.genid)
