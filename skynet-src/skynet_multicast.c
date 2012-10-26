@@ -231,5 +231,7 @@ skynet_multicast_cast(struct skynet_context * from, struct skynet_multicast_mess
 		}
 	}
 
-	skynet_multicast_copy(msg, -release);
+	if (release != 0) {
+		skynet_multicast_copy(msg, -release);
+	}
 }
