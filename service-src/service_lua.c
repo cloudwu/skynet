@@ -4,16 +4,12 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include "luacompat52.h"
+#include "service_lua.h"
 
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-lua_State *
-snlua_create(void) {
-	return luaL_newstate();
-}
 
 static int
 _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
@@ -102,12 +98,14 @@ traceback (lua_State *L) {
 }
 
 int
-snlua_init(lua_State *L, struct skynet_context *ctx, const char * args) {
+snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
+	lua_State *L = l->L;
+	l->ctx = ctx;
 	luaL_init(L);
 	lua_gc(L, LUA_GCSTOP, 0);
 	luaL_openlibs(L);
-	lua_pushlightuserdata(L, ctx);
-	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_context");
+	lua_pushlightuserdata(L, l);
+	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_lua");
 	lua_gc(L, LUA_GCRESTART, 0);
 
 	char tmp[strlen(args)+1];
@@ -159,7 +157,17 @@ snlua_init(lua_State *L, struct skynet_context *ctx, const char * args) {
 	return 1;
 }
 
+struct snlua *
+snlua_create(void) {
+	struct snlua * l = malloc(sizeof(*l));
+	memset(l,0,sizeof(*l));
+	l->L = luaL_newstate();
+	l->init = snlua_init;
+	return l;
+}
+
 void
-snlua_release(lua_State *L) {
-	lua_close(L);
+snlua_release(struct snlua *l) {
+	lua_close(l->L);
+	free(l);
 }

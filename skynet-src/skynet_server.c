@@ -588,7 +588,6 @@ skynet_context_init(struct skynet_context *ctx, uint32_t handle) {
 
 void 
 skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb) {
-	assert(context->cb == NULL);
 	context->cb = cb;
 	context->cb_ud = ud;
 }

@@ -17,6 +17,18 @@ function command.LIST()
 	skynet.ret(skynet.pack(list))
 end
 
+function command.RELOAD(handle)
+	handle = handle_to_address(handle)
+	local cmd = string.match(services[handle], "snlua (.+)")
+	print(services[handle],cmd)
+	if cmd then
+		skynet.send(handle,"debug","RELOAD",cmd)
+		skynet.ret(skynet.pack({cmd}))
+	else
+		skynet.ret(skynet.pack({"Support only snlua"}))
+	end
+end
+
 function command.STAT()
 	local list = {}
 	for k,v in pairs(services) do

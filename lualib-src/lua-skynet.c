@@ -1,6 +1,7 @@
 #include "skynet.h"
 #include "trace_service.h"
 #include "lua-seri.h"
+#include "service_lua.h"
 
 #include "luacompat52.h"
 
@@ -20,6 +21,7 @@ struct stat {
 	uint32_t ti_sec;
 	uint32_t ti_nsec;
 	struct trace_pool *trace;
+	struct snlua *lua;
 };
 
 static void
@@ -81,8 +83,27 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	int r = lua_pcall(L, 5, 0 , trace);
 
 	_stat_end(S, &ti);
-	if (r == LUA_OK) 
+	if (r == LUA_OK) {
+		if (S->lua->reload) {
+			skynet_callback(context, NULL, 0);
+			struct snlua * lua = S->lua;
+			assert(lua->L == L);
+			const char * cmd = lua->reload;
+			lua->reload = NULL;
+			lua->L = luaL_newstate();
+			int err = lua->init(lua, context, cmd);
+			if (err) {
+				skynet_callback(context, S, _cb);
+				skynet_error(context, "lua reload failed : %s", cmd);
+				lua_close(lua->L);
+				lua->L = L;
+			} else {
+				skynet_error(context, "lua reload %s", cmd);
+				lua_close(L);
+			}
+		}
 		return 0;
+	}
 	const char * self = skynet_command(context, "REG", NULL);
 	switch (r) {
 	case LUA_ERRRUN:
@@ -113,10 +134,11 @@ _delete_stat(lua_State *L) {
 
 static int
 _callback(lua_State *L) {
-	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	if (context == NULL) {
+	struct snlua *lua = lua_touserdata(L, lua_upvalueindex(1));
+	if (lua == NULL || lua->ctx == NULL) {
 		return luaL_error(L, "Init skynet context first");
 	}
+	struct skynet_context * context = lua->ctx;
 
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);
@@ -129,6 +151,7 @@ _callback(lua_State *L) {
 	memset(S, 0, sizeof(*S));
 	S->L = gL;
 	S->trace = trace_create();
+	S->lua = lua;
 
 	lua_createtable(L,0,1);
 	lua_pushcfunction(L, _delete_stat);
@@ -398,6 +421,15 @@ _trace_register(lua_State *L) {
 	return 0;
 }
 
+static int
+_reload(lua_State *L) {
+	struct snlua *lua = lua_touserdata(L,lua_upvalueindex(1));
+	lua->reload = luaL_checkstring(L,1);
+	lua_settop(L,1);
+	lua_replace(L,lua_upvalueindex(2));
+	return 0;
+}
+
 // define in lua-remoteobj.c
 int remoteobj_init(lua_State *L);
 
@@ -417,25 +449,11 @@ luaopen_skynet_c(lua_State *L) {
 		{ "redirect", _redirect },
 		{ "forward", _forward },
 		{ "command" , _command },
-		{ "callback" , _callback },
 		{ "error", _error },
 		{ "tostring", _tostring },
 		{ "harbor", _harbor },
 		{ NULL, NULL },
 	};
-
-	lua_createtable(L, 0, (sizeof(pack) + sizeof(l))/sizeof(luaL_Reg)-2);
-	lua_newtable(L);
-	lua_pushstring(L,"__remote");
-	luaL_setfuncs(L,pack,2);
-
-	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
-	struct skynet_context * ctx = lua_touserdata(L,-1);
-	if (ctx == NULL) {
-		return luaL_error(L, "Init skynet context first");
-	}
-
-	luaL_setfuncs(L,l,1);
 
 	luaL_Reg l2[] = {
 		{ "stat", _stat },
@@ -447,6 +465,29 @@ luaopen_skynet_c(lua_State *L) {
 		{ "trace_register", _trace_register },
 		{ NULL, NULL },
 	};
+
+	lua_createtable(L, 0, (sizeof(pack) + sizeof(l) + sizeof(l2))/sizeof(luaL_Reg)-1);
+	lua_newtable(L);
+	lua_pushstring(L,"__remote");
+	luaL_setfuncs(L,pack,2);
+
+	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_lua");
+	struct snlua *lua = lua_touserdata(L,-1);
+	if (lua == NULL || lua->ctx == NULL) {
+		return luaL_error(L, "Init skynet context first");
+	}
+	assert(lua->L == L);
+
+	lua_pushvalue(L,-1);
+	lua_pushcclosure(L,_callback,1);
+	lua_setfield(L, -3, "callback");
+
+	lua_pushnil(L);
+	lua_pushcclosure(L,_reload,2);
+	lua_setfield(L, -2, "reload");
+
+	lua_pushlightuserdata(L, lua->ctx);
+	luaL_setfuncs(L,l,1);
 
 	luaL_setfuncs(L,l2,0);
 

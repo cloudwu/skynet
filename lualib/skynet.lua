@@ -465,6 +465,11 @@ function dbgcmd.INFO()
 	end
 end
 
+function dbgcmd.RELOAD(...)
+	local cmd = table.concat({...}, " ")
+	c.reload(cmd)
+end
+
 local function _debug_dispatch(session, address, cmd, ...)
 	local f = dbgcmd[cmd]
 	assert(f, cmd)
