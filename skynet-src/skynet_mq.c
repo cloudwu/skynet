@@ -37,14 +37,13 @@ static struct global_queue *Q = NULL;
 #define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
 #define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
-#define GP(p) ((p) % (MAX_GLOBAL_MQ-1))
+#define GP(p) ((p) % MAX_GLOBAL_MQ)
 
 static void 
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
 	uint32_t tail = GP(__sync_fetch_and_add(&q->tail,1));
-    assert(!q->flag[tail]);
 	q->queue[tail] = queue;
 	__sync_synchronize();
 	q->flag[tail] = true;
@@ -69,6 +68,7 @@ skynet_globalmq_pop() {
 		return NULL;
 	}
 	q->flag[head_ptr] = false;
+	__sync_synchronize();
 
 	return mq;
 }
