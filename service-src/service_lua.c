@@ -97,6 +97,25 @@ traceback (lua_State *L) {
 	return 1;
 }
 
+static void
+_report_error(lua_State *L, struct skynet_context *ctx, const char *filename, int err) {
+	switch (err) {
+	case LUA_ERRRUN:
+		skynet_error(ctx, "lua do [%s] error : %s", filename, lua_tostring(L,-1));
+		break;
+	case LUA_ERRMEM:
+		skynet_error(ctx, "lua memory error : %s",filename);
+		break;
+	case LUA_ERRERR:
+		skynet_error(ctx, "lua message error : %s",filename);
+		break;
+	case LUA_ERRGCMM:
+		skynet_error(ctx, "lua gc error : %s",filename);
+		break;
+	};
+	lua_pop(L,1);
+}
+
 int
 snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	lua_State *L = l->L;
@@ -135,25 +154,13 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 		}
 	}
 	r = lua_pcall(L,n,0,traceback_index);
-	switch (r) {
-	case LUA_OK:
-		return 0;
-	case LUA_ERRRUN:
-		skynet_error(ctx, "lua do [%s] error : %s", filename, lua_tostring(L,-1));
-		break;
-	case LUA_ERRMEM:
-		skynet_error(ctx, "lua memory error : %s",filename);
-		break;
-	case LUA_ERRERR:
-		skynet_error(ctx, "lua message error : %s",filename);
-		break;
-	case LUA_ERRGCMM:
-		skynet_error(ctx, "lua gc error : %s",filename);
-		break;
-	};
-
-	lua_pop(L,1);
-
+	if (r == LUA_OK) {
+		r = lua_gc(L, LUA_GCCOLLECT, 0);
+		if (r == LUA_OK) {
+			return 0;
+		}
+	}
+	_report_error(L, ctx, filename, r);
 	return 1;
 }
 
