@@ -49,6 +49,23 @@ struct skynet_context {
 	CHECKCALLING_DECL
 };
 
+static int g_total_context = 0;
+
+int 
+skynet_context_total() {
+	return g_total_context;
+}
+
+static void
+_context_inc() {
+	__sync_fetch_and_add(&g_total_context,1);
+}
+
+static void
+_context_dec() {
+	__sync_fetch_and_sub(&g_total_context,1);
+}
+
 static void
 _id_to_hex(char * str, uint32_t id) {
 	int i;
@@ -96,7 +113,10 @@ skynet_context_new(const char * name, const char *param) {
 			ctx->init = true;
 		}
 		skynet_mq_force_push(queue);
-		printf("[:%x] launch %s %s\n",ret->handle, name, param ? param : "");
+		if (ret) {
+			printf("[:%x] launch %s %s\n",ret->handle, name, param ? param : "");
+		}
+		_context_inc();
 		return ret;
 	} else {
 		skynet_context_release(ctx);
@@ -121,6 +141,7 @@ _delete_context(struct skynet_context *ctx) {
 	skynet_module_instance_release(ctx->mod, ctx->instance);
 	skynet_mq_mark_release(ctx->queue);
 	free(ctx);
+	_context_dec();
 }
 
 struct skynet_context * 
@@ -477,6 +498,11 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 			context->endless = false;
 			return context->result;
 		}
+		return NULL;
+	}
+
+	if (strcmp(cmd,"ABORT") == 0) {
+		skynet_handle_retireall();
 		return NULL;
 	}
 

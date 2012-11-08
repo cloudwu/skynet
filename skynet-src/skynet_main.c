@@ -114,5 +114,7 @@ main(int argc, char *argv[]) {
 
 	skynet_start(&config);
 
+	printf("skynet exit\n");
+
 	return 0;
 }

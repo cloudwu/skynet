@@ -20,6 +20,8 @@ struct monitor {
 	struct skynet_monitor ** m;
 };
 
+#define CHECK_ABORT if (skynet_context_total()==0) break;
+
 static void *
 _monitor(void *p) {
 	struct monitor * m = p;
@@ -29,8 +31,14 @@ _monitor(void *p) {
 		for (i=0;i<n;i++) {
 			skynet_monitor_check(m->m[i]);
 		}
+		CHECK_ABORT
 		sleep(5);
 	}
+	for (i=0;i<n;i++) {
+		skynet_monitor_delete(m->m[i]);
+	}
+	free(m->m);
+	free(m);
 
 	return NULL;
 }
@@ -39,6 +47,7 @@ static void *
 _timer(void *p) {
 	for (;;) {
 		skynet_updatetime();
+		CHECK_ABORT
 		usleep(2500);
 	}
 	return NULL;
@@ -49,6 +58,7 @@ _worker(void *p) {
 	struct skynet_monitor *sm = p;
 	for (;;) {
 		if (skynet_context_message_dispatch(sm)) {
+			CHECK_ABORT
 			usleep(1000);
 		} 
 	}
@@ -59,29 +69,24 @@ static void
 _start(int thread) {
 	pthread_t pid[thread+2];
 
-	struct monitor m;
-	m.count = thread;
-	m.m = malloc(thread * sizeof(struct skynet_monitor *));
+	struct monitor *m = malloc(sizeof(*m));
+	m->count = thread;
+	m->m = malloc(thread * sizeof(struct skynet_monitor *));
 	int i;
 	for (i=0;i<thread;i++) {
-		m.m[i] = skynet_monitor_new();
+		m->m[i] = skynet_monitor_new();
 	}
 
-	pthread_create(&pid[0], NULL, _timer, NULL);
-	pthread_create(&pid[1], NULL, _monitor, &m);
+	pthread_create(&pid[0], NULL, _monitor, m);
+	pthread_create(&pid[1], NULL, _timer, NULL);
 
 	for (i=0;i<thread;i++) {
-		pthread_create(&pid[i+2], NULL, _worker, m.m[i]);
+		pthread_create(&pid[i+2], NULL, _worker, m->m[i]);
 	}
 
-	for (i=0;i<thread+2;i++) {
+	for (i=1;i<thread+2;i++) {
 		pthread_join(pid[i], NULL); 
 	}
-
-	for (i=0;i<thread;i++) {
-		skynet_monitor_delete(m.m[i]);
-	}
-	free(m.m);
 }
 
 static int

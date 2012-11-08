@@ -584,4 +584,8 @@ function skynet.endless()
 	return c.command("ENDLESS")~=nil
 end
 
+function skynet.abort()
+	c.command("ABORT")
+end
+
 return skynet

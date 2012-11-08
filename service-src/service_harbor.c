@@ -181,12 +181,12 @@ static void
 _hash_delete(struct hashmap *hash) {
 	int i;
 	for (i=0;i<HASH_SIZE;i++) {
-		struct keyvalue ** ptr = &hash->node[i];
-		while (*ptr) {
-			struct keyvalue * node = *ptr;
-			ptr = &node->next;
+		struct keyvalue * node = hash->node[i];
+		while (node) {
+			struct keyvalue * next = node->next;
 			_release_queue(node->queue);
 			free(node);
+			node = next;
 		}
 	}
 	free(hash);

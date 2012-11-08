@@ -54,11 +54,11 @@ master_release(struct master * m) {
 		free(m->remote_addr[i]);
 	}
 	for (i=0;i<HASH_SIZE;i++) {
-		struct name ** ptr = &m->map.node[i];
-		while (*ptr) {
-			struct name * node = *ptr;
-			ptr = &node->next;
+		struct name * node = m->map.node[i];
+		while (node) {
+			struct name * next = node->next;
 			free(node);
+			node = next;
 		}
 	}
 	free(m);

@@ -93,6 +93,26 @@ skynet_handle_retire(uint32_t handle) {
 	rwlock_wunlock(&s->lock);
 }
 
+void 
+skynet_handle_retireall() {
+	struct handle_storage *s = H;
+	for (;;) {
+		int n=0;
+		int i;
+		for (i=0;i<s->slot_size;i++) {
+			rwlock_rlock(&s->lock);
+			struct skynet_context * ctx = s->slot[i];
+			rwlock_runlock(&s->lock);
+			if (ctx != NULL) {
+				++n;
+				skynet_handle_retire(skynet_context_handle(ctx));
+			}
+		}
+		if (n==0)
+			return;
+	}
+}
+
 struct skynet_context * 
 skynet_handle_grab(uint32_t handle) {
 	struct handle_storage *s = H;
