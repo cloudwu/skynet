@@ -117,8 +117,8 @@ _read_queue(struct connection_pool * pool, int timeout) {
 	int n = epoll_wait(pool->epoll_fd , pool->ev, EPOLLQUEUE, timeout);
 #elif HAVE_KQUEUE
 	struct timespec timeoutspec;
-	timeoutspec.tv_sec = timeout;
-	timeoutspec.tv_nsec = 0;
+	timeoutspec.tv_sec = timeout / 1000;
+	timeoutspec.tv_nsec = (timeout % 1000) * 1000000;
 	int n = kevent(pool->kqueue_fd, NULL, 0, pool->ev, EPOLLQUEUE, &timeoutspec);
 #endif
 	if (n == -1) {
