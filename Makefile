@@ -1,8 +1,15 @@
 .PHONY : all clean 
 
 CFLAGS = -g -Wall 
-SHARED = -fPIC --shared
-LUALIB = -llua
+LDFLAGS = -lpthread -llua -ldl -lm
+
+uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+ifeq ($(uname_S), Darwin)
+	SHARED = -fPIC -dynamiclib -Wl,-undefined,dynamic_lookup
+else
+	LDFLAGS += -ldl -lrt -Wl,-E
+	SHARED = -fPIC --shared
+endif
 
 all : \
   skynet \
@@ -37,7 +44,7 @@ skynet : \
   skynet-src/skynet_env.c \
   skynet-src/skynet_monitor.c \
   luacompat/compat52.c
-	gcc $(CFLAGS) -Iluacompat -Wl,-E -o $@ $^ -Iskynet-src -lpthread -ldl -lrt -Wl,-E $(LUALIB) -lm
+	gcc $(CFLAGS) -Iluacompat -o $@ $^ -Iskynet-src $(LDFLAGS)
 
 luaclib:
 	mkdir luaclib
