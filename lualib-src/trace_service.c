@@ -8,10 +8,23 @@
 
 #define HASH_SIZE 32
 
+#if defined(__APPLE__)
+#include <mach/task.h>
+#include <mach/mach.h>
+#endif
+
 void 
 diff_time(struct timespec *ti, uint32_t *sec, uint32_t *nsec) {
 	struct timespec end;
+#if defined(_POSIX_TIMERS) && defined(_POSIX_THREAD_CPUTIME)
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
+#elif  defined(__APPLE__)
+    struct task_thread_times_info aTaskInfo;
+    mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
+    assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
+    end.tv_sec = aTaskInfo.user_time.seconds;
+    end.tv_nsec = aTaskInfo.user_time.microseconds * 1000;
+#endif
 	int diffsec = end.tv_sec - ti->tv_sec;
 	assert(diffsec>=0);
 	int diffnsec = end.tv_nsec - ti->tv_nsec;
@@ -76,7 +89,15 @@ trace_new(struct trace_pool *p) {
 	t->next = NULL;
 	t->ti_sec = 0;
 	t->ti_nsec = 0;
+#if defined(_POSIX_TIMERS) && defined(_POSIX_THREAD_CPUTIME)
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t->ti);
+#elif  defined(__APPLE__)
+    struct task_thread_times_info aTaskInfo;
+    mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
+    assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
+    t->ti.tv_sec = aTaskInfo.user_time.seconds;
+    t->ti.tv_nsec = aTaskInfo.user_time.microseconds * 1000;
+#endif
 	return t;
 }
 
@@ -130,7 +151,15 @@ trace_switch(struct trace_pool *p, int session) {
 			if (t->next) {
 				t->next->prev = prev;
 			}
-			clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t->ti);
+#if defined(_POSIX_TIMERS) && defined(_POSIX_THREAD_CPUTIME)
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t->ti);
+#elif  defined(__APPLE__)
+            struct task_thread_times_info aTaskInfo;
+            mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
+            assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
+            t->ti.tv_sec = aTaskInfo.user_time.seconds;
+            t->ti.tv_nsec = aTaskInfo.user_time.microseconds * 1000;
+#endif
 			return;
 		}
 		prev = t;
