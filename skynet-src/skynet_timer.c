@@ -202,17 +202,17 @@ skynet_timeout(uint32_t handle, int time, int session) {
 
 static uint32_t
 _gettime(void) {
-    uint32_t t;
+	uint32_t t;
 #if defined(_POSIX_TIMERS)
 	struct timespec ti;
 	clock_gettime(CLOCK_MONOTONIC, &ti);
-    t = (uint32_t)(ti.tv_sec & 0xffffff) * 100;
+	t = (uint32_t)(ti.tv_sec & 0xffffff) * 100;
 	t += ti.tv_nsec / 10000000;
 #else
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    t = (uint32_t)(tv.tv_sec & 0xffffff) * 100;
-    t += tv.tv_usec / 10000;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	t = (uint32_t)(tv.tv_sec & 0xffffff) * 100;
+	t += tv.tv_usec / 10000;
 #endif
 	return t;
 }
@@ -250,9 +250,9 @@ skynet_timer_init(void) {
 	clock_gettime(CLOCK_REALTIME, &ti);
 	uint32_t sec = (uint32_t)ti.tv_sec;
 #else
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    uint32_t sec = (uint32_t)tv.tv_sec;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	uint32_t sec = (uint32_t)tv.tv_sec;
 #endif
 	uint32_t mono = _gettime() / 100;
 

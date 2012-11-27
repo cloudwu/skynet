@@ -73,7 +73,7 @@ connection_deletepool(struct connection_pool * pool) {
 #if HAVE_EPOLL
 	close(pool->epoll_fd);
 #elif HAVE_KQUEUE
-    close(pool->kqueue_fd);
+	close(pool->kqueue_fd);
 #endif
 	free(pool);
 }
