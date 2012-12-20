@@ -32,9 +32,9 @@ struct stat {
 static void
 _stat_begin(struct stat *S, struct timespec *ti) {
 	S->count++;
-#if defined(_POSIX_TIMERS) && defined(_POSIX_THREAD_CPUTIME)
+#if !defined(__APPLE__)
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, ti);
-#elif  defined(__APPLE__)
+#else
 	struct task_thread_times_info aTaskInfo;
 	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
 	assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));

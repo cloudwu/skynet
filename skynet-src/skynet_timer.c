@@ -9,7 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if !defined(_POSIX_TIMERS)
+#if defined(__APPLE__)
 #include <sys/time.h>
 #endif
 
@@ -203,7 +203,7 @@ skynet_timeout(uint32_t handle, int time, int session) {
 static uint32_t
 _gettime(void) {
 	uint32_t t;
-#if defined(_POSIX_TIMERS)
+#if !defined(__APPLE__)
 	struct timespec ti;
 	clock_gettime(CLOCK_MONOTONIC, &ti);
 	t = (uint32_t)(ti.tv_sec & 0xffffff) * 100;
@@ -245,7 +245,7 @@ skynet_timer_init(void) {
 	TI = timer_create_timer();
 	TI->current = _gettime();
 
-#if defined(_POSIX_TIMERS)
+#if !defined(__APPLE__)
 	struct timespec ti;
 	clock_gettime(CLOCK_REALTIME, &ti);
 	uint32_t sec = (uint32_t)ti.tv_sec;
