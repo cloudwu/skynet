@@ -103,6 +103,7 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->handle = skynet_handle_register(ctx);
 	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
 	// init function maybe use ctx->handle, so it must init at last
+	_context_inc();
 
 	CHECKCALLING_BEGIN(ctx)
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
@@ -116,7 +117,6 @@ skynet_context_new(const char * name, const char *param) {
 		if (ret) {
 			printf("[:%x] launch %s %s\n",ret->handle, name, param ? param : "");
 		}
-		_context_inc();
 		return ret;
 	} else {
 		skynet_context_release(ctx);
