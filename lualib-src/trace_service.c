@@ -16,9 +16,9 @@
 void 
 diff_time(struct timespec *ti, uint32_t *sec, uint32_t *nsec) {
 	struct timespec end;
-#if defined(_POSIX_TIMERS) && defined(_POSIX_THREAD_CPUTIME)
+#if  !defined(__APPLE__)
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
-#elif  defined(__APPLE__)
+#else
 	struct task_thread_times_info aTaskInfo;
 	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
 	assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
@@ -89,9 +89,9 @@ trace_new(struct trace_pool *p) {
 	t->next = NULL;
 	t->ti_sec = 0;
 	t->ti_nsec = 0;
-#if defined(_POSIX_TIMERS) && defined(_POSIX_THREAD_CPUTIME)
+#if  !defined(__APPLE__)
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t->ti);
-#elif  defined(__APPLE__)
+#else
 	struct task_thread_times_info aTaskInfo;
 	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
 	assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
@@ -151,9 +151,9 @@ trace_switch(struct trace_pool *p, int session) {
 			if (t->next) {
 				t->next->prev = prev;
 			}
-#if defined(_POSIX_TIMERS) && defined(_POSIX_THREAD_CPUTIME)
+#if  !defined(__APPLE__)
 			clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t->ti);
-#elif  defined(__APPLE__)
+#else
 			struct task_thread_times_info aTaskInfo;
 			mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
 			assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
