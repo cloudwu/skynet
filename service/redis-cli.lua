@@ -148,7 +148,7 @@ skynet.register_protocol {
 	id = 3,
 	pack = function(...) return ... end,
 	unpack = function(msg,sz)
-		if msg == nil then
+		if sz == 0 then
 			skynet.timeout(0, reconnect)
 			return
 		end
