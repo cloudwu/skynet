@@ -33,6 +33,7 @@ _open(lua_State *L) {
 	int r = connect(fd,(struct sockaddr *)&my_addr,sizeof(struct sockaddr_in));
 
 	if (r == -1) {
+		close(fd);
 		return 0;
 	}
 
