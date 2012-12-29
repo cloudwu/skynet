@@ -41,13 +41,6 @@ _open(lua_State *L) {
 }
 
 static int
-_close(lua_State *L) {
-	int fd = luaL_checkinteger(L,1);
-	close(fd);
-	return 0;
-}
-
-static int
 _blockwrite(int fd, const char * buffer, size_t sz) {
 	while (sz > 0) {
 		int bytes = send(fd, buffer, sz, 0);
@@ -313,7 +306,6 @@ int
 luaopen_socket_c(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "open", _open },
-		{ "close", _close },
 		{ "write", _write },
 		{ "new", _new },
 		{ "push", _push },

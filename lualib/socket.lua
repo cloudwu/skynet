@@ -70,7 +70,6 @@ end
 
 function socket.close()
 	if fd then
-		c.close(fd)
 		skynet.send(".connection","text", "DEL", fd)
 		fd = nil
 	end
