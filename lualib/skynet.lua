@@ -357,7 +357,6 @@ do
 	local weak_meta = { __mode = "kv" }
 	local meta = getmetatable(c.unpack(c.pack({ __remote = 0 })))
 	local remote_call_func = setmetatable({}, weak_meta)
-	setmetatable(meta, weak_meta)
 
 	local _send = assert(c.send)
 	local _yield = coroutine.yield
