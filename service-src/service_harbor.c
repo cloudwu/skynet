@@ -63,21 +63,23 @@ struct harbor {
 
 static void
 _push_queue(struct msg_queue * queue, const void * buffer, size_t sz, struct remote_message_header * header) {
-	struct msg * slot = &queue->data[queue->tail];
-	queue->tail = (queue->tail + 1) % queue->size;
-	if (queue->tail == queue->head) {
+	// If there is only 1 free slot which is reserved to distinguish full/empty
+	// of circular buffer, expand it.
+	if (((queue->tail + 1) % queue->size) == queue->head) {
 		struct msg * new_buffer = malloc(queue->size * 2 * sizeof(struct msg));
 		int i;
-		for (i=0;i<queue->size;i++) {
+		for (i=0;i<queue->size-1;i++) {
 			new_buffer[i] = queue->data[(i+queue->head) % queue->size];
 		}
 		free(queue->data);
 		queue->data = new_buffer;
 		queue->head = 0;
-		queue->tail = queue->size;
+		queue->tail = queue->size - 1;
 		queue->size *= 2;
-		slot = &queue->data[queue->tail];
 	}
+	struct msg * slot = &queue->data[queue->tail];
+	queue->tail = (queue->tail + 1) % queue->size;
+
 	slot->buffer = malloc(sz + sizeof(*header));
 	memcpy(slot->buffer, buffer, sz);
 	memcpy(slot->buffer + sz, header, sizeof(*header));
