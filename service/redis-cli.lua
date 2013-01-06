@@ -124,9 +124,13 @@ redcmd[42] = function(data)	-- '*'
 	local bulk = {}
 	for i = 1,n do
 		local line = readline "\r\n"
-		local bytes = tonumber(string.sub(line,2) + 2)
-		local data = readbytes(bytes)
-		table.insert(bulk, string.sub(data,1,-3))
+		local bytes = tonumber(string.sub(line,2))
+		if bytes < 0 then
+			table.insert(bulk, nil)
+		else
+			local data = readbytes(bytes + 2)
+			table.insert(bulk, string.sub(data,1,-3))
+		end
 	end
 	response(true, bulk)
 end
