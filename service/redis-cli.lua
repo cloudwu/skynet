@@ -6,6 +6,9 @@ local table = table
 local tonumber = tonumber
 local ipairs = ipairs
 local unpack = unpack
+local batch_mode = {}
+local batch_count = {}
+local batch_reply = {}
 local redis_server, redis_db = ...
 
 local function compose_message(msg)
@@ -46,9 +49,48 @@ local function pop_request_queue()
 	return reply
 end
 
-local function response(...)
+local function batch_close(address,session)
+	local reply = batch_reply[address]
+	skynet.redirect(address,0, "response", session, skynet.pack(not (type(reply) == "string"), reply))
+	batch_mode[address] = nil
+	batch_count[address] = nil
+	batch_reply[address] = nil
+end
+
+local function batch_dec(address)
+	local bc = batch_count[address]
+	batch_count[address] = bc - 1
+	if bc == 1 then
+		local session = batch_mode[address]
+		if type(session) == "number" then
+			batch_close(address, session)
+		end
+	end
+end
+
+local function response(suc, value)
 	local reply = pop_request_queue()
-	skynet.redirect(reply.address,0, "response", reply.session, skynet.pack(...))
+	local mode = reply.batch
+	local address = reply.address
+	if mode == "read" then
+		if suc then
+			local br = batch_reply[address]
+			if type(br) == "table" then
+				br.n = br.n + 1
+				br[br.n] = value
+			end
+		else
+			batch_reply[address] = value
+		end
+		batch_dec(address)
+	elseif mode == "write" then
+		if not suc then
+			batch_reply[address] = value
+		end
+		batch_dec(address)
+	else
+		skynet.redirect(address,0, "response", reply.session, skynet.pack(suc, value))
+	end
 end
 
 local function readline(sep)
@@ -159,11 +201,37 @@ skynet.register_protocol {
 }
 
 skynet.start(function()
+	skynet.dispatch("text", function(session, address, mode)
+		local last = batch_mode[address]
+		if mode == "end" then
+			assert(last == "read" or last == "write" , "Invalid end")
+			if batch_count[address] == 0 then
+				batch_close(address, session)
+			else
+				batch_mode[address] = session
+			end
+		else
+			assert(last == nil, "Already in batch mode")
+			if mode == "read" then
+				batch_reply[address] = { n = 0 }
+				batch_count[address] = 0
+			elseif mode == "write" then
+				batch_count[address] = 0
+			else
+				error ("Invalid last batch operation : " ..  last)
+			end
+			batch_mode[address] = mode
+		end
+	end)
 	skynet.dispatch("lua", function(session, address, ...)
 		local message = { ... }
 		local cmd = compose_message(message)
 		socket.write(cmd)
-		push_request_queue { session = session , address = address, cmd = cmd }
+		local mode = batch_mode[address]
+		if mode == "read" or mode == "write" then
+			batch_count[address] = batch_count[address] + 1
+		end
+		push_request_queue { session = session , address = address, cmd = cmd , batch = mode }
 	end)
 	init()
 end)
