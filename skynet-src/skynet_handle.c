@@ -178,7 +178,7 @@ _insert_name_before(struct handle_storage *s, char *name, uint32_t handle, int b
 		s->name = n;
 	} else {
 		int i;
-		for (i=s->name_count;i>=before;i--) {
+		for (i=s->name_count;i>before;i--) {
 			s->name[i] = s->name[i-1];
 		}
 	}
