@@ -364,9 +364,7 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		if (context->init == false) {
 			return NULL;
 		}
-		int session = strtol(param, NULL, 10);
-		assert(session);
-		skynet_mq_lock(context->queue, session);
+		skynet_mq_lock(context->queue, context->session_id+1);
 		return NULL;
 	}
 

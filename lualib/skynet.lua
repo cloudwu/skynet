@@ -202,8 +202,8 @@ end
 
 function skynet.blockcall(addr, typename , ...)
 	local p = proto[typename]
+	c.command("LOCK")
 	local session = c.send(addr, p.id , nil , p.pack(...))
-	c.command("LOCK",tostring(session))
 	return p.unpack(coroutine.yield("CALL", session))
 end
 

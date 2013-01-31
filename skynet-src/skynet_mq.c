@@ -12,6 +12,9 @@
 #define DEFAULT_QUEUE_SIZE 64;
 #define MAX_GLOBAL_MQ 0x10000
 
+#define MQ_IN_GLOBAL 1
+#define MQ_LOCKED 2
+
 struct message_queue {
 	uint32_t handle;
 	int cap;
@@ -81,7 +84,7 @@ skynet_mq_create(uint32_t handle) {
 	q->head = 0;
 	q->tail = 0;
 	q->lock = 0;
-	q->in_global = 1;
+	q->in_global = MQ_IN_GLOBAL;
 	q->release = 0;
 	q->lock_session = 0;
 	q->queue = malloc(sizeof(struct skynet_message) * q->cap);
@@ -153,9 +156,14 @@ _pushhead(struct message_queue *q, struct skynet_message *message) {
 	q->queue[head] = *message;
 	q->head = head;
 
-	// this api use in push a unlock message, so the in_global flags must be 1 , but the q is not exist in global queue.
-	assert(q->in_global);
-	skynet_globalmq_push(q);
+	// this api use in push a unlock message, so the in_global flags must not be 0 , 
+	// but the q is not exist in global queue.
+	if (q->in_global == MQ_IN_GLOBAL) {
+		skynet_globalmq_push(q);
+	} else {
+		assert(q->in_global == MQ_LOCKED);
+	}
+	q->lock_session = 0;
 }
 
 void 
@@ -165,7 +173,6 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	
 	if (q->lock_session !=0 && message->session == q->lock_session) {
 		_pushhead(q,message);
-		q->lock_session = 0;
 	} else {
 		q->queue[q->tail] = *message;
 		if (++ q->tail >= q->cap) {
@@ -178,7 +185,7 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 
 		if (q->lock_session == 0) {
 			if (q->in_global == 0) {
-				q->in_global = 1;
+				q->in_global = MQ_IN_GLOBAL;
 				skynet_globalmq_push(q);
 			}
 		}
@@ -191,6 +198,8 @@ void
 skynet_mq_lock(struct message_queue *q, int session) {
 	LOCK(q)
 	assert(q->lock_session == 0);
+	assert(q->in_global == MQ_IN_GLOBAL);
+	q->in_global = MQ_LOCKED;
 	q->lock_session = session;
 	UNLOCK(q)
 }
@@ -214,8 +223,19 @@ skynet_mq_force_push(struct message_queue * queue) {
 void 
 skynet_mq_pushglobal(struct message_queue *queue) {
 	assert(queue->in_global);
-	if (queue->lock_session == 0) {
-		skynet_globalmq_push(queue);
+	if (queue->in_global == MQ_LOCKED) {
+		// lock message queue just now, unlock it.
+		LOCK(queue)
+		queue->in_global = MQ_IN_GLOBAL;
+		if (queue->lock_session == 0) {
+			skynet_globalmq_push(queue);
+		}
+		UNLOCK(queue)
+	} else {
+		queue->in_global = MQ_IN_GLOBAL;
+		if (queue->lock_session == 0) {
+			skynet_globalmq_push(queue);
+		}
 	}
 }
 
