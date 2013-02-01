@@ -167,7 +167,9 @@ _pushhead(struct message_queue *q, struct skynet_message *message) {
 	if (q->in_global == MQ_LOCKED) {
 		skynet_globalmq_push(q);
 		q->in_global = MQ_IN_GLOBAL;
-	} 
+	} else {
+		assert(q->in_global == MQ_DISPATCHING);
+	}
 	q->lock_session = 0;
 }
 
@@ -204,7 +206,7 @@ skynet_mq_lock(struct message_queue *q, int session) {
 	LOCK(q)
 	assert(q->lock_session == 0);
 	assert(q->in_global == MQ_IN_GLOBAL);
-	q->in_global = MQ_LOCKED;
+	q->in_global = MQ_DISPATCHING;
 	q->lock_session = session;
 	UNLOCK(q)
 }
