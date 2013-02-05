@@ -255,11 +255,18 @@ wb_string(struct write_block *wb, const char *str, int len) {
 			wb_push(wb, str, len);
 		}
 	} else {
-		assert(len < 0x10000);
-		int n = TYPE_LONG_STRING;
-		wb_push(wb, &n, 1);
-		uint16_t x = (uint16_t) len;
-		wb_push(wb, &x, 2);
+		int n;
+		if (len < 0x10000) {
+			n = COMBINE_TYPE(TYPE_LONG_STRING, 2);
+			wb_push(wb, &n, 1);
+			uint16_t x = (uint16_t) len;
+			wb_push(wb, &x, 2);
+		} else {
+			n = COMBINE_TYPE(TYPE_LONG_STRING, 4);
+			wb_push(wb, &n, 1);
+			uint32_t x = (uint32_t) len;
+			wb_push(wb, &x, 4);
+		}
 		wb_push(wb, str, len);
 	}
 }
@@ -269,7 +276,7 @@ static void _pack_one(lua_State *L, struct write_block *b, int index, int depth)
 static int
 wb_table_array(lua_State *L, struct write_block * wb, int index, int depth) {
 	int array_size = lua_rawlen(L,index);
-	if (array_size > MAX_COOKIE-1) {
+	if (array_size >= MAX_COOKIE-1) {
 		int n = COMBINE_TYPE(TYPE_TABLE, MAX_COOKIE-1);
 		wb_push(wb, &n, 1);
 		wb_integer(wb, array_size,TYPE_NUMBER);
@@ -343,11 +350,7 @@ _pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 	case LUA_TSTRING: {
 		size_t sz = 0;
 		const char *str = lua_tolstring(L,index,&sz);
-		if (sz >= 0x10000) {
-			wb_free(b);
-			luaL_error(L,"string is too long to serialize");
-		}
-		wb_string(b, str, sz);
+		wb_string(b, str, (int)sz);
 		break;
 	}
 	case LUA_TLIGHTUSERDATA:
@@ -505,12 +508,23 @@ _push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 		_get_buffer(L,rb,cookie);
 		break;
 	case TYPE_LONG_STRING: {
-		uint16_t len = 0;
-		uint16_t *plen = rb_read(rb, &len, 2);
-		if (plen == NULL) {
-			_invalid_stream(L,rb);
+		uint32_t len;
+		if (cookie == 2) {
+			uint16_t *plen = rb_read(rb, &len, 2);
+			if (plen == NULL) {
+				_invalid_stream(L,rb);
+			}
+			_get_buffer(L,rb,(int)*plen);
+		} else {
+			if (cookie != 4) {
+				_invalid_stream(L,rb);
+			}
+			uint32_t *plen = rb_read(rb, &len, 4);
+			if (plen == NULL) {
+				_invalid_stream(L,rb);
+			}
+			_get_buffer(L,rb,(int)*plen);
 		}
-		_get_buffer(L,rb,*plen);
 		break;
 	}
 	case TYPE_TABLE: {
