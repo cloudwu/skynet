@@ -108,7 +108,6 @@ connection_del(struct connection_pool * pool, int fd) {
 	EV_SET(&ke, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 	kevent(pool->kqueue_fd, &ke, 1, NULL, 0, NULL);
 #endif
-	close(fd);
 }
 
 static int

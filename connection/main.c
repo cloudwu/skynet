@@ -87,11 +87,12 @@ _del(struct connection_server * server, int fd) {
 		if (c->fd == fd) {
 			if (c->close == 0) {
 				skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, NULL, 0);
+				connection_del(server->pool, fd);
 			}
 			c->address = 0;
 			c->fd = 0;
 			c->close = 0;
-			connection_del(server->pool, fd);
+			close(fd);
 			return;
 		}
 	}
@@ -125,6 +126,7 @@ _poll(struct connection_server * server) {
 			if (c->close == 0) {
 				c->close = 1;
 				skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, NULL, 0);
+				connection_del(server->pool, c->fd);
 			}
 		} else {
 			skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, buffer, size);
