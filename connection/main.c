@@ -89,6 +89,7 @@ _del(struct connection_server * server, int fd) {
 				skynet_send(server->ctx, 0, c->address, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, NULL, 0);
 				connection_del(server->pool, fd);
 			}
+			--server->current_connection;
 			c->address = 0;
 			c->fd = 0;
 			c->close = 0;
