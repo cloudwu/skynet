@@ -15,13 +15,16 @@
 #endif
 /* ! Test for polling API */
 
+
+#include <sys/types.h>
+
 #ifdef HAVE_EPOLL
 #include <sys/epoll.h>
 #elif HAVE_KQUEUE
 #include <sys/event.h>
 #endif
 
-#include <sys/types.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
