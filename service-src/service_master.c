@@ -244,6 +244,8 @@ _update_address(struct skynet_context * context, struct master *m, int harbor_id
 
 static int
 _mainloop(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
+	assert(sz >= 4);
+
 	if (type != PTYPE_HARBOR) {
 		skynet_error(context, "None harbor message recv from %x (type = %d)", source, type);
 		return 0;
