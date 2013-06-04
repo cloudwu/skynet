@@ -40,7 +40,11 @@ gate_create(void) {
 
 static inline struct connection * 
 _id_to_agent(struct gate *g,int uid) {
-	return g->agent[uid & (g->cap - 1)];
+	struct connection * c = g->agent[uid & (g->cap - 1)];
+	if (c->uid != uid) {
+		return NULL;
+	}
+	return c;
 }
 
 static void

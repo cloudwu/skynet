@@ -746,7 +746,11 @@ mread_yield(struct mread_pool * self) {
 	if (s->status == SOCKET_CLOSED && s->node == NULL) {
 		--self->closed;
 		s->status = SOCKET_INVALID;
-		s->fd = self->free_socket - self->sockets;
+		if (self->free_socket) {
+			s->fd = self->free_socket - self->sockets;
+		} else {
+			s->fd = -1;
+		}
 		self->free_socket = s;
 		self->skip = 0;
 		self->active = -1;
