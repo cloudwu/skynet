@@ -580,16 +580,20 @@ _link_node(struct ringbuffer * rb, int id, struct socket * s , struct ringbuffer
 void
 mread_close_client(struct mread_pool * self, int id) {
 	struct socket * s = &self->sockets[id];
-	s->status = SOCKET_HALFCLOSE;
-	try_close(self,s);
+	if (s->status >= SOCKET_ALIVE && s->status != SOCKET_HALFCLOSE) {
+		s->status = SOCKET_HALFCLOSE;
+		try_close(self, s);
+	}
 }
 
 static void
 force_close_client(struct mread_pool * self, int id) {
 	struct socket * s = &self->sockets[id];
 	free_buffer(&s->client);
-	s->status = SOCKET_HALFCLOSE;
-	try_close(self, s);
+	if (s->status >= SOCKET_ALIVE && s->status != SOCKET_HALFCLOSE) {
+		s->status = SOCKET_HALFCLOSE;
+		try_close(self, s);
+	}
 }
 
 static void
