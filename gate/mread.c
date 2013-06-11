@@ -446,6 +446,9 @@ _read_one(struct mread_pool * self) {
 		readflag = flag & EVFILT_READ;
 #endif
 		++ self->queue_head;
+		if (ret == LISTENSOCKET) {
+			return ret;
+		}
 		if (writeflag) {
 			client_send(&ret->client, ret->fd);
 			try_close(self, ret);
