@@ -449,11 +449,12 @@ _read_one(struct mread_pool * self) {
 		if (ret == LISTENSOCKET) {
 			return ret;
 		}
-		if (writeflag) {
+		if (writeflag && ret->status != SOCKET_CLOSED) {
 			client_send(&ret->client, ret->fd);
 			try_close(self, ret);
 		}
-		if (readflag)
+		if (readflag && ret->status != SOCKET_HALFCLOSE &&
+			ret->status != SOCKET_CLOSED)
 			return ret;
 	}
 }
@@ -527,10 +528,10 @@ mread_poll(struct mread_pool * self , int timeout) {
 			return self->active;
 		}
 	}
-	if (self->closed > 0 ) {
-		return _report_closed(self);
-	}
 	if (self->queue_head >= self->queue_len) {
+		if (self->closed > 0 ) {
+			return _report_closed(self);
+		}
 		if (_read_queue(self, timeout) == -1) {
 			self->active = -1;
 			return -1;
@@ -778,8 +779,7 @@ mread_closed(struct mread_pool * self) {
 		return 0;
 	}
 	struct socket * s = &self->sockets[self->active];
-	if ((s->status == SOCKET_CLOSED ||
-		s->status == SOCKET_HALFCLOSE) && s->node == NULL) {
+	if (s->status == SOCKET_CLOSED && s->node == NULL) {
 		mread_yield(self);
 		return 1;
 	}
