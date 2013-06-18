@@ -15,6 +15,8 @@ static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	assert(sz <= 65535);
 	struct client * c = ud;
+	// tmp will be free by gate.
+	// see gate/mread.c : mread_push()
 	uint8_t *tmp = malloc(sz + 4 + 2);
 	memcpy(tmp, c->id, 4);
 	tmp[4] = (sz >> 8) & 0xff;
