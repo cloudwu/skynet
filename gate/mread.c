@@ -214,6 +214,9 @@ mread_push(struct mread_pool *self, int id, void * buffer, int size, void * ptr)
 				break;
 			}
 			if (sz == size) {
+				// ptr is malloc by 
+				//  service-src/service-client.c : 18
+				//  uint8_t *tmp = malloc(sz + 4 + 2);
 				free(ptr);
 				return;
 			}
@@ -369,9 +372,7 @@ mread_close(struct mread_pool *self) {
 
 	free_buffer(&s->client);
 	free(s);
-	if (self->listen_fd >= 0) {
-		close(self->listen_fd);
-	}
+	mread_close_listen(self);
 #ifdef HAVE_EPOLL
 	close(self->epoll_fd);
 #elif HAVE_KQUEUE
@@ -379,6 +380,17 @@ mread_close(struct mread_pool *self) {
 #endif
 	_release_rb(self->rb);
 	free(self);
+}
+
+void
+mread_close_listen(struct mread_pool *self) {
+	if (self == NULL)
+		return;
+
+	if (self->listen_fd >= 0) {
+		close(self->listen_fd);
+		self->listen_fd = 0;
+	}
 }
 
 static int
