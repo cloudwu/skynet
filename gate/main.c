@@ -207,10 +207,6 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 			mread_push(m, id, (void *)(data+4), sz - 4, (void *)data);
 			return 1;
 		} else {
-			// data is malloc by 
-			//  service-src/service-client.c : 18
-			//  uint8_t *tmp = malloc(sz + 4 + 2);
-			free((void *)data);
 			skynet_error(ctx, "Invalid client id %d from %x",(int)uid,source);
 			return 0;
 		}
