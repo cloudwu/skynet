@@ -341,7 +341,7 @@ _redirect(lua_State *L) {
 		break;
 	}
 	default:
-		luaL_error(L, "skynet.redirect invalid param %s", lua_type(L,5));
+		luaL_error(L, "skynet.redirect invalid param %s", lua_typename(L,mtype));
 	}
 	return 0;
 }
