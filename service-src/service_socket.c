@@ -318,10 +318,12 @@ try_send(struct skynet_context *ctx, struct socket_pool *p, uint32_t source, con
 	}
 	if (s->head) {
 		struct write_buffer * buf = malloc(sizeof(*buf));
-		buf->next = NULL;
 		buf->ptr = (char *)(msg+1);
 		buf->buffer = (void *)msg;
 		buf->sz = sz;
+		assert(s->tail != NULL);
+		assert(s->tail->next == NULL);
+		buf->next = s->tail->next;
 		s->tail->next = buf;
 		s->tail = buf;
 		return 1;
