@@ -2,8 +2,8 @@ local skynet = require "skynet"
 
 skynet.start(function()
 	print("Server start")
+	skynet.launch("socket",128)
 	local service = skynet.launch("snlua","service_mgr")
-	local connection = skynet.launch("connection","256")
 	local lualog = skynet.launch("snlua","lualog")
 	local console = skynet.launch("snlua","console")
 	local remoteroot = skynet.launch("snlua","remote_root")

@@ -3,10 +3,11 @@ local redis = require "redis"
 
 skynet.start(function()
 	local db = redis.connect "main"
+	print(db:select(0))
 	db:batch "write"	-- ignore results
 		db:set("A", "hello")
 		db:set("B", "world")
-	db:batch "end"
+	print(db:batch "end")
 
 	db:batch "read"
 		db:get("A")
@@ -19,6 +20,7 @@ skynet.start(function()
 	print(db:get "A")
 	print(db:set("A","hello world"))
 	print(db:get("A"))
+	db:disconnect()
 	skynet.exit()
 end)
 

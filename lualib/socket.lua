@@ -1,79 +1,189 @@
+local buffer = require "socketbuffer"
 local skynet = require "skynet"
-local c = require "socket.c"
+local table = table
+local next = next
+local assert = assert
+local coroutine = coroutine
+local type = type
+
+local READBUF = {}	-- fd:buffer
+local READREQUEST = {}	-- fd:request_size
+local READSESSION = {}	-- fd:session
+local READLOCK = {}	-- fd:queue(session)
+local READTHREAD= {} -- fd:thread
+
+local selfaddr = skynet.self()
+
+local function response(session)
+	skynet.redirect(selfaddr , 0, "response", session, "")
+end
+
+skynet.register_protocol {
+	name = "client",
+	id = 3,	-- PTYPE_CLIENT
+	pack = buffer.pack,
+	unpack = buffer.unpack,
+	dispatch = function (_, _, fd, msg, sz)
+		local qsz = READREQUEST[fd]
+		local buf = READBUF[fd]
+		local bsz
+		if sz == 0 or buf == true then
+			buf,bsz = true, qsz
+		else
+			buf,bsz = buffer.push(buf, msg, sz)
+		end
+		READBUF[fd] = buf
+		if qsz == nil then
+			return
+		end
+		if type(qsz) == "number" then
+			if qsz > bsz then
+				return
+			end
+		else
+			-- request readline
+			if buffer.readline(buf, qsz, true) == nil then
+				return
+			end
+		end
+
+		response(READSESSION[fd])
+	end
+}
+
+skynet.register_protocol {
+	name = "system",
+	id = 4, -- PTYPE_SYSTEM
+	pack = skynet.pack,
+	unpack = function (...) return ... end,
+	dispatch = function (session, addr, msg, sz)
+		fd, t, sz = skynet.unpack(msg,sz)
+		assert(addr == selfaddr, "PTYPE_SYSTEM message must send by self")
+		if t == 0 then
+			-- lock fd
+			if READTHREAD[fd] == nil then
+				skynet.ret()
+				return
+			end
+
+			local q = READLOCK[fd]
+			if q == nil then
+				READLOCK[fd] = { session }
+			else
+				table.insert(q, session)
+			end
+		else
+			-- request bytes or readline
+			local buf = READBUF[fd]
+			if buf == true then
+				skynet.ret()
+				return
+			end
+			local _,bsz = buffer.push(buf)
+			if t == 1 then
+				-- sz is size
+				if bsz >= sz then
+					skynet.ret()
+					return
+				end
+			else
+				-- sz is sep
+				if buffer.readline(buf, sz, true) then -- don't real read
+					skynet.ret()
+					return
+				end
+			end
+			READSESSION[fd] = session
+		end
+	end
+}
 
 local socket = {}
-local fd
-local object
-local data = {}
 
-local function presend()
-	if next(data) then
-		local tmp = data
-		data = {}
-		for _,v in ipairs(tmp) do
-			socket.write(fd, v)
+function socket.open(addr, port)
+	local cmd = "open" .. " " .. (port and (addr..":"..port) or addr)
+	local r = skynet.call(".socket", "text", cmd)
+	if r == "" then
+		error(cmd .. " failed")
+	end
+	return tonumber(r)
+end
+
+function socket.stdin()
+	local r = skynet.call(".socket", "text", "bind 1")
+	if r == "" then
+		error("stdin bind failed")
+	end
+	return tonumber(r)
+end
+
+function socket.close(fd)
+	socket.lock(fd)
+	skynet.call(".socket", "text", "close", fd)
+	READBUF[fd] = true
+	READLOCK[fd] = nil
+end
+
+function socket.read(fd, sz)
+	assert(coroutine.running() == READTHREAD[fd], "call socket.lock first")
+
+	local str = buffer.pop(READBUF[fd],sz)
+	if str then
+		return str
+	end
+
+	READREQUEST[fd] = sz
+	skynet.call(selfaddr, "system",fd,1,sz)	-- singal size 1
+	READREQUEST[fd] = nil
+
+	str = buffer.pop(READBUF[fd],sz)
+	return str
+end
+
+function socket.readline(fd, sep)
+	assert(coroutine.running() == READTHREAD[fd], "call socket.lock first")
+
+	local str = buffer.readline(READBUF[fd],sep)
+	if str then
+		return str
+	end
+
+	READREQUEST[fd] = sep
+	skynet.call(selfaddr, "system",fd,2,sep)	-- singal sep 2
+	READREQUEST[fd] = nil
+
+	str = buffer.readline(READBUF[fd],sep)
+	return str
+end
+
+function socket.write(fd, msg, sz)
+	assert(coroutine.running() == READTHREAD[fd], "call socket.lock first")
+
+	skynet.send(".socket", "client", fd, msg, sz)
+end
+
+function socket.lock(fd)
+	local lt = READTHREAD[fd]
+	local ct = coroutine.running()
+	if lt then
+		assert(lt ~= ct, "already lock")
+		skynet.call(selfaddr, "system",fd,0)
+	end
+	READTHREAD[fd] = ct
+end
+
+function socket.unlock(fd)
+	READTHREAD[fd] = nil
+	local q = READLOCK[fd]
+	if q then
+		if q[1] then
+			response(q[1])
+		end
+		table.remove(q,1)
+		if q[1] == nil then
+			READLOCK[fd] = nil
 		end
 	end
 end
 
-function socket.connect(addr)
-	local ip, port = string.match(addr,"([^:]+):(.+)")
-	port = tonumber(port)
-	socket.close()
-	fd = c.open(ip,port)
-	if fd == nil then
-		return true
-	end
-	skynet.send(".connection", "text", "ADD", fd , skynet.address(skynet.self()))
-	object = c.new()
-	presend()
-end
-
-function socket.stdin()
-	skynet.send(".connection", "text", "ADD", 1 , skynet.address(skynet.self()))
-	object = c.new()
-end
-
-function socket.push(msg,sz)
-	if msg then
-		c.push(object, msg, sz)
-	end
-end
-
-function socket.read(bytes)
-	return c.read(object, bytes)
-end
-
-function socket.readline(sep)
-	return c.readline(object, sep)
-end
-
-function socket.readblock(...)
-	return c.readblock(object,...)
-end
-
-function socket.write(...)
-	local str = c.write(fd, ...)
-	if str then
-		socket.close()
-		table.insert(data, str)
-	end
-end
-
-function socket.writeblock(...)
-	local str = c.writeblock(fd, ...)
-	if str then
-		socket.close()
-		table.insert(data, str)
-	end
-end
-
-function socket.close()
-	if fd then
-		skynet.send(".connection","text", "DEL", fd)
-		fd = nil
-	end
-end
-
 return socket
-

@@ -21,14 +21,14 @@ all : \
   service/logger.so \
   service/gate.so \
   service/client.so \
-  service/connection.so \
   service/master.so \
   service/multicast.so \
   service/tunnel.so \
   service/harbor.so \
   service/localcast.so \
+  service/socket.so \
   luaclib/skynet.so \
-  luaclib/socket.so \
+  luaclib/socketbuffer.so \
   luaclib/int64.so \
   luaclib/mcast.so \
   client
@@ -72,7 +72,7 @@ service/snlua.so : service-src/service_lua.c
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src
 
 service/gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Igate -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Igate -Iskynet-src -Iservice-src
 
 service/localcast.so : service-src/service_localcast.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
@@ -83,11 +83,11 @@ luaclib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/lua
 service/client.so : service-src/service_client.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
-service/connection.so : connection/connection.c connection/main.c
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iconnection
+service/socket.so : service-src/service_socket.c
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
-luaclib/socket.so : connection/lua-socket.c | luaclib
-	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Iconnection
+luaclib/socketbuffer.so : lualib-src/lua-socket.c | luaclib
+	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src
 
 luaclib/int64.so : lua-int64/int64.c | luaclib
 	gcc $(CFLAGS) $(SHARED) -Iluacompat -O2 $^ -o $@ 

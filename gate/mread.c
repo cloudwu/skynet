@@ -1,28 +1,6 @@
 #include "mread.h"
 #include "ringbuffer.h"
-
-/* Test for polling API */
-#ifdef __linux__
-#define HAVE_EPOLL 1
-#endif
-
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined (__NetBSD__)
-#define HAVE_KQUEUE 1
-#endif
-
-#if !defined(HAVE_EPOLL) && !defined(HAVE_KQUEUE)
-#error "system does not support epoll or kqueue API"
-#endif
-/* ! Test for polling API */
-
-
-#include <sys/types.h>
-
-#ifdef HAVE_EPOLL
-#include <sys/epoll.h>
-#elif HAVE_KQUEUE
-#include <sys/event.h>
-#endif
+#include "event.h"
 
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -37,7 +15,6 @@
 #include <fcntl.h>
 
 #define BACKLOG 32
-#define READQUEUE 32
 #define READBLOCKSIZE 2048
 #define RINGBUFFER_DEFAULT 1024 * 1024
 
@@ -75,11 +52,7 @@ struct socket {
 
 struct mread_pool {
 	int listen_fd;
-#ifdef HAVE_EPOLL
-	int epoll_fd;
-#elif HAVE_KQUEUE
-	int kqueue_fd;
-#endif
+	int efd;
 	int max_connection;
 	int closed;
 	int active;
@@ -88,11 +61,7 @@ struct mread_pool {
 	struct socket * free_socket;
 	int queue_len;
 	int queue_head;
-#ifdef HAVE_EPOLL
-	struct epoll_event ev[READQUEUE];
-#elif HAVE_KQUEUE
-	struct kevent ev[READQUEUE];
-#endif
+	struct event ev[MAX_EVENT];
 	struct ringbuffer * rb;
 };
 
@@ -103,16 +72,7 @@ turn_on(struct mread_pool *self, struct socket * s) {
 	if (s->status < SOCKET_ALIVE || s->enablewrite) {
 		return;
 	}
-#ifdef HAVE_EPOLL
-	struct epoll_event ev;
-	ev.events = EPOLLIN | EPOLLOUT;
-	ev.data.ptr = s;
-	epoll_ctl(self->epoll_fd, EPOLL_CTL_MOD, s->fd, &ev);
-#elif HAVE_KQUEUE
-	struct kevent ke;
-	EV_SET(&ke, s->fd, EVFILT_WRITE, EV_ENABLE, 0, 0, s);
-	kevent(self->kqueue_fd, &ke, 1, NULL, 0, NULL);
-#endif
+	event_write(self->efd, s->fd, s, true);
 	s->enablewrite = 1;
 }
 
@@ -122,18 +82,8 @@ turn_off(struct mread_pool *self, struct socket * s) {
 		return;
 	}
 	s->enablewrite = 0;
-#ifdef HAVE_EPOLL
-	struct epoll_event ev;
-	ev.events = EPOLLIN;
-	ev.data.ptr = s;
-	epoll_ctl(self->epoll_fd, EPOLL_CTL_MOD, s->fd, &ev);
-#elif HAVE_KQUEUE
-	struct kevent ke;
-	EV_SET(&ke, s->fd, EVFILT_WRITE, EV_DISABLE, 0, 0, s);
-	kevent(self->kqueue_fd, &ke, 1, NULL, 0, NULL);
-#endif
+	event_write(self->efd, s->fd, s, false);
 }
-
 
 static void
 free_buffer(struct send_client * sc) {
@@ -301,46 +251,22 @@ mread_create(uint32_t addr, int port , int max , int buffer_size) {
 		return NULL;
 	}
 
-#ifdef HAVE_EPOLL
-	int epoll_fd = epoll_create(max + 1);
-	if (epoll_fd == -1) {
+	int efd = event_init(max+1);
+	if (efd == -1) {
 		close(listen_fd);
 		return NULL;
 	}
 
-	struct epoll_event ev;
-	ev.events = EPOLLIN;
-	ev.data.ptr = LISTENSOCKET;
-
-	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listen_fd, &ev) == -1) {
+	if (event_add(efd, listen_fd, LISTENSOCKET) == -1) {
 		close(listen_fd);
-		close(epoll_fd);
+		close(efd);
 		return NULL;
 	}
-#elif HAVE_KQUEUE
-	int kqueue_fd = kqueue();
-	if (kqueue_fd == -1) {
-		close(listen_fd);
-		return NULL;
-	}
-
-	struct kevent ke;
-	EV_SET(&ke, listen_fd, EVFILT_READ, EV_ADD, 0, 0, LISTENSOCKET);
-	if (kevent(kqueue_fd, &ke, 1, NULL, 0, NULL) == -1) {
-		close(listen_fd);
-		close(kqueue_fd);
-		return NULL;
-	}
-#endif
 
 	struct mread_pool * self = malloc(sizeof(*self));
 
 	self->listen_fd = listen_fd;
-#ifdef HAVE_EPOLL
-	self->epoll_fd = epoll_fd;
-#elif HAVE_KQUEUE
-	self->kqueue_fd = kqueue_fd;
-#endif
+	self->efd = efd;
 	self->max_connection = max;
 	self->closed = 0;
 	self->active = -1;
@@ -373,11 +299,7 @@ mread_close(struct mread_pool *self) {
 	free_buffer(&s->client);
 	free(s);
 	mread_close_listen(self);
-#ifdef HAVE_EPOLL
-	close(self->epoll_fd);
-#elif HAVE_KQUEUE
-	close(self->kqueue_fd);
-#endif
+	close(self->efd);
 	_release_rb(self->rb);
 	free(self);
 }
@@ -396,14 +318,7 @@ mread_close_listen(struct mread_pool *self) {
 static int
 _read_queue(struct mread_pool * self, int timeout) {
 	self->queue_head = 0;
-#ifdef HAVE_EPOLL
-	int n = epoll_wait(self->epoll_fd , self->ev, READQUEUE, timeout);
-#elif HAVE_KQUEUE
-	struct timespec timeoutspec;
-	timeoutspec.tv_sec = timeout / 1000;
-	timeoutspec.tv_nsec = (timeout % 1000) * 1000000;
-	int n = kevent(self->kqueue_fd, NULL, 0, self->ev, READQUEUE, &timeoutspec);
-#endif
+	int n = event_wait(self->efd, self->ev, timeout);
 	if (n == -1) {
 		self->queue_len = 0;
 		return -1;
@@ -424,13 +339,7 @@ try_close(struct mread_pool * self, struct socket * s) {
 		s->status = SOCKET_CLOSED;
 		s->node = NULL;
 		s->temp = NULL;
-#ifdef HAVE_EPOLL
-		epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, s->fd , NULL);
-#elif HAVE_KQUEUE
-		struct kevent ke;
-		EV_SET(&ke, s->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-		kevent(self->kqueue_fd, &ke, 1, NULL, 0, NULL);
-#endif
+		event_del(self->efd, s->fd);
 		close(s->fd);
 //		printf("MREAD close %d (fd=%d)\n",id,s->fd);
 		++self->closed;
@@ -443,20 +352,9 @@ _read_one(struct mread_pool * self) {
 		if (self->queue_head >= self->queue_len) {
 			return NULL;
 		}
-		struct socket * ret = NULL;
-		int writeflag = 0;
-		int readflag = 0;
-#ifdef HAVE_EPOLL
-		ret = self->ev[self->queue_head].data.ptr;
-		uint32_t flag = self->ev[self->queue_head].events;
-		writeflag = flag & EPOLLOUT;
-		readflag = flag & EPOLLIN;
-#elif HAVE_KQUEUE
-		ret = self->ev[self->queue_head].udata;
-		short flag = self->ev[self->queue_head].filter;
-		writeflag = flag & EVFILT_WRITE;
-		readflag = flag & EVFILT_READ;
-#endif
+		struct socket * ret = self->ev[self->queue_head].s;
+		bool writeflag = self->ev[self->queue_head].write;
+		bool readflag = self->ev[self->queue_head].read;
 		++ self->queue_head;
 		if (ret == LISTENSOCKET) {
 			return ret;
@@ -493,23 +391,10 @@ _add_client(struct mread_pool * self, int fd) {
 		close(fd);
 		return NULL;
 	}
-#ifdef HAVE_EPOLL
-	struct epoll_event ev;
-	ev.events = EPOLLIN;
-	ev.data.ptr = s;
-	if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, fd, &ev) == -1) {
+	if (event_add(self->efd, fd, s)) {
 		close(fd);
 		return NULL;
 	}
-#elif HAVE_KQUEUE
-	struct kevent ke;
-	EV_SET(&ke, fd, EVFILT_READ, EV_ADD, 0, 0, s);
-	if (kevent(self->kqueue_fd, &ke, 1, NULL, 0, NULL) == -1) {
-		close(fd);
-		return NULL;
-	}
-#endif
-
 	s->fd = fd;
 	s->node = NULL;
 	s->status = SOCKET_SUSPEND;
