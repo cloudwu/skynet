@@ -7,6 +7,7 @@ skynet.start(function()
 	db:batch "write"	-- ignore results
 		db:set("A", "hello")
 		db:set("B", "world")
+		db:sadd("C", "one")
 	print(db:batch "end")
 
 	db:batch "read"
@@ -20,6 +21,8 @@ skynet.start(function()
 	print(db:get "A")
 	print(db:set("A","hello world"))
 	print(db:get("A"))
+	print(db:sismember("C","one"))
+	print(db:sismember("C","two"))
 	db:disconnect()
 	skynet.exit()
 end)

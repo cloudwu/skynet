@@ -131,14 +131,16 @@ function command:exists(key)
 	local ok, exists = read_response(fd)
 	socket.unlock(fd)
 	assert(ok, exists)
-	exists = exists ~= 0
-	return exists
+	return exists ~= 0
 end
 
 function command:sismember(key, value)
 	assert(not batch, "sismember can't used in batch mode")
-	local result, ismember = skynet.call( self.__handle, "lua" , "SISMEMBER", key, value)
-	assert(result, ismember)
+	socket.lock(fd)
+	socket.write(fd, compose_message { "SISMEMBER", key, value })
+	local ok, ismember = read_response(fd)
+	socket.unlock(fd)
+	assert(ok, ismember)
 	return ismember ~= 0
 end
 
@@ -159,17 +161,12 @@ function command:batch(mode)
 			return allret
 		else
 			local allok = true
-			local allret = true
 			for i = 1, self.__batch do
-				local ok, ret = read_response(fd)
+				local ok = read_response(fd)
 				allok = allok and ok
-				if ret~="OK" then
-					allret = false
-				end
 			end
 			socket.unlock(self.__handle)
 			self.__mode = false
-			assert(allret, "reading in batch write")
 			return allok
 		end
 	else
