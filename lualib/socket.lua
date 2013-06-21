@@ -157,8 +157,6 @@ function socket.readline(fd, sep)
 end
 
 function socket.write(fd, msg, sz)
-	assert(coroutine.running() == READTHREAD[fd], "call socket.lock first")
-
 	skynet.send(".socket", "client", fd, msg, sz)
 end
 

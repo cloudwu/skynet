@@ -19,8 +19,15 @@ local meta = {
 }
 
 function redis.connect(dbname)
-	local fd = socket.open(name[dbname])
-	return setmetatable( { __handle = fd, __mode = false }, meta )
+	local db_conf   =   name[dbname]
+	local fd = socket.open(db_conf.host, db_conf.port or 6379)
+	assert(fd)
+	local r = setmetatable( { __handle = fd, __mode = false }, meta )
+	if db_conf.db ~= nil then
+		r:select(db_conf.db)
+	end
+
+	return r
 end
 
 function command:disconnect()
@@ -108,7 +115,8 @@ setmetatable(command, { __index = function(t,k)
 			socket.write(fd, compose_message { cmd, ... })
 			local ok, ret = read_response(fd)
 			socket.unlock(fd)
-			return ok, ret
+			assert(ok, ret)
+			return ret
 		end
 	end
 	t[k] = f
@@ -125,6 +133,13 @@ function command:exists(key)
 	assert(ok, exists)
 	exists = exists ~= 0
 	return exists
+end
+
+function command:sismember(key, value)
+	assert(not batch, "sismember can't used in batch mode")
+	local result, ismember = skynet.call( self.__handle, "lua" , "SISMEMBER", key, value)
+	assert(result, ismember)
+	return ismember ~= 0
 end
 
 function command:batch(mode)
