@@ -23,10 +23,9 @@
 #ifdef HAVE_EPOLL
 #include <sys/epoll.h>
 #elif HAVE_KQUEUE
+#include <time.h>
 #include <sys/event.h>
 #endif
-
-#ifdef HAVE_EPOLL
 
 #define MAX_EVENT 32
 
@@ -35,6 +34,8 @@ struct event {
 	bool read;
 	bool write;
 };
+
+#ifdef HAVE_EPOLL
 
 static int
 event_init(int max) {
