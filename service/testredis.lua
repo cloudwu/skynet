@@ -5,6 +5,7 @@ skynet.start(function()
 	local db = redis.connect "main"
 	print(db:select(0))
 	db:batch "write"	-- ignore results
+		db:del "C"
 		db:set("A", "hello")
 		db:set("B", "world")
 		db:sadd("C", "one")
@@ -17,6 +18,19 @@ skynet.start(function()
 	for k,v in pairs(r) do
 		print(k,v)
 	end
+
+	db:batch "write"
+	db:del "D"
+	for i=1,1000 do
+		db:hset("D",i,i)
+	end
+	db:batch "end"
+	local r = db:hvals "D"
+	for k,v in pairs(r) do
+		print(k,v)
+	end
+
+
 	print(db:exists "A")
 	print(db:get "A")
 	print(db:set("A","hello world"))

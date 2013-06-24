@@ -33,7 +33,8 @@ skynet.register_protocol {
 			buf,bsz = buffer.push(buf, msg, sz)
 		end
 		READBUF[fd] = buf
-		if qsz == nil then
+		local session = READSESSION[fd]
+		if qsz == nil or session == nil then
 			return
 		end
 		if type(qsz) == "number" then
@@ -47,7 +48,8 @@ skynet.register_protocol {
 			end
 		end
 
-		response(READSESSION[fd])
+		response(session)
+		READSESSION[fd] = nil
 	end
 }
 
