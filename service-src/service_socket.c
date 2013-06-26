@@ -40,7 +40,6 @@ struct socket {
 struct socket_pool {
 	int fd;
 	struct event ev[MAX_EVENT];
-	int poll;
 	int id;
 	int count;
 	int cap;
