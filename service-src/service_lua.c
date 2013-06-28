@@ -3,6 +3,7 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include <assert.h>
 #include "luacompat52.h"
 #include "service_lua.h"
 
@@ -116,8 +117,8 @@ _report_error(lua_State *L, struct skynet_context *ctx, const char *filename, in
 	lua_pop(L,1);
 }
 
-int
-snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
+static int
+_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	lua_State *L = l->L;
 	l->ctx = ctx;
 	luaL_init(L);
@@ -164,12 +165,35 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	return 1;
 }
 
+static int
+_launch(struct skynet_context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz) {
+	assert(type == 0 && session == 0);
+	struct snlua *l = ud;
+	skynet_callback(context, NULL, NULL);
+	_init(l, context, msg);
+
+	return 0;
+}
+
+int
+snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
+	int sz = strlen(args);
+	char * tmp = malloc(sz+1);
+	memcpy(tmp, args, sz+1);
+	skynet_callback(ctx, l , _launch);
+	const char * self = skynet_command(ctx, "REG", NULL);
+	uint32_t handle_id = strtoul(self+1, NULL, 16);
+	// it must be first message
+	skynet_send(ctx, 0, handle_id, PTYPE_TAG_DONTCOPY,0, tmp, sz+1);
+	return 0;
+}
+
 struct snlua *
 snlua_create(void) {
 	struct snlua * l = malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
 	l->L = luaL_newstate();
-	l->init = snlua_init;
+	l->init = _init;
 	return l;
 }
 
