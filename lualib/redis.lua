@@ -135,7 +135,7 @@ function command:exists(key)
 end
 
 function command:sismember(key, value)
-	assert(not batch, "sismember can't used in batch mode")
+	assert(not self.__mode, "sismember can't used in batch mode")
 	socket.lock(fd)
 	socket.write(fd, compose_message { "SISMEMBER", key, value })
 	local ok, ismember = read_response(fd)
