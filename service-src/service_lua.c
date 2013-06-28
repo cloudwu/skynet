@@ -170,7 +170,9 @@ _launch(struct skynet_context * context, void *ud, int type, int session, uint32
 	assert(type == 0 && session == 0);
 	struct snlua *l = ud;
 	skynet_callback(context, NULL, NULL);
-	_init(l, context, msg);
+	if (_init(l, context, msg)) {
+		skynet_command(context, "EXIT", NULL);
+	}
 
 	return 0;
 }
