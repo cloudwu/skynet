@@ -61,20 +61,7 @@ skynet.register_protocol {
 	dispatch = function (session, addr, msg, sz)
 		fd, t, sz = skynet.unpack(msg,sz)
 		assert(addr == selfaddr, "PTYPE_SYSTEM message must send by self")
-		if t == 0 then
-			-- lock fd
-			if READTHREAD[fd] == nil then
-				skynet.ret()
-				return
-			end
-
-			local q = READLOCK[fd]
-			if q == nil then
-				READLOCK[fd] = { session }
-			else
-				table.insert(q, session)
-			end
-		else
+		if t > 0 then	-- lock request when t == 0
 			-- request bytes or readline
 			local buf = READBUF[fd]
 			if buf == true then
@@ -127,8 +114,6 @@ function socket.close(fd)
 end
 
 function socket.read(fd, sz)
-	assert(coroutine.running() == READTHREAD[fd], "call socket.lock first")
-
 	local str = buffer.pop(READBUF[fd],sz)
 	if str then
 		return str
@@ -143,8 +128,6 @@ function socket.read(fd, sz)
 end
 
 function socket.readline(fd, sep)
-	assert(coroutine.running() == READTHREAD[fd], "call socket.lock first")
-
 	local str = buffer.readline(READBUF[fd],sep)
 	if str then
 		return str
@@ -163,13 +146,22 @@ function socket.write(fd, msg, sz)
 end
 
 function socket.lock(fd)
-	local lt = READTHREAD[fd]
-	local ct = coroutine.running()
-	if lt then
-		assert(lt ~= ct, "already lock")
-		skynet.call(selfaddr, "system",fd,0)
+	local locked = READTHREAD[fd]
+	if locked then
+		-- lock fd
+		local session = skynet.genid()
+		local q = READLOCK[fd]
+		if q == nil then
+			READLOCK[fd] = { session }
+		else
+			table.insert(q, session)
+		end
+
+		skynet.redirect(selfaddr , 0, "system", session, skynet.pack(fd,0))
+		coroutine.yield("CALL",session)
+	else
+		READTHREAD[fd] = true
 	end
-	READTHREAD[fd] = ct
 end
 
 function socket.unlock(fd)
@@ -177,10 +169,10 @@ function socket.unlock(fd)
 	local q = READLOCK[fd]
 	if q then
 		if q[1] then
+			READTHREAD[fd] = true
 			response(q[1])
-		end
-		table.remove(q,1)
-		if q[1] == nil then
+			table.remove(q,1)
+		else
 			READLOCK[fd] = nil
 		end
 	end
