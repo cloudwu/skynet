@@ -215,9 +215,7 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 	assert(type == PTYPE_RESPONSE);
 	struct mread_pool * m = g->pool;
 	int connection_id = mread_poll(m,100);	// timeout : 100ms
-	if (connection_id < 0) {
-		skynet_command(ctx, "TIMEOUT", "1");
-	} else {
+	if (connection_id >= 0) {
 		int id = g->map[connection_id].uid;
 		if (id == 0) {
 			id = _gen_id(g, connection_id);
@@ -254,9 +252,9 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 
 		_forward(ctx, g, id, data, len);
 		mread_yield(m);
-_break:
-		skynet_command(ctx, "TIMEOUT", "0");
 	}
+_break:
+	skynet_command(ctx, "TIMEOUT", "0");
 	return 0;
 }
 

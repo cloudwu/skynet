@@ -234,32 +234,36 @@ parser(const char * msg, int sz, char * buffer, int *id) {
 
 static void
 forward(struct skynet_context * context, struct socket *s, struct socket_pool *p) {
-	int * buffer = malloc(READ_BUFFER + sizeof(int));
-	*buffer = s->id;	// convert endian ?
-	int r = 0;
 	for (;;) {
-		r = read(s->fd, buffer+1, READ_BUFFER);
-		if (r == -1) {
-			switch(errno) {
-			case EWOULDBLOCK:
-				free(buffer);
-				return;
-			case EINTR:
-				continue;
+		int * buffer = malloc(READ_BUFFER + sizeof(int));
+		*buffer = s->id;	// convert endian ?
+		int r = 0;
+		for (;;) {
+			r = read(s->fd, buffer+1, READ_BUFFER);
+			if (r == -1) {
+				switch(errno) {
+				case EWOULDBLOCK:
+					free(buffer);
+					return;
+				case EINTR:
+					continue;
+				}
+				r = 0;
+				break;
 			}
-			r = 0;
 			break;
 		}
-		break;
-	}
-	if (r == 0) {
-		force_close(s,p);
-	}
+		if (r == 0) {
+			force_close(s,p);
+		}
 
-	if (s->status == STATUS_HALFCLOSE) {
-		free(buffer);
-	} else {
-		skynet_send(context, 0, s->source, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, buffer, r + 4);
+		if (s->status == STATUS_HALFCLOSE) {
+			free(buffer);
+		} else {
+			skynet_send(context, 0, s->source, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, buffer, r + 4);
+		}
+		if (r < READ_BUFFER)
+			return;
 	}
 }
 
@@ -391,7 +395,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 			}
 		}
 	}
-	skynet_command(context, "TIMEOUT", n == MAX_EVENT ? "0" : "1");
+	skynet_command(context, "TIMEOUT", "0");
 	return 0;
 }
 
