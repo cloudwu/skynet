@@ -77,29 +77,30 @@ end
 
 local instance = {}
 
-skynet.start(function()
-	skynet.dispatch("text" , function(session, address , cmd)
-		if cmd == "" then
-			-- init notice
-			local reply = instance[address]
-			if reply then
-				skynet.redirect(reply.address , 0, "response", reply.session, skynet.address(address))
-				instance[address] = nil
-			end
-		else
-			-- launch request
-			local service, param = string.match(cmd,"([^ ]+) (.*)")
-			local inst = skynet.launch(service, param)
-			if inst then
-				services[inst] = cmd
-				instance[inst] = { session = session, address = address }
-			else
-				skynet.ret("")
-			end
+skynet.dispatch("text" , function(session, address , cmd)
+	if cmd == "" then
+		-- init notice
+		local reply = instance[address]
+		if reply then
+			skynet.redirect(reply.address , 0, "response", reply.session, skynet.address(address))
+			instance[address] = nil
 		end
-	end)
-	skynet.dispatch("lua", function(session, address, cmd , ...)
-		cmd = string.upper(cmd)
-		command[cmd](...)
-	end)
+	else
+		-- launch request
+		local service, param = string.match(cmd,"([^ ]+) (.*)")
+		local inst = skynet.launch(service, param)
+		if inst then
+			services[inst] = cmd
+			instance[inst] = { session = session, address = address }
+		else
+			skynet.ret("")
+		end
+	end
 end)
+
+skynet.dispatch("lua", function(session, address, cmd , ...)
+	cmd = string.upper(cmd)
+	command[cmd](...)
+end)
+
+skynet.start(function() end)
