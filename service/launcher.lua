@@ -77,8 +77,6 @@ end
 
 local instance = {}
 
-skynet.register(".launcher")
-
 skynet.start(function()
 	skynet.dispatch("text" , function(session, address , cmd)
 		if cmd == "" then
