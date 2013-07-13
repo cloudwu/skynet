@@ -80,9 +80,6 @@ LUALIB_API void  (luaL_setmetatable) (lua_State *L, const char *tname);
 
 LUALIB_API const char *(luaL_tolstring) (lua_State *L, int idx, size_t *len);
 
-LUALIB_API void (luaL_traceback) (lua_State *L, lua_State *L1,
-                                  const char *msg, int level);
-
 #endif
 
 #endif

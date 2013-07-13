@@ -113,7 +113,7 @@ lua_tonumberx(lua_State *L, int index, int *isnum) {
 LUA_API lua_Unsigned
 lua_tounsignedx(lua_State *L, int idx, int *isnum) {
 	lua_Number n = lua_tonumberx(L, idx, isnum);
-	return (lua_Unsigned)n;
+	return return (lua_Unsigned)(int)n;
 }
 
 LUA_API lua_Integer
@@ -335,32 +335,6 @@ static int countlevels (lua_State *L) {
   return le - 1;
 }
 
-
-LUALIB_API void luaL_traceback (lua_State *L, lua_State *L1,
-                                const char *msg, int level) {
-  lua_Debug ar;
-  int top = lua_gettop(L);
-  int numlevels = countlevels(L1);
-  int mark = (numlevels > LEVELS1 + LEVELS2) ? LEVELS1 : 0;
-  if (msg) lua_pushfstring(L, "%s\n", msg);
-  lua_pushliteral(L, "stack traceback:");
-  while (lua_getstack(L1, level++, &ar)) {
-    if (level == mark) {  /* too many levels? */
-      lua_pushliteral(L, "\n\t...");  /* add a '...' */
-      level = numlevels - LEVELS2;  /* and skip to last ones */
-    }
-    else {
-      lua_getinfo(L1, "Slnt", &ar);
-      lua_pushfstring(L, "\n\t%s:", ar.short_src);
-      if (ar.currentline > 0)
-        lua_pushfstring(L, "%d:", ar.currentline);
-      lua_pushliteral(L, " in ");
-      pushfuncname(L, &ar);
-      lua_concat(L, lua_gettop(L) - top);
-    }
-  }
-  lua_concat(L, lua_gettop(L) - top);
-}
 
 /* }====================================================== */
 
