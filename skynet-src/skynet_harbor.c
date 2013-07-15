@@ -7,7 +7,7 @@
 #include <assert.h>
 
 static struct skynet_context * REMOTE = 0;
-static int HARBOR = 0;
+static unsigned int HARBOR = 0;
 
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
@@ -39,7 +39,7 @@ skynet_harbor_message_isremote(uint32_t handle) {
 
 void
 skynet_harbor_init(int harbor) {
-	HARBOR = harbor << HANDLE_REMOTE_SHIFT;
+	HARBOR = (unsigned int)harbor << HANDLE_REMOTE_SHIFT;
 }
 
 int
