@@ -87,7 +87,8 @@ new_socket(struct socket_pool *p, int sock, uint32_t addr) {
 			s->id = id;
 			s->source = addr;
 			p->count++;
-			if (++p->id > MAX_ID) {
+			p->id = id + 1;
+			if (p->id > MAX_ID) {
 				p->id = 1;
 			}
 			assert(s->head == NULL && s->tail == NULL);
