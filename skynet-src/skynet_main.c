@@ -1,7 +1,6 @@
 #include "skynet_imp.h"
 #include "skynet_env.h"
 #include "luacompat52.h"
-#include "xmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
