@@ -1,6 +1,7 @@
 #include "skynet_imp.h"
 #include "skynet_env.h"
 #include "luacompat52.h"
+#include "xmalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +9,7 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include <signal.h>
 
 static int
 optint(const char *key, int opt) {
@@ -71,6 +73,13 @@ _init_env(lua_State *L) {
 	lua_pop(L,1);
 }
 
+int sigign() {
+	struct sigaction sa;
+	sa.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &sa, 0);
+	return 0;
+}
+
 int
 main(int argc, char *argv[]) {
 	const char * config_file = "config";
@@ -78,6 +87,8 @@ main(int argc, char *argv[]) {
 		config_file = argv[1];
 	}
 	skynet_env_init();
+
+	sigign();
 
 	struct skynet_config config;
 
