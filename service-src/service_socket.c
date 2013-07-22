@@ -17,8 +17,9 @@
 #define READ_BUFFER 4000
 
 #define STATUS_INVALID 0
-#define STATUS_HALFCLOSE 1
-#define STATUS_SUSPEND 2
+#define STATUS_CONNECT 1
+#define STATUS_HALFCLOSE 2
+#define STATUS_SUSPEND 3
 
 struct write_buffer {
 	struct write_buffer * next;
@@ -66,7 +67,7 @@ _set_nonblocking(int fd)
 }
 
 static int
-new_socket(struct socket_pool *p, int sock, uint32_t addr) {
+new_socket(struct socket_pool *p, int sock, uint32_t addr, int session, bool connecting) {
 	int i;
 	if (p->count >= p->cap) {
 		goto _error;
@@ -79,13 +80,18 @@ new_socket(struct socket_pool *p, int sock, uint32_t addr) {
 			if (event_add(p->fd, sock, s)) {
 				goto _error;
 			}
-			s->status = STATUS_SUSPEND;
-			_set_nonblocking(sock);
+			if (connecting) {
+				event_write(p->fd, sock, s, true);
+				s->status = STATUS_CONNECT;
+			} else {
+				s->status = STATUS_SUSPEND;
+			}
 			int keepalive = 1; 
 			setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));
 			s->fd = sock;
 			s->id = id;
 			s->source = addr;
+			s->session = session;
 			p->count++;
 			p->id = id + 1;
 			if (p->id > MAX_ID) {
@@ -101,9 +107,11 @@ _error:
 }
 
 static void
-cmd_bind(struct skynet_context * ctx, struct socket_pool *p, int sock, int session, uint32_t source) {
-	char ret[10];
-	int id = new_socket(p, sock, source);
+cmd_bind(struct skynet_context * ctx, struct socket_pool *p, int sock, int session, uint32_t source, bool connecting) {
+	if (!connecting) {
+		_set_nonblocking(sock);
+	}
+	int id = new_socket(p, sock, source, session, connecting);
 	if (id<0) {
 		reply(ctx, source, session, NULL , 0);
 		return;
@@ -111,8 +119,6 @@ cmd_bind(struct skynet_context * ctx, struct socket_pool *p, int sock, int sessi
 	if (p->count == 1) {
 		skynet_command(ctx, "TIMEOUT", "0");
 	}
-	int sz = sprintf(ret,"%d",id);
-	reply(ctx, source, session, ret, sz);
 }
 
 static void
@@ -142,8 +148,9 @@ cmd_open(struct skynet_context * ctx, struct socket_pool *p, char * cmd, int ses
 		if ( sock < 0 ) {
 			continue;
 		}
+		_set_nonblocking(sock);
 		status = connect( sock,	ai_ptr->ai_addr, ai_ptr->ai_addrlen	);
-		if ( status	!= 0 ) {
+		if ( status	!= 0 && errno != EINPROGRESS) {
 			close(sock);
 			sock = -1;
 			continue;
@@ -157,7 +164,7 @@ cmd_open(struct skynet_context * ctx, struct socket_pool *p, char * cmd, int ses
 		goto _failed;
 	}
 
-	cmd_bind(ctx, p, sock, session, source);
+	cmd_bind(ctx, p, sock, session, source, true);
 
 	return;
 _failed:
@@ -203,13 +210,21 @@ cmd_close(struct skynet_context * ctx, struct socket_pool *p, int id, int sessio
 }
 
 static void
+_reply_bind(struct skynet_context * ctx, int sock, int session, uint32_t source) {
+	char ret[10];
+	int sz = sprintf(ret,"%d",sock);
+	reply(ctx, source, session, ret, sz);
+}
+
+static void
 _ctrl(struct skynet_context * ctx, struct socket_pool *p, char * command, int id, char * arg, int session, uint32_t source) {
 	if (strcmp(command, "open")==0) {
 		cmd_open(ctx, p, arg, session, source);
 	} else if (strcmp(command, "close")==0) {
 		cmd_close(ctx, p, id, session, source);
 	} else if (strcmp(command, "bind")==0) {
-		cmd_bind(ctx, p, id, session, source);
+		cmd_bind(ctx, p, id, session, source, false);
+		_reply_bind(ctx, id, session, source);
 	} else {
 		skynet_error(ctx, "Unknown command %s", command);
 		reply(ctx, source, session, NULL, 0);
@@ -316,7 +331,7 @@ try_send(struct skynet_context *ctx, struct socket_pool *p, uint32_t source, con
 		skynet_error(ctx, "%x try to write socket %d:%x", source, id, s->source);
 		return 0;
 	}
-	if (s->status != STATUS_SUSPEND) {
+	if (s->status != STATUS_SUSPEND && s->status != STATUS_CONNECT) {
 		skynet_error(ctx, "%x write to closed socket %d", source, id);
 		return 0;
 	}
@@ -335,22 +350,24 @@ try_send(struct skynet_context *ctx, struct socket_pool *p, uint32_t source, con
 
 	char * ptr = (char *)(msg+1);
 
-	for (;;) {
-		int wt = write(s->fd, ptr, sz);
-		if (wt < 0) {
-			switch(errno) {
-			case EINTR:
-				continue;
+	if (s->status != STATUS_CONNECT) {
+		for (;;) {
+			int wt = write(s->fd, ptr, sz);
+			if (wt < 0) {
+				switch(errno) {
+				case EINTR:
+					continue;
+				}
+				break;
 			}
+			if (wt == sz) {
+				return 0;
+			}
+			sz-=wt;
+			ptr+=wt;
+
 			break;
 		}
-		if (wt == sz) {
-			return 0;
-		}
-		sz-=wt;
-		ptr+=wt;
-
-		break;
 	}
 
 	struct write_buffer * buf = malloc(sizeof(*buf));
@@ -384,15 +401,29 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	int i;
 	for (i=0;i<n;i++) {
 		struct event *e = &p->ev[i];
-		if (e->read) {
-			forward(context, e->s, p);
-		}
-		if (e->write) {
-			struct socket *s = e->s;
-			sendout(p, s);
-			if (s->status == STATUS_HALFCLOSE && s->head == NULL) {
-				force_close(s, p);
-				reply(context, source, s->session, NULL, 0);
+		struct socket *s= e->s;
+		if (s->status == STATUS_CONNECT) {
+			int error;
+			socklen_t len = sizeof(error);  
+			int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);  
+			if (code < 0 || error) {  
+				force_close(s,p);
+				reply(context, s->source, s->session, NULL , 0);
+			} else {
+				_reply_bind(context, s->id, s->session, s->source);
+				s->status = STATUS_SUSPEND;
+			}
+		} else {
+			if (e->read) {
+				forward(context, e->s, p);
+			}
+			if (e->write) {
+				struct socket *s = e->s;
+				sendout(p, s);
+				if (s->status == STATUS_HALFCLOSE && s->head == NULL) {
+					force_close(s, p);
+					reply(context, source, s->session, NULL, 0);
+				}
 			}
 		}
 	}

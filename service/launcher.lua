@@ -85,6 +85,14 @@ skynet.dispatch("text" , function(session, address , cmd)
 			skynet.redirect(reply.address , 0, "response", reply.session, skynet.address(address))
 			instance[address] = nil
 		end
+	elseif cmd == "ERROR" then
+		-- see serivce-src/service_lua.c
+		-- init failed
+		local reply = instance[address]
+		if reply then
+			skynet.redirect(reply.address , 0, "response", reply.session, "")
+			instance[address] = nil
+		end
 	else
 		-- launch request
 		local service, param = string.match(cmd,"([^ ]+) (.*)")

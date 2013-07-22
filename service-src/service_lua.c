@@ -117,6 +117,12 @@ _report_error(lua_State *L, struct skynet_context *ctx, const char *filename, in
 	lua_pop(L,1);
 }
 
+static void
+_report_launcher_error(struct skynet_context *ctx) {
+	// sizeof "ERROR" == 5
+	skynet_sendname(ctx, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
+}
+
 static int
 _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	lua_State *L = l->L;
@@ -144,6 +150,7 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 		} else {
 			skynet_error(ctx, "lua parser [%s] error : %s", filename, lua_tostring(L,-1));
 		}
+		_report_launcher_error(ctx);
 		return 1;
 	}
 	int n=0;
@@ -162,6 +169,7 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 		}
 	}
 	_report_error(L, ctx, filename, r);
+	_report_launcher_error(ctx);
 	return 1;
 }
 
