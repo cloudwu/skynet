@@ -96,7 +96,7 @@ function socket.open(addr, port)
 	local cmd = "open" .. " " .. (port and (addr..":"..port) or addr)
 	local r = skynet.call(".socket", "text", cmd)
 	if r == "" then
-		error(cmd .. " failed")
+		return nil,  cmd .. " failed"
 	end
 	local fd = tonumber(r)
 	READBUF[fd] = true
