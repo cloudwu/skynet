@@ -124,6 +124,7 @@ cmd_bind(struct skynet_context * ctx, struct socket_pool *p, int sock, int sessi
 static void
 cmd_open(struct skynet_context * ctx, struct socket_pool *p, char * cmd, int session, uint32_t source) {
 	int status;
+	bool connecting = true;
 	struct addrinfo ai_hints;
 	struct addrinfo *ai_list = NULL;
 	struct addrinfo *ai_ptr = NULL;
@@ -164,7 +165,11 @@ cmd_open(struct skynet_context * ctx, struct socket_pool *p, char * cmd, int ses
 		goto _failed;
 	}
 
-	cmd_bind(ctx, p, sock, session, source, true);
+	if(status == 0) {
+		connecting = false;
+	}
+
+	cmd_bind(ctx, p, sock, session, source, connecting);
 
 	return;
 _failed:
@@ -181,7 +186,9 @@ force_close(struct socket *s, struct socket_pool *p) {
 		free(tmp);
 	}
 	s->head = s->tail = NULL;
+	assert(s->status != STATUS_INVALID);
 	s->status = STATUS_INVALID;
+	s->id = 0;
 	event_del(p->fd, s->fd);
 	close(s->fd);
 	--p->count;
@@ -398,6 +405,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 		return 0;
 	assert(type == PTYPE_RESPONSE);
 	int n = event_wait(p->fd, p->ev, 100); // timeout : 100ms
+
 	int i;
 	for (i=0;i<n;i++) {
 		struct event *e = &p->ev[i];
@@ -446,6 +454,7 @@ socket_init(struct socket_pool *pool, struct skynet_context *ctx, const char * a
 	pool->s = malloc(sizeof(struct socket) * max);
 	memset(pool->s, 0, sizeof(struct socket) * max);
 	pool->fd = fd;
+	pool->id = 1;
 
 	skynet_callback(ctx, pool, _cb);
 	skynet_command(ctx,"REG",".socket");
