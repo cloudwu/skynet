@@ -55,6 +55,13 @@ reply(struct skynet_context * ctx, uint32_t source, int session, char * cmd, int
 	skynet_send(ctx, 0, source, PTYPE_RESPONSE,  session, cmd, sz);
 }
 
+static void
+_reply_bind(struct skynet_context * ctx, int sock, int session, uint32_t source) {
+	char ret[10];
+	int sz = sprintf(ret,"%d",sock);
+	reply(ctx, source, session, ret, sz);
+}
+
 static int
 _set_nonblocking(int fd)
 {
@@ -115,6 +122,9 @@ cmd_bind(struct skynet_context * ctx, struct socket_pool *p, int sock, int sessi
 	if (id<0) {
 		reply(ctx, source, session, NULL , 0);
 		return;
+	}
+	if (!connecting) {
+		_reply_bind(ctx, id, session, source);
 	}
 	if (p->count == 1) {
 		skynet_command(ctx, "TIMEOUT", "0");
@@ -216,13 +226,6 @@ cmd_close(struct skynet_context * ctx, struct socket_pool *p, int id, int sessio
 }
 
 static void
-_reply_bind(struct skynet_context * ctx, int sock, int session, uint32_t source) {
-	char ret[10];
-	int sz = sprintf(ret,"%d",sock);
-	reply(ctx, source, session, ret, sz);
-}
-
-static void
 _ctrl(struct skynet_context * ctx, struct socket_pool *p, char * command, int id, char * arg, int session, uint32_t source) {
 	if (strcmp(command, "open")==0) {
 		cmd_open(ctx, p, arg, session, source);
@@ -230,7 +233,6 @@ _ctrl(struct skynet_context * ctx, struct socket_pool *p, char * command, int id
 		cmd_close(ctx, p, id, session, source);
 	} else if (strcmp(command, "bind")==0) {
 		cmd_bind(ctx, p, id, session, source, false);
-		_reply_bind(ctx, id, session, source);
 	} else {
 		skynet_error(ctx, "Unknown command %s", command);
 		reply(ctx, source, session, NULL, 0);
@@ -403,7 +405,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	if (p->count == 0)
 		return 0;
 	assert(type == PTYPE_RESPONSE);
-	int n = event_wait(p->fd, p->ev, 100); // timeout : 100ms
+	int n = event_wait(p->fd, p->ev, 1); // timeout : 1ms
 
 	int i;
 	for (i=0;i<n;i++) {
