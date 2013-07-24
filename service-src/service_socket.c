@@ -198,7 +198,6 @@ static void
 cmd_close(struct skynet_context * ctx, struct socket_pool *p, int id, int session, uint32_t source) {
 	struct socket * s = &p->s[id % p->cap];
 	if (id != s->id) {
-		skynet_error(ctx, "%x close invalid socket %d", source, id);
 		reply(ctx, source, session, "invalid", -1);
 		return;
 	}
