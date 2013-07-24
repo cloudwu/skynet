@@ -218,7 +218,11 @@ function socket.readline(fd, sep)
 end
 
 function socket.write(fd, msg, sz)
+	if CLOSED[fd] or not READBUF[fd] then
+		return
+	end
 	skynet.send(".socket", "client", fd, msg, sz)
+	return true
 end
 
 function socket.lock(fd)
