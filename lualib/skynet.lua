@@ -28,6 +28,29 @@ local sleep_session = {}
 local trace_handle
 local trace_func = function() end
 
+-- coroutine reuse
+
+local coroutine_poll = {}
+local coroutine_yield = coroutine.yield
+
+local function co_create(f)
+	local co = table.remove(coroutine_poll)
+	if co == nil then
+		co = coroutine.create(function(...)
+			f(...)
+			while true do
+				f = nil
+				coroutine_poll[#coroutine_poll] = co
+				f = coroutine_yield "EXIT"
+				f(coroutine_yield())
+			end
+		end)
+	else
+		coroutine.resume(co, f)
+	end
+	return co
+end
+
 -- suspend is function
 local suspend
 
@@ -74,7 +97,7 @@ function suspend(co, result, command, param, size)
 		end
 		c.send(co_address, 1, co_session, param, size)
 		return suspend(co, coroutine.resume(co))
-	elseif command == nil then
+	elseif command == "EXIT" then
 		-- coroutine exit
 		session_coroutine_id[co] = nil
 		session_coroutine_address[co] = nil
@@ -90,7 +113,7 @@ function skynet.timeout(ti, func)
 	local session = c.command("TIMEOUT",tostring(ti))
 	assert(session)
 	session = tonumber(session)
-	local co = coroutine.create(func)
+	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
 end
@@ -246,7 +269,7 @@ local fork_queue = {}
 
 function skynet.fork(func,...)
 	local args = { ... }
-	local co = coroutine.create(function()
+	local co = co_create(function()
 		func(unpack(args))
 	end)
 	table.insert(fork_queue, co)
@@ -270,7 +293,7 @@ local function dispatch_message(prototype, msg, sz, session, source, ...)
 		local p = assert(proto[prototype], prototype)
 		local f = p.dispatch
 		if f then
-			local co = coroutine.create(f)
+			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
 			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
