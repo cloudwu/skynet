@@ -465,6 +465,7 @@ function dbgcmd.MEM()
 end
 
 function dbgcmd.GC()
+	coroutine_poll = {}
 	collectgarbage "collect"
 end
 
