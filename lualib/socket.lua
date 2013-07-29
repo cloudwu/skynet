@@ -14,6 +14,7 @@ local READTHREAD= {} -- fd:thread
 local CLOSED = {} -- fd:true
 
 local selfaddr = skynet.self()
+local sockets = assert(skynet.localname ".socket")
 
 local function response(session)
 	skynet.redirect(selfaddr , 0, "response", session, "")
@@ -94,7 +95,7 @@ local socket = {}
 
 function socket.open(addr, port)
 	local cmd = "open" .. " " .. (port and (addr..":"..port) or addr)
-	local r = skynet.call(".socket", "text", cmd)
+	local r = skynet.call(sockets, "text", cmd)
 	if r == "" then
 		return nil,  cmd .. " failed"
 	end
@@ -105,7 +106,7 @@ function socket.open(addr, port)
 end
 
 function socket.stdin()
-	local r = skynet.call(".socket", "text", "bind 1")
+	local r = skynet.call(sockets, "text", "bind 1")
 	if r == "" then
 		error("stdin bind failed")
 	end
@@ -117,7 +118,7 @@ end
 
 function socket.close(fd)
 	socket.lock(fd)
-	skynet.call(".socket", "text", "close", fd)
+	skynet.call(sockets, "text", "close", fd)
 	READBUF[fd] = nil
 	READLOCK[fd] = nil
 	CLOSED[fd] = nil
@@ -221,7 +222,7 @@ function socket.write(fd, msg, sz)
 	if CLOSED[fd] or not READBUF[fd] then
 		return
 	end
-	skynet.send(".socket", "client", fd, msg, sz)
+	skynet.send(sockets, "client", fd, msg, sz)
 	return true
 end
 

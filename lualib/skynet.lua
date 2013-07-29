@@ -158,6 +158,10 @@ function skynet.self()
 	return self_handle
 end
 
+function skynet.localname(name)
+	return string_to_handle(c.command("QUERY", name))
+end
+
 function skynet.launch(...)
 	local addr = c.command("LAUNCH", table.concat({...}," "))
 	if addr then

@@ -384,6 +384,15 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		}
 	}
 
+	if (strcmp(cmd,"QUERY") == 0) {
+		if (param[0] == '.') {
+			uint32_t handle = skynet_handle_findname(param+1);
+			sprintf(context->result, ":%x", handle);
+			return context->result;
+		}
+		return NULL;
+	}
+
 	if (strcmp(cmd,"NAME") == 0) {
 		int size = strlen(param);
 		char name[size+1];
