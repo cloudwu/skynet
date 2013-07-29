@@ -615,4 +615,8 @@ function skynet.abort()
 	c.command("ABORT")
 end
 
+function skynet.context_ptr()
+	return c.context()
+end
+
 return skynet

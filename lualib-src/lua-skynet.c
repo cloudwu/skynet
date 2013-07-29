@@ -385,6 +385,14 @@ _harbor(lua_State *L) {
 	return 2;
 }
 
+static int
+_context(lua_State *L) {
+	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+	lua_pushlightuserdata(L, context);
+
+	return 1;
+}
+
 // trace api
 static int
 _trace_new(lua_State *L) {
@@ -465,6 +473,7 @@ luaopen_skynet_c(lua_State *L) {
 		{ "error", _error },
 		{ "tostring", _tostring },
 		{ "harbor", _harbor },
+		{ "context", _context },
 		{ NULL, NULL },
 	};
 

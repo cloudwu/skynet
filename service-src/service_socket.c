@@ -49,6 +49,10 @@ struct socket_pool {
 
 static void
 reply(struct skynet_context * ctx, uint32_t source, int session, char * cmd, int sz) {
+	if (session == 0) {
+		// don't reply when session == 0
+		return;
+	}
 	if (sz < 0) {
 		sz = strlen(cmd);
 	}
