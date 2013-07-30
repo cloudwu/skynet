@@ -101,7 +101,7 @@ luaclib/bson.so : lualib-src/lua-bson.c | luaclib
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ 
 
 luaclib/mongo.so : lualib-src/lua-mongo.c | luaclib
-	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src 
+	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ 
 
 client : client-src/client.c
 	gcc $(CFLAGS) $^ -o $@ -lpthread
