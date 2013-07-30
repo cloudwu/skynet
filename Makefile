@@ -31,6 +31,8 @@ all : \
   luaclib/socketbuffer.so \
   luaclib/int64.so \
   luaclib/mcast.so \
+  luaclib/bson.so \
+  luaclib/mongo.so \
   client
 
 skynet : \
@@ -94,6 +96,12 @@ luaclib/int64.so : lua-int64/int64.c | luaclib
 
 luaclib/mcast.so : lualib-src/lua-localcast.c | luaclib
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Iservice-src
+
+luaclib/bson.so : lualib-src/lua-bson.c | luaclib
+	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ 
+
+luaclib/mongo.so : lualib-src/lua-mongo.c | luaclib
+	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src 
 
 client : client-src/client.c
 	gcc $(CFLAGS) $^ -o $@ -lpthread

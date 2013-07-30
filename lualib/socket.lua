@@ -226,7 +226,14 @@ function socket.write(fd, msg, sz)
 	return true
 end
 
+function socket.invalid(fd)
+	return CLOSED[fd] or not READBUF[fd]
+end
+
 function socket.lock(fd)
+	if CLOSED[fd] or not READBUF[fd] then
+		return
+	end
 	local locked = READTHREAD[fd]
 	if locked then
 		-- lock fd
