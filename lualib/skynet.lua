@@ -122,7 +122,7 @@ function skynet.sleep(ti)
 	local session = c.command("TIMEOUT",tostring(ti))
 	assert(session)
 	session = tonumber(session)
-	local ret = coroutine.yield("SLEEP", session)
+	local ret = coroutine_yield("SLEEP", session)
 	sleep_session[coroutine.running()] = nil
 	if ret == true then
 		c.trace_switch(trace_handle, session)
@@ -133,8 +133,16 @@ end
 function skynet.yield()
 	local session = c.command("TIMEOUT","0")
 	assert(session)
-	coroutine.yield("SLEEP", tonumber(session))
+	coroutine_yield("SLEEP", tonumber(session))
 	sleep_session[coroutine.running()] = nil
+end
+
+function skynet.wait()
+	local session = c.genid()
+	coroutine_yield("SLEEP", session)
+	local co = coroutine.running()
+	sleep_session[co] = nil
+	session_id_coroutine[session] = nil
 end
 
 function skynet.register(name)
@@ -224,25 +232,25 @@ skynet.tostring = assert(c.tostring)
 function skynet.call(addr, typename, ...)
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , p.pack(...))
-	return p.unpack(coroutine.yield("CALL", session))
+	return p.unpack(coroutine_yield("CALL", session))
 end
 
 function skynet.blockcall(addr, typename , ...)
 	local p = proto[typename]
 	c.command("LOCK")
 	local session = c.send(addr, p.id , nil , p.pack(...))
-	return p.unpack(coroutine.yield("CALL", session))
+	return p.unpack(coroutine_yield("CALL", session))
 end
 
 function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , msg, sz)
-	return coroutine.yield("CALL", session)
+	return coroutine_yield("CALL", session)
 end
 
 function skynet.ret(msg, sz)
 	msg = msg or ""
-	coroutine.yield("RETURN", msg, sz)
+	coroutine_yield("RETURN", msg, sz)
 end
 
 function skynet.wakeup(co)
