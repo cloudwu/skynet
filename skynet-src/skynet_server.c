@@ -127,7 +127,8 @@ skynet_context_new(const char * name, const char *param) {
 
 int
 skynet_context_newsession(struct skynet_context *ctx) {
-	int session = ++ctx->session_id;
+	// session always be a positive number
+	int session = (++ctx->session_id) & 0x7fffffff;
 	return session;
 }
 
@@ -353,8 +354,6 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		char * session_ptr = NULL;
 		int ti = strtol(param, &session_ptr, 10);
 		int session = skynet_context_newsession(context);
-		if (session < 0) 
-			return NULL;
 		skynet_timeout(context->handle, ti, session);
 		sprintf(context->result, "%d", session);
 		return context->result;

@@ -107,7 +107,7 @@ client_send(struct send_client *c, int fd) {
 				switch(errno) {
 				case EINTR:
 					continue;
-				case EAGAIN:
+				case EWOULDBLOCK:
 					return;
 				}
 				free_buffer(c);
@@ -143,6 +143,25 @@ client_push(struct send_client *c, void * buf, int sz, void * ptr) {
 	}
 }
 
+static void
+try_close(struct mread_pool * self, struct socket * s) {
+	if (s->client.head == NULL) {
+		turn_off(self, s);
+	}
+	if (s->status != SOCKET_HALFCLOSE) {
+		return;
+	}
+	if (s->client.head == NULL) {
+		s->status = SOCKET_CLOSED;
+		s->node = NULL;
+		s->temp = NULL;
+		event_del(self->efd, s->fd);
+		close(s->fd);
+//		printf("MREAD close %d (fd=%d)\n",id,s->fd);
+		++self->closed;
+	}
+}
+
 void 
 mread_push(struct mread_pool *self, int id, void * buffer, int size, void * ptr) {
 	struct socket * s = &self->sockets[id];
@@ -160,6 +179,13 @@ mread_push(struct mread_pool *self, int id, void * buffer, int size, void * ptr)
 				switch(errno) {
 				case EINTR:
 					continue;
+				case EWOULDBLOCK:
+					break;
+				default:
+					// write error : close fd
+					s->status = SOCKET_HALFCLOSE;
+					try_close(self, s);
+					return;
 				}
 				break;
 			}
@@ -325,25 +351,6 @@ _read_queue(struct mread_pool * self, int timeout) {
 	}
 	self->queue_len = n;
 	return n;
-}
-
-static void
-try_close(struct mread_pool * self, struct socket * s) {
-	if (s->client.head == NULL) {
-		turn_off(self, s);
-	}
-	if (s->status != SOCKET_HALFCLOSE) {
-		return;
-	}
-	if (s->client.head == NULL) {
-		s->status = SOCKET_CLOSED;
-		s->node = NULL;
-		s->temp = NULL;
-		event_del(self->efd, s->fd);
-		close(s->fd);
-//		printf("MREAD close %d (fd=%d)\n",id,s->fd);
-		++self->closed;
-	}
 }
 
 inline static struct socket *
