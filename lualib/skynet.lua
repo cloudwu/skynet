@@ -627,4 +627,9 @@ function skynet.context_ptr()
 	return c.context()
 end
 
+function skynet.monitor(service)
+	local monitor = skynet.uniqueservice(true, service)
+	c.command("MONITOR", string.format(":%08x", monitor))
+end
+
 return skynet

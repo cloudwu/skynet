@@ -4,6 +4,7 @@ skynet.start(function()
 	print("Server start")
 	skynet.launch("socket",128)
 	local service = skynet.newservice("service_mgr")
+	skynet.monitor "simplemonitor"
 	local lualog = skynet.newservice("lualog")
 	local console = skynet.newservice("console")
 	local remoteroot = skynet.newservice("remote_root")
