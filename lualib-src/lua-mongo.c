@@ -348,7 +348,7 @@ op_delete(lua_State *L) {
 	luaL_addlstring(&b, (const char *)selector, selector_len);
 	luaL_pushresult(&b);
 
-	return 0;
+	return 1;
 }
 
 /*
