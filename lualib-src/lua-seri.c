@@ -301,7 +301,7 @@ wb_table_hash(lua_State *L, struct write_block * wb, int index, int depth, int a
 	while (lua_next(L, index) != 0) {
 		if (lua_type(L,-2) == LUA_TNUMBER) {
 			lua_Number k = lua_tonumber(L,-2);
-			lua_Integer x = lua_tointeger(L,-2);
+			int32_t x = (int32_t)lua_tointeger(L,-2);
 			if (k == (lua_Number)x && x>0 && x<=array_size) {
 				lua_pop(L,1);
 				continue;
@@ -335,7 +335,7 @@ _pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 		wb_nil(b);
 		break;
 	case LUA_TNUMBER: {
-		lua_Integer x = lua_tointeger(L,index);
+		int32_t x = (int32_t)lua_tointeger(L,index);
 		lua_Number n = lua_tonumber(L,index);
 		if ((lua_Number)x==n) {
 			wb_integer(b, x, TYPE_NUMBER);
