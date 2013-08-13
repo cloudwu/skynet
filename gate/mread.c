@@ -256,6 +256,7 @@ mread_create(uint32_t addr, int port , int max , int buffer_size) {
 		return NULL;
 	}
 	if ( -1 == _set_nonblocking(listen_fd) ) {
+		close(listen_fd);
 		return NULL;
 	}
 
