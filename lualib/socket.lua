@@ -105,8 +105,8 @@ function socket.open(addr, port)
 	return fd
 end
 
-function socket.stdin()
-	local r = skynet.call(sockets, "text", "bind 1")
+function socket.bind(sock)
+	local r = skynet.call(sockets, "text", "bind " .. tonumber(sock))
 	if r == "" then
 		error("stdin bind failed")
 	end
@@ -114,6 +114,10 @@ function socket.stdin()
 	READBUF[fd] = true
 	CLOSED[fd] = nil
 	return fd
+end
+
+function socket.stdin()
+	return socket.bind(1)
 end
 
 function socket.close(fd)
