@@ -7,6 +7,7 @@ struct mread_pool;
  
 struct mread_pool * mread_create(uint32_t addr, int port , int max , int buffer);
 void mread_close(struct mread_pool *m);
+void mread_close_listen(struct mread_pool *self);
 
 int mread_poll(struct mread_pool *m , int timeout);
 void * mread_pull(struct mread_pool *m , int size);

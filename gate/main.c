@@ -120,6 +120,10 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 		skynet_command(ctx,"TIMEOUT","0");
 		return;
 	}
+    if (memcmp(command, "close", i) == 0) {
+        mread_close_listen(g->pool);
+        return;
+    }
 	skynet_error(ctx, "[gate] Unkown command : %s", command);
 }
 
