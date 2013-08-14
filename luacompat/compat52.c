@@ -113,7 +113,7 @@ lua_tonumberx(lua_State *L, int index, int *isnum) {
 LUA_API lua_Unsigned
 lua_tounsignedx(lua_State *L, int idx, int *isnum) {
 	lua_Number n = lua_tonumberx(L, idx, isnum);
-	return return (lua_Unsigned)(int)n;
+	return (lua_Unsigned)(int)n;
 }
 
 LUA_API lua_Integer
