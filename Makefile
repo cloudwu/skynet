@@ -33,6 +33,7 @@ all : \
   luaclib/mcast.so \
   luaclib/bson.so \
   luaclib/mongo.so \
+  luaclib/dataswap.so \
   client
 
 skynet : \
@@ -83,7 +84,7 @@ luaclib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/lua
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Iservice-src -Ilualib-src
 
 service/client.so : service-src/service_client.c
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Ilualib-src
 
 service/socket.so : service-src/service_socket.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
@@ -103,9 +104,11 @@ luaclib/bson.so : lualib-src/lua-bson.c | luaclib
 luaclib/mongo.so : lualib-src/lua-mongo.c | luaclib
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ 
 
+luaclib/dataswap.so : lualib-src/lua-dataswap.c | luaclib
+	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ 
+
 client : client-src/client.c
 	gcc $(CFLAGS) $^ -o $@ -lpthread
 
 clean :
 	rm skynet client service/*.so luaclib/*.so
-	
