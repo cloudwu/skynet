@@ -48,7 +48,7 @@ event_add(int efd, int sock, void *ud) {
 	ev.events = EPOLLIN;
 	ev.data.ptr = ud;
 	if (epoll_ctl(efd, EPOLL_CTL_ADD, sock, &ev) == -1) {
-		return 1;
+		return -1;
 	}
 	return 0;
 }
@@ -93,7 +93,7 @@ event_add(int efd, int sock, void *ud) {
 	struct kevent ke;
 	EV_SET(&ke, sock, EVFILT_READ, EV_ADD, 0, 0, ud);
 	if (kevent(efd, &ke, 1, NULL, 0, NULL) == -1) {
-		return 1;
+		return -1;
 	}
 	return 0;
 }
