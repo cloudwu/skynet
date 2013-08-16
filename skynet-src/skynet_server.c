@@ -557,7 +557,7 @@ skynet_forward(struct skynet_context * context, uint32_t destination) {
 
 static void
 _filter_args(struct skynet_context * context, int type, int *session, void ** data, size_t * sz) {
-	int dontcopy = type & PTYPE_TAG_DONTCOPY;
+	int needcopy = !(type & PTYPE_TAG_DONTCOPY);
 	int allocsession = type & PTYPE_TAG_ALLOCSESSION;
 	type &= 0xff;
 
@@ -566,15 +566,12 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 		*session = skynet_context_newsession(context);
 	}
 
-	char * msg;
-	if (dontcopy || *data == NULL) {
-		msg = *data;
-	} else {
-		msg = malloc(*sz+1);
+	if (needcopy && *data) {
+  	char * msg = malloc(*sz+1);
 		memcpy(msg, *data, *sz);
 		msg[*sz] = '\0';
+  	*data = msg;
 	}
-	*data = msg;
 
 	assert((*sz & HANDLE_MASK) == *sz);
 	*sz |= type << HANDLE_REMOTE_SHIFT;
@@ -622,7 +619,9 @@ skynet_sendname(struct skynet_context * context, const char * addr , int type, i
 	} else if (addr[0] == '.') {
 		des = skynet_handle_findname(addr + 1);
 		if (des == 0) {
-			free(data);
+			if (type & PTYPE_TAG_DONTCOPY) {
+  			free(data);
+  		}
 			skynet_error(context, "Drop message to %s", addr);
 			return session;
 		}
