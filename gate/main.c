@@ -278,7 +278,7 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 		return 1;
 	}
 	if (max <=0 ) {
-		skynet_error(ctx, "Need max conntection");
+		skynet_error(ctx, "Need max connection");
 		return 1;
 	}
 	if (header != 'S' && header !='L') {

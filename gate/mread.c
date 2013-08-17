@@ -284,7 +284,7 @@ mread_create(uint32_t addr, int port , int max , int buffer_size) {
 		return NULL;
 	}
 
-	if (event_add(efd, listen_fd, LISTENSOCKET) == -1) {
+	if (event_add(efd, listen_fd, LISTENSOCKET)) {
 		close(listen_fd);
 		close(efd);
 		return NULL;
