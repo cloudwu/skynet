@@ -95,6 +95,9 @@ function suspend(co, result, command, param, size)
 			trace_count()
 			error(debug.traceback(co))
 		end
+		-- c.send maybe throw a error, so call trace_count first.
+		-- The coroutine execute time after skynet.ret() will not be trace.
+		trace_count()
 		c.send(co_address, 1, co_session, param, size)
 		return suspend(co, coroutine.resume(co))
 	elseif command == "EXIT" then
