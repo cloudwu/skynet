@@ -131,15 +131,13 @@ function skynet.sleep(ti)
 end
 
 function skynet.yield()
-	local session = c.command("TIMEOUT","0")
-	assert(session)
-	coroutine_yield("SLEEP", tonumber(session))
-	sleep_session[coroutine.running()] = nil
+	return skynet.sleep("0")
 end
 
 function skynet.wait()
 	local session = c.genid()
 	coroutine_yield("SLEEP", session)
+	c.trace_switch(trace_handle, session)
 	local co = coroutine.running()
 	sleep_session[co] = nil
 	session_id_coroutine[session] = nil
@@ -294,7 +292,6 @@ local function dispatch_message(prototype, msg, sz, session, source, ...)
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
 		elseif co == nil then
-			c.trace_switch(trace_handle, session)
 			unknown_response(session, source, msg, sz)
 		else
 			c.trace_switch(trace_handle, session)
