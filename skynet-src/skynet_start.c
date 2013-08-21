@@ -8,6 +8,7 @@
 #include "skynet_harbor.h"
 #include "skynet_group.h"
 #include "skynet_monitor.h"
+#include "skynet_socket.h"
 
 #include <pthread.h>
 #include <unistd.h>
@@ -21,6 +22,12 @@ struct monitor {
 };
 
 #define CHECK_ABORT if (skynet_context_total()==0) break;
+
+static void *
+_socket(void *p) {
+	skynet_socket_mainloop();
+	return NULL;
+}
 
 static void *
 _monitor(void *p) {
@@ -67,7 +74,7 @@ _worker(void *p) {
 
 static void
 _start(int thread) {
-	pthread_t pid[thread+2];
+	pthread_t pid[thread+3];
 
 	struct monitor *m = malloc(sizeof(*m));
 	m->count = thread;
@@ -79,12 +86,13 @@ _start(int thread) {
 
 	pthread_create(&pid[0], NULL, _monitor, m);
 	pthread_create(&pid[1], NULL, _timer, NULL);
+	pthread_create(&pid[2], NULL, _socket, NULL);
 
 	for (i=0;i<thread;i++) {
-		pthread_create(&pid[i+2], NULL, _worker, m->m[i]);
+		pthread_create(&pid[i+3], NULL, _worker, m->m[i]);
 	}
 
-	for (i=1;i<thread+2;i++) {
+	for (i=1;i<thread+3;i++) {
 		pthread_join(pid[i], NULL); 
 	}
 }
@@ -105,9 +113,11 @@ skynet_start(struct skynet_config * config) {
 	skynet_mq_init();
 	skynet_module_init(config->module_path);
 	skynet_timer_init();
+	skynet_socket_init();
 
 	if (config->standalone) {
 		if (_start_master(config->standalone)) {
+			fprintf(stderr, "Init fail : mater");
 			return;
 		}
 	}
@@ -135,5 +145,6 @@ skynet_start(struct skynet_config * config) {
 	}
 
 	_start(config->thread);
+	skynet_socket_free();
 }
 

@@ -1,17 +1,13 @@
 #include "skynet.h"
 #include "skynet_harbor.h"
+#include "skynet_socket.h"
 
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
-#include <errno.h>
 
 #define HASH_SIZE 4096
 
@@ -27,7 +23,9 @@ struct namemap {
 };
 
 struct master {
+	struct skynet_context *ctx;
 	int remote_fd[REMOTE_MAX];
+	bool connected[REMOTE_MAX];
 	char * remote_addr[REMOTE_MAX];
 	struct namemap map;
 };
@@ -39,6 +37,7 @@ master_create() {
 	for (i=0;i<REMOTE_MAX;i++) {
 		m->remote_fd[i] = -1;
 		m->remote_addr[i] = NULL;
+		m->connected[i] = false;
 	}
 	memset(&m->map, 0, sizeof(m->map));
 	return m;
@@ -47,10 +46,12 @@ master_create() {
 void
 master_release(struct master * m) {
 	int i;
+	struct skynet_context *ctx = m->ctx;
 	for (i=0;i<REMOTE_MAX;i++) {
 		int fd = m->remote_fd[i];
 		if (fd >= 0) {
-			close(fd);
+			assert(ctx);
+			skynet_socket_close(ctx, fd);
 		}
 		free(m->remote_addr[i]);
 	}
@@ -103,96 +104,72 @@ _copy_name(char *name, const char * buffer, size_t sz) {
 	}
 }
 
-static int
-_connect_to(const char *ipaddress) {
-	int fd = socket(AF_INET,SOCK_STREAM,0);
-	struct sockaddr_in my_addr;
-	char * port = strchr(ipaddress,':');
-	if (port==NULL) {
-		return -1;
+static void
+_connect_to(struct master *m, int id) {
+	assert(m->connected[id] == false);
+	struct skynet_context * ctx = m->ctx;
+	const char *ipaddress = m->remote_addr[id];
+	char * portstr = strchr(ipaddress,':');
+	if (portstr==NULL) {
+		skynet_error(ctx, "Harbor %d : address invalid (%s)",id, ipaddress);
+		return;
 	}
-	int sz = port - ipaddress;
+	int sz = portstr - ipaddress;
 	char tmp[sz + 1];
 	memcpy(tmp,ipaddress,sz);
 	tmp[sz] = '\0';
-
-	my_addr.sin_addr.s_addr=inet_addr(tmp);
-	my_addr.sin_family=AF_INET;
-	my_addr.sin_port=htons(strtol(port+1,NULL,10));
-
-	int r = connect(fd,(struct sockaddr *)&my_addr,sizeof(struct sockaddr_in));
-
-	if (r == -1) {
-		close(fd);
-		return -1;
-	}
-	
-	return fd;
+	int port = strtol(portstr+1,NULL,10);
+	m->remote_fd[id] = skynet_socket_connect(ctx, tmp, port);
 }
 
-static int
-_send_to(int fd, const void * buf, size_t sz, uint32_t handle) {
-	char buffer[4 + sz + 12];
-	uint32_t header = htonl(sz+12);
-	memcpy(buffer, &header, 4);
+static inline void
+to_bigendian(uint8_t *buffer, uint32_t n) {
+	buffer[0] = (n >> 24) & 0xff;
+	buffer[1] = (n >> 16) & 0xff;
+	buffer[2] = (n >> 8) & 0xff;
+	buffer[3] = n & 0xff;
+}
+
+static void
+_send_to(struct master *m, int id, const void * buf, int sz, uint32_t handle) {
+	uint8_t * buffer= (uint8_t *)malloc(4 + sz + 12);
+	to_bigendian(buffer, sz+12);
 	memcpy(buffer+4, buf, sz);
-	uint32_t u32 = 0;
-	memcpy(buffer+4+sz,&u32,4);
-	u32 = htonl(handle);
-	memcpy(buffer+4+sz+4,&u32,4);
-	u32 = 0;
-	memcpy(buffer+4+sz+8,&u32,4);
+	to_bigendian(buffer+4+sz, 0);
+	to_bigendian(buffer+4+sz+4, handle);
+	to_bigendian(buffer+4+sz+8, 0);
 
 	sz += 4 + 12;
 
-	for (;;) {
-		int err = send(fd, buffer, sz, 0);
-		if (err < 0) {
-			switch (errno) {
-			case EAGAIN:
-			case EINTR:
-				continue;
-			}
-		}
-		if (err != sz) {
-			return 1;
-		}
-		return 0;
+	if (skynet_socket_send(m->ctx, m->remote_fd[id], buffer, sz)) {
+		skynet_error(m->ctx, "Harbor %d : send error", id);
 	}
 }
 
 static void
-_broadcast(struct skynet_context * context, struct master *m, const char *name, size_t sz, uint32_t handle) {
+_broadcast(struct master *m, const char *name, size_t sz, uint32_t handle) {
 	int i;
 	for (i=1;i<REMOTE_MAX;i++) {
 		int fd = m->remote_fd[i];
-		if (fd < 0)
+		if (fd < 0 || m->connected[i]==false)
 			continue;
-		int err = _send_to(fd, name, sz, handle);
-		if (err) {
-			close(fd);
-			fd = _connect_to(m->remote_addr[i]);
-			if (fd < 0) {
-				m->remote_fd[i] = -1;
-				skynet_error(context, "Reconnect to harbor %d : %s faild", i, m->remote_addr[i]);
-			}
-		}
+		_send_to(m, i , name, sz, handle);
 	}
 }
 
 static void
-_request_name(struct skynet_context * context, struct master *m, const char * buffer, size_t sz) {
+_request_name(struct master *m, const char * buffer, size_t sz) {
 	char name[GLOBALNAME_LENGTH];
 	_copy_name(name, buffer, sz);
 	struct name * n = _search_name(m, name);
 	if (n == NULL) {
 		return;
 	}
-	_broadcast(context, m, name, GLOBALNAME_LENGTH, n->value);
+	_broadcast(m, name, GLOBALNAME_LENGTH, n->value);
 }
 
 static void
-_update_name(struct skynet_context * context, struct master *m, uint32_t handle, const char * buffer, size_t sz) {
+_update_name(struct master *m, uint32_t handle, const char * buffer, size_t sz) {
 	char name[GLOBALNAME_LENGTH];
 	_copy_name(name, buffer, sz);
 	struct name * n = _search_name(m, name);
@@ -200,13 +177,14 @@ _update_name(struct skynet_context * context, struct master *m, uint32_t handle,
 		n = _insert_name(m,name);
 	}
 	n->value = handle;
-	_broadcast(context, m,name,GLOBALNAME_LENGTH, handle);
+	_broadcast(m,name,GLOBALNAME_LENGTH, handle);
 }
 
 static void
-_update_address(struct skynet_context * context, struct master *m, int harbor_id, const char * buffer, size_t sz) {
+_update_address(struct master *m, int harbor_id, const char * buffer, size_t sz) {
+	struct skynet_context * context = m->ctx;
 	if (m->remote_fd[harbor_id] >= 0) {
-		close(m->remote_fd[harbor_id]);
+		skynet_socket_close(context, m->remote_fd[harbor_id]);
 		m->remote_fd[harbor_id] = -1;
 	}
 	free(m->remote_addr[harbor_id]);
@@ -214,23 +192,50 @@ _update_address(struct skynet_context * context, struct master *m, int harbor_id
 	memcpy(addr, buffer, sz);
 	addr[sz] = '\0';
 	m->remote_addr[harbor_id] = addr;
-	int fd = _connect_to(addr);
-	if (fd<0) {
-		skynet_error(context, "Can't connect to harbor %d : %s", harbor_id, addr);
-		return;
-	}
-	m->remote_fd[harbor_id] = fd;
-	_broadcast(context, m, addr, sz, harbor_id);
+	_connect_to(m, harbor_id);
+}
 
+static int
+socket_id(struct master *m, int id) {
 	int i;
 	for (i=1;i<REMOTE_MAX;i++) {
-		if (i == harbor_id)
+		if (m->remote_fd[i] == id)
+			return i;
+	}
+	return 0;
+}
+
+static void
+on_connected(struct master *m, int id) {
+	_broadcast(m, m->remote_addr[id], strlen(m->remote_addr[id]), id);
+	m->connected[id] = true;
+	int i;
+	for (i=1;i<REMOTE_MAX;i++) {
+		if (i == id)
 			continue;
 		const char * addr = m->remote_addr[i];
-		if (addr == NULL) {
+		if (addr == NULL || m->connected[i] == false) {
 			continue;
 		}
-		_send_to(fd, addr, strlen(addr), i);
+		_send_to(m, id , addr, strlen(addr), i);
+	}
+}
+
+static void
+dispatch_socket(struct master *m, const struct skynet_socket_message *msg, int sz) {
+	int id = socket_id(m, msg->id);
+	switch(msg->type) {
+	case SKYNET_SOCKET_TYPE_CONNECT:
+		assert(id);
+		on_connected(m, id);
+		break;
+	case SKYNET_SOCKET_TYPE_CLOSE:
+	case SKYNET_SOCKET_TYPE_ERROR:
+		skynet_error(m->ctx, "socket error on harbor %d", id);
+		break;
+	default:
+		skynet_error(m->ctx, "Invalid socket message type %d", msg->type);
+		break;
 	}
 }
 
@@ -244,26 +249,28 @@ _update_address(struct skynet_context * context, struct master *m, int harbor_id
 
 static int
 _mainloop(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
-	assert(sz >= 4);
-
+	if (type == PTYPE_SOCKET) {
+		dispatch_socket(ud, msg, (int)sz);
+		return 0;
+	}
 	if (type != PTYPE_HARBOR) {
 		skynet_error(context, "None harbor message recv from %x (type = %d)", source, type);
 		return 0;
 	}
+	assert(sz >= 4);
 	struct master *m = ud;
-	uint32_t handle = 0;
-	memcpy(&handle, msg, 4);
-	handle = ntohl(handle);
+	const uint8_t *handlen = msg;
+	uint32_t handle = handlen[0]<<24 | handlen[1]<<16 | handlen[2]<<8 | handlen[3];
 	sz -= 4;
 	const char * name = msg;
 	name += 4;
 
 	if (handle == 0) {
-		_request_name(context, m , name, sz);
+		_request_name(m , name, sz);
 	} else if (handle < REMOTE_MAX) {
-		_update_address(context, m , handle, name, sz);
+		_update_address(m , handle, name, sz);
 	} else {
-		_update_name(context, m , handle, name, sz);
+		_update_name(m , handle, name, sz);
 	}
 
 	return 0;
@@ -290,5 +297,6 @@ master_init(struct master *m, struct skynet_context *ctx, const char * args) {
 
 	skynet_callback(ctx, m, _mainloop);
 
+	m->ctx = ctx;
 	return 0;
 }

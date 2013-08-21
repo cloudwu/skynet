@@ -49,6 +49,8 @@ skynet : \
   skynet-src/skynet_group.c \
   skynet-src/skynet_env.c \
   skynet-src/skynet_monitor.c \
+  skynet-src/skynet_socket.c \
+  skynet-src/socket_server.c \
   luacompat/compat52.c
 	gcc $(CFLAGS) -Iluacompat -o $@ $^ -Iskynet-src $(LDFLAGS)
 
