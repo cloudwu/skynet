@@ -142,7 +142,6 @@ function socket.accept(id)
 end
 
 function socket.close(fd)
---	socket.lock(fd)
 	local s = socket_pool[id]
 	if s == nil then
 		return
@@ -154,6 +153,7 @@ function socket.close(fd)
 	if s.buffer then
 		driver.clear(s.buffer)
 	end
+	assert(s.lock_set == nil or next(s.lock_set) == nil)
 	socket_pool[id] = nil
 end
 

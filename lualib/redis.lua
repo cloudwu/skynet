@@ -155,8 +155,8 @@ function command:batch(mode)
 				allok = allok and ok
 				allret[i] = ret
 			end
-			assert(allok, "batch read failed")
 			socket.unlock(self.__handle)
+			assert(allok, "batch read failed")
 			self.__mode = false
 			return allret
 		else
