@@ -1,8 +1,7 @@
 local skynet = require "skynet"
 local socket = require "socket"
 
-local function accepter(id, addr)
-	print("connect from " .. addr .. " " .. id)
+local function accepter(id)
 	socket.accept(id)
 	socket.write(id, "Hello Skynet\n")
 	while true do
@@ -18,5 +17,9 @@ local function accepter(id, addr)
 end
 
 skynet.start(function()
-	socket.listen("127.0.0.1", 8000, accepter)
+	socket.listen("127.0.0.1", 8000, function(id, addr)
+		print("connect from " .. addr .. " " .. id)
+		-- you can also call skynet.newservice for this socket id
+		skynet.fork(accepter, id)
+	end)
 end)

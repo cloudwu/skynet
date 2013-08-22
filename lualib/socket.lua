@@ -88,7 +88,7 @@ socket_message[4] = function(id, newid, addr)
 		driver.close(newid)
 		return
 	end
-	skynet.fork(s.callback, newid, addr)
+	s.callback(newid, addr)
 end
 
 -- SKYNET_SOCKET_TYPE_ERROR = 5
@@ -231,10 +231,38 @@ function socket.listen(host,port,func)
 end
 
 function socket.lock(id)
+	local s = socket_pool[id]
+	assert(s)
+	local lock_set = s.lock
+	local co = coroutine.running()
+	if not lock_set then
+		lock_set = {}
+		s.lock = lock_set
+		lock_set[co] = true
+	elseif next(lock_set) == nil then
+		lock_set[co] = true
+	else
+		assert(lock_set[co] == nil)
+		lock_set[co] = true
+		skynet.wait()
+	end
 end
 
-function socket.unlock(fd)
-
+function socket.unlock(id)
+	local s = socket_pool[id]
+	assert(s)
+	local lock_set = s.lock
+	assert(lock_set)
+	local co = coroutine.running()
+	assert(lock_set[co])
+	lock_set[co] = nil
+	repeat
+		co = next(lock_set)
+		if co == nil then
+			break
+		end
+		lock_set[co] = nil
+	until skynet.wakeup(co)
 end
 
 return socket
