@@ -28,7 +28,7 @@ all : \
   service/localcast.so \
   service/socket.so \
   luaclib/skynet.so \
-  luaclib/socketbuffer.so \
+  luaclib/socketdriver.so \
   luaclib/int64.so \
   luaclib/mcast.so \
   luaclib/bson.so \
@@ -90,8 +90,8 @@ service/client.so : service-src/service_client.c
 service/socket.so : service-src/service_socket.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
-luaclib/socketbuffer.so : lualib-src/lua-socket.c | luaclib
-	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src
+luaclib/socketdriver.so : lualib-src/lua-socket.c | luaclib
+	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Iservice-src
 
 luaclib/int64.so : lua-int64/int64.c | luaclib
 	gcc $(CFLAGS) $(SHARED) -Iluacompat -O2 $^ -o $@ 

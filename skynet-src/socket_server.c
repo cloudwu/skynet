@@ -25,6 +25,7 @@
 #define SOCKET_TYPE_CONNECTED 4
 #define SOCKET_TYPE_HALFCLOSE 5
 #define SOCKET_TYPE_BIND 6
+#define SOCKET_TYPE_NOTACCEPT 7
 
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
 
@@ -89,6 +90,11 @@ struct request_bind {
 	uintptr_t opaque;
 };
 
+struct request_accept {
+	int id;
+	uintptr_t opaque;
+};
+
 struct request_package {
 	uint8_t header[8];	// 6 bytes dummy
 	union {
@@ -98,6 +104,7 @@ struct request_package {
 		struct request_close close;
 		struct request_listen listen;
 		struct request_bind bind;
+		struct request_accept accept;
 	} u;
 };
 
@@ -190,7 +197,9 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 		FREE(tmp);
 	}
 	s->head = s->tail = NULL;
-	sp_del(ss->event_fd, s->fd);
+	if (s->type != SOCKET_TYPE_NOTACCEPT) {
+		sp_del(ss->event_fd, s->fd);
+	}
 	if (s->type != SOCKET_TYPE_BIND) {
 		close(s->fd);
 	}
@@ -214,13 +223,15 @@ socket_server_release(struct socket_server *ss) {
 }
 
 static struct socket *
-new_fd(struct socket_server *ss, int id, int fd, uintptr_t opaque) {
+new_fd(struct socket_server *ss, int id, int fd, uintptr_t opaque, bool add) {
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
 	assert(s->type == SOCKET_TYPE_RESERVE);
 
-	if (sp_add(ss->event_fd, fd, s)) {
-		s->type = SOCKET_TYPE_INVALID;
-		return NULL;
+	if (add) {
+		if (sp_add(ss->event_fd, fd, s)) {
+			s->type = SOCKET_TYPE_INVALID;
+			return NULL;
+		}
 	}
 
 	s->id = id;
@@ -276,7 +287,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		goto _failed;
 	}
 
-	ns = new_fd(ss, id, sock, request->opaque);
+	ns = new_fd(ss, id, sock, request->opaque, true);
 	if (ns == NULL) {
 		close(sock);
 		goto _failed;
@@ -341,7 +352,9 @@ static int
 send_socket(struct socket_server *ss, struct request_send * request, struct socket_message *result) {
 	int id = request->id;
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
-	if (s->type == SOCKET_TYPE_INVALID || s->id != id || s->type == SOCKET_TYPE_HALFCLOSE) {
+	if (s->type == SOCKET_TYPE_INVALID || s->id != id 
+		|| s->type == SOCKET_TYPE_HALFCLOSE
+		|| s->type == SOCKET_TYPE_NOTACCEPT) {
 		FREE(request->buffer);
 		return -1;
 	}
@@ -415,7 +428,7 @@ listen_socket(struct socket_server *ss, struct request_listen * request, struct 
 	if (listen(listen_fd, request->backlog) == -1) {
 		goto _failed;
 	}
-	struct socket *s = new_fd(ss, id, listen_fd, request->opaque);
+	struct socket *s = new_fd(ss, id, listen_fd, request->opaque, true);
 	if (s == NULL) {
 		goto _failed;
 	}
@@ -466,7 +479,7 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 	result->id = id;
 	result->opaque = request->opaque;
 	result->ud = 0;
-	struct socket *s = new_fd(ss, id, request->fd, request->opaque);
+	struct socket *s = new_fd(ss, id, request->fd, request->opaque, true);
 	if (s == NULL) {
 		result->data = NULL;
 		return SOCKET_ERROR;
@@ -474,6 +487,27 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 	sp_nonblocking(request->fd);
 	s->type = SOCKET_TYPE_BIND;
 	result->data = "binding";
+	return SOCKET_OPEN;
+}
+
+static int
+accept_socket(struct socket_server *ss, struct request_accept *request, struct socket_message *result) {
+	int id = request->id;
+	result->id = id;
+	result->opaque = request->opaque;
+	result->ud = 0;
+	result->data = NULL;
+	struct socket *s = &ss->slot[id % MAX_SOCKET];
+	if (s->type != SOCKET_TYPE_NOTACCEPT || s->id !=id) {
+		return SOCKET_ERROR;
+	}
+	if (sp_add(ss->event_fd, s->fd, s)) {
+		s->type = SOCKET_TYPE_INVALID;
+		return SOCKET_ERROR;
+	}
+	s->type = SOCKET_TYPE_CONNECTED;
+	s->opaque = request->opaque;
+	result->data = "accept";
 	return SOCKET_OPEN;
 }
 
@@ -506,6 +540,8 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	block_readpipe(fd, buffer, len);
 	// ctrl command only exist in local fd, so don't worry about endian.
 	switch (type) {
+	case 'A':
+		return accept_socket(ss,(struct request_accept *)buffer, result);
 	case 'B':
 		return bind_socket(ss,(struct request_bind *)buffer, result);
 	case 'L':
@@ -618,15 +654,15 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 		return 0;
 	}
 	sp_nonblocking(client_fd);
-	struct socket *ns = new_fd(ss, id, client_fd, s->opaque);
+	struct socket *ns = new_fd(ss, id, client_fd, s->opaque, false);
 	if (ns == NULL) {
 		close(client_fd);
 		return 0;
 	}
-	ns->type = SOCKET_TYPE_CONNECTED;
+	ns->type = SOCKET_TYPE_NOTACCEPT;
 	result->opaque = s->opaque;
-	result->id = id;
-	result->ud = s->id;
+	result->id = s->id;
+	result->ud = id;
 	result->data = NULL;
 
 	void * sin_addr = (u.s.sa_family == AF_INET) ? (void*)&u.v4.sin_addr : (void *)&u.v6.sin6_addr;
@@ -784,4 +820,13 @@ socket_server_bind(struct socket_server *ss, uintptr_t opaque, int fd) {
 	send_request(ss, &request, 'B', sizeof(request.u.bind));
 	return id;
 }
+
+void 
+socket_server_accept(struct socket_server *ss, uintptr_t opaque, int id) {
+	struct request_package request;
+	request.u.accept.id = id;
+	request.u.accept.opaque = opaque;
+	send_request(ss, &request, 'A', sizeof(request.u.accept));
+}
+
 

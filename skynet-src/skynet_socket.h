@@ -3,11 +3,11 @@
 
 struct skynet_context;
 
-#define SKYNET_SOCKET_TYPE_DATA 0
-#define SKYNET_SOCKET_TYPE_CONNECT 1
-#define SKYNET_SOCKET_TYPE_CLOSE 2
-#define SKYNET_SOCKET_TYPE_ACCEPT 3
-#define SKYNET_SOCKET_TYPE_ERROR 4
+#define SKYNET_SOCKET_TYPE_DATA 1
+#define SKYNET_SOCKET_TYPE_CONNECT 2
+#define SKYNET_SOCKET_TYPE_CLOSE 3
+#define SKYNET_SOCKET_TYPE_ACCEPT 4
+#define SKYNET_SOCKET_TYPE_ERROR 5
 
 struct skynet_socket_message {
 	int type;
@@ -26,5 +26,6 @@ int skynet_socket_listen(struct skynet_context *ctx, const char *host, int port,
 int skynet_socket_connect(struct skynet_context *ctx, const char *host, int port);
 int skynet_socket_bind(struct skynet_context *ctx, int fd);
 void skynet_socket_close(struct skynet_context *ctx, int id);
+void skynet_socket_accept(struct skynet_context *ctx, int id);
 
 #endif

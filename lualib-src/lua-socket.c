@@ -1,250 +1,465 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <assert.h>
 
 #include <lua.h>
 #include <lauxlib.h>
 
 #include "luacompat52.h"
+#include "skynet_socket.h"
+#include "service_lua.h"
+
+#define BACKLOG 32
+// 2 ** 12 == 4096
+#define LARGE_PAGE_NODE 12
+
+struct buffer_node {
+	char * msg;
+	int sz;
+	struct buffer_node *next;
+};
 
 struct socket_buffer {
 	int size;
-	int head;
-	int tail;
+	int offset;
+	struct buffer_node *head;
+	struct buffer_node *tail;
 };
 
-static struct socket_buffer *
-new_buffer(lua_State *L, int sz) {
-	struct socket_buffer * buffer = lua_newuserdata(L, sizeof(*buffer) + sz);
-	buffer->size = sz;
-	buffer->head = 0;
-	buffer->tail = 0;
-
-	return buffer;
-}
-
-static void
-copy_buffer(struct socket_buffer * dest, struct socket_buffer * src) {
-	char * ptr = (char *)(src+1);
-	if (src->tail >= src->head) {
-		int sz = src->tail - src->head;
-		memcpy(dest+1, ptr+ src->head, sz);
-		dest->tail = sz;
-	} else {
-		char * d = (char *)(dest+1);
-		int part = src->size - src->head;
-		memcpy(d, ptr + src->head, part);
-		memcpy(d + part, ptr , src->tail);
-		dest->tail = src->tail + part;
-	}
-}
-
-static void
-append_buffer(struct socket_buffer * buffer, char * msg, int sz) {
-	char * dst = (char *)(buffer + 1);
-	if (sz + buffer->tail < buffer->size) {
-		memcpy(dst + buffer->tail , msg, sz);
-		buffer->tail += sz;
-	} else {
-		int part = buffer->size - buffer->tail;
-		memcpy(dst + buffer->tail , msg, part);
-		memcpy(dst, msg + part, sz - part);
-		buffer->tail = sz - part;
-	}
-}
-
 static int
-lpop(lua_State *L) {
-	struct socket_buffer * buffer = lua_touserdata(L, 1);
-	if (buffer == NULL) {
-		return 0;
-	}
-	int sz = luaL_checkinteger(L, 2);
-	int	bytes = buffer->tail - buffer->head;
-	if (bytes < 0) {
-		bytes += buffer->size;
-	}
-
-	if (sz > bytes || bytes == 0) {
-		lua_pushnil(L);
-		lua_pushinteger(L, bytes);
-		return 2;
-	}
-
-	if (sz == 0) {
-		sz = bytes;
-	}
-
-	char * ptr = (char *)(buffer+1);
-	if (buffer->size - buffer->head >=sz) {
-		lua_pushlstring(L, ptr + buffer->head, sz);
-		buffer->head+=sz;
-	} else {
-		luaL_Buffer b;
-		luaL_buffinit(L, &b);
-		luaL_addlstring(&b, ptr + buffer->head, buffer->size - buffer->head);
-		buffer->head = sz - (buffer->size - buffer->head);
-		luaL_addlstring(&b, ptr, buffer->head);
-		luaL_pushresult(&b);
-	}
-
-	bytes -= sz;
-
-	lua_pushinteger(L,bytes);
-	if (bytes == 0) {
-		buffer->head = buffer->tail = 0;
-	}
-	
-	return 2;
-}
-
-static inline int
-check_sep(struct socket_buffer *buffer, int from, const char * sep, int sz) {
-	const char * ptr = (const char *)(buffer+1);
+lfreepool(lua_State *L) {
+	struct buffer_node * pool = lua_touserdata(L, 1);
+	int sz = lua_rawlen(L,1) / sizeof(*pool);
 	int i;
 	for (i=0;i<sz;i++) {
-		int index = from + i;
-		if (index >= buffer->size) {
-			index = 0;
-		}
-		if (ptr[index] != sep[i]) {
-			return 0;
-		}
-	}
-	return 1;
-}
-
-static int
-lreadline(lua_State *L) {
-	struct socket_buffer * buffer = lua_touserdata(L, 1);
-	if (buffer == NULL) {
-		return 0;
-	}
-	size_t len = 0;
-	const char *sep = luaL_checklstring(L,2,&len);
-	int read = !lua_toboolean(L,3);
-	int	bytes = buffer->tail - buffer->head;
-
-	if (bytes < 0) {
-		bytes += buffer->size;
-	}
-
-	int i;
-	for (i=0;i<=bytes-(int)len;i++) {
-		int index = buffer->head + i;
-		if (index >= buffer->size) {
-			index -= buffer->size;
-		}
-		if (check_sep(buffer, index, sep, (int)len)) {
-			if (read == 0) {
-				lua_pushboolean(L,1);
-			} else {
-				if (i==0) {
-					lua_pushlstring(L, "", 0);
-				} else {
-					const char * ptr = (const char *)(buffer+1);
-					if (--index < 0) {
-						index = buffer->size -1;
-					}
-					if (index < buffer->head) {
-						luaL_Buffer b;
-						luaL_buffinit(L, &b);
-						luaL_addlstring(&b, ptr + buffer->head, buffer->size-buffer->head);
-						luaL_addlstring(&b, ptr, index+1);
-						luaL_pushresult(&b);
-					} else {
-						lua_pushlstring(L, ptr + buffer->head, index-buffer->head+1);
-					}
-					++index;
-				}
-				index+=len;
-				if (index >= buffer->size) {
-					index-=buffer->size;
-				}
-				buffer->head = index;
-			}
-			return 1;
+		struct buffer_node *node = &pool[i];
+		if (node->msg) {
+			free(node->msg);
+			node->msg = NULL;
 		}
 	}
 	return 0;
 }
 
 static int
-lpush(lua_State *L) {
-	struct socket_buffer * buffer = lua_touserdata(L, 1);
-	int bytes = 0;
-	if (buffer) {
-		bytes = buffer->tail - buffer->head;
-		if (bytes < 0) {
-			bytes += buffer->size;
+lnewpool(lua_State *L, int sz) {
+	struct buffer_node * pool = lua_newuserdata(L, sizeof(struct buffer_node) * sz);
+	int i;
+	for (i=0;i<sz;i++) {
+		pool[i].msg = NULL;
+		pool[i].sz = 0;
+		pool[i].next = &pool[i+1];
+	}
+	pool[sz-1].next = NULL;
+	if (luaL_newmetatable(L, "buffer_pool")) {
+		lua_pushcfunction(L, lfreepool);
+		lua_setfield(L, -2, "__gc");
+	}
+	lua_setmetatable(L, -2);
+	return 1;
+};
+
+static int
+lnewbuffer(lua_State *L) {
+	struct socket_buffer * sb = lua_newuserdata(L, sizeof(*sb));	
+	sb->size = 0;
+	sb->offset = 0;
+	sb->head = NULL;
+	sb->tail = NULL;
+	
+	return 1;
+}
+
+/*
+	userdata send_buffer
+	table pool
+	lightuserdata msg
+	int size
+
+	return size
+ */
+static int
+lpushbuffer(lua_State *L) {
+	struct socket_buffer *sb = lua_touserdata(L,1);
+	if (sb == NULL) {
+		return luaL_error(L, "need buffer object at param 1");
+	}
+	char * msg = lua_touserdata(L,3);
+	if (msg == NULL) {
+		return luaL_error(L, "need message block at param 3");
+	}
+	int pool_index = 2;
+	luaL_checktype(L,pool_index,LUA_TTABLE);
+	int sz = luaL_checkinteger(L,4);
+	lua_rawgeti(L,pool_index,1);
+	struct buffer_node * free_node = lua_touserdata(L,-1);	// sb poolt msg size free_node
+	lua_pop(L,1);
+	if (free_node == NULL) {
+		int tsz = lua_rawlen(L,pool_index);
+		if (tsz == 0)
+			tsz++;
+		int size = 8;
+		if (tsz <= LARGE_PAGE_NODE-3) {
+			size <<= tsz;
+		} else {
+			size <<= LARGE_PAGE_NODE-3;
+		}
+		lnewpool(L, size);	
+		free_node = lua_touserdata(L,-1);
+		lua_rawseti(L, pool_index, tsz+1);
+	}
+	lua_pushlightuserdata(L, free_node->next);	
+	lua_rawseti(L, pool_index, 1);	// sb poolt msg size
+	free_node->msg = msg;
+	free_node->sz = sz;
+	free_node->next = NULL;
+
+	if (sb->head == NULL) {
+		assert(sb->tail == NULL);
+		sb->head = sb->tail = free_node;
+	} else {
+		sb->tail->next = free_node;
+		sb->tail = free_node;
+	}
+	sb->size += sz;
+
+	lua_pushinteger(L, sb->size);
+
+	return 1;
+}
+
+static void
+return_free_node(lua_State *L, int pool, struct socket_buffer *sb) {
+	struct buffer_node *free_node = sb->head;
+	sb->head = free_node->next;
+	if (sb->head == NULL) {
+		sb->tail = NULL;
+	}
+	lua_rawgeti(L,pool,1);
+	free_node->next = lua_touserdata(L,-1);
+	lua_pop(L,1);
+	free(free_node->msg);
+	free_node->msg = NULL;
+
+	free_node->sz = 0;
+	lua_pushlightuserdata(L, free_node);
+	lua_rawseti(L, pool, 1);
+}
+
+static void
+pop_lstring(lua_State *L, struct socket_buffer *sb, int sz, int skip) {
+	struct buffer_node * current = sb->head;
+	if (sz < current->sz - sb->offset) {
+		lua_pushlstring(L, current->msg + sb->offset, sz-skip);
+		sb->offset+=sz;
+		return;
+	}
+	if (sz == current->sz - sb->offset) {
+		lua_pushlstring(L, current->msg + sb->offset, sz-skip);
+		sb->offset = 0;
+		return_free_node(L,2,sb);
+		return;
+	}
+
+	luaL_Buffer b;
+	luaL_buffinit(L, &b);
+	for (;;) {
+		int bytes = current->sz - sb->offset;
+		if (bytes >= sz) {
+			if (sz > skip) {
+				luaL_addlstring(&b, current->msg + sb->offset, sz - skip);
+			} 
+			sb->offset += sz;
+			if (bytes == sz) {
+				return_free_node(L,2,sb);
+				sb->offset = 0;
+			}
+			break;
+		}
+		luaL_addlstring(&b, current->msg + sb->offset, (sz - skip < bytes) ? sz - skip : bytes);
+		return_free_node(L,2,sb);
+		sb->offset = 0;
+		sz-=bytes;
+		if (sz==0)
+			break;
+		current = sb->head;
+		assert(current);
+	}
+	luaL_pushresult(&b);
+}
+
+/*
+	userdata send_buffer
+	table pool
+	integer sz
+ */
+static int
+lpopbuffer(lua_State *L) {
+	struct socket_buffer * sb = lua_touserdata(L, 1);
+	if (sb == NULL) {
+		return luaL_error(L, "Need buffer object at param 1");
+	}
+	luaL_checktype(L,2,LUA_TTABLE);
+	int sz = luaL_checkinteger(L,3);
+	if (sb->size < sz || sz == 0) {
+		lua_pushnil(L);
+	} else {
+		pop_lstring(L,sb,sz,0);
+		sb->size -= sz;
+	}
+	lua_pushinteger(L, sb->size);
+
+	return 2;
+}
+
+/*
+	userdata send_buffer
+	table pool
+ */
+static int
+lclearbuffer(lua_State *L) {
+	struct socket_buffer * sb = lua_touserdata(L, 1);
+	if (sb == NULL) {
+		return luaL_error(L, "Need buffer object at param 1");
+	}
+	luaL_checktype(L,2,LUA_TTABLE);
+	while(sb->head) {
+		return_free_node(L,2,sb);
+	}
+	return 0;
+}
+
+static int
+lreadall(lua_State *L) {
+	struct socket_buffer * sb = lua_touserdata(L, 1);
+	if (sb == NULL) {
+		return luaL_error(L, "Need buffer object at param 1");
+	}
+	luaL_checktype(L,2,LUA_TTABLE);
+	luaL_Buffer b;
+	luaL_buffinit(L, &b);
+	while(sb->head) {
+		struct buffer_node *current = sb->head;
+		luaL_addlstring(&b, current->msg + sb->offset, current->sz - sb->offset);
+		return_free_node(L,2,sb);
+	}
+	luaL_pushresult(&b);
+	return 1;
+}
+
+static int
+ldrop(lua_State *L) {
+	void * msg = lua_touserdata(L,1);
+	luaL_checkinteger(L,2);
+	free(msg);
+	return 0;
+}
+
+static bool
+check_sep(struct buffer_node * node, int from, const char *sep, int seplen) {
+	for (;;) {
+		int sz = node->sz - from;
+		if (sz >= seplen) {
+			return memcmp(node->msg+from,sep,seplen) == 0;
+		}
+		if (sz > 0) {
+			if (memcmp(node->msg + from, sep, sz)) {
+				return false;
+			}
+		}
+		node = node->next;
+		sep += sz;
+		seplen -= sz;
+		from = 0;
+	}
+}
+
+/*
+	userdata send_buffer
+	table pool , nil for check
+	string sep
+ */
+static int
+lreadline(lua_State *L) {
+	struct socket_buffer * sb = lua_touserdata(L, 1);
+	if (sb == NULL) {
+		return luaL_error(L, "Need buffer object at param 1");
+	}
+	// only check
+	bool check = !lua_istable(L, 2);
+	size_t seplen = 0;
+	const char *sep = luaL_checklstring(L,3,&seplen);
+	int i;
+	struct buffer_node *current = sb->head;
+	if (current == NULL)
+		return 0;
+	int from = sb->offset;
+	int bytes = current->sz - from;
+	for (i=0;i<=sb->size - (int)seplen;i++) {
+		if (check_sep(current, from, sep, seplen)) {
+			if (check) {
+				lua_pushboolean(L,true);
+			} else {
+				pop_lstring(L, sb, i+seplen, seplen);
+				sb->size -= i+seplen;
+			}
+			return 1;
+		}
+		++from;
+		--bytes;
+		if (bytes == 0) {
+			current = current->next;
+			from = 0;
+			if (current == NULL)
+				break;
+			bytes = current->sz;
 		}
 	}
-	void * msg = lua_touserdata(L,2);
-	if (msg == NULL) {
-		lua_settop(L,1);
-		lua_pushinteger(L,bytes);
-		return 2;
-	}
+	return 0;
+}
 
-	int sz = luaL_checkinteger(L,3);
-
-	if (buffer == NULL) {
-		struct socket_buffer * nbuf = new_buffer(L, sz * 2);
-		append_buffer(nbuf, msg, sz);
-	} else if (sz + bytes >= buffer->size) {
-		struct socket_buffer * nbuf = new_buffer(L, (sz + bytes) * 2);
-		copy_buffer(nbuf, buffer);
-		append_buffer(nbuf, msg, sz);
-	} else {
-		lua_settop(L,1);
-		append_buffer(buffer, msg, sz);
-	}
-	lua_pushinteger(L, sz + bytes);
+static int
+lstr2p(lua_State *L) {
+	size_t sz = 0;
+	const char * str = luaL_checklstring(L,1,&sz);
+	void *ptr = malloc(sz);
+	memcpy(ptr, str, sz);
+	lua_pushlightuserdata(L, ptr);
+	lua_pushinteger(L, (int)sz);
 	return 2;
 }
 
+// for skynet socket
+
+/*
+	lightuserdata msg
+	integer size
+
+	return type n1 n2 ptr_or_string
+*/
 static int
 lunpack(lua_State *L) {
-	int * msg = lua_touserdata(L,1);
-	int sz = luaL_checkinteger(L,2);
-	if (msg == NULL || sz < 4) {
-		return luaL_error(L, "Invalid socket message");
+	struct skynet_socket_message *message = lua_touserdata(L,1);
+	int size = luaL_checkinteger(L,2);
+
+	lua_pushinteger(L, message->type);
+	lua_pushinteger(L, message->id);
+	lua_pushinteger(L, message->ud);
+	if (message->buffer == NULL) {
+		lua_pushlstring(L, (char *)(message+1),size - sizeof(*message));
+	} else {
+		lua_pushlightuserdata(L, message->buffer);
 	}
-	lua_pushinteger(L, *msg);
-	lua_pushlightuserdata(L, msg+1);
-	lua_pushinteger(L, sz - 4);
-	return 3;
+	return 4;
 }
 
 static int
-lpack(lua_State *L) {
-	int fd = luaL_checkinteger(L, 1);
-	const void *buffer;
-	size_t sz;
+lconnect(lua_State *L) {
+	const char * host = luaL_checkstring(L,1);
+	int port = luaL_checkinteger(L,2);
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = skynet_socket_connect(ctx, host, port);
+	lua_pushinteger(L, id);
+
+	return 1;
+}
+
+static int
+lclose(lua_State *L) {
+	int id = luaL_checkinteger(L,1);
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	skynet_socket_close(ctx, id);
+	return 0;
+}
+
+static int
+llisten(lua_State *L) {
+	const char * host = luaL_checkstring(L,1);
+	int port = luaL_checkinteger(L,2);
+	int backlog = luaL_optinteger(L,3,BACKLOG);
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = skynet_socket_listen(ctx, host,port,backlog);
+
+	lua_pushinteger(L,id);
+	return 1;
+}
+
+static int
+lsend(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	void *buffer;
+	int sz;
 	if (lua_isuserdata(L,2)) {
 		buffer = lua_touserdata(L,2);
-		sz = luaL_checkinteger(L, 3);
+		sz = luaL_checkinteger(L,3);
 	} else {
-		buffer = luaL_checklstring(L,2,&sz);
+		size_t len = 0;
+		const char * str =  luaL_checklstring(L, 2, &len);
+		buffer = malloc(len);
+		memcpy(buffer, str, len);
+		sz = (int)len;
 	}
-	int * b = malloc(4 + sz);
-	*b = fd;
-	memcpy(b+1, buffer, sz);
-	lua_pushlightuserdata(L, b);
-	lua_pushinteger(L, 4+sz);
-	return 2;
+	int err = skynet_socket_send(ctx, id, buffer, sz);
+	lua_pushboolean(L, err);
+	return 1;
+}
+
+static int
+lbind(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int fd = luaL_checkinteger(L, 1);
+	int id = skynet_socket_bind(ctx,fd);
+	lua_pushinteger(L,id);
+	return 1;
+}
+
+static int
+laccept(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	skynet_socket_accept(ctx,id);
+	return 0;
 }
 
 int
-luaopen_socketbuffer(lua_State *L) {
+luaopen_socketdriver(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
-		{ "push", lpush },
-		{ "pop", lpop },
+		{ "buffer", lnewbuffer },
+		{ "push", lpushbuffer },
+		{ "pop", lpopbuffer },
+		{ "drop", ldrop },
+		{ "readall", lreadall },
+		{ "clear", lclearbuffer },
 		{ "readline", lreadline },
+		{ "str2p", lstr2p },
+
 		{ "unpack", lunpack },
-		{ "pack", lpack },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);
+	luaL_Reg l2[] = {
+		{ "connect", lconnect },
+		{ "close", lclose },
+		{ "listen", llisten },
+		{ "send", lsend },
+		{ "bind", lbind },
+		{ "accept", laccept },
+		{ NULL, NULL },
+	};
+	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_lua");
+	struct snlua *lua = lua_touserdata(L,-1);
+	if (lua == NULL || lua->ctx == NULL) {
+		return luaL_error(L, "Init skynet context first");
+	}
+	assert(lua->L == L);
+	lua_pop(L,1);
+
+	lua_pushlightuserdata(L, lua->ctx);
+	luaL_setfuncs(L,l2,1);
+
 	return 1;
 }

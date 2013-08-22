@@ -128,3 +128,9 @@ skynet_socket_close(struct skynet_context *ctx, int id) {
 	uint32_t source = skynet_context_handle(ctx);
 	socket_server_close(SOCKET_SERVER, source, id);
 }
+
+void 
+skynet_socket_accept(struct skynet_context *ctx, int id) {
+	uint32_t source = skynet_context_handle(ctx);
+	socket_server_accept(SOCKET_SERVER, source, id);
+}
