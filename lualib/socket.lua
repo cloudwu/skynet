@@ -265,4 +265,14 @@ function socket.unlock(id)
 	until skynet.wakeup(co)
 end
 
+-- abandon use to forward socket id to other service
+-- you must call socket.accept(id) later in other service
+function socket.abandon(id)
+	local s = socket_pool[id]
+	if s and s.buffer then
+		driver.clear(s.buffer)
+	end
+	socket_pool[id] = nil
+end
+
 return socket

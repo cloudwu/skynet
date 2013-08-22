@@ -498,12 +498,14 @@ accept_socket(struct socket_server *ss, struct request_accept *request, struct s
 	result->ud = 0;
 	result->data = NULL;
 	struct socket *s = &ss->slot[id % MAX_SOCKET];
-	if (s->type != SOCKET_TYPE_NOTACCEPT || s->id !=id) {
+	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
 		return SOCKET_ERROR;
 	}
-	if (sp_add(ss->event_fd, s->fd, s)) {
-		s->type = SOCKET_TYPE_INVALID;
-		return SOCKET_ERROR;
+	if (s->type == SOCKET_TYPE_NOTACCEPT) {
+		if (sp_add(ss->event_fd, s->fd, s)) {
+			s->type = SOCKET_TYPE_INVALID;
+			return SOCKET_ERROR;
+		}
 	}
 	s->type = SOCKET_TYPE_CONNECTED;
 	s->opaque = request->opaque;
