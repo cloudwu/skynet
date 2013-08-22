@@ -135,6 +135,7 @@ end
 
 function command:sismember(key, value)
 	assert(not self.__mode, "sismember can't used in batch mode")
+	local fd = self.__handle
 	socket.lock(fd)
 	socket.write(fd, compose_message { "SISMEMBER", key, value })
 	local ok, ismember = read_response(fd)
