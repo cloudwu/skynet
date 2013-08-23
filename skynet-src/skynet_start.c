@@ -50,7 +50,7 @@ _socket(void *p) {
 			break;
 		if (r<0)
 			continue;
-		// todo: wakeup will kill some performance when system with a lot of high connections
+		// FIXME: wakeup will kill some performance when lots of connections
 		wakeup(m,0);
 	}
 	return NULL;
