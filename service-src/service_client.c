@@ -28,14 +28,9 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 
 int
 client_init(struct client *c, struct skynet_context *ctx, const char * args) {
-	int fd = 0, gate = 0, id = 0;
-	// gate and id is unused now.
-	sscanf(args, "%d %d %d",&fd,&gate,&id);
-	if (gate == 0) {
-		skynet_error(ctx, "Invalid init client %s",args);
-		return 1;
-	}
-	c->id = fd;
+	int id = 0;
+	sscanf(args, "%d",&id);
+	c->id = id;
 	skynet_callback(ctx, c, _cb);
 
 	return 0;
