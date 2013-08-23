@@ -64,36 +64,39 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	}
 }
 
-void 
-skynet_socket_mainloop() {
+int 
+skynet_socket_poll() {
 	struct socket_server *ss = SOCKET_SERVER;
 	assert(ss);
 	struct socket_message result;
-	for (;;) {
-		int type = socket_server_poll(ss, &result);
-		switch (type) {
-		case SOCKET_EXIT:
-			return;
-		case SOCKET_DATA:
-			forward_message(SKYNET_SOCKET_TYPE_DATA, false, &result);
-			break;
-		case SOCKET_CLOSE:
-			forward_message(SKYNET_SOCKET_TYPE_CLOSE, false, &result);
-			break;
-		case SOCKET_OPEN:
-			forward_message(SKYNET_SOCKET_TYPE_CONNECT, true, &result);
-			break;
-		case SOCKET_ERROR:
-			forward_message(SKYNET_SOCKET_TYPE_ERROR, false, &result);
-			break;
-		case SOCKET_ACCEPT:
-			forward_message(SKYNET_SOCKET_TYPE_ACCEPT, true, &result);
-			break;
-		default:
-			skynet_error(NULL, "Unknown socket message type %d.",type);
-			break;
-		}
+	int more = 1;
+	int type = socket_server_poll(ss, &result, &more);
+	switch (type) {
+	case SOCKET_EXIT:
+		return 0;
+	case SOCKET_DATA:
+		forward_message(SKYNET_SOCKET_TYPE_DATA, false, &result);
+		break;
+	case SOCKET_CLOSE:
+		forward_message(SKYNET_SOCKET_TYPE_CLOSE, false, &result);
+		break;
+	case SOCKET_OPEN:
+		forward_message(SKYNET_SOCKET_TYPE_CONNECT, true, &result);
+		break;
+	case SOCKET_ERROR:
+		forward_message(SKYNET_SOCKET_TYPE_ERROR, false, &result);
+		break;
+	case SOCKET_ACCEPT:
+		forward_message(SKYNET_SOCKET_TYPE_ACCEPT, true, &result);
+		break;
+	default:
+		skynet_error(NULL, "Unknown socket message type %d.",type);
+		return -1;
 	}
+	if (more) {
+		return -1;
+	}
+	return 1;
 }
 
 int

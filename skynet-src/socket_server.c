@@ -106,6 +106,7 @@ struct request_package {
 		struct request_bind bind;
 		struct request_start start;
 	} u;
+	uint8_t dummy[256];
 };
 
 union sockaddr_all {
@@ -679,10 +680,13 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 
 // return type
 int 
-socket_server_poll(struct socket_server *ss, struct socket_message * result) {
+socket_server_poll(struct socket_server *ss, struct socket_message * result, int * more) {
 	for (;;) {
 		if (ss->event_index == ss->event_n) {
 			ss->event_n = sp_wait(ss->event_fd, ss->ev, MAX_EVENT);
+			if (more) {
+				*more = 0;
+			}
 			ss->event_index = 0;
 			if (ss->event_n <= 0) {
 				return -1;
@@ -747,7 +751,7 @@ int
 socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
 	struct request_package request;
 	int len = strlen(addr);
-	if (len + sizeof(request.u.open) > sizeof(request.u)) {
+	if (len + sizeof(request.u.open) > 256) {
 		fprintf(stderr, "socket-server : Invalid addr %s.\n",addr);
 		return 0;
 	}
@@ -755,7 +759,8 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 	request.u.open.opaque = opaque;
 	request.u.open.id = id;
 	request.u.open.port = port;
-	strcpy(request.u.open.host, addr);
+	memcpy(request.u.open.host, addr, len);
+	request.u.open.host[len] = '\0';
 	send_request(ss, &request, 'O', sizeof(request.u.open) + len);
 	return id;
 }
@@ -796,7 +801,7 @@ int
 socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * addr, int port, int backlog) {
 	struct request_package request;
 	int len = (addr!=NULL) ? strlen(addr) : 0;
-	if (len + sizeof(request.u.listen) > sizeof(request.u)) {
+	if (len + sizeof(request.u.listen) > 256) {
 		fprintf(stderr, "socket-server : Invalid listen addr %s.\n",addr);
 		return 0;
 	}
@@ -808,7 +813,9 @@ socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * ad
 	if (len == 0) {
 		request.u.listen.host[0] = '\0';
 	} else {
-		strcpy(request.u.listen.host, addr);
+		int len = strlen(addr);
+		memcpy(request.u.listen.host, addr, len);
+		request.u.listen.host[len] = '\0';
 	}
 	send_request(ss, &request, 'L', sizeof(request.u.listen) + len);
 	return id;

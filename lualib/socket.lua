@@ -111,13 +111,18 @@ skynet.register_protocol {
 	end
 }
 
-local function connect(id)
+local function connect(id, func)
+	local newbuffer
+	if func == nil then
+		newbuffer = driver.buffer()
+	end
 	local s = {
 		id = id,
-		buffer = driver.buffer(),
+		buffer = newbuffer,
 		connected = false,
 		read_require = false,
 		co = false,
+		callback = func,
 	}
 	socket_pool[id] = s
 	suspend(s)
@@ -136,9 +141,9 @@ function socket.stdin()
 	return connect(id)
 end
 
-function socket.accept(id)
-	driver.accept(id)
-	return connect(id)
+function socket.start(id, func)
+	driver.start(id)
+	return connect(id, func)
 end
 
 function socket.close(fd)
@@ -219,16 +224,7 @@ function socket.invalid(id)
 	return socket_pool[id] == nil
 end
 
-function socket.listen(host,port,func)
-	local id = driver.listen(host,port)
-	local s = {
-		id = id,
-		connected = true,
-		callback = func
-	}
-	socket_pool[id] = s
-	return id
-end
+socket.listen = assert(driver.listen)
 
 function socket.lock(id)
 	local s = socket_pool[id]

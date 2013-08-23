@@ -19,7 +19,7 @@ struct skynet_socket_message {
 void skynet_socket_init();
 void skynet_socket_exit();
 void skynet_socket_free();
-void skynet_socket_mainloop();
+int skynet_socket_poll();
 
 int skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz);
 int skynet_socket_listen(struct skynet_context *ctx, const char *host, int port, int backlog);

@@ -529,7 +529,7 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	}
 
 	if (strcmp(cmd,"MONITOR") == 0) {
-		uint32_t handle;
+		uint32_t handle=0;
 		if (param == NULL || param[0] == '\0') {
 			handle = context->handle;
 		} else {

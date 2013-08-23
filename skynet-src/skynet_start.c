@@ -15,17 +15,44 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct monitor {
 	int count;
 	struct skynet_monitor ** m;
+	pthread_cond_t cond;
+	pthread_mutex_t mutex;
+	int sleep;
+};
+
+struct worker_parm {
+	struct monitor *m;
+	int id;
 };
 
 #define CHECK_ABORT if (skynet_context_total()==0) break;
 
+static void
+wakeup(struct monitor *m, int busy) {
+	if (m->sleep >= m->count - busy) {
+		pthread_mutex_lock(&m->mutex);
+		pthread_cond_signal(&m->cond);
+		pthread_mutex_unlock(&m->mutex);
+	}
+}
+
 static void *
 _socket(void *p) {
-	skynet_socket_mainloop();
+	struct monitor * m = p;
+	for (;;) {
+		int r = skynet_socket_poll();
+		if (r==0)
+			break;
+		if (r<0)
+			continue;
+		// todo: wakeup will kill some performance when system with a lot of high connections
+		wakeup(m,0);
+	}
 	return NULL;
 }
 
@@ -52,9 +79,11 @@ _monitor(void *p) {
 
 static void *
 _timer(void *p) {
+	struct monitor * m = p;
 	for (;;) {
 		skynet_updatetime();
 		CHECK_ABORT
+		wakeup(m,1);
 		usleep(2500);
 	}
 	return NULL;
@@ -62,11 +91,18 @@ _timer(void *p) {
 
 static void *
 _worker(void *p) {
-	struct skynet_monitor *sm = p;
+	struct worker_parm *wp = p;
+	int id = wp->id;
+	struct monitor *m = wp->m;
+	struct skynet_monitor *sm = m->m[id];
 	for (;;) {
 		if (skynet_context_message_dispatch(sm)) {
 			CHECK_ABORT
-			usleep(1000);
+			pthread_mutex_lock(&m->mutex);
+			++ m->sleep;
+			pthread_cond_wait(&m->cond, &m->mutex);
+			-- m->sleep;
+			pthread_mutex_unlock(&m->mutex);
 		} 
 	}
 	return NULL;
@@ -77,19 +113,27 @@ _start(int thread) {
 	pthread_t pid[thread+3];
 
 	struct monitor *m = malloc(sizeof(*m));
+	memset(m, 0, sizeof(*m));
 	m->count = thread;
+	m->sleep = 0;
+
 	m->m = malloc(thread * sizeof(struct skynet_monitor *));
 	int i;
 	for (i=0;i<thread;i++) {
-		m->m[i] = skynet_monitor_new();
+		m->m[i] = skynet_monitor_new(i);
 	}
+	pthread_mutex_init(&m->mutex, NULL);
+	pthread_cond_init(&m->cond, NULL);
 
 	pthread_create(&pid[0], NULL, _monitor, m);
-	pthread_create(&pid[1], NULL, _timer, NULL);
-	pthread_create(&pid[2], NULL, _socket, NULL);
+	pthread_create(&pid[1], NULL, _timer, m);
+	pthread_create(&pid[2], NULL, _socket, m);
 
+	struct worker_parm wp[thread];
 	for (i=0;i<thread;i++) {
-		pthread_create(&pid[i+3], NULL, _worker, m->m[i]);
+		wp[i].m = m;
+		wp[i].id = i;
+		pthread_create(&pid[i+3], NULL, _worker, &wp[i]);
 	}
 
 	for (i=1;i<thread+3;i++) {
