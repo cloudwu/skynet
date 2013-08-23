@@ -357,8 +357,24 @@ lunpack(lua_State *L) {
 
 static int
 lconnect(lua_State *L) {
-	const char * host = luaL_checkstring(L,1);
-	int port = luaL_checkinteger(L,2);
+	size_t sz = 0;
+	const char * addr = luaL_checklstring(L,1,&sz);
+	char tmp[sz];
+	int port;
+	const char * host;
+	if (lua_isnoneornil(L,2)) {
+		const char * sep = strchr(addr,':');
+		if (sep == NULL) {
+			return luaL_error(L, "Connect to invalid address %s.",addr);
+		}
+		memcpy(tmp, addr, sep-addr);
+		tmp[sep-addr] = '\0';
+		host = tmp;
+		port = strtoul(sep+1,NULL,10);
+	} else {
+		host = addr;
+		port = luaL_checkinteger(L,2);
+	}
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = skynet_socket_connect(ctx, host, port);
 	lua_pushinteger(L, id);

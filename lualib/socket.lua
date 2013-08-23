@@ -252,13 +252,17 @@ function socket.unlock(id)
 	local co = coroutine.running()
 	assert(lock_set[co])
 	lock_set[co] = nil
-	repeat
+	while true do
 		co = next(lock_set)
 		if co == nil then
 			break
 		end
-		lock_set[co] = nil
-	until skynet.wakeup(co)
+		if skynet.wakeup(co) then
+			break
+		else
+			lock_set[co] = nil
+		end
+	end
 end
 
 -- abandon use to forward socket id to other service

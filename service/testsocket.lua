@@ -17,7 +17,9 @@ local function accepter(id)
 end
 
 skynet.start(function()
-	socket.listen("127.0.0.1", 8000, function(id, addr)
+	local id = socket.listen("127.0.0.1", 8000)
+
+	socket.start(id , function(id, addr)
 		print("connect from " .. addr .. " " .. id)
 		-- you can also call skynet.newservice for this socket id
 		skynet.fork(accepter, id)
