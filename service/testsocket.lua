@@ -2,7 +2,7 @@ local skynet = require "skynet"
 local socket = require "socket"
 
 local function accepter(id)
-	socket.accept(id)
+	socket.start(id)
 	socket.write(id, "Hello Skynet\n")
 	while true do
 		local str = socket.readline(id,"\n")

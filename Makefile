@@ -26,7 +26,6 @@ all : \
   service/tunnel.so \
   service/harbor.so \
   service/localcast.so \
-  service/socket.so \
   luaclib/skynet.so \
   luaclib/socketdriver.so \
   luaclib/int64.so \
@@ -75,8 +74,8 @@ service/logger.so : skynet-src/skynet_logger.c
 service/snlua.so : service-src/service_lua.c
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src
 
-service/gate.so : gate/mread.c gate/ringbuffer.c gate/main.c
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Igate -Iskynet-src -Iservice-src
+service/gate.so : service-src/service_gate.c
+	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 service/localcast.so : service-src/service_localcast.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
@@ -85,9 +84,6 @@ luaclib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/lua
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Iservice-src -Ilualib-src
 
 service/client.so : service-src/service_client.c
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
-
-service/socket.so : service-src/service_socket.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 luaclib/socketdriver.so : lualib-src/lua-socket.c | luaclib

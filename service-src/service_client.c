@@ -15,13 +15,14 @@ static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	assert(sz <= 65535);
 	struct client * c = ud;
-	// tmp will be free by gate.
-	// see gate/mread.c : mread_push()
+	// tmp will be free by skynet_socket.
+	// see skynet_src/socket_server.c : send_socket()
 	uint8_t *tmp = malloc(sz + 4 + 2);
-	memcpy(tmp, c->id, 4);
-	tmp[4] = (sz >> 8) & 0xff;
-	tmp[5] = sz & 0xff;
-	memcpy(tmp+6, msg, sz);
+	tmp[0] = (sz >> 8) & 0xff;
+	tmp[1] = sz & 0xff;
+	memcpy(tmp+2, msg, sz);
+	// 4 bytes id at the end
+	memcpy(tmp+2+sz, c->id, 4);
 
 	skynet_send(context, source, c->gate, PTYPE_CLIENT | PTYPE_TAG_DONTCOPY, 0, tmp, sz+6);
 

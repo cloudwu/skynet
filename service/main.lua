@@ -2,7 +2,6 @@ local skynet = require "skynet"
 
 skynet.start(function()
 	print("Server start")
-	skynet.launch("socket",128)
 	local service = skynet.newservice("service_mgr")
 	skynet.monitor "simplemonitor"
 	local lualog = skynet.newservice("lualog")

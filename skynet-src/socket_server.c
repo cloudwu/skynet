@@ -17,15 +17,15 @@
 #define MAX_SOCKET_P 16
 #define MAX_EVENT 64
 #define MIN_READ_BUFFER 64
-
 #define SOCKET_TYPE_INVALID 0
 #define SOCKET_TYPE_RESERVE 1
-#define SOCKET_TYPE_LISTEN 2
-#define SOCKET_TYPE_CONNECTING 3
-#define SOCKET_TYPE_CONNECTED 4
-#define SOCKET_TYPE_HALFCLOSE 5
-#define SOCKET_TYPE_BIND 6
-#define SOCKET_TYPE_NOTACCEPT 7
+#define SOCKET_TYPE_PLISTEN 2
+#define SOCKET_TYPE_LISTEN 3
+#define SOCKET_TYPE_CONNECTING 4
+#define SOCKET_TYPE_CONNECTED 5
+#define SOCKET_TYPE_HALFCLOSE 6
+#define SOCKET_TYPE_PACCEPT 7
+#define SOCKET_TYPE_BIND 8
 
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
 
@@ -90,7 +90,7 @@ struct request_bind {
 	uintptr_t opaque;
 };
 
-struct request_accept {
+struct request_start {
 	int id;
 	uintptr_t opaque;
 };
@@ -104,7 +104,7 @@ struct request_package {
 		struct request_close close;
 		struct request_listen listen;
 		struct request_bind bind;
-		struct request_accept accept;
+		struct request_start start;
 	} u;
 };
 
@@ -197,7 +197,7 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 		FREE(tmp);
 	}
 	s->head = s->tail = NULL;
-	if (s->type != SOCKET_TYPE_NOTACCEPT) {
+	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
 		sp_del(ss->event_fd, s->fd);
 	}
 	if (s->type != SOCKET_TYPE_BIND) {
@@ -354,10 +354,11 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
 	if (s->type == SOCKET_TYPE_INVALID || s->id != id 
 		|| s->type == SOCKET_TYPE_HALFCLOSE
-		|| s->type == SOCKET_TYPE_NOTACCEPT) {
+		|| s->type == SOCKET_TYPE_PACCEPT) {
 		FREE(request->buffer);
 		return -1;
 	}
+	assert(s->type != SOCKET_TYPE_PLISTEN && s->type != SOCKET_TYPE_LISTEN);
 	if (s->head == NULL) {
 		int n = write(s->fd, request->buffer, request->sz);
 		if (n<0) {
@@ -428,11 +429,11 @@ listen_socket(struct socket_server *ss, struct request_listen * request, struct 
 	if (listen(listen_fd, request->backlog) == -1) {
 		goto _failed;
 	}
-	struct socket *s = new_fd(ss, id, listen_fd, request->opaque, true);
+	struct socket *s = new_fd(ss, id, listen_fd, request->opaque, false);
 	if (s == NULL) {
 		goto _failed;
 	}
-	s->type = SOCKET_TYPE_LISTEN;
+	s->type = SOCKET_TYPE_PLISTEN;
 	return -1;
 _failed:
 	close(listen_fd);
@@ -491,7 +492,7 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 }
 
 static int
-accept_socket(struct socket_server *ss, struct request_accept *request, struct socket_message *result) {
+start_socket(struct socket_server *ss, struct request_start *request, struct socket_message *result) {
 	int id = request->id;
 	result->id = id;
 	result->opaque = request->opaque;
@@ -501,16 +502,17 @@ accept_socket(struct socket_server *ss, struct request_accept *request, struct s
 	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
 		return SOCKET_ERROR;
 	}
-	if (s->type == SOCKET_TYPE_NOTACCEPT) {
+	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		if (sp_add(ss->event_fd, s->fd, s)) {
 			s->type = SOCKET_TYPE_INVALID;
 			return SOCKET_ERROR;
 		}
+		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
+		s->opaque = request->opaque;
+		result->data = "start";
+		return SOCKET_OPEN;
 	}
-	s->type = SOCKET_TYPE_CONNECTED;
-	s->opaque = request->opaque;
-	result->data = "accept";
-	return SOCKET_OPEN;
+	return -1;
 }
 
 static void
@@ -542,8 +544,8 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	block_readpipe(fd, buffer, len);
 	// ctrl command only exist in local fd, so don't worry about endian.
 	switch (type) {
-	case 'A':
-		return accept_socket(ss,(struct request_accept *)buffer, result);
+	case 'S':
+		return start_socket(ss,(struct request_start *)buffer, result);
 	case 'B':
 		return bind_socket(ss,(struct request_bind *)buffer, result);
 	case 'L':
@@ -661,7 +663,7 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 		close(client_fd);
 		return 0;
 	}
-	ns->type = SOCKET_TYPE_NOTACCEPT;
+	ns->type = SOCKET_TYPE_PACCEPT;
 	result->opaque = s->opaque;
 	result->id = s->id;
 	result->ud = id;
@@ -824,11 +826,11 @@ socket_server_bind(struct socket_server *ss, uintptr_t opaque, int fd) {
 }
 
 void 
-socket_server_accept(struct socket_server *ss, uintptr_t opaque, int id) {
+socket_server_start(struct socket_server *ss, uintptr_t opaque, int id) {
 	struct request_package request;
-	request.u.accept.id = id;
-	request.u.accept.opaque = opaque;
-	send_request(ss, &request, 'A', sizeof(request.u.accept));
+	request.u.start.id = id;
+	request.u.start.opaque = opaque;
+	send_request(ss, &request, 'S', sizeof(request.u.start));
 }
 
 

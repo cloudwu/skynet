@@ -561,7 +561,7 @@ _connect_master(struct skynet_context * ctx, void * ud, int type, int session, u
 		return 0;
 	}
 	if (message->type == SKYNET_SOCKET_TYPE_ERROR) {
-		fprintf(stderr, "Harbor: Conenct to master failed\n");
+		fprintf(stderr, "Harbor: Connect to master failed\n");
 		exit(1);
 	}
 	assert(message->type == SKYNET_SOCKET_TYPE_CONNECT);

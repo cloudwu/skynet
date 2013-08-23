@@ -417,10 +417,10 @@ lbind(lua_State *L) {
 }
 
 static int
-laccept(lua_State *L) {
+lstart(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
-	skynet_socket_accept(ctx,id);
+	skynet_socket_start(ctx,id);
 	return 0;
 }
 
@@ -447,7 +447,7 @@ luaopen_socketdriver(lua_State *L) {
 		{ "listen", llisten },
 		{ "send", lsend },
 		{ "bind", lbind },
-		{ "accept", laccept },
+		{ "start", lstart },
 		{ NULL, NULL },
 	};
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_lua");
