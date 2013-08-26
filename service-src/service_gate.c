@@ -1,5 +1,7 @@
 #include "skynet.h"
 #include "skynet_socket.h"
+#include "databuffer.h"
+#include "hashid.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -9,40 +11,27 @@
 #include <stdarg.h>
 
 #define BACKLOG 32
-#define MESSAGEPOOL 1024
-
-struct message {
-	char * buffer;
-	int size;
-	struct message * next;
-};
 
 struct connection {
 	int id;	// skynet_socket id
-	struct connection * next;
 	uint32_t agent;
 	uint32_t client;
 	char remote_name[32];
-	int header;
-	int offset;
-	int size;
-	struct message * head;
-	struct message * tail;
+	struct databuffer buffer;
 };
 
 struct gate {
+	struct skynet_context *ctx;
 	int listen_id;
 	uint32_t watchdog;
 	uint32_t broker;
-	int hashmod;
-	int connection;
-	int max_connection;
 	int client_tag;
 	int header_size;
-	struct connection ** hash;
-	struct connection * pool;
+	int max_connection;
+	struct hashid hash;
+	struct connection *conn;
 	// todo: save message pool ptr for release
-	struct message * freelist;
+	struct messagepool mp;
 };
 
 struct gate *
@@ -55,88 +44,21 @@ gate_create(void) {
 
 void
 gate_release(struct gate *g) {
-	// todo: close all the fd and free memory (be careful about freelist)
-}
-
-static inline void
-return_message(struct gate *g, struct connection *c) {
-	struct message *m = c->head;
-	if (m->next == NULL) {
-		assert(c->tail == m);
-		c->head = c->tail = NULL;
-	} else {
-		c->head = m->next;
-	}
-	free(m->buffer);
-	m->buffer = NULL;
-	m->size = 0;
-	m->next = g->freelist;
-	g->freelist = m;
-}
-
-static struct connection *
-lookup_id(struct gate *g, int id) {
-	int h = id & g->hashmod;
-	struct connection * c = g->hash[h];
-	while(c) {
-		if (c->id == id)
-			return c;
-		c = c->next;
-	}
-	return NULL;
-}
-
-static struct connection *
-remove_id(struct gate *g, int id) {
-	int h = id & g->hashmod;
-	struct connection * c = g->hash[h];
-	if (c == NULL)
-		return NULL;
-	if (c->id == id) {
-		g->hash[h] = c->next;
-		goto _clear;
-	}
-	while(c->next) {
-		if (c->next->id == id) {
-			struct connection * temp = c;
-			c->next = temp->next;
-			c = temp;
-			goto _clear;
-		}
-		c = c->next;
-	}
-	return NULL;
-_clear:
-	while (c->head) {
-		return_message(g,c);
-	}
-	memset(c, 0, sizeof(*c));
-	c->id = -1;
-	--g->connection;
-	return c;
-}
-
-static struct connection *
-insert_id(struct gate *g, int id) {
-	struct connection *c = NULL;
 	int i;
+	struct skynet_context *ctx = g->ctx;
 	for (i=0;i<g->max_connection;i++) {
-		int index = (i+g->connection) % g->max_connection;
-		if (g->pool[index].id == -1) {
-			c = &g->pool[index];
-			break;
+		struct connection *c = &g->conn[i];
+		if (c->id >=0) {
+			skynet_socket_close(ctx, c->id);
 		}
 	}
-	assert(c);
-	c->id = id;
-	assert(c->next == NULL);
-	int h = id & g->hashmod;
-	if (g->hash[h]) {
-		c->next = g->hash[h];
-	} else {
-		g->hash[h] = c;
+	if (g->listen_id >= 0) {
+		skynet_socket_close(ctx, g->listen_id);
 	}
-	return c;
+	messagepool_free(&g->mp);
+	hashid_clear(&g->hash);
+	free(g->conn);
+	free(g);
 }
 
 static void
@@ -154,16 +76,18 @@ _parm(char *msg, int sz, int command_sz) {
 }
 
 static void
-_forward_agent(struct gate * g, int id, uint32_t agentaddr, uint32_t clientaddr) {
-	struct connection * agent = lookup_id(g,id);
-	if (agent) {
+_forward_agent(struct gate * g, int fd, uint32_t agentaddr, uint32_t clientaddr) {
+	int id = hashid_lookup(&g->hash, fd);
+	if (id >=0) {
+		struct connection * agent = &g->conn[id];
 		agent->agent = agentaddr;
 		agent->client = clientaddr;
 	}
 }
 
 static void
-_ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
+_ctrl(struct gate * g, const void * msg, int sz) {
+	struct skynet_context * ctx = g->ctx;
 	char tmp[sz+1];
 	memcpy(tmp, msg, sz);
 	tmp[sz] = '\0';
@@ -179,8 +103,8 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 	if (memcmp(command,"kick",i)==0) {
 		_parm(tmp, sz, i);
 		int uid = strtol(command , NULL, 10);
-		struct connection * agent = lookup_id(g,uid);
-		if (agent) {
+		int id = hashid_lookup(&g->hash, uid);
+		if (id>=0) {
 			skynet_socket_close(ctx, uid);
 		}
 		return;
@@ -214,6 +138,7 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
     if (memcmp(command, "close", i) == 0) {
 		if (g->listen_id >= 0) {
 			skynet_socket_close(ctx, g->listen_id);
+			g->listen_id = -1;
 		}
 		return;
 	}
@@ -221,10 +146,11 @@ _ctrl(struct skynet_context * ctx, struct gate * g, const void * msg, int sz) {
 }
 
 static void
-_report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
+_report(struct gate * g, const char * data, ...) {
 	if (g->watchdog == 0) {
 		return;
 	}
+	struct skynet_context * ctx = g->ctx;
 	va_list ap;
 	va_start(ap, data);
 	char tmp[1024];
@@ -235,117 +161,44 @@ _report(struct gate *g, struct skynet_context * ctx, const char * data, ...) {
 }
 
 static void
-read_data(struct gate *g, struct connection *c, char * buffer, int sz) {
-	assert(c->size >= sz);
-	c->size -= sz;
-	for (;;) {
-		struct message *current = c->head;
-		int bsz = current->size - c->offset;
-		if (bsz > sz) {
-			memcpy(buffer, current->buffer + c->offset, sz);
-			c->offset += sz;
-			return;
-		}
-		if (bsz == sz) {
-			memcpy(buffer, current->buffer + c->offset, sz);
-			c->offset = 0;
-			return_message(g, c);
-			return;
-		} else {
-			memcpy(buffer, current->buffer + c->offset, bsz);
-			return_message(g, c);
-			c->offset = 0;
-			buffer+=bsz;
-			sz-=bsz;
-		}
-	}
-}
-
-static void
-_forward(struct skynet_context * ctx,struct gate *g, struct connection * c) {
+_forward(struct gate *g, struct connection * c, int size) {
+	struct skynet_context * ctx = g->ctx;
 	if (g->broker) {
-		void * temp = malloc(c->header);
-		read_data(g,c,temp, c->header);
-		skynet_send(ctx, 0, g->broker, g->client_tag | PTYPE_TAG_DONTCOPY, 0, temp, c->header);
+		void * temp = malloc(size);
+		databuffer_read(&c->buffer,&g->mp,temp, size);
+		skynet_send(ctx, 0, g->broker, g->client_tag | PTYPE_TAG_DONTCOPY, 0, temp, size);
 		return;
 	}
 	if (c->agent) {
-		void * temp = malloc(c->header);
-		read_data(g,c,temp, c->header);
-		skynet_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONTCOPY, 0 , temp, c->header);
+		void * temp = malloc(size);
+		databuffer_read(&c->buffer,&g->mp,temp, size);
+		skynet_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONTCOPY, 0 , temp, size);
 	} else if (g->watchdog) {
-		char * tmp = malloc(c->header + 32);
+		char * tmp = malloc(size + 32);
 		int n = snprintf(tmp,32,"%d data ",c->id);
-		read_data(g,c,tmp+n,c->header);
-		skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT | PTYPE_TAG_DONTCOPY, 0, tmp, c->header + n);
+		databuffer_read(&c->buffer,&g->mp,tmp+n,size);
+		skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT | PTYPE_TAG_DONTCOPY, 0, tmp, size + n);
 	}
 }
 
 static void
-push_message(struct gate *g, struct connection *c, void * data, int sz) {
-	struct message * m;
-	if (g->freelist) {
-		m = g->freelist;
-		g->freelist = m->next;
-	} else {
-		struct message * temp = malloc(sizeof(struct message) * MESSAGEPOOL);
-		int i;
-		for (i=1;i<MESSAGEPOOL;i++) {
-			temp[i].buffer = NULL;
-			temp[i].size = 0;
-			temp[i].next = &temp[i+1];
-		}
-		temp[MESSAGEPOOL-1].next = NULL;
-		m = temp;
-		g->freelist = &temp[1];
-	}
-	m->buffer = data;
-	m->size = sz;
-	m->next = NULL;
-	c->size += sz;
-	if (c->head == NULL) {
-		assert(c->tail == NULL);
-		c->head = c->tail = m;
-	} else {
-		c->tail->next = m;
-		c->tail = m;
+dispatch_message(struct gate *g, struct connection *c, int id, void * data, int sz) {
+	int size = databuffer_push(&c->buffer,&g->mp, g->header_size, data, sz);
+	if (size > 0) {
+		_forward(g, c, size);
+		databuffer_reset(&c->buffer);
 	}
 }
 
 static void
-dispatch_message(struct skynet_context *ctx, struct gate *g, struct connection *c, int id, void * data, int sz) {
-	push_message(g, c, data, sz);
-	if (c->header == 0) {
-		// parser header (2 or 4)
-		if (c->size < g->header_size) {
-			return;
-		}
-		uint8_t plen[4];
-		read_data(g,c,(char *)plen,g->header_size);
-		// big-endian
-		if (g->header_size == 2) {
-			c->header = plen[0] << 8 | plen[1];
-		} else {
-			c->header = plen[0] << 24 | plen[1] << 16 | plen[2] << 8 | plen[3];
-		}
-		if (c->header == 0) {
-			// empty message (invalid), not forwarding
-			return;
-		}
-	}
-	if (c->size < c->header)
-		return;
-	_forward(ctx, g, c);
-	c->header = 0;
-}
-
-static void
-dispatch_socket_message(struct skynet_context * ctx, struct gate *g, const struct skynet_socket_message * message, int sz) {
+dispatch_socket_message(struct gate *g, const struct skynet_socket_message * message, int sz) {
+	struct skynet_context * ctx = g->ctx;
 	switch(message->type) {
 	case SKYNET_SOCKET_TYPE_DATA: {
-		struct connection *c = lookup_id(g, message->id);
-		if (c) {
-			dispatch_message(ctx, g, c, message->id, message->buffer, message->ud);
+		int id = hashid_lookup(&g->hash, message->id);
+		if (id>=0) {
+			struct connection *c = &g->conn[id];
+			dispatch_message(g, c, message->id, message->buffer, message->ud);
 		} else {
 			skynet_error(ctx, "Drop unknown connection %d message", message->id);
 			skynet_socket_close(ctx, message->id);
@@ -358,9 +211,10 @@ dispatch_socket_message(struct skynet_context * ctx, struct gate *g, const struc
 			// start listening
 			break;
 		}
-		struct connection *c = lookup_id(g, message->id);
-		if (c) {
-			_report(g, ctx, "%d open %d %s:0",message->id,message->id,c->remote_name);
+		int id = hashid_lookup(&g->hash, message->id);
+		if (id>=0) {
+			struct connection *c = &g->conn[id];
+			_report(g, "%d open %d %s:0",message->id,message->id,c->remote_name);
 		} else {
 			skynet_error(ctx, "Close unknown connection %d", message->id);
 			skynet_socket_close(ctx, message->id);
@@ -369,20 +223,23 @@ dispatch_socket_message(struct skynet_context * ctx, struct gate *g, const struc
 	}
 	case SKYNET_SOCKET_TYPE_CLOSE:
 	case SKYNET_SOCKET_TYPE_ERROR: {
-		struct connection * c = remove_id(g, message->id);
-		if (c) {
-			_report(g, ctx, "%d close", message->id);
+		int id = hashid_remove(&g->hash, message->id);
+		if (id>=0) {
+			struct connection *c = &g->conn[id];
+			databuffer_clear(&c->buffer,&g->mp);
+			memset(c, 0, sizeof(*c));
+			c->id = -1;
+			_report(g, "%d close", message->id);
 		}
 		break;
 	}
 	case SKYNET_SOCKET_TYPE_ACCEPT:
 		// report accept, then it will be get a SKYNET_SOCKET_TYPE_CONNECT message
 		assert(g->listen_id == message->id);
-		if (g->connection >= g->max_connection) {
+		if (hashid_full(&g->hash)) {
 			skynet_socket_close(ctx, message->ud);
 		} else {
-			++g->connection;
-			struct connection *c = insert_id(g, message->ud);
+			struct connection *c = &g->conn[hashid_insert(&g->hash, message->ud)];
 			if (sz >= sizeof(c->remote_name)) {
 				sz = sizeof(c->remote_name) - 1;
 			}
@@ -399,7 +256,7 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 	struct gate *g = ud;
 	switch(type) {
 	case PTYPE_TEXT:
-		_ctrl(ctx, g , msg , (int)sz);
+		_ctrl(g , msg , (int)sz);
 		break;
 	case PTYPE_CLIENT: {
 		if (sz <=4 ) {
@@ -409,8 +266,8 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 		// The last 4 bytes in msg are the id of socket, write following bytes to it
 		const uint8_t * idbuf = msg + sz - 4;
 		uint32_t uid = idbuf[0] | idbuf[1] << 8 | idbuf[2] << 16 | idbuf[3] << 24;
-		struct connection * c = lookup_id(g,uid);
-		if (c) {
+		int id = hashid_lookup(&g->hash, uid);
+		if (id>=0) {
 			// don't send id (last 4 bytes)
 			skynet_socket_send(ctx, uid, (void*)msg, sz-4);
 			// return 1 means don't free msg
@@ -423,14 +280,15 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 	case PTYPE_SOCKET:
 		assert(source == 0);
 		// recv socket message from skynet_socket
-		dispatch_socket_message(ctx, g, msg, (int)(sz-sizeof(struct skynet_socket_message)));
+		dispatch_socket_message(g, msg, (int)(sz-sizeof(struct skynet_socket_message)));
 		break;
 	}
 	return 0;
 }
 
 static void
-start_listen(struct skynet_context * ctx, struct gate *g, char * listen_addr) {
+start_listen(struct gate *g, char * listen_addr) {
+	struct skynet_context * ctx = g->ctx;
 	char * portstr = strchr(listen_addr,':');
 	const char * host = "";
 	int port;
@@ -488,27 +346,25 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 		}
 	}
 
+	g->ctx = ctx;
+
 	int cap = 16;
 	while (cap < max) {
 		cap *= 2;
 	}
-	g->hashmod = cap-1;
+	hashid_init(&g->hash, max, cap);
+	g->conn = malloc(max * sizeof(struct connection));
+	memset(g->conn, 0, max *sizeof(struct connection));
 	g->max_connection = max;
-	g->connection = 0;
+	int i;
+	for (i=0;i<max;i++) {
+		g->conn[i].id = -1;
+	}
+	
 	g->client_tag = client_tag;
 	g->header_size = header=='S' ? 2 : 4;
 
-	g->hash = malloc(cap * sizeof(struct connection *));
-	memset(g->hash, 0, cap * sizeof(struct connection *));
-
-	g->pool  = malloc(max * sizeof(struct connection));
-	memset(g->pool, 0, max * sizeof(struct connection));
-	int i;
-	for (i=0;i<max;i++) {
-		g->pool[i].id = -1;
-	}
-
-	start_listen(ctx,g,binding);
+	start_listen(g,binding);
 	skynet_callback(ctx,g,_cb);
 
 	return 0;
