@@ -689,6 +689,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			}
 			ss->event_index = 0;
 			if (ss->event_n <= 0) {
+				ss->event_n = 0;
 				return -1;
 			}
 		}
