@@ -248,6 +248,7 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 			if (sz >= sizeof(c->remote_name)) {
 				sz = sizeof(c->remote_name) - 1;
 			}
+			c->id = message->ud;
 			memcpy(c->remote_name, message+1, sz);
 			c->remote_name[sz] = '\0';
 			skynet_socket_start(ctx, message->ud);
