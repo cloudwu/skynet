@@ -88,8 +88,8 @@ databuffer_read(struct databuffer *db, struct messagepool *mp, void * buffer, in
 	}
 }
 
-static int
-databuffer_push(struct databuffer *db, struct messagepool *mp, int header_size,void *data, int sz) {
+static void
+databuffer_push(struct databuffer *db, struct messagepool *mp, void *data, int sz) {
 	struct message * m;
 	if (mp->freelist) {
 		m = mp->freelist;
@@ -120,7 +120,10 @@ databuffer_push(struct databuffer *db, struct messagepool *mp, int header_size,v
 		db->tail->next = m;
 		db->tail = m;
 	}
+}
 
+static int
+databuffer_readheader(struct databuffer *db, struct messagepool *mp, int header_size) {
 	if (db->header == 0) {
 		// parser header (2 or 4)
 		if (db->size < header_size) {

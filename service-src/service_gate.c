@@ -183,10 +183,15 @@ _forward(struct gate *g, struct connection * c, int size) {
 
 static void
 dispatch_message(struct gate *g, struct connection *c, int id, void * data, int sz) {
-	int size = databuffer_push(&c->buffer,&g->mp, g->header_size, data, sz);
-	if (size > 0) {
-		_forward(g, c, size);
-		databuffer_reset(&c->buffer);
+	databuffer_push(&c->buffer,&g->mp, data, sz);
+	for (;;) {
+		int size = databuffer_readheader(&c->buffer, &g->mp, g->header_size);
+		if (size < 0) {
+			return;
+		} else if (size > 0) {
+			_forward(g, c, size);
+			databuffer_reset(&c->buffer);
+		}
 	}
 }
 
