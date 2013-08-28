@@ -419,7 +419,7 @@ lsend(lua_State *L) {
 		sz = (int)len;
 	}
 	int err = skynet_socket_send(ctx, id, buffer, sz);
-	lua_pushboolean(L, err);
+	lua_pushboolean(L, !err);
 	return 1;
 }
 
