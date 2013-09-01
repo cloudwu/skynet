@@ -33,11 +33,20 @@ struct worker_parm {
 #define CHECK_ABORT if (skynet_context_total()==0) break;
 
 static void
+create_thread(pthread_t *thread, void *(*start_routine) (void *), void *arg) {
+	if (pthread_create(thread,NULL, start_routine, arg)) {
+		fprintf(stderr, "Create thread failed");
+		exit(1);
+	}
+}
+
+static void
 wakeup(struct monitor *m, int busy) {
 	if (m->sleep >= m->count - busy) {
-		pthread_mutex_lock(&m->mutex);
-		pthread_cond_signal(&m->cond);
-		pthread_mutex_unlock(&m->mutex);
+		if (pthread_mutex_lock(&m->mutex) == 0) {
+			pthread_cond_signal(&m->cond);
+			pthread_mutex_unlock(&m->mutex);
+		}
 	}
 }
 
@@ -98,11 +107,12 @@ _worker(void *p) {
 	for (;;) {
 		if (skynet_context_message_dispatch(sm)) {
 			CHECK_ABORT
-			pthread_mutex_lock(&m->mutex);
-			++ m->sleep;
-			pthread_cond_wait(&m->cond, &m->mutex);
-			-- m->sleep;
-			pthread_mutex_unlock(&m->mutex);
+			if (pthread_mutex_lock(&m->mutex) == 0) {
+				++ m->sleep;
+				pthread_cond_wait(&m->cond, &m->mutex);
+				-- m->sleep;
+				pthread_mutex_unlock(&m->mutex);
+			}
 		} 
 	}
 	return NULL;
@@ -122,23 +132,31 @@ _start(int thread) {
 	for (i=0;i<thread;i++) {
 		m->m[i] = skynet_monitor_new(i);
 	}
-	pthread_mutex_init(&m->mutex, NULL);
-	pthread_cond_init(&m->cond, NULL);
+	if (pthread_mutex_init(&m->mutex, NULL)) {
+		fprintf(stderr, "Init mutex error");
+		exit(1);
+	}
+	if (pthread_cond_init(&m->cond, NULL)) {
+		fprintf(stderr, "Init cond error");
+		exit(1);
+	}
 
-	pthread_create(&pid[0], NULL, _monitor, m);
-	pthread_create(&pid[1], NULL, _timer, m);
-	pthread_create(&pid[2], NULL, _socket, m);
+	create_thread(&pid[0], _monitor, m);
+	create_thread(&pid[1], _timer, m);
+	create_thread(&pid[2], _socket, m);
 
 	struct worker_parm wp[thread];
 	for (i=0;i<thread;i++) {
 		wp[i].m = m;
 		wp[i].id = i;
-		pthread_create(&pid[i+3], NULL, _worker, &wp[i]);
+		create_thread(&pid[i+3], _worker, &wp[i]);
 	}
 
 	for (i=1;i<thread+3;i++) {
 		pthread_join(pid[i], NULL); 
 	}
+	pthread_mutex_destroy(&m->mutex);
+	pthread_cond_destroy(&m->cond);
 }
 
 static int
