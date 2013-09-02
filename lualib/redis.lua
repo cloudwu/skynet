@@ -63,11 +63,10 @@ redcmd[42] = function(fd, data)	-- '*'
 	for i = 1,n do
 		local line = readline(fd,"\r\n")
 		local bytes = tonumber(string.sub(line,2))
-		if bytes < 0 then
-			table.insert(bulk, nil)
-		else
+		if bytes >= 0 then
 			local data = readbytes(fd, bytes + 2)
-			table.insert(bulk, string.sub(data,1,-3))
+			-- bulk[i] = nil when bytes < 0
+			bulk[i] = string.sub(data,1,-3)
 		end
 	end
 	return true, bulk
