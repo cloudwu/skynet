@@ -186,6 +186,7 @@ _update_address(struct master *m, int harbor_id, const char * buffer, size_t sz)
 	if (m->remote_fd[harbor_id] >= 0) {
 		skynet_socket_close(context, m->remote_fd[harbor_id]);
 		m->remote_fd[harbor_id] = -1;
+		m->connected[harbor_id] = false;
 	}
 	free(m->remote_addr[harbor_id]);
 	char * addr = malloc(sz+1);
