@@ -43,10 +43,8 @@ create_thread(pthread_t *thread, void *(*start_routine) (void *), void *arg) {
 static void
 wakeup(struct monitor *m, int busy) {
 	if (m->sleep >= m->count - busy) {
-		if (pthread_mutex_lock(&m->mutex) == 0) {
-			pthread_cond_signal(&m->cond);
-			pthread_mutex_unlock(&m->mutex);
-		}
+		// signal sleep worker, "spurious wakeup" is harmless
+		pthread_cond_signal(&m->cond);
 	}
 }
 
@@ -59,7 +57,6 @@ _socket(void *p) {
 			break;
 		if (r<0)
 			continue;
-		// FIXME: wakeup will kill some performance when lots of connections
 		wakeup(m,0);
 	}
 	return NULL;
@@ -109,9 +106,14 @@ _worker(void *p) {
 			CHECK_ABORT
 			if (pthread_mutex_lock(&m->mutex) == 0) {
 				++ m->sleep;
+				// "spurious wakeup" is harmless,
+				// because skynet_context_message_dispatch() can be call at any time.
 				pthread_cond_wait(&m->cond, &m->mutex);
 				-- m->sleep;
-				pthread_mutex_unlock(&m->mutex);
+				if (pthread_mutex_unlock(&m->mutex)) {
+					fprintf(stderr, "unlock mutex error");
+					exit(1);
+				}
 			}
 		} 
 	}
