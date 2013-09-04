@@ -59,7 +59,7 @@ lnewpool(lua_State *L, int sz) {
 	}
 	lua_setmetatable(L, -2);
 	return 1;
-};
+}
 
 static int
 lnewbuffer(lua_State *L) {
