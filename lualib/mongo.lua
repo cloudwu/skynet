@@ -62,34 +62,65 @@ local collection_meta = {
 	end
 }
 
+local function try_connect(host, port)
+	-- try 10 times
+	for i = 1, 10 do
+		local sock = socket.open(host, port)
+		if not sock then
+			-- todo: write log
+			print("Try to connect " .. host .. " failed")
+			skynet.sleep(100*i)
+		else
+			return sock
+		end
+	end
+	error("Connect to mongo " .. host .. " failed")
+end
+
+local function reconnect(obj)
+	for _,v in pairs(obj.__request) do
+		v.succ = nil
+		-- wakeup request coroutine and send a failure.
+		skynet.wakeup(v.co)
+	end
+	-- todo: reconnect is too simple now.
+	local sock = try_connect(obj.host, obj.port)
+	obj.__sock = sock
+	return sock
+end
+
 local function reply_queue(obj)
 	local sock = obj.__sock
 	local tmp = {}
 	local request_set = obj.__request
 	while true do
-		-- todo: reconnect
-		local length = driver.length(socket.read(sock, 4))
-		local reply = socket.read(sock, length)
-		if reply == nil then
-			--todo : reconnect
-			break
+		local len_reply = socket.read(sock, 4)
+		if not len_reply then
+			sock = reconnect(obj)
+		else
+			local length = driver.length(len_reply)
+			local reply = socket.read(sock, length)
+			if not reply then
+				sock = reconnect(obj)
+			else
+				local succ, reply_id, document, cursor_id, startfrom = driver.reply(reply, tmp)
+				local result = assert(request_set[reply_id])
+				driver.copy_result(tmp, result.result)
+				result.succ = succ
+				result.document = document
+				result.cursor_id = cursor_id
+				result.startfrom = startfrom
+				result.data = reply
+				skynet.wakeup(result.co)
+			end
 		end
-		local succ, reply_id, document, cursor_id, startfrom = driver.reply(reply, tmp)
-		local result = assert(request_set[reply_id])
-		driver.copy_result(tmp, result.result)
-		result.succ = succ
-		result.document = document
-		result.cursor_id = cursor_id
-		result.startfrom = startfrom
-		result.data = reply
-		skynet.wakeup(result.co)
 	end
 end
 
 function mongo.client( obj )
 	obj.port = obj.port or 27017
 	obj.__id = 0
-	obj.__sock = assert(socket.open(obj.host, obj.port),"Connect failed")
+	obj.__sock = try_connect(obj.host, obj.port)
 	obj.__request = {}
 	setmetatable(obj, client_meta)
 	skynet.fork(reply_queue, obj)
@@ -143,9 +174,10 @@ function mongo_db:runCommand(cmd)
 	local sock = conn.__sock
 	local pack = driver.query(request_id, 0, self.__cmd, 0, 1, bson_encode(cmd))
 	-- todo: check send
-	socket.write(sock, pack)
-
+	assert(socket.write(sock, pack), "write fail")
 	local _, succ, doc = get_reply(conn,request_id)
+	-- todo: check succ and doc
+	assert(succ, "runCommand error")
 	return bson_decode(doc)
 end
 
@@ -170,7 +202,7 @@ function mongo_collection:insert(doc)
 	local pack = driver.insert(0, self.full_name, bson_encode(doc))
 	-- todo: check send
 	-- flags support 1: ContinueOnError
-	socket.write(sock, pack)
+	assert(socket.write(sock, pack), "write fail")
 end
 
 function mongo_collection:batch_insert(docs)
@@ -183,7 +215,7 @@ function mongo_collection:batch_insert(docs)
 	local sock = self.connection.__sock
 	local pack = driver.insert(0, self.full_name, docs)
 	-- todo: check send
-	socket.write(sock, pack)
+	assert(socket.write(sock, pack), "write fail")
 end
 
 function mongo_collection:update(selector,update,upsert,multi)
@@ -191,14 +223,14 @@ function mongo_collection:update(selector,update,upsert,multi)
 	local sock = self.connection.__sock
 	local pack = driver.update(self.full_name, flags, bson_encode(selector), bson_encode(update))
 	-- todo: check send
-	socket.write(sock, pack)
+	assert(socket.write(sock, pack),"write fail")
 end
 
 function mongo_collection:delete(selector, single)
 	local sock = self.connection.__sock
 	local pack = driver.delete(self.full_name, single, bson_encode(selector))
 	-- todo: check send
-	socket.write(sock, pack)
+	assert(socket.write(sock, pack), "write fail")
 end
 
 function mongo_collection:findOne(query, selector)
@@ -208,7 +240,7 @@ function mongo_collection:findOne(query, selector)
 	local pack = driver.query(request_id, 0, self.full_name, 0, 1, query and bson_encode(query) or empty_bson, selector and bson_encode(selector))
 
 	-- todo: check send
-	socket.write(sock, pack)
+	assert(socket.write(sock, pack),"write fail")
 
 	local _, succ, doc = get_reply(conn, request_id)
 	-- todo: check succ
@@ -251,7 +283,7 @@ function mongo_cursor:hasNext()
 		end
 
 		--todo: check send
-		socket.write(sock, pack)
+		assert(socket.write(sock, pack),"write fail")
 
 		local data, succ, doc, cursor = get_reply(conn, request_id, self.__document)
 		if succ then
@@ -301,7 +333,7 @@ function mongo_cursor:close()
 		local sock = self.__collection.connection.__sock
 		local pack = driver.kill(self.__cursor)
 		-- todo: check send
-		socket.write(sock, pack)
+		assert(socket.write(sock, pack),"write fail")
 	end
 end
 
