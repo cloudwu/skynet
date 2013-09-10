@@ -42,7 +42,7 @@ struct buffer {
 };
 
 static inline uint32_t
-to_little_endian(uint32_t v) {
+little_endian(uint32_t v) {
 	union {
 		uint32_t v;
 		uint8_t b[4];
@@ -222,8 +222,8 @@ op_reply(lua_State *L) {
 		return 1;
 	}
 
-	int id = to_little_endian(reply->response_id);
-	int flags = to_little_endian(reply->flags);
+	int id = little_endian(reply->response_id);
+	int flags = little_endian(reply->flags);
 	if (flags & REPLY_QUERYFAILURE) {
 		lua_pushboolean(L,0);
 		lua_pushinteger(L, id);
@@ -231,8 +231,8 @@ op_reply(lua_State *L) {
 		return 3;
 	}
 
-	int starting_from = to_little_endian(reply->starting);
-	int number = to_little_endian(reply->number);
+	int starting_from = little_endian(reply->starting);
+	int number = little_endian(reply->number);
 	int sz = (int)data_len - sizeof(*reply);
 	const uint8_t * doc = (const uint8_t *)(reply+1);
 
@@ -516,7 +516,7 @@ reply_length(lua_State *L) {
 	const char * rawlen_str = luaL_checkstring(L, 1);
 	int rawlen = 0;
 	memcpy(&rawlen, rawlen_str, sizeof(int));
-	int length = to_little_endian(rawlen);
+	int length = little_endian(rawlen);
 	lua_pushinteger(L, length - 4);
 	return 1;
 }
