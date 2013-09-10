@@ -49,7 +49,6 @@ struct remote_message_header {
 
 struct harbor {
 	struct skynet_context *ctx;
-	const void * starting_msg;
 	char * local_addr;
 	int id;
 	struct hashmap * map;
@@ -211,7 +210,6 @@ harbor_create(void) {
 		h->remote_addr[i] = NULL;
 	}
 	h->map = _hash_new();
-	h->starting_msg = NULL;
 	return h;
 }
 
@@ -235,7 +233,7 @@ harbor_release(struct harbor *h) {
 }
 
 static int
-_connect_to(struct harbor *h, const char *ipaddress) {
+_connect_to(struct harbor *h, const char *ipaddress, bool blocking) {
 	char * port = strchr(ipaddress,':');
 	if (port==NULL) {
 		return -1;
@@ -247,7 +245,11 @@ _connect_to(struct harbor *h, const char *ipaddress) {
 
 	int portid = strtol(port+1, NULL,10);
 
-	return skynet_socket_connect(h->ctx, tmp, portid);
+	if (blocking) {
+		return skynet_socket_block_connect(h->ctx, tmp, portid);
+	} else {
+		return skynet_socket_connect(h->ctx, tmp, portid);
+	}
 }
 
 static inline void
@@ -318,7 +320,7 @@ _update_remote_address(struct harbor *h, int harbor_id, const char * ipaddr) {
 		free(h->remote_addr[harbor_id]);
 		h->remote_addr[harbor_id] = NULL;
 	}
-	h->remote_fd[harbor_id] = _connect_to(h, ipaddr);
+	h->remote_fd[harbor_id] = _connect_to(h, ipaddr, false);
 	h->connected[harbor_id] = false;
 }
 
@@ -397,7 +399,6 @@ _remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int
 		cookie.session = (uint32_t)session;
 		_send_remote(context, fd, msg,sz,&cookie);
 	} else {
-		_request_master(h, NULL, 0, harbor_id);
 		skynet_error(context, "Drop message to harbor %d from %x to %x (session = %d, msgsz = %d)",harbor_id, source, destination,session,(int)sz);
 	}
 	return 0;
@@ -551,38 +552,10 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 	}
 }
 
-static int
-_connect_master(struct skynet_context * ctx, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
-	struct harbor *h = ud;
-	if (type != PTYPE_SOCKET) {
-		// when message before connected, forward to self.
-		// If recv the same message, sleep a while.
-		if (h->starting_msg == msg) {
-			usleep(1000);
-		} else {
-			if (h->starting_msg == NULL) {
-				h->starting_msg = msg;
-			}
-		}
-		skynet_forward(ctx, 0);
-		return 0;
-	}
-	const struct skynet_socket_message * message = msg;
-	if (message->id != h->master_fd) {
-		if (message->type == SKYNET_SOCKET_TYPE_DATA) {
-			free(message->buffer);
-		}
-		skynet_error(ctx, "Invalid socket message incoming before connecting to master");
-		return 0;
-	}
-	if (message->type == SKYNET_SOCKET_TYPE_ERROR) {
-		fprintf(stderr, "Harbor: Connect to master failed\n");
-		exit(1);
-	}
-	assert(message->type == SKYNET_SOCKET_TYPE_CONNECT);
-
+static void
+_launch_gate(struct skynet_context * ctx, const char * local_addr) {
 	char tmp[128];
-	sprintf(tmp,"gate L ! %s %d %d 0",h->local_addr, PTYPE_HARBOR, REMOTE_MAX);
+	sprintf(tmp,"gate L ! %s %d %d 0",local_addr, PTYPE_HARBOR, REMOTE_MAX);
 	const char * gate_addr = skynet_command(ctx, "LAUNCH", tmp);
 	if (gate_addr == NULL) {
 		fprintf(stderr, "Harbor : launch gate failed\n");
@@ -597,12 +570,6 @@ _connect_master(struct skynet_context * ctx, void * ud, int type, int session, u
 	int n = sprintf(tmp,"broker %s",self_addr);
 	skynet_send(ctx, 0, gate, PTYPE_TEXT, 0, tmp, n);
 	skynet_send(ctx, 0, gate, PTYPE_TEXT, 0, "start", 5);
-
-	skynet_callback(ctx, h, _mainloop);
-
-	_request_master(h, h->local_addr, strlen(h->local_addr), h->id);
-
-	return 0;
 }
 
 int
@@ -614,12 +581,17 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 	int harbor_id = 0;
 	sscanf(args,"%s %s %d",master_addr, local_addr, &harbor_id);
 	h->master_addr = strdup(master_addr);
-	h->master_fd = _connect_to(h, master_addr);
+	h->master_fd = _connect_to(h, master_addr, true);
+	if (h->master_fd == -1) {
+		fprintf(stderr, "Harbor: Connect to master failed\n");
+		exit(1);
+	}
 	h->local_addr = strdup(local_addr);
 	h->id = harbor_id;
-	h->starting_msg = NULL;
 
-	skynet_callback(ctx, h, _connect_master);
+	_launch_gate(ctx, local_addr);
+	skynet_callback(ctx, h, _mainloop);
+	_request_master(h, local_addr, strlen(local_addr), harbor_id);
 
 	return 0;
 }

@@ -24,6 +24,7 @@ int skynet_socket_poll();
 int skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz);
 int skynet_socket_listen(struct skynet_context *ctx, const char *host, int port, int backlog);
 int skynet_socket_connect(struct skynet_context *ctx, const char *host, int port);
+int skynet_socket_block_connect(struct skynet_context *ctx, const char *host, int port);
 int skynet_socket_bind(struct skynet_context *ctx, int fd);
 void skynet_socket_close(struct skynet_context *ctx, int id);
 void skynet_socket_start(struct skynet_context *ctx, int id);

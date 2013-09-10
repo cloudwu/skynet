@@ -78,8 +78,7 @@ struct request_close {
 
 struct request_listen {
 	int id;
-	int port;
-	int backlog;
+	int fd;
 	uintptr_t opaque;
 	char host[1];
 };
@@ -246,7 +245,7 @@ new_fd(struct socket_server *ss, int id, int fd, uintptr_t opaque, bool add) {
 
 // return -1 when connecting
 static int
-open_socket(struct socket_server *ss, struct request_open * request, struct socket_message *result) {
+open_socket(struct socket_server *ss, struct request_open * request, struct socket_message *result, bool blocking) {
 	int id = request->id;
 	result->opaque = request->opaque;
 	result->id = id;
@@ -274,7 +273,9 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		if ( sock < 0 ) {
 			continue;
 		}
-		sp_nonblocking(sock);
+		if (!blocking) {
+			sp_nonblocking(sock);
+		}
 		status = connect( sock,	ai_ptr->ai_addr, ai_ptr->ai_addrlen	);
 		if ( status	!= 0 && errno != EINPROGRESS) {
 			close(sock);
@@ -404,32 +405,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 static int
 listen_socket(struct socket_server *ss, struct request_listen * request, struct socket_message *result) {
 	int id = request->id;
-	// only support ipv4
-	// todo: support ipv6 by getaddrinfo
-	uint32_t addr = INADDR_ANY;
-	if (request->host[0]) {
-		addr=inet_addr(request->host);
-	}
-	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listen_fd < 0) {
-		goto _failed_noclose;
-	}
-	int reuse = 1;
-	if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
-		goto _failed;
-	}
-
-	struct sockaddr_in my_addr;
-	memset(&my_addr, 0, sizeof(struct sockaddr_in));
-	my_addr.sin_family = AF_INET;
-	my_addr.sin_port = htons(request->port);
-	my_addr.sin_addr.s_addr = addr;
-	if (bind(listen_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
-		goto _failed;
-	}
-	if (listen(listen_fd, request->backlog) == -1) {
-		goto _failed;
-	}
+	int listen_fd = request->fd;
 	struct socket *s = new_fd(ss, id, listen_fd, request->opaque, false);
 	if (s == NULL) {
 		goto _failed;
@@ -438,7 +414,6 @@ listen_socket(struct socket_server *ss, struct request_listen * request, struct 
 	return -1;
 _failed:
 	close(listen_fd);
-_failed_noclose:
 	result->opaque = request->opaque;
 	result->id = id;
 	result->ud = 0;
@@ -554,7 +529,7 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	case 'K':
 		return close_socket(ss,(struct request_close *)buffer, result);
 	case 'O':
-		return open_socket(ss, (struct request_open *)buffer, result);
+		return open_socket(ss, (struct request_open *)buffer, result, false);
 	case 'X':
 		result->opaque = 0;
 		result->id = 0;
@@ -748,22 +723,42 @@ send_request(struct socket_server *ss, struct request_package *request, char typ
 	}
 }
 
-int 
-socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
-	struct request_package request;
+static int
+open_request(struct socket_server *ss, struct request_package *req, uintptr_t opaque, const char *addr, int port) {
 	int len = strlen(addr);
-	if (len + sizeof(request.u.open) > 256) {
+	if (len + sizeof(req->u.open) > 256) {
 		fprintf(stderr, "socket-server : Invalid addr %s.\n",addr);
 		return 0;
 	}
 	int id = reverve_id(ss);
-	request.u.open.opaque = opaque;
-	request.u.open.id = id;
-	request.u.open.port = port;
-	memcpy(request.u.open.host, addr, len);
-	request.u.open.host[len] = '\0';
+	req->u.open.opaque = opaque;
+	req->u.open.id = id;
+	req->u.open.port = port;
+	memcpy(req->u.open.host, addr, len);
+	req->u.open.host[len] = '\0';
+
+	return len;
+}
+
+int 
+socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
+	struct request_package request;
+	int len = open_request(ss, &request, opaque, addr, port);
 	send_request(ss, &request, 'O', sizeof(request.u.open) + len);
-	return id;
+	return request.u.open.id;
+}
+
+int 
+socket_server_block_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
+	struct request_package request;
+	struct socket_message result;
+	open_request(ss, &request, opaque, addr, port);
+	int ret = open_socket(ss, &request.u.open, &result, true);
+	if (ret == SOCKET_OPEN) {
+		return result.id;
+	} else {
+		return -1;
+	}
 }
 
 // return -1 when error
@@ -798,27 +793,52 @@ socket_server_close(struct socket_server *ss, uintptr_t opaque, int id) {
 	send_request(ss, &request, 'K', sizeof(request.u.close));
 }
 
+static int
+do_listen(const char * host, int port, int backlog) {
+	// only support ipv4
+	// todo: support ipv6 by getaddrinfo
+	uint32_t addr = INADDR_ANY;
+	if (host[0]) {
+		addr=inet_addr(host);
+	}
+	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (listen_fd < 0) {
+		return -1;
+	}
+	int reuse = 1;
+	if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
+		goto _failed;
+	}
+
+	struct sockaddr_in my_addr;
+	memset(&my_addr, 0, sizeof(struct sockaddr_in));
+	my_addr.sin_family = AF_INET;
+	my_addr.sin_port = htons(port);
+	my_addr.sin_addr.s_addr = addr;
+	if (bind(listen_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
+		goto _failed;
+	}
+	if (listen(listen_fd, backlog) == -1) {
+		goto _failed;
+	}
+	return listen_fd;
+_failed:
+	close(listen_fd);
+	return -1;
+}
+
 int 
 socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * addr, int port, int backlog) {
-	struct request_package request;
-	int len = (addr!=NULL) ? strlen(addr) : 0;
-	if (len + sizeof(request.u.listen) > 256) {
-		fprintf(stderr, "socket-server : Invalid listen addr %s.\n",addr);
-		return 0;
+	int fd = do_listen(addr, port, backlog);
+	if (fd < 0) {
+		return -1;
 	}
+	struct request_package request;
 	int id = reverve_id(ss);
 	request.u.listen.opaque = opaque;
 	request.u.listen.id = id;
-	request.u.listen.port = port;
-	request.u.listen.backlog = backlog;
-	if (len == 0) {
-		request.u.listen.host[0] = '\0';
-	} else {
-		int len = strlen(addr);
-		memcpy(request.u.listen.host, addr, len);
-		request.u.listen.host[len] = '\0';
-	}
-	send_request(ss, &request, 'L', sizeof(request.u.listen) + len);
+	request.u.listen.fd = fd;
+	send_request(ss, &request, 'L', sizeof(request.u.listen));
 	return id;
 }
 
