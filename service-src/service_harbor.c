@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #define HASH_SIZE 4096
 #define DEFAULT_QUEUE_SIZE 1024
@@ -48,6 +49,7 @@ struct remote_message_header {
 
 struct harbor {
 	struct skynet_context *ctx;
+	const void * starting_msg;
 	char * local_addr;
 	int id;
 	struct hashmap * map;
@@ -551,7 +553,19 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 static int
 _connect_master(struct skynet_context * ctx, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct harbor *h = ud;
-	assert(type == PTYPE_SOCKET);
+	if (type != PTYPE_SOCKET) {
+		// when message before connected, forward to self.
+		// If recv the same message, sleep a while.
+		if (h->starting_msg == msg) {
+			usleep(1000);
+		} else {
+			if (h->starting_msg == NULL) {
+				h->starting_msg = msg;
+			}
+		}
+		skynet_forward(ctx, 0);
+		return 0;
+	}
 	const struct skynet_socket_message * message = msg;
 	if (message->id != h->master_fd) {
 		if (message->type == SKYNET_SOCKET_TYPE_DATA) {
@@ -602,6 +616,7 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 	h->master_fd = _connect_to(h, master_addr);
 	h->local_addr = strdup(local_addr);
 	h->id = harbor_id;
+	h->starting_msg = NULL;
 
 	skynet_callback(ctx, h, _connect_master);
 

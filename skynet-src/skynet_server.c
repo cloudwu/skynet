@@ -552,7 +552,11 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 void 
 skynet_forward(struct skynet_context * context, uint32_t destination) {
 	assert(context->forward == 0);
-	context->forward = destination;
+	if (destination == 0) {
+		context->forward = context->handle;
+	} else {
+		context->forward = destination;
+	}
 }
 
 static void
