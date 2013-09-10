@@ -211,6 +211,7 @@ harbor_create(void) {
 		h->remote_addr[i] = NULL;
 	}
 	h->map = _hash_new();
+	h->starting_msg = NULL;
 	return h;
 }
 
