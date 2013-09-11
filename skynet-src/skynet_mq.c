@@ -56,7 +56,6 @@ skynet_globalmq_push(struct message_queue * queue) {
 	q->queue[tail] = queue;
 	__sync_synchronize();
 	q->flag[tail] = true;
-	__sync_synchronize();
 }
 
 struct message_queue * 
@@ -72,12 +71,13 @@ skynet_globalmq_pop() {
 		return NULL;
 	}
 
+	__sync_synchronize();
+
 	struct message_queue * mq = q->queue[head_ptr];
 	if (!__sync_bool_compare_and_swap(&q->head, head, head+1)) {
 		return NULL;
 	}
 	q->flag[head_ptr] = false;
-	__sync_synchronize();
 
 	return mq;
 }
