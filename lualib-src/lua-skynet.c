@@ -309,7 +309,8 @@ _send(lua_State *L) {
 		luaL_error(L, "skynet.send invalid param %s", lua_type(L,4));
 	}
 	if (session < 0) {
-		luaL_error(L, "skynet.send session (%d) < 0", session);
+		// send to invalid address
+		return 0;
 	}
 	lua_pushinteger(L,session);
 	return 1;
