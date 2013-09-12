@@ -244,8 +244,13 @@ skynet_mq_pushglobal(struct message_queue *queue) {
 
 void 
 skynet_mq_mark_release(struct message_queue *q) {
+	LOCK(q)
 	assert(q->release == 0);
 	q->release = 1;
+	if (q->in_global != MQ_IN_GLOBAL) {
+		skynet_globalmq_push(q);
+	}
+	UNLOCK(q)
 }
 
 static int

@@ -21,3 +21,5 @@ skynet.start(function()
 	skynet.exit()
 	print("Test timer exit")
 end)
+
+error "!!!"

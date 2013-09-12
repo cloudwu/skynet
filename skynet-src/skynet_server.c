@@ -126,6 +126,7 @@ skynet_context_new(const char * name, const char *param) {
 	} else {
 		skynet_context_release(ctx);
 		skynet_handle_retire(ctx->handle);
+		skynet_mq_release(queue);
 		return NULL;
 	}
 }
