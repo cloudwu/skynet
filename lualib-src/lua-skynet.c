@@ -399,6 +399,9 @@ static int
 _trace_new(lua_State *L) {
 	struct trace_pool *p = lua_touserdata(L,1);
 	struct trace_info *t = trace_new(p);
+	if (t==NULL) {
+		return luaL_error(L, "Last trace didn't close");
+	}
 	lua_pushlightuserdata(L,t);
 	return 1;
 }

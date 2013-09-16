@@ -81,7 +81,9 @@ trace_release(struct trace_pool *p) {
 
 struct trace_info *
 trace_new(struct trace_pool *p) {
-	assert(p->current == NULL);
+	if (p->current) {
+		return NULL;
+	}
 	struct trace_info *t = malloc(sizeof(*t));
 	p->current = t;
 	t->session = 0;
