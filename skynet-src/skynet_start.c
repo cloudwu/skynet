@@ -89,7 +89,7 @@ _timer(void *p) {
 	for (;;) {
 		skynet_updatetime();
 		CHECK_ABORT
-		wakeup(m,1);
+		wakeup(m,m->count);
 		usleep(2500);
 	}
 	return NULL;
