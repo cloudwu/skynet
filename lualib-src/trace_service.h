@@ -6,6 +6,7 @@
 
 #define NANOSEC 1000000000
 
+void current_time(struct timespec *ti);
 void diff_time(struct timespec *ti, uint32_t *sec, uint32_t *nsec);
 
 struct trace_pool;

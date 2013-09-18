@@ -32,15 +32,7 @@ struct stat {
 static void
 _stat_begin(struct stat *S, struct timespec *ti) {
 	S->count++;
-#if !defined(__APPLE__)
-	clock_gettime(CLOCK_THREAD_CPUTIME_ID, ti);
-#else
-	struct task_thread_times_info aTaskInfo;
-	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
-	assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
-	ti->tv_sec = aTaskInfo.user_time.seconds;
-	ti->tv_nsec = aTaskInfo.user_time.microseconds * 1000;
-#endif
+	current_time(ti);
 }
 
 inline static void
