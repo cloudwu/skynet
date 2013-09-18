@@ -88,6 +88,12 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	int r = lua_pcall(L, 5, 0 , trace);
 
 	_stat_end(S, &ti);
+
+	struct trace_info *tti = trace_yield(S->trace);
+	if (tti) {
+		skynet_error(context, "Untraced time %f",  trace_delete(S->trace, tti));
+	}
+
 	if (r == LUA_OK) {
 		if (S->lua->reload) {
 			skynet_callback(context, NULL, 0);
