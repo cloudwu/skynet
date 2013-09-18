@@ -233,20 +233,24 @@ skynet.tostring = assert(c.tostring)
 function skynet.call(addr, typename, ...)
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , p.pack(...))
-	return p.unpack(coroutine_yield("CALL", session))
+	return p.unpack(coroutine_yield("CALL", assert(session, "call to invalid address")))
 end
 
 function skynet.blockcall(addr, typename , ...)
 	local p = proto[typename]
 	c.command("LOCK")
 	local session = c.send(addr, p.id , nil , p.pack(...))
+	if session == nil then
+		c.command("UNLOCK")
+		error("call to invalid address")
+	end
 	return p.unpack(coroutine_yield("CALL", session))
 end
 
 function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , msg, sz)
-	return coroutine_yield("CALL", session)
+	return coroutine_yield("CALL", assert(session, "call to invalid address"))
 end
 
 function skynet.ret(msg, sz)
@@ -405,7 +409,7 @@ do
 			f = function(...)
 				local addr = remote_query(t.__remote)
 				-- the proto is 11 (lua is 10)
-				local session = _send(addr, 11 , nil, _pack(t,method,...))
+				local session = assert(_send(addr, 11 , nil, _pack(t,method,...)), "call to invalid address")
 				local msg, sz = _yield("CALL", session)
 				return select(2,assert(_unpack(msg,sz)))
 			end

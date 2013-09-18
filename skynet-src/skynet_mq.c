@@ -147,6 +147,19 @@ expand_queue(struct message_queue *q) {
 	q->queue = new_queue;
 }
 
+static void
+_unlock(struct message_queue *q) {
+	// this api use in push a unlock message, so the in_global flags must not be 0 , 
+	// but the q is not exist in global queue.
+	if (q->in_global == MQ_LOCKED) {
+		skynet_globalmq_push(q);
+		q->in_global = MQ_IN_GLOBAL;
+	} else {
+		assert(q->in_global == MQ_DISPATCHING);
+	}
+	q->lock_session = 0;
+}
+
 static void 
 _pushhead(struct message_queue *q, struct skynet_message *message) {
 	int head = q->head - 1;
@@ -162,15 +175,7 @@ _pushhead(struct message_queue *q, struct skynet_message *message) {
 	q->queue[head] = *message;
 	q->head = head;
 
-	// this api use in push a unlock message, so the in_global flags must not be 0 , 
-	// but the q is not exist in global queue.
-	if (q->in_global == MQ_LOCKED) {
-		skynet_globalmq_push(q);
-		q->in_global = MQ_IN_GLOBAL;
-	} else {
-		assert(q->in_global == MQ_DISPATCHING);
-	}
-	q->lock_session = 0;
+	_unlock(q);
 }
 
 void 
@@ -208,6 +213,13 @@ skynet_mq_lock(struct message_queue *q, int session) {
 	assert(q->in_global == MQ_IN_GLOBAL);
 	q->in_global = MQ_DISPATCHING;
 	q->lock_session = session;
+	UNLOCK(q)
+}
+
+void
+skynet_mq_unlock(struct message_queue *q) {
+	LOCK(q)
+	_unlock(q);
 	UNLOCK(q)
 }
 

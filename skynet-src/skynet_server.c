@@ -384,6 +384,14 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		return NULL;
 	}
 
+	if (strcmp(cmd,"UNLOCK") == 0) {
+		if (context->init == false) {
+			return NULL;
+		}
+		skynet_mq_unlock(context->queue);
+		return NULL;
+	}
+
 	if (strcmp(cmd,"REG") == 0) {
 		if (param == NULL || param[0] == '\0') {
 			sprintf(context->result, ":%x", context->handle);
