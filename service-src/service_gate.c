@@ -189,8 +189,16 @@ dispatch_message(struct gate *g, struct connection *c, int id, void * data, int 
 		if (size < 0) {
 			return;
 		} else if (size > 0) {
-			_forward(g, c, size);
-			databuffer_reset(&c->buffer);
+			if (size >= 0x1000000) {
+				struct skynet_context * ctx = g->ctx;
+				databuffer_clear(&c->buffer,&g->mp);
+				skynet_socket_close(ctx, id);
+				skynet_error(ctx, "Recv socket message > 16M");
+				return;
+			} else {
+				_forward(g, c, size);
+				databuffer_reset(&c->buffer);
+			}
 		}
 	}
 }
