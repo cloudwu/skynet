@@ -6,8 +6,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
-#define LOG_MESSAGE_SIZE 1024
+#define LOG_MESSAGE_SIZE 256
 
 void 
 skynet_error(struct skynet_context * context, const char *msg, ...) {
@@ -20,16 +21,30 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 	}
 
 	char tmp[LOG_MESSAGE_SIZE];
+	char *data = NULL;
 
 	va_list ap;
+
 	va_start(ap,msg);
 	int len = vsnprintf(tmp, LOG_MESSAGE_SIZE, msg, ap);
 	va_end(ap);
-
-	if (len >= LOG_MESSAGE_SIZE) {
-		len = LOG_MESSAGE_SIZE - 1;
-		tmp[len] = '\0';
+	if (len < LOG_MESSAGE_SIZE) {
+		data = strdup(tmp);
+	} else {
+		int max_size = LOG_MESSAGE_SIZE;
+		for (;;) {
+			max_size *= 2;
+			data = malloc(max_size);
+			va_start(ap,msg);
+			len = vsnprintf(data, max_size, msg, ap);
+			va_end(ap);
+			if (len < max_size) {
+				break;
+			}
+			free(data);
+		}
 	}
+
 
 	struct skynet_message smsg;
 	if (context == NULL) {
@@ -38,7 +53,7 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 		smsg.source = skynet_context_handle(context);
 	}
 	smsg.session = 0;
-	smsg.data = strdup(tmp);
+	smsg.data = data;
 	smsg.sz = len | (PTYPE_TEXT << HANDLE_REMOTE_SHIFT);
 	skynet_context_push(logger, &smsg);
 }
