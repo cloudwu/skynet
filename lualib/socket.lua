@@ -156,7 +156,7 @@ function socket.close(fd)
 		suspend(s)
 	end
 	if s.buffer then
-		driver.clear(s.buffer)
+		driver.clear(s.buffer,buffer_pool)
 	end
 	assert(s.lock_set == nil or next(s.lock_set) == nil)
 	socket_pool[id] = nil
@@ -270,7 +270,7 @@ end
 function socket.abandon(id)
 	local s = socket_pool[id]
 	if s and s.buffer then
-		driver.clear(s.buffer)
+		driver.clear(s.buffer,buffer_pool)
 	end
 	socket_pool[id] = nil
 end
