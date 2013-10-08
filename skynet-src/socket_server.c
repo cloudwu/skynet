@@ -123,7 +123,7 @@ reverve_id(struct socket_server *ss) {
 	for (i=0;i<MAX_SOCKET;i++) {
 		int id = __sync_add_and_fetch(&(ss->alloc_id), 1);
 		if (id < 0) {
-			id = __sync_fetch_and_and(&(ss->alloc_id), 0x7fffffff);
+			id = __sync_and_and_fetch(&(ss->alloc_id), 0x7fffffff);
 		}
 		struct socket *s = &ss->slot[id % MAX_SOCKET];
 		if (s->type == SOCKET_TYPE_INVALID) {
