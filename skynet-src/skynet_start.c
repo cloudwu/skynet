@@ -55,11 +55,26 @@ _socket(void *p) {
 		int r = skynet_socket_poll();
 		if (r==0)
 			break;
-		if (r<0)
+		if (r<0) {
+			CHECK_ABORT
 			continue;
+		}
 		wakeup(m,0);
 	}
 	return NULL;
+}
+
+static void
+free_monitor(struct monitor *m) {
+	int i;
+	int n = m->count;
+	for (i=0;i<n;i++) {
+		skynet_monitor_delete(m->m[i]);
+	}
+	pthread_mutex_destroy(&m->mutex);
+	pthread_cond_destroy(&m->cond);
+	free(m->m);
+	free(m);
 }
 
 static void *
@@ -68,17 +83,15 @@ _monitor(void *p) {
 	int i;
 	int n = m->count;
 	for (;;) {
+		CHECK_ABORT
 		for (i=0;i<n;i++) {
 			skynet_monitor_check(m->m[i]);
 		}
-		CHECK_ABORT
-		sleep(5);
+		for (i=0;i<5;i++) {
+			CHECK_ABORT
+			sleep(1);
+		}
 	}
-	for (i=0;i<n;i++) {
-		skynet_monitor_delete(m->m[i]);
-	}
-	free(m->m);
-	free(m);
 
 	return NULL;
 }
@@ -92,6 +105,10 @@ _timer(void *p) {
 		wakeup(m,m->count-1);
 		usleep(2500);
 	}
+	// wakeup socket thread
+	skynet_socket_exit();
+	// wakeup all worker thread
+	pthread_cond_broadcast(&m->cond);
 	return NULL;
 }
 
@@ -154,11 +171,11 @@ _start(int thread) {
 		create_thread(&pid[i+3], _worker, &wp[i]);
 	}
 
-	for (i=1;i<thread+3;i++) {
+	for (i=0;i<thread+3;i++) {
 		pthread_join(pid[i], NULL); 
 	}
-	pthread_mutex_destroy(&m->mutex);
-	pthread_cond_destroy(&m->cond);
+
+	free_monitor(m);
 }
 
 static int
