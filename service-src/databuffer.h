@@ -104,8 +104,8 @@ databuffer_push(struct databuffer *db, struct messagepool *mp, void *data, int s
 			temp[i].next = &temp[i+1];
 		}
 		temp[MESSAGEPOOL-1].next = NULL;
-		mp->pool = mpl;
 		mpl->next = mp->pool;
+		mp->pool = mpl;
 		m = &temp[0];
 		mp->freelist = &temp[1];
 	}
