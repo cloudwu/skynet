@@ -70,7 +70,7 @@ hashid_remove(struct hashid *hi, int id) {
 	}
 	while(c->next) {
 		if (c->next->id == id) {
-			struct hashid_node * temp = c;
+			struct hashid_node * temp = c->next;
 			c->next = temp->next;
 			c = temp;
 			goto _clear;
@@ -103,9 +103,9 @@ hashid_insert(struct hashid * hi, int id) {
 	int h = id & hi->hashmod;
 	if (hi->hash[h]) {
 		c->next = hi->hash[h];
-	} else {
-		hi->hash[h] = c;
 	}
+	hi->hash[h] = c;
+	
 	return c - hi->id;
 }
 
