@@ -230,16 +230,15 @@ function socket.lock(id)
 	local s = socket_pool[id]
 	assert(s)
 	local lock_set = s.lock
-	local co = coroutine.running()
 	if not lock_set then
 		lock_set = {}
 		s.lock = lock_set
-		lock_set[co] = true
-	elseif next(lock_set) == nil then
-		lock_set[co] = true
+	end
+	local co = coroutine.running()
+	if #lock_set == 0 then
+		lock_set[1] = co
 	else
-		assert(lock_set[co] == nil)
-		lock_set[co] = true
+		table.insert(lock_set, co)
 		skynet.wait()
 	end
 end
@@ -250,18 +249,11 @@ function socket.unlock(id)
 	local lock_set = s.lock
 	assert(lock_set)
 	local co = coroutine.running()
-	assert(lock_set[co])
-	lock_set[co] = nil
-	while true do
-		co = next(lock_set)
-		if co == nil then
-			break
-		end
-		if skynet.wakeup(co) then
-			break
-		else
-			lock_set[co] = nil
-		end
+	assert(lock_set[1] == co)
+	table.remove(lock_set,1)
+	co = lock_set[1]
+	if co then
+		skynet.wakeup(co)
 	end
 end
 
