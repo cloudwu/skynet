@@ -149,7 +149,7 @@ _start(int thread) {
 	m->m = malloc(thread * sizeof(struct skynet_monitor *));
 	int i;
 	for (i=0;i<thread;i++) {
-		m->m[i] = skynet_monitor_new(i);
+		m->m[i] = skynet_monitor_new();
 	}
 	if (pthread_mutex_init(&m->mutex, NULL)) {
 		fprintf(stderr, "Init mutex error");
