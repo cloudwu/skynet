@@ -20,6 +20,18 @@ skynet.register_protocol {
 	end
 }
 
+local function report_error(succ, ...)
+	if succ then
+		return ...
+	else
+		print("Message queue dispatch error: ", ...)
+	end
+end
+
+local function do_func(f, msg)
+	return report_error(pcall(f, table.unpack(msg)))
+end
+
 local function message_dispatch(f)
 	while true do
 		if #message_queue==0 then
@@ -29,9 +41,9 @@ local function message_dispatch(f)
 			local msg = table.remove(message_queue,1)
 			local session = msg.session
 			if session == 0 then
-				assert(f(table.unpack(msg))==nil, "message in queue returns value")
+				assert(do_func(f, msg) == nil, "message in queue returns value")
 			else
-				local data, size = skynet.pack(f(table.unpack(msg)))
+				local data, size = skynet.pack(do_func(f,msg))
 				-- 1 means response
 				c.send(msg.addr, 1, session, data, size)
 			end
