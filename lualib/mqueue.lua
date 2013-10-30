@@ -20,21 +20,8 @@ skynet.register_protocol {
 	end
 }
 
--- todo: write to log system
-local function write_log(...)
-	return print(...)
-end
-
-local function report_error(succ, ...)
-	if succ then
-		return ...
-	else
-		write_log("Message queue dispatch error: ", ...)
-	end
-end
-
 local function do_func(f, msg)
-	return report_error(pcall(f, table.unpack(msg)))
+	return pcall(f, table.unpack(msg))
 end
 
 local function message_dispatch(f)
@@ -47,7 +34,8 @@ local function message_dispatch(f)
 			local session = msg.session
 			if session == 0 then
 				if do_func(f, msg) ~= nil then
-					write_log("Message queue returns value, maybe need call this service")
+					skynet.fork(message_dispatch,f)
+					error(string.format("[:%x] send a message to [:%x] return something", msg.addr, skynet.self()))
 				end
 			else
 				local data, size = skynet.pack(do_func(f,msg))
@@ -65,7 +53,7 @@ function mqueue.register(f)
 end
 
 function mqueue.call(addr, ...)
-	return skynet.call(addr, "queue", ...)
+	return assert(skynet.call(addr, "queue", ...))
 end
 
 function mqueue.send(addr, ...)

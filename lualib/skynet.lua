@@ -5,6 +5,7 @@ local tonumber = tonumber
 local coroutine = coroutine
 local assert = assert
 local pairs = pairs
+local pcall = pcall
 
 local proto = {}
 local skynet = {}
@@ -292,7 +293,7 @@ function skynet.fork(func,...)
 	table.insert(fork_queue, co)
 end
 
-local function dispatch_message(prototype, msg, sz, session, source, ...)
+local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 	-- PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
 		local co = session_id_coroutine[session]
@@ -318,14 +319,27 @@ local function dispatch_message(prototype, msg, sz, session, source, ...)
 			error(string.format("Can't dispatch type %s : ", p.name))
 		end
 	end
+end
+
+local function dispatch_message(...)
+	local succ, err = pcall(raw_dispatch_message,...)
 	while true do
 		local key,co = next(fork_queue)
 		if co == nil then
-			return
+			break
 		end
 		fork_queue[key] = nil
-		suspend(co,coroutine.resume(co))
+		local fork_succ, fork_err = pcall(suspend,co,coroutine.resume(co))
+		if not fork_succ then
+			if succ then
+				succ = false
+				err = fork_err
+			else
+				err = err .. "\n" .. fork_err
+			end
+		end
 	end
+	assert(succ, err)
 end
 
 function skynet.newservice(name, ...)
