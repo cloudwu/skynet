@@ -154,9 +154,9 @@ function command:batch(mode)
 				allok = allok and ok
 				allret[i] = ret
 			end
+			self.__mode = false
 			socket.unlock(self.__handle)
 			assert(allok, "batch read failed")
-			self.__mode = false
 			return allret
 		else
 			local allok = true
@@ -164,15 +164,15 @@ function command:batch(mode)
 				local ok = read_response(fd)
 				allok = allok and ok
 			end
-			socket.unlock(self.__handle)
 			self.__mode = false
+			socket.unlock(self.__handle)
 			return allok
 		end
 	else
-		assert(mode == "read" or mode == "write")
+		assert(not self.__mode and (mode == "read" or mode == "write"))
+		socket.lock(self.__handle)
 		self.__mode = mode
 		self.__batch = 0
-		socket.lock(self.__handle)
 	end
 end
 
