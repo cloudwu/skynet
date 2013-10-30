@@ -52,8 +52,16 @@ function mqueue.register(f)
 	skynet.fork(message_dispatch,f)
 end
 
+local function catch(succ, ...)
+	if succ then
+		return ...
+	else
+		error(...)
+	end
+end
+
 function mqueue.call(addr, ...)
-	return assert(skynet.call(addr, "queue", ...))
+	return catch(skynet.call(addr, "queue", ...))
 end
 
 function mqueue.send(addr, ...)
