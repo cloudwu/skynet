@@ -169,7 +169,7 @@ function command:batch(mode)
 			return allok
 		end
 	else
-		assert(not self.__mode and (mode == "read" or mode == "write"))
+		assert(mode == "read" or mode == "write")
 		socket.lock(self.__handle)
 		self.__mode = mode
 		self.__batch = 0
