@@ -20,11 +20,16 @@ skynet.register_protocol {
 	end
 }
 
+-- todo: write to log system
+local function write_log(...)
+	return print(...)
+end
+
 local function report_error(succ, ...)
 	if succ then
 		return ...
 	else
-		print("Message queue dispatch error: ", ...)
+		write_log("Message queue dispatch error: ", ...)
 	end
 end
 
@@ -41,7 +46,9 @@ local function message_dispatch(f)
 			local msg = table.remove(message_queue,1)
 			local session = msg.session
 			if session == 0 then
-				assert(do_func(f, msg) == nil, "message in queue returns value")
+				if do_func(f, msg) ~= nil then
+					write_log("Message queue returns value, maybe need call this service")
+				end
 			else
 				local data, size = skynet.pack(do_func(f,msg))
 				-- 1 means response
