@@ -30,17 +30,17 @@ local trace_func = function() end
 
 -- coroutine reuse
 
-local coroutine_poll = {}
+local coroutine_pool = {}
 local coroutine_yield = coroutine.yield
 
 local function co_create(f)
-	local co = table.remove(coroutine_poll)
+	local co = table.remove(coroutine_pool)
 	if co == nil then
 		co = coroutine.create(function(...)
 			f(...)
 			while true do
 				f = nil
-				coroutine_poll[#coroutine_poll] = co
+				coroutine_pool[#coroutine_pool] = co
 				f = coroutine_yield "EXIT"
 				f(coroutine_yield())
 			end
@@ -481,7 +481,7 @@ function dbgcmd.MEM()
 end
 
 function dbgcmd.GC()
-	coroutine_poll = {}
+	coroutine_pool = {}
 	collectgarbage "collect"
 end
 
