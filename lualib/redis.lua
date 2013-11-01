@@ -35,6 +35,9 @@ function command:disconnect()
 end
 
 local function compose_message(msg)
+	if #msg == 1 then
+		return msg[1] .. "\r\n"
+	end
 	local lines = { "*" .. #msg }
 	for _,v in ipairs(msg) do
 		local t = type(v)
@@ -174,6 +177,76 @@ function command:batch(mode)
 		self.__mode = mode
 		self.__batch = 0
 	end
+end
+
+function command:multi()
+	local fd = self.__handle
+	socket.lock(fd)
+	self.__mode = "multi"
+	self.__batch = 0
+	socket.write(fd, "MULTI\r\n")
+end
+
+local function read_exec(fd)
+	local result = readline(fd, "\r\n")
+	local firstchar = string.byte(result)
+	local data = string.sub(result,2)
+	if firstchar ~= 42 then
+		return false, data
+	end
+
+	local n = tonumber(data)
+	local result = {}
+	local err = nil
+	for i = 1,n do
+		local ok, r = read_response(fd)
+		result[i] = r
+		if not err then
+			err = {}
+			for j = 1, i-1 do
+				err[j] = true
+			end
+		end
+		err[i] = ok
+	end
+	return result, err
+end
+
+function command:exec()
+	if self.__mode ~= "multi" then
+		error "call multi first"
+	end
+	local fd = self.__handle
+	socket.write(fd, "EXEC\r\n")
+	local allok = true
+	for i = 0, self.__batch do
+		local ok, queue = read_response(fd)
+		allok = allok and ok
+	end
+	if not allok then
+		self.__mode = false
+		socket.unlock(fd)
+		error "Queue command error"
+	end
+
+	local result, err = read_exec(fd)
+
+	self.__mode = false
+	socket.unlock(fd)
+
+	if not result then
+		error(err)
+	elseif err then
+		local errmsg = ""
+		for k,v in ipairs(err) do
+			if v == false then
+				errmsg = errmsg .. k .. ":" .. result[k]
+			end
+		end
+		error(errmsg)
+	end
+
+	return result
 end
 
 return redis
