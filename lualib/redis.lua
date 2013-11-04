@@ -201,13 +201,17 @@ local function read_exec(fd)
 	for i = 1,n do
 		local ok, r = read_response(fd)
 		result[i] = r
-		if not err then
-			err = {}
-			for j = 1, i-1 do
-				err[j] = true
+		if err then
+			err[i] = ok
+		else
+			if ok == false then
+				err = {}
+				for j = 1, i-1 do
+					err[j] = true
+				end
+				err[i] = false
 			end
 		end
-		err[i] = ok
 	end
 	return result, err
 end
