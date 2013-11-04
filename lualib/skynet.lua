@@ -601,12 +601,22 @@ local function init_template(start)
 	init_all()
 end
 
+local function init_service(start)
+	local ok, err = xpcall(init_template, debug.traceback, start)
+	if not ok then
+		print("init service failed:", err)
+		skynet.send(".launcher","text", "ERROR")
+		skynet.exit()
+	else
+		skynet.send(".launcher","text", "")
+	end
+end
+
 function skynet.start(start_func)
 	c.callback(dispatch_message)
 	trace_handle = assert(c.stat "trace")
 	skynet.timeout(0, function()
-		init_template(start_func)
-		skynet.send(".launcher","text", "")
+		init_service(start_func)
 	end)
 end
 
@@ -616,8 +626,7 @@ function skynet.filter(f ,start_func)
 	end)
 	trace_handle = assert(c.stat "trace")
 	skynet.timeout(0, function()
-	init_template(start_func)
-		skynet.send(".launcher","text", "")
+		init_service(start_func)
 	end)
 end
 
