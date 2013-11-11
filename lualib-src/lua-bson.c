@@ -247,7 +247,7 @@ write_double(struct bson *b, lua_Number d) {
 	}
 }
 
-static void pack_dict(lua_State *L, struct bson *b);
+static void pack_dict(lua_State *L, struct bson *b, bool array);
 
 static inline void
 append_key(struct bson *bs, int type, const char *key, size_t sz) {
@@ -291,7 +291,7 @@ append_table(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 	} else {
 		append_key(bs, BSON_DOCUMENT, key, sz);
 	}
-	pack_dict(L, bs);
+	pack_dict(L, bs, isarray);
 }
 
 static void
@@ -414,7 +414,8 @@ bson_numstr( char *str, int i ) {
 }
 
 static void
-pack_dict(lua_State *L, struct bson *b) {
+pack_dict(lua_State *L, struct bson *b, bool isarray) {
+	int arraydec = isarray ? 1 : 0;
 	int length = reserve_length(b);
 	lua_pushnil(L);
 	while(lua_next(L,-2) != 0) {
@@ -424,7 +425,7 @@ pack_dict(lua_State *L, struct bson *b) {
 		size_t sz;
 		switch(kt) {
 		case LUA_TNUMBER:
-			sz = bson_numstr(numberkey, lua_tointeger(L,-2)-1);
+			sz = bson_numstr(numberkey, lua_tointeger(L,-2)-arraydec);
 			key = numberkey;			
 			break;
 		case LUA_TSTRING:
@@ -794,7 +795,7 @@ lencode(lua_State *L) {
 	bson_create(&b);
 	lua_settop(L,1);
 	luaL_checktype(L, 1, LUA_TTABLE);
-	pack_dict(L,&b);
+	pack_dict(L, &b, false);
 	void * ud = lua_newuserdata(L, b.size);
 	memcpy(ud, b.ptr, b.size);
 	bson_destroy(&b);
@@ -1132,4 +1133,3 @@ luaopen_bson(lua_State *L) {
 
 	return 1;
 }
-
