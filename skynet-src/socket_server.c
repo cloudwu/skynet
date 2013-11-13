@@ -328,7 +328,7 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 				case EINTR:
 					continue;
 				case EAGAIN:
-					return 0;
+					return -1;
 				}
 				force_close(ss,s, result);
 				return SOCKET_CLOSE;
