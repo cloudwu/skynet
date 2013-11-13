@@ -433,6 +433,7 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 			break;
 		default:
 			luaL_error(L, "Invalid key type : %s", lua_typename(L, kt));
+			return;
 		}
 
 		append_one(b, L, key, sz);
