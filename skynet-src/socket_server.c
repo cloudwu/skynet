@@ -575,6 +575,7 @@ forward_message(struct socket_server *ss, struct socket *s, struct socket_messag
 
 	if (s->type == SOCKET_TYPE_HALFCLOSE) {
 		// discard recv data
+		FREE(buffer);
 		return -1;
 	}
 
