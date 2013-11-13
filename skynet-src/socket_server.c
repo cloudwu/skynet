@@ -347,6 +347,11 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 	s->tail = NULL;
 	sp_write(ss->event_fd, s->fd, s, false);
 
+	if (s->type == SOCKET_TYPE_HALFCLOSE) {
+		force_close(ss, s, result);
+		return SOCKET_CLOSE;
+	}
+
 	return -1;
 }
 
