@@ -268,7 +268,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		goto _failed;
 	}
 	int sock= -1;
-	for	( ai_ptr = ai_list;	ai_ptr != NULL;	ai_ptr = ai_ptr->ai_next ) {
+	for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next ) {
 		sock = socket( ai_ptr->ai_family, ai_ptr->ai_socktype, ai_ptr->ai_protocol );
 		if ( sock < 0 ) {
 			continue;
@@ -276,8 +276,8 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		if (!blocking) {
 			sp_nonblocking(sock);
 		}
-		status = connect( sock,	ai_ptr->ai_addr, ai_ptr->ai_addrlen	);
-		if ( status	!= 0 && errno != EINPROGRESS) {
+		status = connect( sock, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+		if ( status != 0 && errno != EINPROGRESS) {
 			close(sock);
 			sock = -1;
 			continue;
@@ -328,7 +328,7 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 				case EINTR:
 					continue;
 				case EAGAIN:
-					return 0;
+					return -1;
 				}
 				force_close(ss,s, result);
 				return SOCKET_CLOSE;
@@ -346,6 +346,11 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 	}
 	s->tail = NULL;
 	sp_write(ss->event_fd, s->fd, s, false);
+
+	if (s->type == SOCKET_TYPE_HALFCLOSE) {
+		force_close(ss, s, result);
+		return SOCKET_CLOSE;
+	}
 
 	return -1;
 }
@@ -575,6 +580,7 @@ forward_message(struct socket_server *ss, struct socket *s, struct socket_messag
 
 	if (s->type == SOCKET_TYPE_HALFCLOSE) {
 		// discard recv data
+		FREE(buffer);
 		return -1;
 	}
 
