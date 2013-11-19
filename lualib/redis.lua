@@ -22,6 +22,9 @@ function redis.connect(dbname)
 	local db_conf   =   name[dbname]
 	local fd = assert(socket.open(db_conf.host, db_conf.port or 6379))
 	local r = setmetatable( { __handle = fd, __mode = false }, meta )
+	if db_conf.auth ~= nil then
+		r:auth(db_conf.auth)
+	end
 	if db_conf.db ~= nil then
 		r:select(db_conf.db)
 	end
