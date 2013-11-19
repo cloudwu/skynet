@@ -285,10 +285,12 @@ end
 
 local fork_queue = {}
 
+local tunpack = table.unpack
+
 function skynet.fork(func,...)
 	local args = { ... }
 	local co = co_create(function()
-		func(unpack(args))
+		func(tunpack(args))
 	end)
 	table.insert(fork_queue, co)
 end
