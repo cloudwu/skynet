@@ -355,20 +355,25 @@ function skynet.newservice(name, ...)
 end
 
 function skynet.uniqueservice(global, ...)
-	local t = 0
-	while true do
-		local handle
-		if global == true then
-			handle = skynet.call("SERVICE", "lua", ...)
-		else
-			handle = skynet.call(".service", "lua", global, ...)
-		end
-		if handle ~= false then
-			return handle
-		end
-		skynet.sleep(t)
-		t=t+1
+	local handle
+	if global == true then
+		handle = skynet.call("SERVICE", "lua", "LAUNCH", ...)
+	else
+		handle = skynet.call(".service", "lua", "LAUNCH", global, ...)
 	end
+	assert(handle , "Unique service launch failed")
+	return handle
+end
+
+function skynet.queryservice(global, ...)
+	local handle
+	if global == true then
+		handle = skynet.call("SERVICE", "lua", "QUERY", ...)
+	else
+		handle = skynet.call(".service", "lua", "QUERY", global, ...)
+	end
+	assert(handle , "Unique service query failed")
+	return handle
 end
 
 local function group_command(cmd, handle, address)
@@ -656,8 +661,14 @@ function skynet.context_ptr()
 	return c.context()
 end
 
-function skynet.monitor(service)
-	local monitor = skynet.uniqueservice(true, service)
+function skynet.monitor(service, query)
+	local monitor
+	if query then
+		monitor = skynet.queryservice(true, service)
+	else
+		monitor = skynet.uniqueservice(true, service)
+	end
+	assert(monitor, "Monitor launch failed")
 	c.command("MONITOR", string.format(":%08x", monitor))
 end
 
