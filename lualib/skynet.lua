@@ -172,7 +172,7 @@ function skynet.sleep(ti)
 	local session = c.command("TIMEOUT",tostring(ti))
 	assert(session)
 	session = tonumber(session)
-	local ret = coroutine_yield("SLEEP", session)
+	local succ, ret = coroutine_yield("SLEEP", session)
 	sleep_session[coroutine.running()] = nil
 	if ret == true then
 		c.trace_switch(trace_handle, session)
@@ -486,8 +486,12 @@ do
 				local addr = remote_query(t.__remote)
 				-- the proto is 11 (lua is 10)
 				local session = assert(_send(addr, 11 , nil, _pack(t,method,...)), "call to invalid address")
-				local msg, sz = coroutine_yield(session)
-				return select(2,assert(_unpack(msg,sz)))
+				local succ, msg, sz = coroutine_yield("CALL", session)
+				if succ then
+					return select(2,assert(_unpack(msg,sz)))
+				else
+					error "call to dead remote object"
+				end
 			end
 			remote_call_func[method] = f
 		end
