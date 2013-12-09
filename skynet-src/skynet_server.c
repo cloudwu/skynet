@@ -540,7 +540,12 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	if (strcmp(cmd,"MONITOR") == 0) {
 		uint32_t handle=0;
 		if (param == NULL || param[0] == '\0') {
-			handle = context->handle;
+			if (G_NODE.monitor_exit) {
+				// return current monitor serivce
+				sprintf(context->result, ":%x", G_NODE.monitor_exit);
+				return context->result;
+			}
+			return NULL;
 		} else {
 			if (param[0] == ':') {
 				handle = strtoul(param+1, NULL, 16);
