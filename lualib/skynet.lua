@@ -47,6 +47,7 @@ local function dispatch_exit()
 	if session then
 		local co = session_id_coroutine[session]
 		session_id_coroutine[session] = nil
+		c.trace_switch(trace_handle, session)
 		return suspend(co, coroutine.resume(co, false))
 	end
 end
