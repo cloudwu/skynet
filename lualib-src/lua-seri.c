@@ -601,10 +601,13 @@ _luaseri_unpack(lua_State *L) {
 		return 0;
 	}
 	void * buffer = lua_touserdata(L,1);
+	int len = luaL_checkinteger(L,2);
+	if (len == 0) {
+		return 0;
+	}
 	if (buffer == NULL) {
 		return luaL_error(L, "deserialize null pointer");
 	}
-	int len = luaL_checkinteger(L,2);
 
 	lua_settop(L,0);
 	struct read_block rb;

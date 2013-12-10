@@ -52,12 +52,20 @@ local function dispatch_error_queue()
 	end
 end
 
-local function _error_dispatch(session, monitor, service)
---  Don't remove from watching_service , because user may call dead service
-	watching_service[service] = false
-	for session, srv in pairs(watching_session) do
-		if srv == service then
-			table.insert(error_queue, session)
+local function _error_dispatch(error_session, monitor, service)
+	if service then
+		-- service is down
+		--  Don't remove from watching_service , because user may call dead service
+		watching_service[service] = false
+		for session, srv in pairs(watching_session) do
+			if srv == service then
+				table.insert(error_queue, session)
+			end
+		end
+	else
+		-- capture an error for error_session
+		if watching_session[error_session] then
+			table.insert(error_queue, error_session)
 		end
 	end
 end
@@ -124,6 +132,14 @@ end
 function suspend(co, result, command, param, size)
 	if not result then
 		trace_count()
+		local session = session_coroutine_id[co]
+		local addr = session_coroutine_address[co]
+		if session and session ~= 0  then
+			-- 7 means error (PTYPE_RESERVED_ERROR)
+			c.send(addr, 7, session, "")
+		end
+		session_coroutine_id[co] = nil
+		session_coroutine_address[co] = nil
 		error(debug.traceback(co,command))
 	end
 	if command == "CALL" then
@@ -144,6 +160,7 @@ function suspend(co, result, command, param, size)
 		-- c.send maybe throw a error, so call trace_count first.
 		-- The coroutine execute time after skynet.ret() will not be trace.
 		trace_count()
+		-- 1 means response (PTYPE_RESPONSE)
 		c.send(co_address, 1, co_session, param, size)
 		return suspend(co, coroutine.resume(co))
 	elseif command == "EXIT" then
@@ -280,7 +297,7 @@ local function yield_call(service, session)
 	watching_session[session] = service
 	local succ, msg, sz = coroutine_yield("CALL", session)
 	watching_session[session] = nil
-	assert(succ, "Service is dead")
+	assert(succ, "Capture an error")
 	return msg,sz
 end
 
