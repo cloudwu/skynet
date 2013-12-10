@@ -12,7 +12,7 @@
 #define PTYPE_HARBOR 5
 #define PTYPE_SOCKET 6
 // read lualib/skynet.lua lualib/simplemonitor.lua
-#define PTYPE_EXIT 7	
+#define PTYPE_RESERVED_ERROR 7	
 // read lualib/skynet.lua lualib/mqueue.lua
 #define PTYPE_RESERVED_QUEUE 8
 #define PTYPE_RESERVED_DEBUG 9

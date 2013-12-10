@@ -28,7 +28,7 @@ local sleep_session = {}
 
 local watching_service = {}
 local watching_session = {}
-local exit_queue = {}
+local error_queue = {}
 
 -- suspend is function
 local suspend
@@ -42,8 +42,8 @@ end
 
 ----- monitor exit
 
-local function dispatch_exit()
-	local session = table.remove(exit_queue,1)
+local function dispatch_error_queue()
+	local session = table.remove(error_queue,1)
 	if session then
 		local co = session_id_coroutine[session]
 		session_id_coroutine[session] = nil
@@ -52,12 +52,12 @@ local function dispatch_exit()
 	end
 end
 
-local function _exit_dispatch(session, monitor, service)
+local function _error_dispatch(session, monitor, service)
 --  Don't remove from watching_service , because user may call dead service
 	watching_service[service] = false
 	for session, srv in pairs(watching_session) do
 		if srv == service then
-			table.insert(exit_queue, session)
+			table.insert(error_queue, session)
 		end
 	end
 end
@@ -156,7 +156,7 @@ function suspend(co, result, command, param, size)
 	end
 	trace_count()
 	dispatch_wakeup()
-	dispatch_exit()
+	dispatch_error_queue()
 end
 
 function skynet.timeout(ti, func)
@@ -636,11 +636,11 @@ do
 	}
 
 	REG {
-		name = "exit",
+		name = "error",
 		id = 7,
 		pack = skynet.pack,
 		unpack = skynet.unpack,
-		dispatch = _exit_dispatch,
+		dispatch = _error_dispatch,
 	}
 end
 
