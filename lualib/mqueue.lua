@@ -8,7 +8,7 @@ local message_queue = {}
 
 skynet.register_protocol {
 	name = "queue",
-	id = 10,
+	id = 8,
 	pack = skynet.pack,
 	unpack = skynet.unpack,
 	dispatch = function(session, from, ...)
