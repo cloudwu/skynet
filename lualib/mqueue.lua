@@ -8,6 +8,7 @@ local message_queue = {}
 
 skynet.register_protocol {
 	name = "queue",
+	-- please read skynet.h for magic number 8
 	id = 8,
 	pack = skynet.pack,
 	unpack = skynet.unpack,
