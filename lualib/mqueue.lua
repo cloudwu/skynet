@@ -12,7 +12,7 @@ skynet.register_protocol {
 	pack = skynet.pack,
 	unpack = skynet.unpack,
 	dispatch = function(session, from, ...)
-		table.insert(message_queue, {..., session = session, addr = from})
+		table.insert(message_queue, {session = session, addr = from, ... })
 		if thread_id then
 			skynet.wakeup(thread_id)
 			thread_id = nil
