@@ -117,6 +117,12 @@ union sockaddr_all {
 #define MALLOC malloc
 #define FREE free
 
+static void
+socket_keepalive(int fd) {
+	int keepalive = 1;
+	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));  
+}
+
 static int
 reverve_id(struct socket_server *ss) {
 	int i;
@@ -273,6 +279,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		if ( sock < 0 ) {
 			continue;
 		}
+		socket_keepalive(sock);
 		if (!blocking) {
 			sp_nonblocking(sock);
 		}
@@ -642,6 +649,7 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 		close(client_fd);
 		return 0;
 	}
+	socket_keepalive(client_fd);
 	sp_nonblocking(client_fd);
 	struct socket *ns = new_fd(ss, id, client_fd, s->opaque, false);
 	if (ns == NULL) {
