@@ -15,6 +15,18 @@ static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	assert(sz <= 65535);
 	struct client * c = ud;
+	if (type == PTYPE_RESERVED_ERROR) {
+		// todo: tell client the session is broken
+		return 0;
+	}
+	if (type == PTYPE_RESPONSE) {
+		// todo: response to client with session, session may be packed into package
+	} else {
+		printf("client %d\n",type);
+		assert(type == PTYPE_TEXT);
+		// todo: support other protocol
+	}
+	// todo: design the protocol between client and agent
 	// tmp will be free by skynet_socket.
 	// see skynet_src/socket_server.c : send_socket()
 	uint8_t *tmp = malloc(sz + 2);
