@@ -119,6 +119,7 @@ _connect_to(struct master *m, int id) {
 	memcpy(tmp,ipaddress,sz);
 	tmp[sz] = '\0';
 	int port = strtol(portstr+1,NULL,10);
+	skynet_error(ctx, "Master connect to harbor(%d) %s:%d", id, tmp, port);
 	m->remote_fd[id] = skynet_socket_connect(ctx, tmp, port);
 }
 
