@@ -245,6 +245,8 @@ _connect_to(struct harbor *h, const char *ipaddress, bool blocking) {
 
 	int portid = strtol(port+1, NULL,10);
 
+	skynet_error(h->ctx, "Harbor(%d) connect to %s:%d", h->id, tmp, portid);
+
 	if (blocking) {
 		return skynet_socket_block_connect(h->ctx, tmp, portid);
 	} else {

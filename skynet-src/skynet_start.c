@@ -196,6 +196,13 @@ skynet_start(struct skynet_config * config) {
 	skynet_timer_init();
 	skynet_socket_init();
 
+	struct skynet_context *ctx;
+	ctx = skynet_context_new("logger", config->logger);
+	if (ctx == NULL) {
+		fprintf(stderr,"launch logger error");
+		exit(1);
+	}
+
 	if (config->standalone) {
 		if (_start_master(config->standalone)) {
 			fprintf(stderr, "Init fail : mater");
@@ -208,12 +215,6 @@ skynet_start(struct skynet_config * config) {
 		return;
 	}
 
-	struct skynet_context *ctx;
-	ctx = skynet_context_new("logger", config->logger);
-	if (ctx == NULL) {
-		fprintf(stderr,"launch logger error");
-		exit(1);
-	}
 	ctx = skynet_context_new("localcast", NULL);
 	if (ctx == NULL) {
 		fprintf(stderr,"launch local cast error");
