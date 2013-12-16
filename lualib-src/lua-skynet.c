@@ -454,19 +454,10 @@ _reload(lua_State *L) {
 	return 0;
 }
 
-// define in lua-remoteobj.c
-int remoteobj_init(lua_State *L);
-
 int
 luaopen_skynet_c(lua_State *L) {
 	luaL_checkversion(L);
 	
-	luaL_Reg pack[] = {
-		{ "pack", _luaseri_pack },
-		{ "unpack", _luaseri_unpack },
-		{ NULL, NULL },
-	};
-
 	luaL_Reg l[] = {
 		{ "send" , _send },
 		{ "genid", _genid },
@@ -477,12 +468,13 @@ luaopen_skynet_c(lua_State *L) {
 		{ "tostring", _tostring },
 		{ "harbor", _harbor },
 		{ "context", _context },
+		{ "pack", _luaseri_pack },
+		{ "unpack", _luaseri_unpack },
 		{ NULL, NULL },
 	};
 
 	luaL_Reg l2[] = {
 		{ "stat", _stat },
-		{ "remote_init", remoteobj_init },
 		{ "trace_new", _trace_new },
 		{ "trace_delete", _trace_delete },
 		{ "trace_switch", _trace_switch },
@@ -491,10 +483,7 @@ luaopen_skynet_c(lua_State *L) {
 		{ NULL, NULL },
 	};
 
-	lua_createtable(L, 0, (sizeof(pack) + sizeof(l) + sizeof(l2))/sizeof(luaL_Reg)-1);
-	lua_newtable(L);
-	lua_pushstring(L,"__remote");
-	luaL_setfuncs(L,pack,2);
+	lua_createtable(L, 0, (sizeof(l) + sizeof(l2))/sizeof(luaL_Reg)-1);
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_lua");
 	struct snlua *lua = lua_touserdata(L,-1);

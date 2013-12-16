@@ -20,7 +20,6 @@
 // hibits 0~31 : len
 #define TYPE_LONG_STRING 5
 #define TYPE_TABLE 6
-#define TYPE_REMOTE 7
 
 #define MAX_COOKIE 32
 #define COMBINE_TYPE(t,v) ((t) | (v) << 3)
@@ -360,16 +359,7 @@ _pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 		if (index < 0) {
 			index = lua_gettop(L) + index + 1;
 		}
-		lua_pushvalue(L, lua_upvalueindex(2));	// __remote
-		lua_rawget(L, index);
-		if (lua_isnumber(L,-1)) {
-			int handle = lua_tointeger(L,-1);
-			lua_pop(L,1);
-			wb_integer(b, handle, TYPE_REMOTE);
-		} else {
-			lua_pop(L,1);
-			wb_table(L, b, index, depth+1);
-		}
+		wb_table(L, b, index, depth+1);
 		break;
 	}
 	default:
@@ -531,21 +521,8 @@ _push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 		_unpack_table(L,rb,cookie);
 		break;
 	}
-	case TYPE_REMOTE: {
-		lua_pushvalue(L,lua_upvalueindex(1));	// metatable
-		int handle = _get_integer(L,rb,cookie);
-		lua_rawgeti(L,-1,handle);
-		if (lua_isnil(L,-1)) {
-			lua_pop(L,2);
-			lua_createtable(L,0,1);
-			lua_pushvalue(L,lua_upvalueindex(2));	// __remote
-			lua_pushinteger(L,handle);
-			lua_rawset(L,-3);
-			lua_pushvalue(L,lua_upvalueindex(1));	// metatable
-			lua_setmetatable(L,-2);
-		} else {
-			lua_replace(L, -2);
-		}
+	default: {
+		_invalid_stream(L,rb);
 		break;
 	}
 	}

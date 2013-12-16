@@ -80,7 +80,7 @@ service/gate.so : service-src/service_gate.c
 service/localcast.so : service-src/service_localcast.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
-luaclib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/lua-remoteobj.c lualib-src/trace_service.c | luaclib
+luaclib/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/trace_service.c | luaclib
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src -Iservice-src -Ilualib-src
 
 service/client.so : service-src/service_client.c

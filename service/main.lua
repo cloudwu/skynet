@@ -6,7 +6,6 @@ skynet.start(function()
 	skynet.monitor "simplemonitor"
 	local lualog = skynet.newservice("lualog")
 	local console = skynet.newservice("console")
-	local remoteroot = skynet.newservice("remote_root")
 	local watchdog = skynet.newservice("watchdog","8888 4 0")
 	local db = skynet.newservice("simpledb")
 --	skynet.launch("snlua","testgroup")
