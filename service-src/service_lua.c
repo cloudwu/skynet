@@ -6,6 +6,7 @@
 #include <assert.h>
 #include "luacompat52.h"
 #include "service_lua.h"
+#include "luacode_cache.h"
 
 #include <assert.h>
 #include <string.h>
@@ -66,38 +67,35 @@ _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
 		exit(1);
 	}
 	tmp[namelen+pathlen-1] = '\0';
-	FILE *f = fopen(tmp,"rb");
-	if (f == NULL) {
-		return -1;
-	} else {
-		fclose(f);
-		int r = luaL_loadfile(L,tmp);
-		if (r == LUA_OK) {
-			int i;
-			for (i=namelen+pathlen-2;i>=0;i--) {
-				if (tmp[i] == '/') {
-					lua_pushlstring(L,tmp,i+1);
-					lua_setglobal(L,"SERVICE_PATH");
-					break;
-				}
+	//	luacode_loadfile is the same with luaL_loadfile except cache.
+	int r = luacode_loadfile(L,tmp);
+	if (r == LUA_OK) {
+		int i;
+		for (i=namelen+pathlen-2;i>=0;i--) {
+			if (tmp[i] == '/') {
+				lua_pushlstring(L,tmp,i+1);
+				lua_setglobal(L,"SERVICE_PATH");
+				break;
 			}
-			if (i<0) {
-				return 0;
-			}
-			lua_getglobal(L,"package");
-			lua_getfield(L,-1,"path");
-			luaL_Buffer b;
-			luaL_buffinit(L, &b);
-			luaL_addlstring(&b, tmp, i+1);
-			luaL_addstring(&b, "?.lua;");
-			luaL_addvalue(&b);
-			luaL_pushresult(&b);
-			lua_setfield(L,-2,"path");
-			lua_pop(L,1);
+		}
+		if (i<0) {
 			return 0;
 		}
-		return 1;
+		lua_getglobal(L,"package");
+		lua_getfield(L,-1,"path");
+		luaL_Buffer b;
+		luaL_buffinit(L, &b);
+		luaL_addlstring(&b, tmp, i+1);
+		luaL_addstring(&b, "?.lua;");
+		luaL_addvalue(&b);
+		luaL_pushresult(&b);
+		lua_setfield(L,-2,"path");
+		lua_pop(L,1);
+		return 0;
+	} else if (r == LUA_ERRFILE) {
+		return -1;
 	}
+	return 1;
 }
 
 static int
@@ -168,6 +166,8 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	luaL_openlibs(L);
 	lua_pushlightuserdata(L, l);
 	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_lua");
+	luaL_requiref(L, "skynet.codecache", luacode_lib , 0);
+	lua_pop(L,1);
 	lua_gc(L, LUA_GCRESTART, 0);
 
 	char tmp[strlen(args)+1];

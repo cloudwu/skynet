@@ -31,6 +31,7 @@ _logger(struct skynet_context * context, void *ud, int type, int session, uint32
 	fprintf(inst->handle, "[:%x] ",source);
 	fwrite(msg, sz , 1, inst->handle);
 	fprintf(inst->handle, "\n");
+	fflush(inst->handle);
 
 	return 0;
 }
