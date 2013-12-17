@@ -12,6 +12,42 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+// time
+
+#include <time.h>
+#define NANOSEC 1000000000
+
+#if defined(__APPLE__)
+#include <mach/task.h>
+#include <mach/mach.h>
+#endif
+
+static void
+current_time(struct timespec *ti) {
+#if  !defined(__APPLE__)
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, ti);
+#else
+	struct task_thread_times_info aTaskInfo;
+	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
+	assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
+	ti->tv_sec = aTaskInfo.user_time.seconds;
+	ti->tv_nsec = aTaskInfo.user_time.microseconds * 1000;
+#endif
+}
+
+static double
+diff_time(struct timespec *ti) {
+	struct timespec end;
+	current_time(&end);
+	int diffsec = end.tv_sec - ti->tv_sec;
+	int diffnsec = end.tv_nsec - ti->tv_nsec;
+	if (diffnsec < 0) {
+		--diffsec;
+		diffnsec += NANOSEC;
+	}
+	return (double)diffsec + (double)diffnsec / NANOSEC;
+}
+
 static int
 _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
 	int namelen = strlen(name);
@@ -178,7 +214,13 @@ _launch(struct skynet_context * context, void *ud, int type, int session, uint32
 	assert(type == 0 && session == 0);
 	struct snlua *l = ud;
 	skynet_callback(context, NULL, NULL);
-	if (_init(l, context, msg)) {
+	struct timespec ti;
+	current_time(&ti);
+	int err = _init(l, context, msg);
+	double t = diff_time(&ti);
+	lua_pushnumber(l->L, t);
+	lua_setfield(l->L, LUA_REGISTRYINDEX, "skynet_boottime");
+	if (err) {
 		skynet_command(context, "EXIT", NULL);
 	}
 

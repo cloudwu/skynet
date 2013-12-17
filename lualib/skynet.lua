@@ -509,6 +509,7 @@ function dbgcmd.STAT()
 	local stat = {}
 	query_state(stat, "count")
 	query_state(stat, "time")
+	stat.boottime = debug.getregistry().skynet_boottime
 	skynet.ret(skynet.pack(stat))
 end
 

@@ -28,10 +28,6 @@ current_time(struct timespec *ti) {
 
 void 
 diff_time(struct timespec *ti, uint32_t *sec, uint32_t *nsec) {
-	if (sec == NULL) {
-		current_time(ti);
-		return;
-	}
 	struct timespec end;
 	current_time(&end);
 	int diffsec = end.tv_sec - ti->tv_sec;
