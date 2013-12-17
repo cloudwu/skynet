@@ -16,6 +16,16 @@ struct codecache {
 
 static struct codecache CC = { 0 , NULL };
 
+static void 
+_clearcache() {
+	if (CC.L == NULL)
+		return;
+	LOCK(&CC)
+		lua_close(CC.L);
+		CC.L = luaL_newstate();
+	UNLOCK(&CC)
+}
+
 static void
 _init() {
 	CC.lock = 0;
@@ -80,13 +90,6 @@ luacode_load(const char * key, const char * code, size_t *sz) {
 	return _save(key, code, sz);
 }
 
-/*
-static int
-cache_load(lua_State *L) {
-	return 0;
-}
-*/
-
 // copy from lbaselib.c
 static int 
 load_aux (lua_State *L, int status, int envidx) {
@@ -148,6 +151,76 @@ cache_loadfile(lua_State *L) {
 			}
 		}
 	}
+	return load_aux(L, status, env);
+}
+
+/*
+** reserved slot, above all arguments, to hold a copy of the returned
+** string to avoid it being collected while parsed. 'load' has four
+** optional arguments (chunk, source name, mode, and environment).
+*/
+#define RESERVEDSLOT	5
+
+/*
+** Reader for generic `load' function: `lua_load' uses the
+** stack for internal stuff, so the reader cannot change the
+** stack top. Instead, it keeps its resulting string in a
+** reserved slot inside the stack.
+*/
+static const char *generic_reader (lua_State *L, void *ud, size_t *size) {
+  (void)(ud);  /* not used */
+  luaL_checkstack(L, 2, "too many nested functions");
+  lua_pushvalue(L, 1);  /* get function */
+  lua_call(L, 0, 1);  /* call it */
+  if (lua_isnil(L, -1)) {
+    lua_pop(L, 1);  /* pop result */
+    *size = 0;
+    return NULL;
+  }
+  else if (!lua_isstring(L, -1))
+    luaL_error(L, "reader function must return a string");
+  lua_replace(L, RESERVEDSLOT);  /* save string in reserved slot */
+  return lua_tolstring(L, RESERVEDSLOT, size);
+}
+
+static int 
+cache_load(lua_State *L) {
+	int status;
+	size_t l;
+	const char *s = lua_tolstring(L, 1, &l);
+	const char *mode = luaL_optstring(L, 3, "bt");
+	int env = (!lua_isnone(L, 4) ? 4 : 0);  /* 'env' index or 0 if no 'env' */
+	const char *cname = lua_tostring(L,2);
+	if (cname) {
+		// read cache
+		size_t sz = 0;
+		const char * bytecode = luacode_load(cname, NULL, &sz);
+		if (bytecode) {
+			// load from cache
+			status = luaL_loadbuffer(L, bytecode, sz, cname);
+			return load_aux(L, status, env);
+		}
+	}
+
+	if (s != NULL) {  /* loading a string? */
+		const char *chunkname = luaL_optstring(L, 2, s);
+		status = luaL_loadbufferx(L, s, l, chunkname, mode);
+	}
+	else {  /* loading from a reader function */
+		const char *chunkname = luaL_optstring(L, 2, "=(load)");
+		luaL_checktype(L, 1, LUA_TFUNCTION);
+		lua_settop(L, RESERVEDSLOT);  /* create reserved slot */
+		status = lua_load(L, generic_reader, NULL, chunkname, mode);
+	}
+	if (cname && status == LUA_OK) {
+		size_t sz = 0;
+		str_dump(L);
+		const char * bytecode = lua_tolstring(L,-1,&sz);
+		// update cache
+		luacode_load(cname, bytecode, &sz);
+		lua_pop(L,1);
+	}
+
 	return load_aux(L, status, env);
 }
 
@@ -264,30 +337,44 @@ searcher_cache (lua_State *L) {
 	return checkload(L, (luacode_loadfile(L, filename) == LUA_OK), filename);
 }
 
-static void
+static int
 replace_searcher_lua(lua_State *L) {
 	lua_getglobal(L, "package");
 	if (!lua_istable(L,-1)) {
-		luaL_error(L, "Can't find package");
+//		luaL_error(L, "Can't find package");
+		return 1;
 	}
 	lua_getfield(L, -1, "searchers");
 	if (!lua_istable(L,-1)) {
-		luaL_error(L, "Can't find package.searchers");
+//		luaL_error(L, "Can't find package.searchers");
+		return 1;
 	}
 	lua_pushvalue(L,-2);
 	lua_pushcclosure(L, searcher_cache, 1);
 	// package.searcher[2] is searcher_lua, replace it.
 	lua_rawseti(L, -2, 2);
 	lua_pop(L,2);
+
+	return 0;
+}
+
+static int
+cache_clear(lua_State *L) {
+	_clearcache();
+	return 0;
 }
 
 //-------------------------
 
 int 
 luacode_lib(lua_State *L) {
-	replace_searcher_lua(L);
+	if (replace_searcher_lua(L)) {
+		// Don't support package.searchers
+		return 0;
+	}
 	luaL_Reg l[] = {
-//		{ "load", cache_load },
+		{ "load", cache_load },
+		{ "clear", cache_clear },
 		{ "loadfile", cache_loadfile },
 		{ NULL, NULL },
 	};

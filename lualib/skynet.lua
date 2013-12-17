@@ -10,6 +10,9 @@ local pcall = pcall
 local proto = {}
 local skynet = {}
 
+-- code cache
+skynet.cache = require "skynet.codecache"
+
 function skynet.register_protocol(class)
 	local name = class.name
 	local id = class.id
