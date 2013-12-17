@@ -93,6 +93,7 @@ _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
 		lua_pop(L,1);
 		return 0;
 	} else if (r == LUA_ERRFILE) {
+		lua_pop(L,1);
 		return -1;
 	}
 	return 1;
