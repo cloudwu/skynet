@@ -330,6 +330,8 @@ start_listen(struct gate *g, char * listen_addr) {
 
 int
 gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
+	if (parm == NULL)
+		return 1;
 	int max = 0;
 	int buffer = 0;
 	int sz = strlen(parm)+1;

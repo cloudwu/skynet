@@ -41,6 +41,8 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 int
 client_init(struct client *c, struct skynet_context *ctx, const char * args) {
 	int id = 0;
+	if (args == NULL)
+		return 1;
 	sscanf(args, "%d",&id);
 	c->id = id;
 	skynet_callback(ctx, c, _cb);

@@ -120,10 +120,11 @@ skynet_context_new(const char * name, const char *param) {
 		}
 		skynet_mq_force_push(queue);
 		if (ret) {
-			printf("[:%x] launch %s %s\n",ret->handle, name, param ? param : "");
+			skynet_error(ret, "LAUNCH %s %s", name, param ? param : "");
 		}
 		return ret;
 	} else {
+		skynet_error(ctx, "FAILED launch %s", name);
 		skynet_context_release(ctx);
 		skynet_handle_retire(ctx->handle);
 		skynet_mq_release(queue);
@@ -358,9 +359,11 @@ static void
 handle_exit(struct skynet_context * context, uint32_t handle) {
 	if (handle == 0) {
 		handle = context->handle;
+		skynet_error(context, "KILL self");
 	}
 	if (G_NODE.monitor_exit) {
 		skynet_send(context,  handle, G_NODE.monitor_exit, PTYPE_CLIENT, 0, NULL, 0);
+		skynet_error(context, "KILL :%0x", handle);
 	}
 	skynet_handle_retire(handle);
 }
@@ -476,7 +479,6 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		args = strsep(&args, "\r\n");
 		struct skynet_context * inst = skynet_context_new(mod,args);
 		if (inst == NULL) {
-			fprintf(stderr, "Launch %s %s failed\n",mod,args);
 			return NULL;
 		} else {
 			_id_to_hex(context->result, inst->handle);

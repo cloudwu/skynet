@@ -34,7 +34,8 @@ skynet_harbor_register(struct remote_name *rname) {
 
 int 
 skynet_harbor_message_isremote(uint32_t handle) {
-	return (handle & ~HANDLE_MASK) != HARBOR;
+	int h = (handle & ~HANDLE_MASK);
+	return h != HARBOR && h !=0;
 }
 
 void

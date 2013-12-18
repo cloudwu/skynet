@@ -309,7 +309,10 @@ function skynet.call(addr, typename, ...)
 	if watching_service[addr] == false then
 		error("Service is dead")
 	end
-	local session = assert(c.send(addr, p.id , nil , p.pack(...)),"call to invalid address")
+	local session = c.send(addr, p.id , nil , p.pack(...))
+	if session == nil then
+		error("call to invalid address " .. tostring(addr))
+	end
 	return p.unpack(yield_call(addr, session))
 end
 
@@ -319,7 +322,7 @@ function skynet.blockcall(addr, typename , ...)
 	local session = c.send(addr, p.id , nil , p.pack(...))
 	if session == nil then
 		c.command("UNLOCK")
-		error("call to invalid address")
+		error("call to invalid address " .. tostring(addr))
 	end
 	return p.unpack(yield_call(addr, session))
 end
