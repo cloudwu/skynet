@@ -356,11 +356,11 @@ skynet_queryname(struct skynet_context * context, const char * name) {
 
 static void
 handle_exit(struct skynet_context * context, uint32_t handle) {
-	if (G_NODE.monitor_exit) {
-		skynet_send(context,  handle, G_NODE.monitor_exit, PTYPE_CLIENT, 0, NULL, 0);
-	}
 	if (handle == 0) {
 		handle = context->handle;
+	}
+	if (G_NODE.monitor_exit) {
+		skynet_send(context,  handle, G_NODE.monitor_exit, PTYPE_CLIENT, 0, NULL, 0);
 	}
 	skynet_handle_retire(handle);
 }
