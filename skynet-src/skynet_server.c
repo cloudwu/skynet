@@ -360,10 +360,11 @@ handle_exit(struct skynet_context * context, uint32_t handle) {
 	if (handle == 0) {
 		handle = context->handle;
 		skynet_error(context, "KILL self");
+	} else {
+		skynet_error(context, "KILL :%0x", handle);
 	}
 	if (G_NODE.monitor_exit) {
 		skynet_send(context,  handle, G_NODE.monitor_exit, PTYPE_CLIENT, 0, NULL, 0);
-		skynet_error(context, "KILL :%0x", handle);
 	}
 	skynet_handle_retire(handle);
 }
