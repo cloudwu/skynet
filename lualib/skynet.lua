@@ -8,7 +8,20 @@ local pairs = pairs
 local pcall = pcall
 
 local proto = {}
-local skynet = {}
+local skynet = {
+	-- read skynet.h
+	PTYPE_TEXT = 0,
+	PTYPE_RESPONSE = 1,
+	PTYPE_MULTICAST = 2,
+	PTYPE_CLIENT = 3,
+	PTYPE_SYSTEM = 4,
+	PTYPE_HARBOR = 5,
+	PTYPE_SOCKET = 6,
+	PTYPE_ERROR = 7,
+	PTYPE_QUEUE = 8,
+	PTYPE_DEBUG = 9,
+	PTYPE_LUA = 10
+}
 
 -- code cache
 skynet.cache = require "skynet.codecache"
@@ -138,8 +151,7 @@ function suspend(co, result, command, param, size)
 		local session = session_coroutine_id[co]
 		local addr = session_coroutine_address[co]
 		if session and session ~= 0  then
-			-- 7 means error (PTYPE_RESERVED_ERROR)
-			c.send(addr, 7, session, "")
+			c.send(addr, skynet.PTYPE_ERROR, session, "")
 		end
 		session_coroutine_id[co] = nil
 		session_coroutine_address[co] = nil
@@ -155,7 +167,6 @@ function suspend(co, result, command, param, size)
 	elseif command == "RETURN" then
 		local co_session = session_coroutine_id[co]
 		local co_address = session_coroutine_address[co]
-		-- PTYPE_RESPONSE = 1 , see skynet.h
 		if param == nil then
 			trace_count()
 			error(debug.traceback(co))
@@ -163,8 +174,7 @@ function suspend(co, result, command, param, size)
 		-- c.send maybe throw a error, so call trace_count first.
 		-- The coroutine execute time after skynet.ret() will not be trace.
 		trace_count()
-		-- 1 means response (PTYPE_RESPONSE)
-		c.send(co_address, 1, co_session, param, size)
+		c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size)
 		return suspend(co, coroutine.resume(co))
 	elseif command == "EXIT" then
 		-- coroutine exit
@@ -375,7 +385,7 @@ function skynet.fork(func,...)
 end
 
 local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
-	-- PTYPE_RESPONSE = 1, read skynet.h
+	-- skynet.PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
 		local co = session_id_coroutine[session]
 		if co == "BREAK" then
@@ -544,7 +554,7 @@ do
 
 	REG {
 		name = "text",
-		id = 0,
+		id = skynet.PTYPE_TEXT,
 		pack = function (...)
 			local n = select ("#" , ...)
 			if n == 0 then
@@ -560,19 +570,19 @@ do
 
 	REG {
 		name = "lua",
-		id = 10,
+		id = skynet.PTYPE_LUA,
 		pack = skynet.pack,
 		unpack = skynet.unpack,
 	}
 
 	REG {
 		name = "response",
-		id = 1,
+		id = skynet.PTYPE_RESPONSE,
 	}
 
 	REG {
 		name = "debug",
-		id = 9,
+		id = skynet.PTYPE_DEBUG,
 		pack = skynet.pack,
 		unpack = skynet.unpack,
 		dispatch = _debug_dispatch,
@@ -580,7 +590,7 @@ do
 
 	REG {
 		name = "error",
-		id = 7,
+		id = skynet.PTYPE_ERROR,
 		pack = skynet.pack,
 		unpack = skynet.unpack,
 		dispatch = _error_dispatch,

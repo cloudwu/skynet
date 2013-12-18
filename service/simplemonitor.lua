@@ -6,7 +6,7 @@ local service_map = {}
 
 skynet.register_protocol {
 	name = "client",
-	id = 3,
+	id = skynet.PTYPE_CLIENT,	-- PTYPE_CLIENT = 3
 	unpack = function() end,
 	dispatch = function(_, address)
 		local w = service_map[address]

@@ -104,7 +104,7 @@ end
 
 skynet.register_protocol {
 	name = "socket",
-	id = 6,	-- PTYPE_SOCKET
+	id = skynet.PTYPE_SOCKET,	-- PTYPE_SOCKET = 6
 	unpack = driver.unpack,
 	dispatch = function (_, _, t, n1, n2, data)
 		socket_message[t](n1,n2,data)
