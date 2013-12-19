@@ -14,7 +14,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define PREALLOCMEM (1024 * 1024)
+// define PREALLOCMEM to enable skynet defined alloc
+//#define PREALLOCMEM (1024 * 1024)
 
 // time
 
@@ -259,8 +260,8 @@ snlua_create(void) {
 
 void
 snlua_release(struct snlua *l) {
-	void * ud = NULL;
 #ifdef PREALLOCMEM
+	void * ud = NULL;
 	lua_Alloc lalloc = lua_getallocf(l->L, &ud);
 	assert(lalloc == skynet_lua_alloc);
 	lua_close(l->L);

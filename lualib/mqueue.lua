@@ -34,9 +34,14 @@ local function message_dispatch(f)
 			local msg = table.remove(message_queue,1)
 			local session = msg.session
 			if session == 0 then
-				if do_func(f, msg) ~= nil then
-					skynet.fork(message_dispatch,f)
-					error(string.format("[:%x] send a message to [:%x] return something", msg.addr, skynet.self()))
+				local ok, msg = do_func(f, msg)
+				if ok then
+					if msg then
+						skynet.fork(message_dispatch,f)
+						error(string.format("[:%x] send a message to [:%x] return something", msg.addr, skynet.self()))
+					end
+				else
+					error(string.format("[:%x] send a message to [:%x] throw an error : %s", msg.addr, skynet.self(),msg))
 				end
 			else
 				local data, size = skynet.pack(do_func(f,msg))
