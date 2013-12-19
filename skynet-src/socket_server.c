@@ -49,6 +49,7 @@ struct socket {
 struct socket_server {
 	int recvctrl_fd;
 	int sendctrl_fd;
+	int checkctrl;
 	poll_fd event_fd;
 	int alloc_id;
 	int event_n;
@@ -171,6 +172,7 @@ socket_server_create() {
 	ss->event_fd = efd;
 	ss->recvctrl_fd = fd[0];
 	ss->sendctrl_fd = fd[1];
+	ss->checkctrl = 1;
 
 	for (i=0;i<MAX_SOCKET;i++) {
 		struct socket *s = &ss->slot[i];
@@ -522,6 +524,22 @@ block_readpipe(int pipefd, void *buffer, int sz) {
 	}
 }
 
+static int
+has_cmd(struct socket_server *ss) {
+	fd_set rfds;
+	struct timeval tv = {0,0};
+	int retval;
+
+	FD_ZERO(&rfds);
+	FD_SET(ss->recvctrl_fd, &rfds);
+
+	retval = select(ss->recvctrl_fd+1, &rfds, NULL, NULL, &tv);
+	if (retval == 1) {
+		return 1;
+	}
+	return 0;
+}
+
 // return type
 static int
 ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
@@ -670,12 +688,25 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 	return 1;
 }
 
+
 // return type
 int 
 socket_server_poll(struct socket_server *ss, struct socket_message * result, int * more) {
 	for (;;) {
+		if (ss->checkctrl) {
+			if (has_cmd(ss)) {
+				int type = ctrl_cmd(ss, result);
+				if (type != -1)
+					return type;
+				else
+					continue;
+			} else {
+				ss->checkctrl = 0;
+			}
+		}
 		if (ss->event_index == ss->event_n) {
 			ss->event_n = sp_wait(ss->event_fd, ss->ev, MAX_EVENT);
+			ss->checkctrl = 1;
 			if (more) {
 				*more = 0;
 			}
@@ -688,11 +719,8 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 		struct event *e = &ss->ev[ss->event_index++];
 		struct socket *s = e->s;
 		if (s == NULL) {
-			int type = ctrl_cmd(ss, result);
-			if (type != -1)
-				return type;
-			else
-				continue;
+			// dispatch pipe message at beginning
+			continue;
 		}
 		switch (s->type) {
 		case SOCKET_TYPE_CONNECTING:
