@@ -71,7 +71,7 @@ service/harbor.so : service-src/service_harbor.c
 service/logger.so : skynet-src/skynet_logger.c
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
-service/snlua.so : service-src/service_lua.c service-src/luacode_cache.c
+service/snlua.so : service-src/service_lua.c service-src/luacode_cache.c service-src/luaalloc.c
 	gcc $(CFLAGS) $(SHARED) -Iluacompat $^ -o $@ -Iskynet-src
 
 service/gate.so : service-src/service_gate.c

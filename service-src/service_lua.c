@@ -7,11 +7,14 @@
 #include "luacompat52.h"
 #include "service_lua.h"
 #include "luacode_cache.h"
+#include "luaalloc.h"
 
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#define PREALLOCMEM (1024 * 1024)
 
 // time
 
@@ -245,13 +248,25 @@ struct snlua *
 snlua_create(void) {
 	struct snlua * l = malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
+#ifdef PREALLOCMEM
+	l->L = lua_newstate(skynet_lua_alloc, skynet_lalloc_new(PREALLOCMEM));
+#else
 	l->L = luaL_newstate();
+#endif
 	l->init = _init;
 	return l;
 }
 
 void
 snlua_release(struct snlua *l) {
+	void * ud = NULL;
+#ifdef PREALLOCMEM
+	lua_Alloc lalloc = lua_getallocf(l->L, &ud);
+	assert(lalloc == skynet_lua_alloc);
 	lua_close(l->L);
+	skynet_lalloc_delete(ud);
+#else
+	lua_close(l->L);
+#endif
 	free(l);
 }
