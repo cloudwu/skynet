@@ -10,9 +10,9 @@ function cmd.LAUNCH(service_name, ...)
 	end
 
 	if s == nil then
-		s = {}
+		s = { launch = true }
 		service[service_name] = s
-	else
+	elseif s.launch then
 		assert(type(s) == "table")
 		local co = coroutine.running()
 		table.insert(s, co)
