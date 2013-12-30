@@ -447,6 +447,9 @@ static void
 _get_buffer(lua_State *L, struct read_block *rb, int len) {
 	char tmp[len];
 	char * p = rb_read(rb,tmp,len);
+	if (p == NULL) {
+		_invalid_stream(L,rb);
+	}
 	lua_pushlstring(L,p,len);
 }
 
