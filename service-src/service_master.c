@@ -182,12 +182,17 @@ _update_name(struct master *m, uint32_t handle, const char * buffer, size_t sz) 
 }
 
 static void
-_update_address(struct master *m, int harbor_id, const char * buffer, size_t sz) {
+close_harbor(struct master *m, int harbor_id) {
 	struct skynet_context * context = m->ctx;
+	skynet_socket_close(context, m->remote_fd[harbor_id]);
+	m->remote_fd[harbor_id] = -1;
+	m->connected[harbor_id] = false;
+}
+
+static void
+_update_address(struct master *m, int harbor_id, const char * buffer, size_t sz) {
 	if (m->remote_fd[harbor_id] >= 0) {
-		skynet_socket_close(context, m->remote_fd[harbor_id]);
-		m->remote_fd[harbor_id] = -1;
-		m->connected[harbor_id] = false;
+		close_harbor(m, harbor_id);
 	}
 	free(m->remote_addr[harbor_id]);
 	char * addr = malloc(sz+1);
@@ -233,6 +238,7 @@ dispatch_socket(struct master *m, const struct skynet_socket_message *msg, int s
 		break;
 	case SKYNET_SOCKET_TYPE_CLOSE:
 	case SKYNET_SOCKET_TYPE_ERROR:
+		close_harbor(m, id);
 		skynet_error(m->ctx, "socket error on harbor %d", id);
 		break;
 	default:
