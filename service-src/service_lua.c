@@ -6,7 +6,6 @@
 #include <assert.h>
 #include "luacompat52.h"
 #include "service_lua.h"
-#include "luacode_cache.h"
 #include "luaalloc.h"
 
 #include <assert.h>
@@ -16,6 +15,13 @@
 
 // define PREALLOCMEM to enable skynet defined alloc
 //#define PREALLOCMEM (1024 * 1024)
+
+// define NOCODECACHE to disable lua code cache
+//#define NOCODECACHE
+
+#ifndef NOCODECACHE
+#include "luacode_cache.h"
+#endif
 
 // time
 
@@ -72,7 +78,11 @@ _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
 	}
 	tmp[namelen+pathlen-1] = '\0';
 	//	luacode_loadfile is the same with luaL_loadfile except cache.
+#ifdef NOCODECACHE
+	int r = luaL_loadfile(L,tmp);
+#else
 	int r = luacode_loadfile(L,tmp);
+#endif
 	if (r == LUA_OK) {
 		int i;
 		for (i=namelen+pathlen-2;i>=0;i--) {
@@ -171,8 +181,10 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	luaL_openlibs(L);
 	lua_pushlightuserdata(L, l);
 	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_lua");
+#ifndef NOCODECACHE
 	luaL_requiref(L, "skynet.codecache", luacode_lib , 0);
 	lua_pop(L,1);
+#endif
 	lua_gc(L, LUA_GCRESTART, 0);
 
 	char tmp[strlen(args)+1];
