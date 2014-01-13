@@ -183,10 +183,12 @@ _update_name(struct master *m, uint32_t handle, const char * buffer, size_t sz) 
 
 static void
 close_harbor(struct master *m, int harbor_id) {
-	struct skynet_context * context = m->ctx;
-	skynet_socket_close(context, m->remote_fd[harbor_id]);
-	m->remote_fd[harbor_id] = -1;
-	m->connected[harbor_id] = false;
+	if (m->connected[harbor_id]) {
+		struct skynet_context * context = m->ctx;
+		skynet_socket_close(context, m->remote_fd[harbor_id]);
+		m->remote_fd[harbor_id] = -1;
+		m->connected[harbor_id] = false;
+	}
 }
 
 static void
@@ -236,10 +238,11 @@ dispatch_socket(struct master *m, const struct skynet_socket_message *msg, int s
 		assert(id);
 		on_connected(m, id);
 		break;
-	case SKYNET_SOCKET_TYPE_CLOSE:
 	case SKYNET_SOCKET_TYPE_ERROR:
-		close_harbor(m, id);
 		skynet_error(m->ctx, "socket error on harbor %d", id);
+		// go though, close socket
+	case SKYNET_SOCKET_TYPE_CLOSE:
+		close_harbor(m, id);
 		break;
 	default:
 		skynet_error(m->ctx, "Invalid socket message type %d", msg->type);
