@@ -102,11 +102,17 @@ skynet_socket_poll() {
 
 int
 skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz) {
-	int err = socket_server_send(SOCKET_SERVER, id, buffer, sz);
-	if (err < 0) {
+	int64_t wsz = socket_server_send(SOCKET_SERVER, id, buffer, sz);
+	if (wsz < 0) {
 		free(buffer);
+		return -1;
+	} else if (wsz > 1024 * 1024) {
+		int kb4 = wsz / 1024 / 4;
+		if (kb4 % 256 == 0) {
+			skynet_error(ctx, "%d Mb bytes on socket %d need to send out", (int)(wsz / (1024 * 1024)), id);
+		}
 	}
-	return err;
+	return 0;
 }
 
 int 

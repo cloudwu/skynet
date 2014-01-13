@@ -41,6 +41,7 @@ struct socket {
 	int id;
 	int type;
 	int size;
+	int64_t wb_size;
 	uintptr_t opaque;
 	struct write_buffer * head;
 	struct write_buffer * tail;
@@ -246,6 +247,7 @@ new_fd(struct socket_server *ss, int id, int fd, uintptr_t opaque, bool add) {
 	s->fd = fd;
 	s->size = MIN_READ_BUFFER;
 	s->opaque = opaque;
+	s->wb_size = 0;
 	assert(s->head == NULL);
 	assert(s->tail == NULL);
 	return s;
@@ -345,6 +347,7 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 				force_close(ss,s, result);
 				return SOCKET_CLOSE;
 			}
+			s->wb_size -= sz;
 			if (sz != tmp->sz) {
 				tmp->ptr += sz;
 				tmp->sz -= sz;
@@ -365,6 +368,24 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 	}
 
 	return -1;
+}
+
+static void
+append_sendbuffer(struct socket *s, struct request_send * request, int n) {
+	struct write_buffer * buf = MALLOC(sizeof(*buf));
+	buf->ptr = request->buffer+n;
+	buf->sz = request->sz - n;
+	buf->buffer = request->buffer;
+	buf->next = NULL;
+	s->wb_size += buf->sz;
+	if (s->head == NULL) {
+		s->head = s->tail = buf;
+	} else {
+		assert(s->tail != NULL);
+		assert(s->tail->next == NULL);
+		s->tail->next = buf;
+		s->tail = buf;
+	}
 }
 
 static int
@@ -396,25 +417,10 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			FREE(request->buffer);
 			return -1;
 		}
-
-		struct write_buffer * buf = MALLOC(sizeof(*buf));
-		buf->next = NULL;
-		buf->ptr = request->buffer+n;
-		buf->sz = request->sz - n;
-		buf->buffer = request->buffer;
-		s->head = s->tail = buf;
-
+		append_sendbuffer(s, request, n);
 		sp_write(ss->event_fd, s->fd, s, true);
 	} else {
-		struct write_buffer * buf = MALLOC(sizeof(*buf));
-		buf->ptr = request->buffer;
-		buf->buffer = request->buffer;
-		buf->sz = request->sz;
-		assert(s->tail != NULL);
-		assert(s->tail->next == NULL);
-		buf->next = s->tail->next;
-		s->tail->next = buf;
-		s->tail = buf;
+		append_sendbuffer(s, request, 0);
 	}
 	return -1;
 }
@@ -807,7 +813,7 @@ socket_server_block_connect(struct socket_server *ss, uintptr_t opaque, const ch
 }
 
 // return -1 when error
-int 
+int64_t 
 socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz) {
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
@@ -821,7 +827,7 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 	request.u.send.buffer = (char *)buffer;
 
 	send_request(ss, &request, 'D', sizeof(request.u.send));
-	return 0;
+	return s->wb_size;
 }
 
 void
