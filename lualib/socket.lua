@@ -146,7 +146,7 @@ function socket.start(id, func)
 	return connect(id, func)
 end
 
-function socket.close(fd)
+function socket.close(id)
 	local s = socket_pool[id]
 	if s == nil then
 		return
