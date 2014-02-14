@@ -20,28 +20,40 @@ static struct modules * M = NULL;
 
 static void *
 _try_open(struct modules *m, const char * name) {
+	const char *l;
 	const char * path = m->path;
 	size_t path_size = strlen(path);
 	size_t name_size = strlen(name);
 
 	int sz = path_size + name_size;
+	//search path
+	void * dl = NULL;
 	char tmp[sz];
-	int i;
-	for (i=0;path[i]!='?' && path[i]!='\0';i++) {
-		tmp[i] = path[i];
-	}
-	memcpy(tmp+i,name,name_size);
-	if (path[i] == '?') {
-		strcpy(tmp+i+name_size,path+i+1);
-	} else {
-		fprintf(stderr,"Invalid C service path\n");
-		exit(1);
-	}
-
-	void * dl = dlopen(tmp, RTLD_NOW | RTLD_GLOBAL);
+	do
+	{
+		memset(tmp,0,sz);
+		while (*path == ';') path++;
+		if (*path == '\0') break;
+		l = strchr(path, ';');
+		if (l == NULL) l = path + strlen(path);
+		int len = l - path;
+		int i;
+		for (i=0;path[i]!='?' && i < len ;i++) {
+			tmp[i] = path[i];
+		}
+		memcpy(tmp+i,name,name_size);
+		if (path[i] == '?') {
+			strncpy(tmp+i+name_size,path+i+1,len - i - 1);
+		} else {
+			fprintf(stderr,"Invalid C service path\n");
+			exit(1);
+		}
+		dl = dlopen(tmp, RTLD_NOW | RTLD_GLOBAL);
+		path = l;
+	}while(dl == NULL);
 
 	if (dl == NULL) {
-		fprintf(stderr, "try open %s failed : %s\n",tmp,dlerror());
+		fprintf(stderr, "try open %s failed : %s\n",name,dlerror());
 	}
 
 	return dl;
