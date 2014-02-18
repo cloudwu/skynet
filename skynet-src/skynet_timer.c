@@ -220,8 +220,8 @@ _gettime(void) {
 void
 skynet_updatetime(void) {
 	uint32_t ct = _gettime();
-	if (ct > TI->current) {
-		int diff = ct-TI->current;
+	if (ct != TI->current) {
+		int diff = ct>=TI->current?ct-TI->current:(0xffffff+1)*100-TI->current+ct;
 		TI->current = ct;
 		int i;
 		for (i=0;i<diff;i++) {
