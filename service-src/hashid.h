@@ -90,7 +90,7 @@ hashid_insert(struct hashid * hi, int id) {
 	struct hashid_node *c = NULL;
 	int i;
 	for (i=0;i<hi->cap;i++) {
-		int index = (i+hi->count) % hi->cap;
+		int index = (i+id) % hi->cap;
 		if (hi->id[index].id == -1) {
 			c = &hi->id[index];
 			break;
