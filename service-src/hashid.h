@@ -19,12 +19,15 @@ struct hashid {
 };
 
 static void
-hashid_init(struct hashid *hi, int max, int hashcap) {
+hashid_init(struct hashid *hi, int max) {
 	int i;
-	assert((hashcap & (hashcap-1))==0);
-	hi->cap = max;
-	assert(hi->cap <= hashcap);
+	int hashcap;
+	hashcap = 16;
+	while (hashcap < max) {
+		hashcap *= 2;
+	}
 	hi->hashmod = hashcap - 1;
+	hi->cap = max;
 	hi->count = 0;
 	hi->id = malloc(max * sizeof(struct hashid_node));
 	for (i=0;i<max;i++) {
@@ -90,7 +93,7 @@ hashid_insert(struct hashid * hi, int id) {
 	struct hashid_node *c = NULL;
 	int i;
 	for (i=0;i<hi->cap;i++) {
-		int index = (i+hi->count) % hi->cap;
+		int index = (i+id) % hi->cap;
 		if (hi->id[index].id == -1) {
 			c = &hi->id[index];
 			break;
