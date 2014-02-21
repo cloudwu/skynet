@@ -526,6 +526,7 @@ function dbgcmd.STAT()
 	query_state(stat, "count")
 	query_state(stat, "time")
 	stat.boottime = debug.getregistry().skynet_boottime
+	stat.mqlen = skynet.mqlen()
 	skynet.ret(skynet.pack(stat))
 end
 
@@ -690,6 +691,10 @@ function skynet.monitor(service, query)
 	end
 	assert(monitor, "Monitor launch failed")
 	c.command("MONITOR", string.format(":%08x", monitor))
+end
+
+function skynet.mqlen()
+	return tonumber(c.command "MQLEN")
 end
 
 return skynet

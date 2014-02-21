@@ -26,6 +26,9 @@ void skynet_mq_push(struct message_queue *q, struct skynet_message *message);
 void skynet_mq_lock(struct message_queue *q, int session);
 void skynet_mq_unlock(struct message_queue *q);
 
+// return the length of message queue, for debug
+int skynet_mq_length(struct message_queue *q);
+
 void skynet_mq_force_push(struct message_queue *q);
 void skynet_mq_pushglobal(struct message_queue *q);
 

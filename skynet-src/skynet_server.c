@@ -563,6 +563,12 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		return NULL;
 	}
 
+	if (strcmp(cmd, "MQLEN") == 0) {
+		int len = skynet_mq_length(context->queue);
+		sprintf(context->result, "%d", len);
+		return context->result;
+	}
+
 	return NULL;
 }
 
