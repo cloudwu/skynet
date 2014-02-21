@@ -368,11 +368,7 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 
 	g->ctx = ctx;
 
-	int cap = 16;
-	while (cap < max) {
-		cap *= 2;
-	}
-	hashid_init(&g->hash, max, cap);
+	hashid_init(&g->hash, max);
 	g->conn = malloc(max * sizeof(struct connection));
 	memset(g->conn, 0, max *sizeof(struct connection));
 	g->max_connection = max;
