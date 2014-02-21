@@ -111,16 +111,18 @@ skynet_mq_handle(struct message_queue *q) {
 
 int
 skynet_mq_length(struct message_queue *q) {
-	int head, tail;
+	int head, tail,cap;
+
 	LOCK(q)
 	head = q->head;
 	tail = q->tail;
+	cap = q->cap;
 	UNLOCK(q)
 	
 	if (head <= tail) {
 		return tail - head;
 	}
-	return tail + q->cap - head;
+	return tail + cap - head;
 }
 
 int
