@@ -37,7 +37,7 @@ end
 
 skynet.register_protocol {
 	name = "client",
-	id = 3,
+	id = skynet.PTYPE_CLIENT,
 }
 
 skynet.start(function()

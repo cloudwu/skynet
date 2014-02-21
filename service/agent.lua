@@ -3,7 +3,7 @@ local client = ...
 
 skynet.register_protocol {
 	name = "client",
-	id = 3,
+	id = skynet.PTYPE_CLIENT,
 	pack = function(...) return ... end,
 	unpack = skynet.tostring,
 	dispatch = function (session, address, text)
