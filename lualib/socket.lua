@@ -38,7 +38,7 @@ socket_message[1] = function(id, size, data)
 	local s = socket_pool[id]
 	if s == nil then
 		print("socket: drop package from " .. id)
-		driver.drop(data)
+		driver.drop(data, size)
 		return
 	end
 
