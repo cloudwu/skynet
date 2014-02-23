@@ -2,6 +2,7 @@
 #include "trace_service.h"
 #include "lua-seri.h"
 #include "service_lua.h"
+#include "timingqueue.h"
 
 #include "luacompat52.h"
 
@@ -26,6 +27,7 @@ struct stat {
 	uint32_t ti_sec;
 	uint32_t ti_nsec;
 	struct trace_pool *trace;
+	struct tqueue * tq;
 	struct snlua *lua;
 };
 
@@ -64,6 +66,31 @@ _stat(lua_State *L) {
 	return 0;
 }
 
+static inline double
+current_time_tick(struct stat *S) {
+	return (double)S->ti_sec + (double)S->ti_nsec / NANOSEC;
+}
+
+static struct stat *
+get_stat(lua_State *L) {
+	struct stat * S = lua_touserdata(L, lua_upvalueindex(2));
+	if (S == NULL) {
+		lua_rawgetp(L, LUA_REGISTRYINDEX, _stat);
+		S = lua_touserdata(L, -1);
+		lua_replace(L, lua_upvalueindex(2));
+	}
+
+	return S;
+}
+
+static inline void
+save_session(lua_State *L, int session) {
+	if (session > 0) {
+		struct stat * S = get_stat(L);
+		tqueue_push(S->tq, session, current_time_tick(S));
+	}
+}
+
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct stat *S = ud;
@@ -71,6 +98,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	struct timespec ti;
 	_stat_begin(S, &ti);
 	int trace = 1;
+	int r;
 	int top = lua_gettop(L);
 	if (top == 1) {
 		lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
@@ -85,7 +113,18 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	lua_pushinteger(L, session);
 	lua_pushnumber(L, source);
 
-	int r = lua_pcall(L, 5, 0 , trace);
+	if (type == PTYPE_RESPONSE && session > 0) {
+		double t = tqueue_pop(S->tq, session);
+		if (t != 0) {
+			t = current_time_tick(S) - t;
+			lua_pushnumber(L, t);
+			r = lua_pcall(L, 6, 0 , trace);
+		} else {
+			r = lua_pcall(L, 5, 0 , trace);
+		}
+	} else {
+		r = lua_pcall(L, 5, 0 , trace);
+	}
 
 	_stat_end(S, &ti);
 
@@ -137,9 +176,23 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 }
 
 static int
+_timing(lua_State *L) {
+	int session = luaL_checkinteger(L,1);
+	struct stat * S = get_stat(L);
+	double t = tqueue_pop(S->tq, session);
+	if (t != 0) {
+		t = current_time_tick(S) - t;
+	}
+	lua_pushnumber(L, t);
+
+	return 1;
+}
+
+static int
 _delete_stat(lua_State *L) {
 	struct stat * S = lua_touserdata(L,1);
 	trace_release(S->trace);
+	tqueue_delete(S->tq);
 	return 0;
 }
 
@@ -162,6 +215,7 @@ _callback(lua_State *L) {
 	memset(S, 0, sizeof(*S));
 	S->L = gL;
 	S->trace = trace_create();
+	S->tq = tqueue_new();
 	S->lua = lua;
 
 	lua_createtable(L,0,1);
@@ -220,16 +274,19 @@ _sendname(lua_State *L, struct skynet_context * context, const char * dest) {
 		size_t len = 0;
 		void * msg = (void *)lua_tolstring(L,4,&len);
 		session = skynet_sendname(context, dest, type, session , msg, len);
+		save_session(L, session);
 		break;
 	}
 	case LUA_TNIL :
 		session = skynet_sendname(context, dest, type, session , NULL, 0);
+		save_session(L, session);
 		break;
 	case LUA_TLIGHTUSERDATA: {
 		luaL_checktype(L, 4, LUA_TLIGHTUSERDATA);
 		void * msg = lua_touserdata(L,4);
 		int size = luaL_checkinteger(L,5);
 		session = skynet_sendname(context, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		save_session(L, session);
 		break;
 	}
 	default:
@@ -295,12 +352,14 @@ _send(lua_State *L) {
 			msg = NULL;
 		}
 		session = skynet_send(context, 0, dest, type, session , msg, len);
+		save_session(L, session);
 		break;
 	}
 	case LUA_TLIGHTUSERDATA: {
 		void * msg = lua_touserdata(L,4);
 		int size = luaL_checkinteger(L,5);
 		session = skynet_send(context, 0, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		save_session(L, session);
 		break;
 	}
 	default:
@@ -332,12 +391,14 @@ _redirect(lua_State *L) {
 			msg = NULL;
 		}
 		session = skynet_send(context, source, dest, type, session , msg, len);
+		save_session(L, session);
 		break;
 	}
 	case LUA_TLIGHTUSERDATA: {
 		void * msg = lua_touserdata(L,5);
 		int size = luaL_checkinteger(L,6);
 		session = skynet_send(context, source, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		save_session(L, session);
 		break;
 	}
 	default:
@@ -461,6 +522,7 @@ luaopen_skynet_c(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "send" , _send },
 		{ "genid", _genid },
+		{ "timing", _timing },
 		{ "redirect", _redirect },
 		{ "forward", _forward },
 		{ "command" , _command },
@@ -501,7 +563,8 @@ luaopen_skynet_c(lua_State *L) {
 	lua_setfield(L, -2, "reload");
 
 	lua_pushlightuserdata(L, lua->ctx);
-	luaL_setfuncs(L,l,1);
+	lua_pushnil(L);
+	luaL_setfuncs(L,l,2);
 
 	luaL_setfuncs(L,l2,0);
 

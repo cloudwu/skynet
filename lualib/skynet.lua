@@ -46,6 +46,9 @@ local watching_service = {}
 local watching_session = {}
 local error_queue = {}
 
+-- timing remote call, turn off by default. Use skynet.timing_call() to turn on.
+local timing_call = nil
+
 -- suspend is function
 local suspend
 
@@ -384,9 +387,23 @@ function skynet.fork(func,...)
 	table.insert(fork_queue, co)
 end
 
-local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
+local function timing(session, source, ti)
+	local t = timing_call[source]
+	if t == nil then
+		t = { n = 1, ti = 0 }
+		timing_call[source] = t
+	else
+		t.n = t.n + 1
+	end
+	t.ti = t.ti + ti
+end
+
+local function raw_dispatch_message(prototype, msg, sz, session, source, ti)
 	-- skynet.PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
+		if ti and timing_call then
+			timing(session, source, ti)
+		end
 		local co = session_id_coroutine[session]
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
@@ -404,7 +421,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
-			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
+			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz)))
 		else
 			print("Unknown request :" , p.unpack(msg,sz))
 			error(string.format("Can't dispatch type %s : ", p.name))
@@ -535,6 +552,17 @@ function dbgcmd.INFO()
 		skynet.ret(skynet.pack(internal_info_func()))
 	else
 		skynet.ret(skynet.pack(nil))
+	end
+end
+
+function dbgcmd.TIMING()
+	if timing_call then
+		skynet.ret(skynet.pack(timing_call))
+		-- turn off timing
+		timing_call = nil
+	else
+		-- turn on timing
+		timing_call = {}
 	end
 end
 
@@ -695,6 +723,14 @@ end
 
 function skynet.mqlen()
 	return tonumber(c.command "MQLEN")
+end
+
+function skynet.timing_call()
+	timing_call = {}
+end
+
+function skynet.timing_session(session)
+	return c.timing(session)
 end
 
 return skynet

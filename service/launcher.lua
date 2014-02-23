@@ -48,6 +48,22 @@ function command.INFO(handle)
 	end
 end
 
+function command.TIMING(handle)
+	handle = handle_to_address(handle)
+	if services[handle] == nil then
+		skynet.ret(skynet.pack(nil))
+	else
+		local r = skynet.call(handle,"debug","TIMING")
+		local result = {}
+		for k,v in pairs(r) do
+			local key = services[k] or string.format("[:%08x]", k)
+			v.avg = v.ti/v.n
+			result[key] = v
+		end
+		skynet.ret(skynet.pack(result))
+	end
+end
+
 function command.KILL(handle)
 	handle = handle_to_address(handle)
 	skynet.kill(handle)
