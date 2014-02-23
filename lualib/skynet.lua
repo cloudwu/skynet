@@ -725,8 +725,10 @@ function skynet.mqlen()
 	return tonumber(c.command "MQLEN")
 end
 
-function skynet.timing_call()
-	timing_call = {}
+function skynet.timing_call(tc)
+	local ret = timing_call
+	timing_call = tc or {}
+	return ret
 end
 
 function skynet.timing_session(session)
