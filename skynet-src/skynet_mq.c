@@ -37,7 +37,6 @@ struct global_queue {
 	uint32_t head;
 	uint32_t tail;
 	struct message_queue ** queue;
-	bool * flag;
 
 };
 
@@ -52,10 +51,10 @@ static void
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
+	assert(queue != 0);
 	uint32_t tail = GP(__sync_fetch_and_add(&q->tail,1));
+	assert(q->queue[tail] == NULL);
 	q->queue[tail] = queue;
-	__sync_synchronize();
-	q->flag[tail] = true;
 }
 
 struct message_queue * 
@@ -67,17 +66,16 @@ skynet_globalmq_pop() {
 		return NULL;
 	}
 
-	if(!q->flag[head_ptr]) {
+	if (!q->queue[head_ptr]) {
 		return NULL;
 	}
-
-	__sync_synchronize();
 
 	struct message_queue * mq = q->queue[head_ptr];
 	if (!__sync_bool_compare_and_swap(&q->head, head, head+1)) {
 		return NULL;
 	}
-	q->flag[head_ptr] = false;
+
+	q->queue[head_ptr] = NULL;
 
 	return mq;
 }
@@ -243,8 +241,7 @@ skynet_mq_init() {
 	struct global_queue *q = malloc(sizeof(*q));
 	memset(q,0,sizeof(*q));
 	q->queue = malloc(MAX_GLOBAL_MQ * sizeof(struct message_queue *));
-	q->flag = malloc(MAX_GLOBAL_MQ * sizeof(bool));
-	memset(q->flag, 0, sizeof(bool) * MAX_GLOBAL_MQ);
+	memset(q->queue, 0, MAX_GLOBAL_MQ * sizeof(struct message_queue *));
 	Q=q;
 }
 
