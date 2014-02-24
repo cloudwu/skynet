@@ -188,7 +188,8 @@ function socket.readall(id)
 	local s = socket_pool[id]
 	assert(s)
 	if not s.connected then
-		return driver.readall(s.buffer, buffer_pool)
+		local r = driver.readall(s.buffer, buffer_pool)
+		return r ~= "" and r
 	end
 	assert(not s.read_required)
 	s.read_required = true
