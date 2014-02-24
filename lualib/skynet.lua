@@ -393,12 +393,12 @@ local function timing(session, source, ti)
 	end
 	local t = timing_call[source]
 	if t == nil then
-		t = { n = 1, ti = 0 }
+		t = { n = 1, ti = ti }
 		timing_call[source] = t
 	else
 		t.n = t.n + 1
+		t.ti = t.ti + ti
 	end
-	t.ti = t.ti + ti
 end
 
 local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
