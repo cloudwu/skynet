@@ -58,6 +58,7 @@ struct socket_server {
 	struct event ev[MAX_EVENT];
 	struct socket slot[MAX_SOCKET];
 	char buffer[MAX_INFO];
+	fd_set rfds;
 };
 
 struct request_open {
@@ -184,6 +185,8 @@ socket_server_create() {
 	ss->alloc_id = 0;
 	ss->event_n = 0;
 	ss->event_index = 0;
+	FD_ZERO(&ss->rfds);
+	assert(ss->recvctrl_fd < FD_SETSIZE);
 
 	return ss;
 }
@@ -532,14 +535,12 @@ block_readpipe(int pipefd, void *buffer, int sz) {
 
 static int
 has_cmd(struct socket_server *ss) {
-	fd_set rfds;
 	struct timeval tv = {0,0};
 	int retval;
 
-	FD_ZERO(&rfds);
-	FD_SET(ss->recvctrl_fd, &rfds);
+	FD_SET(ss->recvctrl_fd, &ss->rfds);
 
-	retval = select(ss->recvctrl_fd+1, &rfds, NULL, NULL, &tv);
+	retval = select(ss->recvctrl_fd+1, &ss->rfds, NULL, NULL, &tv);
 	if (retval == 1) {
 		return 1;
 	}
