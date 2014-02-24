@@ -56,9 +56,9 @@ function command.TIMING(handle)
 		local r = skynet.call(handle,"debug","TIMING")
 		local result = {}
 		for k,v in pairs(r) do
-			local key = services[k] or string.format("[:%08x]", k)
+			v.name = services[k]
 			v.avg = v.ti/v.n
-			result[key] = v
+			result[skynet.address(k)] = v
 		end
 		skynet.ret(skynet.pack(result))
 	end
