@@ -388,6 +388,9 @@ function skynet.fork(func,...)
 end
 
 local function timing(session, source, ti)
+	if ti == nil then
+		return
+	end
 	local t = timing_call[source]
 	if t == nil then
 		t = { n = 1, ti = 0 }
@@ -398,11 +401,11 @@ local function timing(session, source, ti)
 	t.ti = t.ti + ti
 end
 
-local function raw_dispatch_message(prototype, msg, sz, session, source, ti)
+local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 	-- skynet.PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
-		if ti and timing_call then
-			timing(session, source, ti)
+		if timing_call then
+			timing(session, source, ...)
 		end
 		local co = session_id_coroutine[session]
 		if co == "BREAK" then
@@ -421,7 +424,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ti)
 			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
-			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz)))
+			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz,...)))
 		else
 			print("Unknown request :" , p.unpack(msg,sz))
 			error(string.format("Can't dispatch type %s : ", p.name))
