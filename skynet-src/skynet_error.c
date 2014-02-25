@@ -12,11 +12,11 @@
 
 void 
 skynet_error(struct skynet_context * context, const char *msg, ...) {
-	static int logger = -1;
-	if (logger < 0) {
+	static uint32_t logger = 0;
+	if (logger == 0) {
 		logger = skynet_handle_findname("logger");
 	}
-	if (logger < 0) {
+	if (logger == 0) {
 		return;
 	}
 
