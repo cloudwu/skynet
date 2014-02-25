@@ -9,12 +9,14 @@ local function handle_to_address(handle)
 	return tonumber("0x" .. string.sub(handle , 2))
 end
 
+local NORET = {}
+
 function command.LIST()
 	local list = {}
 	for k,v in pairs(services) do
 		list[skynet.address(k)] = v
 	end
-	skynet.ret(skynet.pack(list))
+	return list
 end
 
 function command.RELOAD(handle)
@@ -23,9 +25,9 @@ function command.RELOAD(handle)
 	print(services[handle],cmd)
 	if cmd then
 		skynet.send(handle,"debug","RELOAD",cmd)
-		skynet.ret(skynet.pack({cmd}))
+		return {cmd}
 	else
-		skynet.ret(skynet.pack({"Support only snlua"}))
+		return {"Support only snlua"}
 	end
 end
 
@@ -35,23 +37,23 @@ function command.STAT()
 		local stat = skynet.call(k,"debug","STAT")
 		list[skynet.address(k)] = stat
 	end
-	skynet.ret(skynet.pack(list))
+	return list
 end
 
 function command.INFO(handle)
 	handle = handle_to_address(handle)
 	if services[handle] == nil then
-		skynet.ret(skynet.pack(nil))
+		return
 	else
 		local result = skynet.call(handle,"debug","INFO")
-		skynet.ret(skynet.pack(result))
+		return result
 	end
 end
 
 function command.TIMING(handle)
 	handle = handle_to_address(handle)
 	if services[handle] == nil then
-		skynet.ret(skynet.pack(nil))
+		return
 	else
 		local r = skynet.call(handle,"debug","TIMING")
 		local result = {}
@@ -60,15 +62,16 @@ function command.TIMING(handle)
 			v.avg = v.ti/v.n
 			result[skynet.address(k)] = v
 		end
-		skynet.ret(skynet.pack(result))
+		return result
 	end
 end
 
 function command.KILL(handle)
 	handle = handle_to_address(handle)
 	skynet.kill(handle)
-	skynet.ret( skynet.pack({ [handle] = tostring(services[handle]) }))
+	local ret = { [skynet.address(handle)] = tostring(services[handle]) }
 	services[handle] = nil
+	return ret
 end
 
 function command.MEM()
@@ -77,18 +80,20 @@ function command.MEM()
 		local kb, bytes = skynet.call(k,"debug","MEM")
 		list[skynet.address(k)] = string.format("%d Kb (%s)",kb,v)
 	end
-	skynet.ret(skynet.pack(list))
+	return list
 end
 
 function command.GC()
 	for k,v in pairs(services) do
 		skynet.send(k,"debug","GC")
 	end
-	command.MEM()
+	return command.MEM()
 end
 
 function command.REMOVE(handle)
 	services[handle] = nil
+	-- don't return (skynet.ret) because the handle may exit
+	return NORET
 end
 
 local instance = {}
@@ -124,7 +129,15 @@ end)
 
 skynet.dispatch("lua", function(session, address, cmd , ...)
 	cmd = string.upper(cmd)
-	command[cmd](...)
+	local f = command[cmd]
+	if f then
+		local ret = f(...)
+		if ret ~= NORET then
+			skynet.ret(skynet.pack(ret))
+		end
+	else
+		skynet.ret(skynet.pack {"Unknown command"} )
+	end
 end)
 
 skynet.start(function() end)

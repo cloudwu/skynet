@@ -324,7 +324,7 @@ function skynet.call(addr, typename, ...)
 	end
 	local session = c.send(addr, p.id , nil , p.pack(...))
 	if session == nil then
-		error("call to invalid address " .. tostring(addr))
+		error("call to invalid address " .. skynet.address(addr))
 	end
 	return p.unpack(yield_call(addr, session))
 end
@@ -335,7 +335,7 @@ function skynet.blockcall(addr, typename , ...)
 	local session = c.send(addr, p.id , nil , p.pack(...))
 	if session == nil then
 		c.command("UNLOCK")
-		error("call to invalid address " .. tostring(addr))
+		error("call to invalid address " .. skynet.address(addr))
 	end
 	return p.unpack(yield_call(addr, session))
 end
@@ -510,7 +510,11 @@ function skynet.query_group(handle)
 end
 
 function skynet.address(addr)
-	return string.format(":%x",addr)
+	if type(addr) == "number" then
+		return string.format(":%x",addr)
+	else
+		return tostring(addr)
+	end
 end
 
 function skynet.harbor(addr)
@@ -566,6 +570,7 @@ function dbgcmd.TIMING()
 	else
 		-- turn on timing
 		timing_call = {}
+		skynet.ret(skynet.pack(timing_call))
 	end
 end
 
