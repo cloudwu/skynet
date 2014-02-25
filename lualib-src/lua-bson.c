@@ -419,7 +419,7 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 	lua_pushnil(L);
 	while(lua_next(L,-2) != 0) {
 		int kt = lua_type(L, -2);
-		char numberkey[8];
+		char numberkey[32];
 		const char * key = NULL;
 		size_t sz;
 		if (isarray) {
