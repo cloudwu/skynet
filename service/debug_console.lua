@@ -1,7 +1,9 @@
 local skynet = require "skynet"
+local codecache = require "skynet.codecache"
 local socket = require "socket"
 
 local port = tonumber(...)
+local COMMAND = {}
 
 local function format_table(t)
 	local index = {}
@@ -35,15 +37,33 @@ local function dump_list(print, list)
 	end
 end
 
-local function docmd(cmdline, print)
+local function split_cmdline(cmdline)
 	local split = {}
 	for i in string.gmatch(cmdline, "%S+") do
 		table.insert(split,i)
 	end
-	local ok, list = pcall(skynet.call,".launcher","lua", table.unpack(split))
+	return split
+end
+
+local function docmd(cmdline, print)
+	local split = split_cmdline(cmdline)
+	local cmd = COMMAND[split[1]]
+	local ok, list
+	if cmd then
+		ok, list = pcall(cmd, select(2,table.unpack(split)))
+	else
+		ok, list = pcall(skynet.call,".launcher","lua", table.unpack(split))
+	end
+
 	if ok then
 		if list then
-			dump_list(print, list)
+			if type(list) == "string" then
+				print(list)
+			else
+				dump_list(print, list)
+			end
+		else
+			print("OK")
 		end
 	else
 		print("Error:", list)
@@ -78,3 +98,34 @@ skynet.start(function()
 		skynet.fork(console_main_loop, id , print)
 	end)
 end)
+
+function COMMAND.help()
+	return {
+		help = "This help message",
+		list = "List all the service",
+		stat = "Dump all stats",
+		info = "Info address : get service infomation",
+		timing = "timing address : get service timing infomation",
+		kill = "kill address : kill service",
+		mem = "mem : show memory status",
+		gc = "gc : force every lua service do garbage collect",
+		reload = "reload address : reload a lua service",
+		start = "lanuch a new lua service",
+		clearcache = "clear lua code cache",
+	}
+end
+
+function COMMAND.clearcache()
+	codecache.clear()
+end
+
+function COMMAND.start(...)
+	local addr = skynet.newservice(...)
+	if addr then
+		return { [skynet.address(addr)] = ... }
+	else
+		return "Failed"
+	end
+end
+
+
