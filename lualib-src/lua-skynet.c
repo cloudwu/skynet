@@ -84,8 +84,8 @@ get_stat(lua_State *L) {
 }
 
 static inline void
-save_session(lua_State *L, int session) {
-	if (session > 0) {
+save_session(lua_State *L, int type, int session) {
+	if (session > 0 && (type & 0xff) != PTYPE_RESPONSE) {
 		struct stat * S = get_stat(L);
 		tqueue_push(S->tq, session, current_time_tick(S));
 	}
@@ -274,19 +274,19 @@ _sendname(lua_State *L, struct skynet_context * context, const char * dest) {
 		size_t len = 0;
 		void * msg = (void *)lua_tolstring(L,4,&len);
 		session = skynet_sendname(context, dest, type, session , msg, len);
-		save_session(L, session);
+		save_session(L, type, session);
 		break;
 	}
 	case LUA_TNIL :
 		session = skynet_sendname(context, dest, type, session , NULL, 0);
-		save_session(L, session);
+		save_session(L, type, session);
 		break;
 	case LUA_TLIGHTUSERDATA: {
 		luaL_checktype(L, 4, LUA_TLIGHTUSERDATA);
 		void * msg = lua_touserdata(L,4);
 		int size = luaL_checkinteger(L,5);
 		session = skynet_sendname(context, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
-		save_session(L, session);
+		save_session(L, type, session);
 		break;
 	}
 	default:
@@ -352,14 +352,14 @@ _send(lua_State *L) {
 			msg = NULL;
 		}
 		session = skynet_send(context, 0, dest, type, session , msg, len);
-		save_session(L, session);
+		save_session(L, type, session);
 		break;
 	}
 	case LUA_TLIGHTUSERDATA: {
 		void * msg = lua_touserdata(L,4);
 		int size = luaL_checkinteger(L,5);
 		session = skynet_send(context, 0, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
-		save_session(L, session);
+		save_session(L, type, session);
 		break;
 	}
 	default:
@@ -391,14 +391,14 @@ _redirect(lua_State *L) {
 			msg = NULL;
 		}
 		session = skynet_send(context, source, dest, type, session , msg, len);
-		save_session(L, session);
+		save_session(L, type, session);
 		break;
 	}
 	case LUA_TLIGHTUSERDATA: {
 		void * msg = lua_touserdata(L,5);
 		int size = luaL_checkinteger(L,6);
 		session = skynet_send(context, source, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
-		save_session(L, session);
+		save_session(L, type, session);
 		break;
 	}
 	default:
