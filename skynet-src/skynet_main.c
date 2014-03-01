@@ -39,6 +39,7 @@ optstring(const char *key,const char * opt) {
 	if (str == NULL) {
 		if (opt) {
 			skynet_setenv(key, opt);
+			opt = skynet_getenv(key);
 		}
 		return opt;
 	}
