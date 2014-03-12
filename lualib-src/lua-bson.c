@@ -857,12 +857,12 @@ lencode(lua_State *L) {
 }
 
 static int
-lencode_sorted(lua_State *L) {
+lencode_order(lua_State *L) {
 	struct bson b;
 	bson_create(&b);
 	int n = lua_gettop(L);
 	if (n%2 != 0) {
-		return luaL_error(L, "Invalid sorted dict");
+		return luaL_error(L, "Invalid ordered dict");
 	}
 	pack_sorted_dict(L, &b, n);
 	lua_settop(L,1);
@@ -1161,7 +1161,7 @@ luaopen_bson(lua_State *L) {
 	}
 	luaL_Reg l[] = {
 		{ "encode", lencode },
-		{ "encode_sorted", lencode_sorted },
+		{ "encode_order", lencode_order },
 		{ "date", ldate },
 		{ "timestamp", ltimestamp  },
 		{ "regex", lregex },

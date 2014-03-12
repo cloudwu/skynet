@@ -6,7 +6,7 @@ local rawget = rawget
 local assert = assert
 
 local bson_encode = bson.encode
-local bson_encode_sorted = bson.encode_sorted
+local bson_encode_order = bson.encode_order
 local bson_decode = bson.decode
 local empty_bson = bson_encode {}
 
@@ -182,9 +182,9 @@ function mongo_db:runCommand(cmd,cmd_v,...)
 	local sock = conn.__sock
 	local bson_cmd
 	if not cmd_v then
-		bson_cmd = bson_encode_sorted(cmd,1)
+		bson_cmd = bson_encode_order(cmd,1)
 	else
-		bson_cmd = bson_encode_sorted(cmd,cmd_v,...)
+		bson_cmd = bson_encode_order(cmd,cmd_v,...)
 	end
 	local pack = driver.query(request_id, 0, self.__cmd, 0, 1, bson_cmd)
 	-- todo: check send
