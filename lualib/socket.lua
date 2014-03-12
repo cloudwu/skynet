@@ -153,6 +153,8 @@ function socket.close(id)
 	end
 	if s.connected then
 		driver.close(s.id)
+		-- notice: call socket.close in __gc should be carefully,
+		-- because skynet.wait never return in __gc, so driver.clear may not be called
 		if s.co then
 			-- reading this socket on another coroutine
 			assert(not s.closing)
