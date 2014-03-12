@@ -6,6 +6,7 @@ local rawget = rawget
 local assert = assert
 
 local bson_encode = bson.encode
+local bson_encode_sorted = bson.encode_sorted
 local bson_decode = bson.decode
 local empty_bson = bson_encode {}
 
@@ -96,11 +97,17 @@ local function reply_queue(obj)
 	while true do
 		local len_reply = socket.read(sock, 4)
 		if not len_reply then
+			if obj.__sock == nil then
+				return
+			end
 			sock = reconnect(obj)
 		else
 			local length = driver.length(len_reply)
 			local reply = socket.read(sock, length)
 			if not reply then
+				if obj.__sock == nil then
+					return
+				end
 				sock = reconnect(obj)
 			else
 				local succ, reply_id, document, cursor_id, startfrom = driver.reply(reply, tmp)
@@ -142,8 +149,9 @@ end
 
 function mongo_client:disconnect()
 	if self.__sock then
-		socket.close(self.__sock)
+		local so = self.__sock
 		self.__sock = nil
+		socket.close(so)
 	end
 end
 
@@ -153,11 +161,11 @@ function mongo_client:genId()
 	return id
 end
 
-function mongo_client:runCommand(cmd)
+function mongo_client:runCommand(...)
 	if not self.admin then
 		self.admin = self:getDB "admin"
 	end
-	return self.admin:runCommand(cmd)
+	return self.admin:runCommand(...)
 end
 
 local function get_reply(conn, request_id, result)
@@ -168,11 +176,17 @@ local function get_reply(conn, request_id, result)
 	return r.data, r.succ, r.document, r.cursor_id, r.startfrom
 end
 
-function mongo_db:runCommand(cmd)
+function mongo_db:runCommand(cmd,cmd_v,...)
 	local conn = self.connection
 	local request_id = conn:genId()
 	local sock = conn.__sock
-	local pack = driver.query(request_id, 0, self.__cmd, 0, 1, bson_encode(cmd))
+	local bson_cmd
+	if not cmd_v then
+		bson_cmd = bson_encode_sorted(cmd,1)
+	else
+		bson_cmd = bson_encode_sorted(cmd,cmd_v,...)
+	end
+	local pack = driver.query(request_id, 0, self.__cmd, 0, 1, bson_cmd)
 	-- todo: check send
 	assert(socket.write(sock, pack), "write fail")
 	local _, succ, doc = get_reply(conn,request_id)

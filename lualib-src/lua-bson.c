@@ -457,6 +457,24 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 	write_length(b, b->size - length, length);
 }
 
+static void
+pack_sorted_dict(lua_State *L, struct bson *b, int n) {
+	int length = reserve_length(b);
+	int i;
+	for (i=0;i<n;i+=2) {
+		size_t sz;
+		const char * key = lua_tolstring(L, i+1, &sz);
+		if (key == NULL) {
+			luaL_error(L, "Argument %d need a string", i+1);
+		}
+		lua_pushvalue(L, i+2);
+		append_one(b, L, key, sz);
+		lua_pop(L,1);
+	}
+	write_byte(b,0);
+	write_length(b, b->size - length, length);
+}
+ 
 static int
 ltostring(lua_State *L) {
 	size_t sz = lua_rawlen(L, 1);
@@ -804,16 +822,8 @@ ldecode(lua_State *L) {
 	return 1;
 }
 
-static int
-lencode(lua_State *L) {
-	struct bson b;
-	bson_create(&b);
-	lua_settop(L,1);
-	luaL_checktype(L, 1, LUA_TTABLE);
-	pack_dict(L, &b, false);
-	void * ud = lua_newuserdata(L, b.size);
-	memcpy(ud, b.ptr, b.size);
-	bson_destroy(&b);
+static void
+bson_meta(lua_State *L) {
 	if (luaL_newmetatable(L, "bson")) {
 		luaL_Reg l[] = {
 			{ "decode", ldecode },
@@ -830,6 +840,36 @@ lencode(lua_State *L) {
 		lua_setfield(L, -2, "__newindex");
 	}
 	lua_setmetatable(L, -2);
+}
+
+static int
+lencode(lua_State *L) {
+	struct bson b;
+	bson_create(&b);
+	lua_settop(L,1);
+	luaL_checktype(L, 1, LUA_TTABLE);
+	pack_dict(L, &b, false);
+	void * ud = lua_newuserdata(L, b.size);
+	memcpy(ud, b.ptr, b.size);
+	bson_destroy(&b);
+	bson_meta(L);
+	return 1;
+}
+
+static int
+lencode_sorted(lua_State *L) {
+	struct bson b;
+	bson_create(&b);
+	int n = lua_gettop(L);
+	if (n%2 != 0) {
+		return luaL_error(L, "Invalid sorted dict");
+	}
+	pack_sorted_dict(L, &b, n);
+	lua_settop(L,1);
+	void * ud = lua_newuserdata(L, b.size);
+	memcpy(ud, b.ptr, b.size);
+	bson_destroy(&b);
+	bson_meta(L);
 	return 1;
 }
 
@@ -1121,6 +1161,7 @@ luaopen_bson(lua_State *L) {
 	}
 	luaL_Reg l[] = {
 		{ "encode", lencode },
+		{ "encode_sorted", lencode_sorted },
 		{ "date", ldate },
 		{ "timestamp", ltimestamp  },
 		{ "regex", lregex },
