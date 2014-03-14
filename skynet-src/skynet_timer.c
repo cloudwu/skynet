@@ -102,16 +102,36 @@ timer_add(struct timer *T,void *arg,size_t sz,int time)
 	__sync_lock_release(&T->lock);
 }
 
-static void 
-timer_execute(struct timer *T)
-{
-	while (__sync_lock_test_and_set(&T->lock,1)) {};
-	int idx=T->time & TIME_NEAR_MASK;
-	struct timer_node *current;
-	int mask,i,time;
+static void
+timer_shift(struct timer *T) {
+	int mask = TIME_NEAR;
+	int time = (++T->time) >> TIME_NEAR_SHIFT;
+	int i=0;
+	
+	while ((T->time & (mask-1))==0) {
+		int idx=time & TIME_LEVEL_MASK;
+		if (idx!=0) {
+			--idx;
+			struct timer_node *current = link_clear(&T->t[i][idx]);
+			while (current) {
+				struct timer_node *temp=current->next;
+				add_node(T,current);
+				current=temp;
+			}
+			break;				
+		}
+		mask <<= TIME_LEVEL_SHIFT;
+		time >>= TIME_LEVEL_SHIFT;
+		++i;
+	}	
+}
+
+static inline void
+timer_execute(struct timer *T) {
+	int idx = T->time & TIME_NEAR_MASK;
 	
 	while (T->near[idx].head.next) {
-		current=link_clear(&T->near[idx]);
+		struct timer_node *current = link_clear(&T->near[idx]);
 		
 		do {
 			struct timer_event * event = (struct timer_event *)(current+1);
@@ -128,29 +148,20 @@ timer_execute(struct timer *T)
 			free(temp);	
 		} while (current);
 	}
-	
-	++T->time;
-	
-	mask = TIME_NEAR;
-	time = T->time >> TIME_NEAR_SHIFT;
-	i=0;
-	
-	while ((T->time & (mask-1))==0) {
-		idx=time & TIME_LEVEL_MASK;
-		if (idx!=0) {
-			--idx;
-			current=link_clear(&T->t[i][idx]);
-			while (current) {
-				struct timer_node *temp=current->next;
-				add_node(T,current);
-				current=temp;
-			}
-			break;				
-		}
-		mask <<= TIME_LEVEL_SHIFT;
-		time >>= TIME_LEVEL_SHIFT;
-		++i;
-	}	
+}
+
+static void 
+timer_update(struct timer *T)
+{
+	while (__sync_lock_test_and_set(&T->lock,1)) {};
+
+	// try to dispatch timeout 0 (rare condition)
+	timer_execute(T);
+
+	// shift time first, and then dispatch timer message
+	timer_shift(T);
+	timer_execute(T);
+
 	__sync_lock_release(&T->lock);
 }
 
@@ -225,7 +236,7 @@ skynet_updatetime(void) {
 		TI->current = ct;
 		int i;
 		for (i=0;i<diff;i++) {
-			timer_execute(TI);
+			timer_update(TI);
 		}
 	}
 }
