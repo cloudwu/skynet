@@ -275,7 +275,7 @@ function socket.unlock(id)
 end
 
 -- abandon use to forward socket id to other service
--- you must call socket.accept(id) later in other service
+-- you must call socket.start(id) later in other service
 function socket.abandon(id)
 	local s = socket_pool[id]
 	if s and s.buffer then
