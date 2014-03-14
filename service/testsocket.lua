@@ -3,27 +3,31 @@ local socket = require "socket"
 
 local mode , id = ...
 
+local function echo(id)
+	socket.start(id)
+
+	while true do
+		local str = socket.readline(id,"\n")
+		if str then
+			socket.write(id, str .. "\n")
+		else
+			socket.close(id)
+			return
+		end
+	end
+end
+
 if mode == "agent" then
 	id = tonumber(id)
 
 	skynet.start(function()
-		socket.start(id)
-
-		while true do
-			local str = socket.readline(id,"\n")
-			if str then
-				socket.write(id, str .. "\n")
-			else
-				socket.close(id)
-				print("closed " .. id)
-				break
-			end
-		end
-
-		skynet.exit()
+		skynet.fork(function()
+			echo(id)
+			skynet.exit()
+		end)
 	end)
 else
-	local function accepter(id)
+	local function accept(id)
 		socket.start(id)
 		socket.write(id, "Hello Skynet\n")
 		skynet.newservice("testsocket", "agent", id)
@@ -37,8 +41,11 @@ else
 
 		socket.start(id , function(id, addr)
 			print("connect from " .. addr .. " " .. id)
-			-- you can also call skynet.newservice for this socket id
-			skynet.fork(accepter, id)
+			-- you have choices :
+			-- 1. skynet.newservice("testsocket", "agent", id)
+			-- 2. skynet.fork(echo, id)
+			-- 3. accept(id)
+			accept(id)
 		end)
 	end)
 end
