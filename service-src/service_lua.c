@@ -7,6 +7,7 @@
 #include "luacompat52.h"
 #include "service_lua.h"
 #include "luaalloc.h"
+#include "luacode_cache.h"
 
 #include <assert.h>
 #include <string.h>
@@ -17,10 +18,28 @@
 //#define PREALLOCMEM (1024 * 1024)
 
 // define NOCODECACHE to disable lua code cache
-//#define NOCODECACHE
+#define NOCODECACHE
 
-#ifndef NOCODECACHE
-#include "luacode_cache.h"
+#ifdef NOCODECACHE
+
+#define loadfile(L, name)	luaL_loadfile(L,name)
+
+#else
+
+//	luacode_loadfile is the same with luaL_loadfile except cache.
+#define loadfile(L, name)	luacode_loadfile(L,name)
+
+#endif
+
+// LUA_CACHELIB may defined in patched lua for shared proto
+#ifdef LUA_CACHELIB
+
+#define codecache luaopen_cache
+
+#else
+
+#define codecache luacode_lib
+
 #endif
 
 // time
@@ -77,12 +96,7 @@ _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
 		exit(1);
 	}
 	tmp[namelen+pathlen-1] = '\0';
-	//	luacode_loadfile is the same with luaL_loadfile except cache.
-#ifdef NOCODECACHE
-	int r = luaL_loadfile(L,tmp);
-#else
-	int r = luacode_loadfile(L,tmp);
-#endif
+	int r = loadfile(L,tmp);
 	if (r == LUA_OK) {
 		int i;
 		for (i=namelen+pathlen-2;i>=0;i--) {
@@ -181,10 +195,8 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	luaL_openlibs(L);
 	lua_pushlightuserdata(L, l);
 	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_lua");
-#ifndef NOCODECACHE
-	luaL_requiref(L, "skynet.codecache", luacode_lib , 0);
+	luaL_requiref(L, "skynet.codecache", codecache , 0);
 	lua_pop(L,1);
-#endif
 	lua_gc(L, LUA_GCRESTART, 0);
 
 	char tmp[strlen(args)+1];
