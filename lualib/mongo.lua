@@ -97,7 +97,7 @@ local function reply_queue(obj)
 	while true do
 		local len_reply = socket.read(sock, 4)
 		if not len_reply then
-			if obj.__sock == nil then
+			if not obj.__sock then
 				return
 			end
 			sock = reconnect(obj)
@@ -105,7 +105,7 @@ local function reply_queue(obj)
 			local length = driver.length(len_reply)
 			local reply = socket.read(sock, length)
 			if not reply then
-				if obj.__sock == nil then
+				if not obj.__sock then
 					return
 				end
 				sock = reconnect(obj)
@@ -150,7 +150,7 @@ end
 function mongo_client:disconnect()
 	if self.__sock then
 		local so = self.__sock
-		self.__sock = nil
+		self.__sock = false
 		socket.close(so)
 	end
 end
