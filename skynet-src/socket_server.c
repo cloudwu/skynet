@@ -513,6 +513,10 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 		s->opaque = request->opaque;
 		result->data = "start";
 		return SOCKET_OPEN;
+	} else if (s->type == SOCKET_TYPE_CONNECTED) {
+		s->opaque = request->opaque;
+		result->data = "transfer";
+		return SOCKET_OPEN;
 	}
 	return -1;
 }

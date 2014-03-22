@@ -11,7 +11,17 @@ local function wakeup(co)
 	end
 end
 
+local function test()
+	skynet.timeout(10, function() print("test timeout 10") end)
+	for i=1,10 do
+		print("test sleep",i,skynet.now())
+		skynet.sleep(1)
+	end
+end
+
 skynet.start(function()
+	test()
+
 	skynet.fork(wakeup, coroutine.running())
 	skynet.timeout(300, function() timeout "Hello World" end)
 	for i = 1, 10 do
@@ -20,4 +30,5 @@ skynet.start(function()
 	end
 	skynet.exit()
 	print("Test timer exit")
+
 end)

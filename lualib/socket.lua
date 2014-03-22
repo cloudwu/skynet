@@ -153,13 +153,29 @@ function socket.close(id)
 	end
 	if s.connected then
 		driver.close(s.id)
-		suspend(s)
+		-- notice: call socket.close in __gc should be carefully,
+		-- because skynet.wait never return in __gc, so driver.clear may not be called
+		if s.co then
+			-- reading this socket on another coroutine
+			assert(not s.closing)
+			s.closing = coroutine.running()
+			skynet.wait()
+		else
+			suspend(s)
+		end
 	end
 	if s.buffer then
 		driver.clear(s.buffer,buffer_pool)
 	end
 	assert(s.lock_set == nil or next(s.lock_set) == nil)
 	socket_pool[id] = nil
+end
+
+local function close_socket(s)
+	if s.closing then
+		skynet.wakeup(s.closing)
+	end
+	return driver.readall(s.buffer, buffer_pool)
 end
 
 function socket.read(id, sz)
@@ -170,7 +186,7 @@ function socket.read(id, sz)
 		return ret
 	end
 	if not s.connected then
-		return false, driver.readall(s.buffer, buffer_pool)
+		return false, close_socket(s)
 	end
 
 	assert(not s.read_required)
@@ -180,7 +196,7 @@ function socket.read(id, sz)
 	if ret then
 		return ret
 	else
-		return false, driver.readall(s.buffer, buffer_pool)
+		return false, close_socket(s)
 	end
 end
 
@@ -188,14 +204,14 @@ function socket.readall(id)
 	local s = socket_pool[id]
 	assert(s)
 	if not s.connected then
-		local r = driver.readall(s.buffer, buffer_pool)
+		local r = close_socket(s)
 		return r ~= "" and r
 	end
 	assert(not s.read_required)
 	s.read_required = true
 	suspend(s)
 	assert(s.connected == false)
-	return driver.readall(s.buffer, buffer_pool)
+	return close_socket(s)
 end
 
 function socket.readline(id, sep)
@@ -207,7 +223,7 @@ function socket.readline(id, sep)
 		return ret
 	end
 	if not s.connected then
-		return false, driver.readall(s.buffer, buffer_pool)
+		return false, close_socket(s)
 	end
 	assert(not s.read_required)
 	s.read_required = sep
@@ -215,7 +231,7 @@ function socket.readline(id, sep)
 	if s.connected then
 		return driver.readline(s.buffer, buffer_pool, sep)
 	else
-		return false, driver.readall(s.buffer, buffer_pool)
+		return false, close_socket(s)
 	end
 end
 
@@ -259,7 +275,7 @@ function socket.unlock(id)
 end
 
 -- abandon use to forward socket id to other service
--- you must call socket.accept(id) later in other service
+-- you must call socket.start(id) later in other service
 function socket.abandon(id)
 	local s = socket_pool[id]
 	if s and s.buffer then
