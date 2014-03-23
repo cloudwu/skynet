@@ -521,24 +521,6 @@ reply_length(lua_State *L) {
 	return 1;
 }
 
-static int
-copy_result(lua_State *L) {
-	if (lua_type(L,2) == LUA_TNIL)
-		return 0;
-	int n1 = lua_rawlen(L,1);
-	int n2 = lua_rawlen(L,2);
-	int i;
-	for (i=0;i<n1;i++) {
-		lua_rawgeti(L,1,i+1);
-		lua_rawseti(L,2,i+1);
-	}
-	for (i=n1;i<n2;i++) {
-		lua_pushnil(L);
-		lua_rawseti(L,2,i+1);
-	}
-	return 0;
-}
-
 int
 luaopen_mongo_driver(lua_State *L) {
 	luaL_checkversion(L);
@@ -551,7 +533,6 @@ luaopen_mongo_driver(lua_State *L) {
 		{ "update", op_update },
 		{ "insert", op_insert },
 		{ "length", reply_length },
-		{ "copy_result", copy_result },
 		{ NULL, NULL },
 	};
 
