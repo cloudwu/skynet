@@ -366,7 +366,7 @@ local function dispatch_response(self)
 		-- response() return session
 		while self.__sock do
 			local ok , session, result_ok, result_data = pcall(response, self.__sock)
-			if ok then
+			if ok and session then
 				local co = self.__thread[session]
 				self.__thread[session] = nil
 				if co then
@@ -524,6 +524,35 @@ function channel:request(request, response)
 			print("socket: dispatch", request, result_data)
 		end
 		return self:request(request, response)
+	else
+		assert(result, result_data)
+		return result_data
+	end
+end
+
+function channel:response(response)
+	if not self.__sock then
+		assert(not self.__closed)
+		reconnect_channel(self)
+	end
+	assert(type(response) == "function")
+
+	local co = coroutine.running()
+	table.insert(self.__request, response)
+	table.insert(self.__thread, co)
+
+	skynet.wait()
+
+	local result = self.__result[co]
+	self.__result[co] = nil
+	local result_data = self.__result_data[co]
+	self.__result_data[co] = nil
+
+	if result == socket_error then
+		if result_data then
+			print("socket: dispatch", request, result_data)
+		end
+		return self:response(response)
 	else
 		assert(result, result_data)
 		return result_data

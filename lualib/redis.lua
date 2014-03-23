@@ -19,24 +19,6 @@ local meta = {
 ---------- redis response
 local redcmd = {}
 
-redcmd[42] = function(fd, data)	-- '*'
-	local n = tonumber(data)
-	if n < 0 then
-		return true, nil
-	end
-	local bulk = {}
-	for i = 1,n do
-		local line = fd:readline "\r\n"
-		local bytes = tonumber(string.sub(line,2))
-		if bytes >= 0 then
-			local data = fd:read(bytes + 2)
-			-- bulk[i] = nil when bytes < 0
-			bulk[i] = string.sub(data,1,-3)
-		end
-	end
-	return true, bulk
-end
-
 redcmd[36] = function(fd, data) -- '$'
 	local bytes = tonumber(data)
 	if bytes < 0 then
@@ -65,6 +47,25 @@ local function read_response(fd)
 	local data = string.sub(result,2)
 	return redcmd[firstchar](fd,data)
 end
+
+redcmd[42] = function(fd, data)	-- '*'
+	local n = tonumber(data)
+	if n < 0 then
+		return true, nil
+	end
+	local bulk = {}
+	local noerr = true
+	for i = 1,n do
+		local ok, v = read_response(fd)
+		if ok then
+			bulk[i] = v
+		else
+			noerr = false
+		end
+	end
+	return noerr, bulk
+end
+
 -------------------
 
 local function redis_login(auth, db)
@@ -141,37 +142,87 @@ function command:sismember(key, value)
 	return fd:request(compose_message { "SISMEMBER", key, value }, read_boolean)
 end
 
-local function read_exec(fd)
-	local result = fd:readline "\r\n"
-	local firstchar = string.byte(result)
-	local data = string.sub(result,2)
-	if firstchar ~= 42 then
-		return false, data
-	end
+--- watch mode
 
-	local n = tonumber(data)
-	local result = {}
-	local err = nil
-	for i = 1,n do
-		local ok, r = read_response(fd)
-		if ok then
-			result[i] = r
-		else
-			if not err then
-				err = {}
-			end
-			table.insert(err, i .. ":" .. r)
+local watch = {}
+
+local watchmeta = {
+	__index = watch,
+	__gc = function(self)
+		self.__sock:close()
+	end,
+}
+
+local function watch_login(obj, auth)
+	return function(so)
+		if auth then
+			so:request("AUTH "..auth.."\r\n", read_response)
 		end
-	end
-	if err then
-		return false, table.concat(err,",")
-	else
-		return true, result
+		for k in pairs(obj.__psubscribe) do
+			so:request(compose_message { "PSUBSCRIBE", k })
+		end
+		for k in pairs(obj.__subscribe) do
+			so:request(compose_message { "SUBSCRIBE", k })
+		end
 	end
 end
 
-function command:exec()
-	return self[1]:request( "EXEC\r\n" , read_exec)
+function redis.watch(dbname)
+	local db_conf = name[dbname]
+	local obj = {
+		__subscribe = {},
+		__psubscribe = {},
+	}
+	local channel = socket.channel {
+		host = db_conf.host,
+		port = db_conf.port or 6379,
+		auth = watch_login(obj, db_conf.auth),
+	}
+	obj.__sock = channel
+
+	return setmetatable( obj, watchmeta )
+end
+
+function watch:disconnect()
+	self.__sock:close()
+	setmetatable(self, nil)
+end
+
+local function watch_func( name )
+	local NAME = string.upper(name)
+	watch[name] = function(self, ...)
+		local so = self.__sock
+		for i = 1, select("#", ...) do
+			local v = select(i, ...)
+			so:request(compose_message { NAME, v })
+		end
+	end
+end
+
+watch_func "subscribe"
+watch_func "psubscribe"
+watch_func "unsubscribe"
+watch_func "punsubscribe"
+
+function watch:message()
+	local so = self.__sock
+	while true do
+		local ret = so:response(read_response)
+		local type , channel, data , data2 = ret[1], ret[2], ret[3], ret[4]
+		if type == "message" then
+			return data, channel
+		elseif type == "pmessage" then
+			return data2, data, channel
+		elseif type == "subscribe" then
+			self.__subscribe[channel] = true
+		elseif type == "psubscribe" then
+			self.__psubscribe[channel] = true
+		elseif type == "unsubscribe" then
+			self.__subscribe[channel] = nil
+		elseif type == "punsubscribe" then
+			self.__psubscribe[channel] = nil
+		end
+	end
 end
 
 return redis
