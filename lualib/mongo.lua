@@ -105,7 +105,7 @@ function mongo_client:disconnect()
 	if self.__sock then
 		local so = self.__sock
 		self.__sock = false
-		socket.close(so)
+		so:close()
 	end
 end
 
