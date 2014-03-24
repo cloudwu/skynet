@@ -67,8 +67,8 @@ local collection_meta = {
 local function dispatch_reply(so)
 	local len_reply = so:read(4)
 	local reply = so:read(driver.length(len_reply))
-	local result = {}
-	local succ, reply_id, document, cursor_id, startfrom = driver.reply(reply, result)
+	local result = { result = {} }
+	local succ, reply_id, document, cursor_id, startfrom = driver.reply(reply, result.result)
 	result.document = document
 	result.cursor_id = cursor_id
 	result.startfrom = startfrom
@@ -237,8 +237,8 @@ function mongo_cursor:hasNext()
 
 		if ok then
 			if doc then
-				self.__document = doc
-				self.__data = data
+				self.__document = result.result
+				self.__data = result.data
 				self.__ptr = 1
 				self.__cursor = cursor
 				return true
