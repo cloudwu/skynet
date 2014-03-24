@@ -337,6 +337,7 @@ function socket.channel(desc)
 		__connecting = {},
 		__sock = false,
 		__closed = false,
+		__authcoroutine = false,
 	}
 
 	return setmetatable(c, channel_meta)
@@ -346,7 +347,8 @@ local function close_channel_socket(self)
 	if self.__sock then
 		local so = self.__sock
 		self.__sock = false
-		socket.close(so[1])
+		-- never raise error
+		pcall(socket.close,so[1])
 	end
 end
 
@@ -420,12 +422,13 @@ local function dispatch_response(self)
 	end
 end
 
-local function try_connect(self)
-	assert(not self.__sock)
+local function connect_once(self)
+	assert(not self.__sock and not self.__authcoroutine)
 	local fd = socket.open(self.__host, self.__port)
 	if not fd then
-		return
+		return false
 	end
+	self.__authcoroutine = coroutine.running()
 	self.__sock = setmetatable( {fd} , channel_socket_meta )
 	skynet.fork(dispatch_response, self)
 
@@ -434,46 +437,20 @@ local function try_connect(self)
 		if not ok then
 			close_channel_socket(self)
 			if message ~= socket_error then
-				error(message)
+				print("socket: auth failed", message)
 			end
 		end
+		self.__authcoroutine = false
+		return ok
 	end
+
+	return true
 end
 
-function channel:connect()
-	if self.__sock then
-		return true
-	end
-	if self.__closed then
-		self.__closed = false
-	end
-	if #self.__connecting > 0 then
-		-- connecting in other coroutine
-		local co = coroutine.running()
-		table.insert(self.__connecting, co)
-		skynet.wait()
-	else
-		self.__connecting[1] = true
-		try_connect(self)
-		self.__connecting[1] = nil
-		for i=2, #self.__connecting do
-			local co = self.__connecting[i]
-			self.__connecting[i] = nil
-			skynet.wakeup(co)
-		end
-	end
-
-	if self.__sock then
-		return true
-	else
-		return false
-	end
-end
-
-local function reconnect_channel(self)
+local function try_connect(self)
 	local t = 100
 	while not self.__closed do
-		if self:connect() then
+		if connect_once(self) then
 			return
 		end
 		if t > 1000 then
@@ -487,11 +464,52 @@ local function reconnect_channel(self)
 	end
 end
 
-function channel:request(request, response)
-	if not self.__sock then
-		assert(not self.__closed)
-		reconnect_channel(self)
+local function block_connect(self)
+	if self.__sock then
+		local authco = self.__authcoroutine
+		if not authco then
+			return true
+		end
+		if authco == coroutine.running() then
+			-- authing
+			return true
+		end
 	end
+	if self.__closed then
+		return false
+	end
+	if #self.__connecting > 0 then
+		-- connecting in other coroutine
+		local co = coroutine.running()
+		table.insert(self.__connecting, co)
+		skynet.wait()
+		-- check connection again
+		return block_connect(self)
+	end
+
+	self.__connecting[1] = true
+	try_connect(self)
+	self.__connecting[1] = nil
+	for i=2, #self.__connecting do
+		local co = self.__connecting[i]
+		self.__connecting[i] = nil
+		skynet.wakeup(co)
+	end
+
+	-- check again
+	return block_connect(self)
+end
+
+function channel:connect()
+	if self.__closed then
+		self.__closed = false
+	end
+
+	return block_connect(self)
+end
+
+function channel:request(request, response)
+	assert(block_connect(self))
 
 	if not socket.write(self.__sock[1], request) then
 		return self:request(request, response)
@@ -531,10 +549,8 @@ function channel:request(request, response)
 end
 
 function channel:response(response)
-	if not self.__sock then
-		assert(not self.__closed)
-		reconnect_channel(self)
-	end
+	assert(block_connect(self))
+
 	assert(type(response) == "function")
 
 	local co = coroutine.running()
