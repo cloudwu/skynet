@@ -1,5 +1,6 @@
 local bson = require "bson"
 local socket = require "socket"
+local socketchannel = require "socketchannel"
 local skynet = require "skynet"
 local driver = require "mongo.driver"
 local rawget = rawget
@@ -78,7 +79,7 @@ end
 function mongo.client( obj )
 	obj.port = obj.port or 27017
 	obj.__id = 0
-	obj.__sock = socket.channel {
+	obj.__sock = socketchannel.channel {
 		host = obj.host,
 		port = obj.port,
 		response = dispatch_reply,
