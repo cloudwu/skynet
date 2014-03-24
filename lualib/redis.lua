@@ -89,6 +89,8 @@ function redis.connect(dbname)
 		port = db_conf.port or 6379,
 		auth = redis_login(db_conf.auth, db_conf.db),
 	}
+	-- try connect first
+	channel:connect()
 	return setmetatable( { channel }, meta )
 end
 
@@ -180,6 +182,8 @@ function redis.watch(dbname)
 	}
 	obj.__sock = channel
 
+	-- try connect first
+	channel:connect()
 	return setmetatable( obj, watchmeta )
 end
 
