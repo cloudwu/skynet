@@ -158,7 +158,7 @@ function suspend(co, result, command, param, size)
 		end
 		session_coroutine_id[co] = nil
 		session_coroutine_address[co] = nil
-		error(debug.traceback(co,command))
+		error(debug.traceback(co,tostring(command)))
 	end
 	if command == "CALL" then
 		c.trace_register(trace_handle, param)
@@ -444,13 +444,13 @@ local function dispatch_message(...)
 		if not fork_succ then
 			if succ then
 				succ = false
-				err = fork_err
+				err = tostring(fork_err)
 			else
-				err = err .. "\n" .. fork_err
+				err = tostring(err) .. "\n" .. tostring(fork_err)
 			end
 		end
 	end
-	assert(succ, err)
+	assert(succ, tostring(err))
 end
 
 function skynet.newservice(name, ...)
