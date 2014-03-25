@@ -116,7 +116,7 @@ local function co_create(f)
 			f(...)
 			while true do
 				f = nil
-				coroutine_pool[#coroutine_pool] = co
+				coroutine_pool[#coroutine_pool+1] = co
 				f = coroutine_yield "EXIT"
 				f(coroutine_yield())
 			end
