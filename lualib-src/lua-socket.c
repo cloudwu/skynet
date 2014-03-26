@@ -7,7 +7,6 @@
 #include <lua.h>
 #include <lauxlib.h>
 
-#include "luacompat52.h"
 #include "skynet_socket.h"
 #include "service_lua.h"
 

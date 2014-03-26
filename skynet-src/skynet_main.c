@@ -1,6 +1,5 @@
 #include "skynet_imp.h"
 #include "skynet_env.h"
-#include "luacompat52.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,7 +112,7 @@ main(int argc, char *argv[]) {
 	optstring("luaservice","./service/?.lua");
 
 	config.thread =  optint("thread",8);
-	config.module_path = optstring("cpath","./service/?.so");
+	config.module_path = optstring("cpath","./cservice/?.so");
 	config.logger = optstring("logger",NULL);
 	config.harbor = optint("harbor", 1);
 	config.master = optstring("master","127.0.0.1:2012");

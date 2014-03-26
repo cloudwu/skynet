@@ -2,7 +2,6 @@
   https://github.com/cloudwu/lua-serialize
  */
 
-#include "luacompat52.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <stdlib.h>

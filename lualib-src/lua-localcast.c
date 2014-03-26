@@ -1,6 +1,5 @@
 #include <lua.h>
 #include <lauxlib.h>
-#include "luacompat52.h"
 #include "localcast.h"
 
 #include <stdlib.h>

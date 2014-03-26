@@ -4,8 +4,6 @@
 #include "service_lua.h"
 #include "timingqueue.h"
 
-#include "luacompat52.h"
-
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
 
