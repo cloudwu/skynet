@@ -9,11 +9,13 @@ none :
 	@echo "Please do 'make PLATFORM' where PLATFORM is one of these:"
 	@echo "   $(PLATS)"
 
-LUA_STATICLIB = 3rd/lua/liblua.a
-LUA_INC = -I3rd/lua
+LUA_STATICLIB ?= 3rd/lua/liblua.a
+LUA_INC ?= -I3rd/lua
+LUA_CLIB_PATH ?= luaclib
+CSERVICE_PATH ?= cservice
+SKYNET_BUILD_PATH ?= .
+
 LUA_LIB = $(LUA_STATICLIB)
-LUA_CLIB_PATH = luaclib
-CSERVICE_PATH = cservice
 
 CFLAGS = -g -Wall $(LUA_INC)
 
@@ -44,11 +46,11 @@ SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
   skynet_monitor.c skynet_socket.c socket_server.c
 
 all : \
-  skynet \
+  $(SKYNET_BUILD_PATH)/skynet \
   $(foreach v, $(CSERVICE), $(CSERVICE_PATH)/$(v).so) \
   $(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so) 
 
-skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_STATICLIB)
+$(SKYNET_BUILD_PATH)/skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_STATICLIB)
 	gcc $(CFLAGS) -o $@ $^ -Iskynet-src $(EXPORT) $(LIBS)
 
 $(LUA_CLIB_PATH) :
@@ -82,8 +84,8 @@ $(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
 $(LUA_CLIB_PATH)/mongo.so : lualib-src/lua-mongo.c | $(LUA_CLIB_PATH)
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ 
 
-client : client-src/client.c
+$(SKYNET_BUILD_PATH)/client : client-src/client.c
 	gcc $(CFLAGS) $^ -o $@ -lpthread
 
 clean :
-	rm -f skynet client $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
+	rm -f $(SKYNET_BUILD_PATH)/skynet $(SKYNET_BUILD_PATH)/client $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
