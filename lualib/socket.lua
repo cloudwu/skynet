@@ -257,6 +257,9 @@ function socket.block(id)
 	assert(not s.read_required)
 	s.read_required = 0
 	suspend(s)
+	if not s.connected and s.closing then
+		skynet.wakeup(s.closing)
+	end
 	return s.connected
 end
 
