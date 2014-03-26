@@ -3,7 +3,14 @@ PLATS = linux freebsd macosx
 
 .PHONY : none $(PLATS) clean lua all
 
-$(PLAT) :
+ifneq ($(PLAT), none)
+
+.PHONY : default
+
+default :
+	$(MAKE) $(PLAT)
+
+endif
 
 none :
 	@echo "Please do 'make PLATFORM' where PLATFORM is one of these:"
@@ -17,13 +24,13 @@ SKYNET_BUILD_PATH ?= .
 
 LUA_LIB = $(LUA_STATICLIB)
 
-CFLAGS = -g -Wall $(LUA_INC)
+CFLAGS = -g -Wall $(LUA_INC) $(MYCFLAGS)
 
 LIBS = -lpthread -lm
 SHARED = -fPIC --shared
 EXPORT = -Wl,-E
 
-$(PLATS) : all client
+$(PLATS) : all 
 
 linux : PLAT = linux
 macosx : PLAT = macosx
@@ -51,7 +58,7 @@ all : \
   $(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so) 
 
 $(SKYNET_BUILD_PATH)/skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_STATICLIB)
-	gcc $(CFLAGS) -o $@ $^ -Iskynet-src $(EXPORT) $(LIBS)
+	gcc $(CFLAGS) -o $@ $^ -Iskynet-src $(LDFLAGS) $(EXPORT) $(LIBS)
 
 $(LUA_CLIB_PATH) :
 	mkdir $(LUA_CLIB_PATH)
@@ -83,6 +90,8 @@ $(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
 
 $(LUA_CLIB_PATH)/mongo.so : lualib-src/lua-mongo.c | $(LUA_CLIB_PATH)
 	gcc $(CFLAGS) $(SHARED) $^ -o $@ 
+
+all : $(SKYNET_BUILD_PATH)/client
 
 $(SKYNET_BUILD_PATH)/client : client-src/client.c
 	gcc $(CFLAGS) $^ -o $@ -lpthread
