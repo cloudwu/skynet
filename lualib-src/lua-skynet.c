@@ -290,7 +290,7 @@ _sendname(lua_State *L, struct skynet_context * context, const char * dest) {
 		break;
 	}
 	default:
-		luaL_error(L, "skynet.send invalid param %s", lua_type(L,4));
+		luaL_error(L, "skynet.send invalid param %s", lua_typename(L,lua_type(L,4)));
 	}
 	if (session < 0) {
 		luaL_error(L, "skynet.send session (%d) < 0", session);
@@ -363,7 +363,7 @@ _send(lua_State *L) {
 		break;
 	}
 	default:
-		luaL_error(L, "skynet.send invalid param %s", lua_type(L,4));
+		luaL_error(L, "skynet.send invalid param %s", lua_typename(L, lua_type(L,4)));
 	}
 	if (session < 0) {
 		// send to invalid address
@@ -545,7 +545,7 @@ luaopen_skynet_c(lua_State *L) {
 		{ NULL, NULL },
 	};
 
-	lua_createtable(L, 0, (sizeof(l) + sizeof(l2))/sizeof(luaL_Reg)-1);
+	lua_createtable(L, 0, (sizeof(l) + sizeof(l2))/sizeof(luaL_Reg)-2);
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_lua");
 	struct snlua *lua = lua_touserdata(L,-1);
