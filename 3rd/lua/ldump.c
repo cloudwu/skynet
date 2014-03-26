@@ -79,7 +79,7 @@ static void DumpFunction(const Proto* f, DumpState* D);
 
 static void DumpConstants(const Proto* f, DumpState* D)
 {
- int i,n=f->sizek;
+ int i,n=f->sp->sizek;
  DumpInt(n,D);
  for (i=0; i<n; i++)
  {
@@ -101,23 +101,23 @@ static void DumpConstants(const Proto* f, DumpState* D)
     default: lua_assert(0);
   }
  }
- n=f->sizep;
+ n=f->sp->sizep;
  DumpInt(n,D);
  for (i=0; i<n; i++) DumpFunction(f->p[i],D);
 }
 
 static void DumpUpvalues(const Proto* f, DumpState* D)
 {
- int i,n=f->sizeupvalues;
+ int i,n=f->sp->sizeupvalues;
  DumpInt(n,D);
  for (i=0; i<n; i++)
  {
-  DumpChar(f->upvalues[i].instack,D);
-  DumpChar(f->upvalues[i].idx,D);
+  DumpChar(f->sp->upvalues[i].instack,D);
+  DumpChar(f->sp->upvalues[i].idx,D);
  }
 }
 
-static void DumpDebug(const Proto* f, DumpState* D)
+static void DumpDebug(const SharedProto* f, DumpState* D)
 {
  int i,n;
  DumpString((D->strip) ? NULL : f->source,D);
@@ -138,15 +138,16 @@ static void DumpDebug(const Proto* f, DumpState* D)
 
 static void DumpFunction(const Proto* f, DumpState* D)
 {
- DumpInt(f->linedefined,D);
- DumpInt(f->lastlinedefined,D);
- DumpChar(f->numparams,D);
- DumpChar(f->is_vararg,D);
- DumpChar(f->maxstacksize,D);
- DumpCode(f,D);
+ const SharedProto *sp = f->sp;
+ DumpInt(sp->linedefined,D);
+ DumpInt(sp->lastlinedefined,D);
+ DumpChar(sp->numparams,D);
+ DumpChar(sp->is_vararg,D);
+ DumpChar(sp->maxstacksize,D);
+ DumpCode(sp,D);
  DumpConstants(f,D);
  DumpUpvalues(f,D);
- DumpDebug(f,D);
+ DumpDebug(sp,D);
 }
 
 static void DumpHeader(DumpState* D)

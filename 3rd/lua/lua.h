@@ -264,6 +264,7 @@ LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
 
 LUA_API int (lua_dump) (lua_State *L, lua_Writer writer, void *data);
 
+LUA_API void (lua_clonefunction) (lua_State *L, const void *eL);
 
 /*
 ** coroutine functions

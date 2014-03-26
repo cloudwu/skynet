@@ -146,9 +146,9 @@ static const Proto* combine(lua_State* L, int n)
   for (i=0; i<n; i++)
   {
    f->p[i]=toproto(L,i-n-1);
-   if (f->p[i]->sizeupvalues>0) f->p[i]->upvalues[0].instack=0;
+   if (f->p[i]->sp->sizeupvalues>0) f->p[i]->sp->upvalues[0].instack=0;
   }
-  f->sizelineinfo=0;
+  f->sp->sizelineinfo=0;
   return f;
  }
 }
@@ -271,13 +271,14 @@ static void PrintConstant(const Proto* f, int i)
  }
 }
 
-#define UPVALNAME(x) ((f->upvalues[x].name) ? getstr(f->upvalues[x].name) : "-")
+#define UPVALNAME(x) ((f->sp->upvalues[x].name) ? getstr(f->sp->upvalues[x].name) : "-")
 #define MYK(x)		(-1-(x))
 
 static void PrintCode(const Proto* f)
 {
- const Instruction* code=f->code;
- int pc,n=f->sizecode;
+ const SharedProto *sp = f->sp;
+ const Instruction* code=sp->code;
+ int pc,n=sp->sizecode;
  for (pc=0; pc<n; pc++)
  {
   Instruction i=code[pc];
@@ -375,7 +376,7 @@ static void PrintCode(const Proto* f)
 #define SS(x)	((x==1)?"":"s")
 #define S(x)	(int)(x),SS(x)
 
-static void PrintHeader(const Proto* f)
+static void PrintHeader(const SharedProto* f)
 {
  const char* s=f->source ? getstr(f->source) : "=?";
  if (*s=='@' || *s=='=')
@@ -397,8 +398,9 @@ static void PrintHeader(const Proto* f)
 
 static void PrintDebug(const Proto* f)
 {
+ const SharedProto *sp = f->sp;
  int i,n;
- n=f->sizek;
+ n=sp->sizek;
  printf("constants (%d) for %p:\n",n,VOID(f));
  for (i=0; i<n; i++)
  {
@@ -406,26 +408,26 @@ static void PrintDebug(const Proto* f)
   PrintConstant(f,i);
   printf("\n");
  }
- n=f->sizelocvars;
+ n=sp->sizelocvars;
  printf("locals (%d) for %p:\n",n,VOID(f));
  for (i=0; i<n; i++)
  {
   printf("\t%d\t%s\t%d\t%d\n",
-  i,getstr(f->locvars[i].varname),f->locvars[i].startpc+1,f->locvars[i].endpc+1);
+  i,getstr(sp->locvars[i].varname),sp->locvars[i].startpc+1,sp->locvars[i].endpc+1);
  }
- n=f->sizeupvalues;
+ n=sp->sizeupvalues;
  printf("upvalues (%d) for %p:\n",n,VOID(f));
  for (i=0; i<n; i++)
  {
   printf("\t%d\t%s\t%d\t%d\n",
-  i,UPVALNAME(i),f->upvalues[i].instack,f->upvalues[i].idx);
+  i,UPVALNAME(i),sp->upvalues[i].instack,sp->upvalues[i].idx);
  }
 }
 
 static void PrintFunction(const Proto* f, int full)
 {
- int i,n=f->sizep;
- PrintHeader(f);
+ int i,n=f->sp->sizep;
+ PrintHeader(f->sp);
  PrintCode(f);
  if (full) PrintDebug(f);
  for (i=0; i<n; i++) PrintFunction(f->p[i],full);

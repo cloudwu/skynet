@@ -993,6 +993,63 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   return status;
 }
 
+static Proto *
+cloneproto (lua_State *L, const Proto *src) {
+  /* copy constants and nested proto */
+  int i,n;
+  Proto *f = luaF_newproto (L, src->sp);
+  n = src->sp->sizek;
+  f->k=luaM_newvector(L,n,TValue);
+  for (i=0; i<n; i++) setnilvalue(&f->k[i]);
+  for (i=0; i<n; i++) {
+    const TValue *s=&src->k[i];
+    TValue *o=&f->k[i];
+    if (ttisstring(s)) {
+      TString * str = luaS_newlstr(L,svalue(s),tsvalue(s)->len);
+      setsvalue2n(L,o,str);
+    } else {
+      setobj(L,o,s);
+    }
+  }
+  n = src->sp->sizep;
+  f->p=luaM_newvector(L,n,struct Proto *);
+  for (i=0; i<n; i++) f->p[i]=NULL;
+  for (i=0; i<n; i++) {
+    f->p[i]=cloneproto(L, src->p[i]);
+  }
+  return f;
+}
+
+LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
+  int i;
+  Closure *cl;
+  const LClosure *f = cast(const LClosure *, fp);
+  lua_lock(L);
+  if (f->p->sp->l_G == G(L)) {
+    setclLvalue(L,L->top,f);
+    api_incr_top(L);
+    lua_unlock(L);
+    return;
+  }
+  cl = luaF_newLclosure(L,f->nupvalues);
+  cl->l.p = cloneproto(L, f->p);
+  setclLvalue(L,L->top,cl);
+  api_incr_top(L);
+  for (i = 0; i < cl->l.nupvalues; i++) {  /* initialize upvalues */
+    UpVal *up = luaF_newupval(L);
+    cl->l.upvals[i] = up;
+    luaC_objbarrier(L, cl, up);
+  }
+  if (f->nupvalues == 1) {  /* does it have one upvalue? */
+    /* get global table from registry */
+    Table *reg = hvalue(&G(L)->l_registry);
+    const TValue *gt = luaH_getint(reg, LUA_RIDX_GLOBALS);
+    /* set global table as 1st upvalue of 'cl' (may be LUA_ENV) */
+    setobj(L, cl->l.upvals[0]->v, gt);
+    luaC_barrier(L, cl->l.upvals[0], gt);
+  }
+  lua_unlock(L);
+}
 
 LUA_API int lua_dump (lua_State *L, lua_Writer writer, void *data) {
   int status;
@@ -1198,7 +1255,7 @@ static const char *aux_upvalue (StkId fi, int n, TValue **val,
     case LUA_TLCL: {  /* Lua closure */
       LClosure *f = clLvalue(fi);
       TString *name;
-      Proto *p = f->p;
+      SharedProto *p = f->p->sp;
       if (!(1 <= n && n <= p->sizeupvalues)) return NULL;
       *val = f->upvals[n-1]->v;
       if (owner) *owner = obj2gco(f->upvals[n - 1]);

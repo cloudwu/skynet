@@ -105,6 +105,10 @@ main(int argc, char *argv[]) {
 	} 
 	_init_env(L);
 
+#ifdef LUA_CACHELIB
+  printf("Skynet lua code cache enable\n");
+#endif
+
 	const char *path = optstring("lua_path","./lualib/?.lua;./lualib/?/init.lua");
 	setenv("LUA_PATH",path,1);
 	const char *cpath = optstring("lua_cpath","./luaclib/?.so");

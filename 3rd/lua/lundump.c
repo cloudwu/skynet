@@ -83,7 +83,7 @@ static TString* LoadString(LoadState* S)
  }
 }
 
-static void LoadCode(LoadState* S, Proto* f)
+static void LoadCode(LoadState* S, SharedProto* f)
 {
  int n=LoadInt(S);
  f->code=luaM_newvector(S->L,n,Instruction);
@@ -98,7 +98,7 @@ static void LoadConstants(LoadState* S, Proto* f)
  int i,n;
  n=LoadInt(S);
  f->k=luaM_newvector(S->L,n,TValue);
- f->sizek=n;
+ f->sp->sizek=n;
  for (i=0; i<n; i++) setnilvalue(&f->k[i]);
  for (i=0; i<n; i++)
  {
@@ -123,16 +123,16 @@ static void LoadConstants(LoadState* S, Proto* f)
  }
  n=LoadInt(S);
  f->p=luaM_newvector(S->L,n,Proto*);
- f->sizep=n;
+ f->sp->sizep=n;
  for (i=0; i<n; i++) f->p[i]=NULL;
  for (i=0; i<n; i++)
  {
-  f->p[i]=luaF_newproto(S->L);
+  f->p[i]=luaF_newproto(S->L, NULL);
   LoadFunction(S,f->p[i]);
  }
 }
 
-static void LoadUpvalues(LoadState* S, Proto* f)
+static void LoadUpvalues(LoadState* S, SharedProto* f)
 {
  int i,n;
  n=LoadInt(S);
@@ -146,7 +146,7 @@ static void LoadUpvalues(LoadState* S, Proto* f)
  }
 }
 
-static void LoadDebug(LoadState* S, Proto* f)
+static void LoadDebug(LoadState* S, SharedProto* f)
 {
  int i,n;
  f->source=LoadString(S);
@@ -170,15 +170,16 @@ static void LoadDebug(LoadState* S, Proto* f)
 
 static void LoadFunction(LoadState* S, Proto* f)
 {
- f->linedefined=LoadInt(S);
- f->lastlinedefined=LoadInt(S);
- f->numparams=LoadByte(S);
- f->is_vararg=LoadByte(S);
- f->maxstacksize=LoadByte(S);
- LoadCode(S,f);
+ SharedProto *sp = f->sp;
+ sp->linedefined=LoadInt(S);
+ sp->lastlinedefined=LoadInt(S);
+ sp->numparams=LoadByte(S);
+ sp->is_vararg=LoadByte(S);
+ sp->maxstacksize=LoadByte(S);
+ LoadCode(S,sp);
  LoadConstants(S,f);
- LoadUpvalues(S,f);
- LoadDebug(S,f);
+ LoadUpvalues(S,sp);
+ LoadDebug(S,sp);
 }
 
 /* the code below must be consistent with the code in luaU_header */
@@ -219,12 +220,12 @@ Closure* luaU_undump (lua_State* L, ZIO* Z, Mbuffer* buff, const char* name)
  LoadHeader(&S);
  cl=luaF_newLclosure(L,1);
  setclLvalue(L,L->top,cl); incr_top(L);
- cl->l.p=luaF_newproto(L);
+ cl->l.p=luaF_newproto(L, NULL);
  LoadFunction(&S,cl->l.p);
- if (cl->l.p->sizeupvalues != 1)
+ if (cl->l.p->sp->sizeupvalues != 1)
  {
   Proto* p=cl->l.p;
-  cl=luaF_newLclosure(L,cl->l.p->sizeupvalues);
+  cl=luaF_newLclosure(L,cl->l.p->sp->sizeupvalues);
   cl->l.p=p;
   setclLvalue(L,L->top-1,cl);
  }

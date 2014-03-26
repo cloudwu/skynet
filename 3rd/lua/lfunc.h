@@ -18,7 +18,7 @@
                          cast(int, sizeof(TValue *)*((n)-1)))
 
 
-LUAI_FUNC Proto *luaF_newproto (lua_State *L);
+LUAI_FUNC Proto *luaF_newproto (lua_State *L, SharedProto *sp);
 LUAI_FUNC Closure *luaF_newCclosure (lua_State *L, int nelems);
 LUAI_FUNC Closure *luaF_newLclosure (lua_State *L, int nelems);
 LUAI_FUNC UpVal *luaF_newupval (lua_State *L);

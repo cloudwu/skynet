@@ -98,14 +98,14 @@ LUA_API int lua_getstack (lua_State *L, int level, lua_Debug *ar) {
 
 
 static const char *upvalname (Proto *p, int uv) {
-  TString *s = check_exp(uv < p->sizeupvalues, p->upvalues[uv].name);
+  TString *s = check_exp(uv < p->sp->sizeupvalues, p->sp->upvalues[uv].name);
   if (s == NULL) return "?";
   else return getstr(s);
 }
 
 
 static const char *findvararg (CallInfo *ci, int n, StkId *pos) {
-  int nparams = clLvalue(ci->func)->p->numparams;
+  int nparams = clLvalue(ci->func)->p->sp->numparams;
   if (n >= ci->u.l.base - ci->func - nparams)
     return NULL;  /* no such vararg */
   else {
@@ -183,7 +183,7 @@ static void funcinfo (lua_Debug *ar, Closure *cl) {
     ar->what = "C";
   }
   else {
-    Proto *p = cl->l.p;
+    SharedProto *p = cl->l.p->sp;
     ar->source = p->source ? getstr(p->source) : "=?";
     ar->linedefined = p->linedefined;
     ar->lastlinedefined = p->lastlinedefined;
@@ -201,12 +201,12 @@ static void collectvalidlines (lua_State *L, Closure *f) {
   else {
     int i;
     TValue v;
-    int *lineinfo = f->l.p->lineinfo;
+    int *lineinfo = f->l.p->sp->lineinfo;
     Table *t = luaH_new(L);  /* new table to store active lines */
     sethvalue(L, L->top, t);  /* push it on stack */
     api_incr_top(L);
     setbvalue(&v, 1);  /* boolean 'true' to be the value of all indices */
-    for (i = 0; i < f->l.p->sizelineinfo; i++)  /* for all lines with code */
+    for (i = 0; i < f->l.p->sp->sizelineinfo; i++)  /* for all lines with code */
       luaH_setint(L, t, lineinfo[i], &v);  /* table[line] = true */
   }
 }
@@ -232,8 +232,8 @@ static int auxgetinfo (lua_State *L, const char *what, lua_Debug *ar,
           ar->nparams = 0;
         }
         else {
-          ar->isvararg = f->l.p->is_vararg;
-          ar->nparams = f->l.p->numparams;
+          ar->isvararg = f->l.p->sp->is_vararg;
+          ar->nparams = f->l.p->sp->numparams;
         }
         break;
       }
@@ -342,7 +342,7 @@ static int findsetreg (Proto *p, int lastpc, int reg) {
   int setreg = -1;  /* keep last instruction that changed 'reg' */
   int jmptarget = 0;  /* any code before this address is conditional */
   for (pc = 0; pc < lastpc; pc++) {
-    Instruction i = p->code[pc];
+    Instruction i = p->sp->code[pc];
     OpCode op = GET_OPCODE(i);
     int a = GETARG_A(i);
     switch (op) {
@@ -397,7 +397,7 @@ static const char *getobjname (Proto *p, int lastpc, int reg,
   /* else try symbolic execution */
   pc = findsetreg(p, lastpc, reg);
   if (pc != -1) {  /* could find instruction? */
-    Instruction i = p->code[pc];
+    Instruction i = p->sp->code[pc];
     OpCode op = GET_OPCODE(i);
     switch (op) {
       case OP_MOVE: {
@@ -423,7 +423,7 @@ static const char *getobjname (Proto *p, int lastpc, int reg,
       case OP_LOADK:
       case OP_LOADKX: {
         int b = (op == OP_LOADK) ? GETARG_Bx(i)
-                                 : GETARG_Ax(p->code[pc + 1]);
+                                 : GETARG_Ax(p->sp->code[pc + 1]);
         if (ttisstring(&p->k[b])) {
           *name = svalue(&p->k[b]);
           return "constant";
@@ -446,7 +446,7 @@ static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name) {
   TMS tm;
   Proto *p = ci_func(ci)->p;  /* calling function */
   int pc = currentpc(ci);  /* calling instruction index */
-  Instruction i = p->code[pc];  /* calling instruction */
+  Instruction i = p->sp->code[pc];  /* calling instruction */
   switch (GET_OPCODE(i)) {
     case OP_CALL:
     case OP_TAILCALL:  /* get function name */
@@ -559,7 +559,7 @@ static void addinfo (lua_State *L, const char *msg) {
   if (isLua(ci)) {  /* is Lua code? */
     char buff[LUA_IDSIZE];  /* add file:line information */
     int line = currentline(ci);
-    TString *src = ci_func(ci)->p->source;
+    TString *src = ci_func(ci)->p->sp->source;
     if (src)
       luaO_chunkid(buff, getstr(src), LUA_IDSIZE);
     else {  /* no source available; use "?" instead */
