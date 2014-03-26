@@ -16,13 +16,13 @@ none :
 	@echo "Please do 'make PLATFORM' where PLATFORM is one of these:"
 	@echo "   $(PLATS)"
 
-LUA_STATICLIB ?= 3rd/lua/liblua.a
+LUA_STATICLIB = 3rd/lua/liblua.a
+LUA_LIB ?= $(LUA_STATICLIB)
 LUA_INC ?= -I3rd/lua
 LUA_CLIB_PATH ?= luaclib
 CSERVICE_PATH ?= cservice
 SKYNET_BUILD_PATH ?= .
 
-LUA_LIB = $(LUA_STATICLIB)
 
 CFLAGS = -g -Wall $(LUA_INC) $(MYCFLAGS)
 
@@ -57,7 +57,7 @@ all : \
   $(foreach v, $(CSERVICE), $(CSERVICE_PATH)/$(v).so) \
   $(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so) 
 
-$(SKYNET_BUILD_PATH)/skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_STATICLIB)
+$(SKYNET_BUILD_PATH)/skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_LIB)
 	gcc $(CFLAGS) -o $@ $^ -Iskynet-src $(LDFLAGS) $(EXPORT) $(LIBS)
 
 $(LUA_CLIB_PATH) :

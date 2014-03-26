@@ -4,6 +4,13 @@
 make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd now
 ```
 
+Or you can :
+
+```
+export PLAT=linux
+make
+```
+
 ## Test
 
 Run these in different console
