@@ -26,13 +26,11 @@ current_time(struct timespec *ti) {
 #endif
 }
 
-void 
-diff_time(struct timespec *ti, uint32_t *sec, uint32_t *nsec) {
-	struct timespec end;
-	current_time(&end);
-	int diffsec = end.tv_sec - ti->tv_sec;
+static void
+_diff_time(struct timespec *ti, struct timespec *end, uint32_t *sec, uint32_t *nsec) {
+	int diffsec = end->tv_sec - ti->tv_sec;
 	assert(diffsec>=0);
-	int diffnsec = end.tv_nsec - ti->tv_nsec;
+	int diffnsec = end->tv_nsec - ti->tv_nsec;
 	if (diffnsec < 0) {
 		--diffsec;
 		diffnsec += NANOSEC;
@@ -43,6 +41,13 @@ diff_time(struct timespec *ti, uint32_t *sec, uint32_t *nsec) {
 		*nsec -= NANOSEC;
 	}
 	*sec += diffsec;
+}
+
+void 
+diff_time(struct timespec *ti, uint32_t *sec, uint32_t *nsec) {
+	struct timespec end;
+	current_time(&end);
+	_diff_time(ti, &end, sec, nsec);
 }
 
 struct trace_info {
@@ -75,6 +80,19 @@ _free_slot(struct trace_info *t) {
 	}
 }
 
+static void
+_new_time(struct trace_info *t) {
+	current_time(&t->ti);
+}
+
+static void
+_save_time(struct trace_info *t) {
+	struct timespec now;
+	current_time(&now);
+	_diff_time(&t->ti, &now, &t->ti_sec, &t->ti_nsec);
+	t->ti = now;
+}
+
 void
 trace_release(struct trace_pool *p) {
 	int i;
@@ -96,7 +114,7 @@ trace_new(struct trace_pool *p) {
 	t->next = NULL;
 	t->ti_sec = 0;
 	t->ti_nsec = 0;
-	current_time(&t->ti);
+	_new_time(t);
 	return t;
 }
 
@@ -115,6 +133,7 @@ trace_register(struct trace_pool *p, int session) {
 		p->slot[hash]->prev = t;
 	}
 	p->slot[hash] = t;
+	_save_time(t);
 }
 
 struct trace_info * 
@@ -123,7 +142,7 @@ trace_yield(struct trace_pool *p) {
 	if (t == NULL)
 		return NULL;
 
-	diff_time(&t->ti,&t->ti_sec,&t->ti_nsec);
+	_save_time(t);
 
 	if (t->session == 0) {
 		return t;
@@ -150,7 +169,7 @@ trace_switch(struct trace_pool *p, int session) {
 			if (t->next) {
 				t->next->prev = prev;
 			}
-			current_time(&t->ti);
+			_new_time(t);
 			return;
 		}
 		prev = t;
