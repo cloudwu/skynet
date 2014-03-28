@@ -1,4 +1,5 @@
 #include "trace_service.h"
+#include "skynet_timer.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -49,9 +50,10 @@ struct trace_info {
 	int session;
 	struct trace_info * prev;
 	struct trace_info * next;
-	struct timespec ti;
-	uint32_t ti_sec;
-	uint32_t ti_nsec;
+	struct {
+		uint32_t elapsed;
+		uint32_t last;
+	} time;
 };
 
 struct trace_pool {
@@ -75,6 +77,13 @@ _free_slot(struct trace_info *t) {
 	}
 }
 
+static void
+_save_time(struct trace_info *t) {
+	uint32_t now = skynet_gettime();
+	t->time.elapsed += now - t->time.last;
+	t->time.last = now;
+}
+
 void
 trace_release(struct trace_pool *p) {
 	int i;
@@ -94,9 +103,8 @@ trace_new(struct trace_pool *p) {
 	t->session = 0;
 	t->prev = NULL;
 	t->next = NULL;
-	t->ti_sec = 0;
-	t->ti_nsec = 0;
-	current_time(&t->ti);
+	t->time.elapsed = 0;
+	t->time.last = skynet_gettime();
 	return t;
 }
 
@@ -123,9 +131,8 @@ trace_yield(struct trace_pool *p) {
 	if (t == NULL)
 		return NULL;
 
-	diff_time(&t->ti,&t->ti_sec,&t->ti_nsec);
-
 	if (t->session == 0) {
+		_save_time(t);
 		return t;
 	} else {
 		p->current = NULL;
@@ -150,7 +157,6 @@ trace_switch(struct trace_pool *p, int session) {
 			if (t->next) {
 				t->next->prev = prev;
 			}
-			current_time(&t->ti);
 			return;
 		}
 		prev = t;
@@ -163,7 +169,7 @@ trace_delete(struct trace_pool *p, struct trace_info *t) {
 	assert(p->current == t);
 	p->current = NULL;
 	if (t) {
-		double ti = (double)t->ti_sec + (double)t->ti_nsec / NANOSEC;
+		double ti = (double)t->time.elapsed/100;
 		free(t);
 		return ti;
 	} else {
