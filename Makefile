@@ -1,6 +1,8 @@
 PLAT ?= none
 PLATS = linux freebsd macosx
 
+CC ?= gcc
+
 .PHONY : none $(PLATS) clean lua all
 
 ifneq ($(PLAT), none)
@@ -42,7 +44,7 @@ macosx : EXPORT =
 linux freebsd : LIBS += -lrt
 
 $(LUA_STATICLIB) :
-	cd 3rd/lua && $(MAKE) $(PLAT)
+	cd 3rd/lua && $(MAKE) CC=$(CC) $(PLAT)
 
 CSERVICE = snlua logger gate client master multicast tunnel harbor localcast
 LUA_CLIB = skynet socketdriver int64 mcast bson mongo
@@ -58,7 +60,7 @@ all : \
   $(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so) 
 
 $(SKYNET_BUILD_PATH)/skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_LIB)
-	gcc $(CFLAGS) -o $@ $^ -Iskynet-src $(LDFLAGS) $(EXPORT) $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ -Iskynet-src $(LDFLAGS) $(EXPORT) $(LIBS)
 
 $(LUA_CLIB_PATH) :
 	mkdir $(LUA_CLIB_PATH)
@@ -68,33 +70,33 @@ $(CSERVICE_PATH) :
 
 define CSERVICE_TEMP
   $$(CSERVICE_PATH)/$(1).so : service-src/service_$(1).c | $$(CSERVICE_PATH)
-	gcc $$(CFLAGS) $$(SHARED) $$< -o $$@ -Iskynet-src
+	$(CC) $$(CFLAGS) $$(SHARED) $$< -o $$@ -Iskynet-src
 endef
 
 $(foreach v, $(CSERVICE), $(eval $(call CSERVICE_TEMP,$(v))))
 
 $(LUA_CLIB_PATH)/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c lualib-src/trace_service.c lualib-src/timingqueue.c | $(LUA_CLIB_PATH)
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src -Ilualib-src
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src -Ilualib-src
 
 $(LUA_CLIB_PATH)/socketdriver.so : lualib-src/lua-socket.c | $(LUA_CLIB_PATH)
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src
 
 $(LUA_CLIB_PATH)/int64.so : 3rd/lua-int64/int64.c | $(LUA_CLIB_PATH)
-	gcc $(CFLAGS) $(SHARED) -O2 $^ -o $@ 
+	$(CC) $(CFLAGS) $(SHARED) -O2 $^ -o $@ 
 
 $(LUA_CLIB_PATH)/mcast.so : lualib-src/lua-localcast.c | $(LUA_CLIB_PATH)
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src
 
 $(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ 
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
 
 $(LUA_CLIB_PATH)/mongo.so : lualib-src/lua-mongo.c | $(LUA_CLIB_PATH)
-	gcc $(CFLAGS) $(SHARED) $^ -o $@ 
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
 
 all : $(SKYNET_BUILD_PATH)/client
 
 $(SKYNET_BUILD_PATH)/client : client-src/client.c
-	gcc $(CFLAGS) $^ -o $@ -lpthread
+	$(CC) $(CFLAGS) $^ -o $@ -lpthread
 
 clean :
 	rm -f $(SKYNET_BUILD_PATH)/skynet $(SKYNET_BUILD_PATH)/client $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
