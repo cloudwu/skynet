@@ -41,6 +41,7 @@ local function message_dispatch(f)
 						error(string.format("[:%x] send a message to [:%x] return something", msg.addr, skynet.self()))
 					end
 				else
+					skynet.fork(message_dispatch,f)
 					error(string.format("[:%x] send a message to [:%x] throw an error : %s", msg.addr, skynet.self(),msg))
 				end
 			else
