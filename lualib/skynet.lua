@@ -521,6 +521,14 @@ function skynet.harbor(addr)
 	return c.harbor(addr)
 end
 
+function skynet.error(...)
+	local t = {...}
+	for i=1,#t do
+		t[i] = tostring(t[i])
+	end
+	return c.error(table.concat(t, " "))
+end
+
 ----- debug
 
 local internal_info_func
