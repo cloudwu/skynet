@@ -3,6 +3,7 @@ local socket = require "socket"
 local socketchannel = require "socketchannel"
 local skynet = require "skynet"
 local driver = require "mongo.driver"
+local md5 = require "md5"
 local rawget = rawget
 local assert = assert
 
@@ -76,6 +77,18 @@ local function dispatch_reply(so)
 	return reply_id, succ, result
 end
 
+local function mongo_auth(mongoc)
+	local user = rawget(mongoc, "username")
+	local pass = rawget(mongoc, "password")
+
+	if user == nil or pass == nil then
+		return
+	end
+	return function()
+		assert(mongoc:auth(user, pass))
+	end
+end
+
 function mongo.client( obj )
 	obj.port = obj.port or 27017
 	obj.__id = 0
@@ -83,6 +96,7 @@ function mongo.client( obj )
 		host = obj.host,
 		port = obj.port,
 		response = dispatch_reply,
+		auth = mongo_auth(obj),
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect()
@@ -121,6 +135,23 @@ function mongo_client:runCommand(...)
 		self.admin = self:getDB "admin"
 	end
 	return self.admin:runCommand(...)
+end
+
+function mongo_client:auth(user,password)
+	local password = md5.sumhexa(string.format("%s:mongo:%s",user,password))
+	local result= self:runCommand "getnonce"
+	if result.ok ~=1 then
+		return false
+	end
+
+	local key = md5.sumhexa(string.format("%s%s%s",result.nonce,user,password))
+	local result= self:runCommand ("authenticate",1,"user",user,"nonce",result.nonce,"key",key)
+	return result.ok == 1
+end
+
+function mongo_client:logout()
+	local result = self:runCommand "logout"
+	return result.ok == 1
 end
 
 function mongo_db:runCommand(cmd,cmd_v,...)
