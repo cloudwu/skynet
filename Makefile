@@ -1,6 +1,6 @@
 PLAT ?= none
 PLATS = linux freebsd macosx
-
+EE = 222
 CC ?= gcc
 
 .PHONY : none $(PLATS) clean lua all
