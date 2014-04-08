@@ -15,9 +15,9 @@ struct socket_server;
 
 // socket_server对应的msg
 struct socket_message {
-	int id; // 应用层的socket fd
+	int id; 	      // 应用层的socket fd
 	uintptr_t opaque; // 在skynet中对应一个actor实体的handler
-	int ud;	//对于accept连接来说是新连接的fd 对于数据到来是数据的大小
+	int ud;			  // 对于accept连接来说是新连接的fd 对于数据到来是数据的大小
 	char * data;
 };
 

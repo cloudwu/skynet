@@ -12,15 +12,15 @@
 #include <assert.h>
 #include <string.h>
 
-#define MAX_INFO 128
-// MAX_SOCKET will be 2^MAX_SOCKET_P
+#define MAX_INFO 128		     // MAX_SOCKET will be 2^MAX_SOCKET_P
+
 #define MAX_SOCKET_P 16
-#define MAX_EVENT 64          // 用于epoll_wait的第三个参数 每次返回事件的多少
-#define MIN_READ_BUFFER 64    // 最小分配的读缓冲大小 为了减少read的调用 尽可能分配大的读缓冲区 muduo是用了reav来减少read系统调用次数的 它可以准备多块缓冲区
-#define SOCKET_TYPE_INVALID 0 // 无效的sock fe
-#define SOCKET_TYPE_RESERVE 1 // 预留已经被申请 即将被使用
-#define SOCKET_TYPE_PLISTEN 2 // listen fd但是未加入epoll管理
-#define SOCKET_TYPE_LISTEN 3  // 监听到套接字已经加入epoll管理
+#define MAX_EVENT 64          	 // 用于epoll_wait的第三个参数 每次返回事件的多少
+#define MIN_READ_BUFFER 64    	 // 最小分配的读缓冲大小 为了减少read的调用 尽可能分配大的读缓冲区 muduo是用了reav来减少read系统调用次数的 它可以准备多块缓冲区
+#define SOCKET_TYPE_INVALID 0 	 // 无效的sock fe
+#define SOCKET_TYPE_RESERVE 1 	 // 预留已经被申请 即将被使用
+#define SOCKET_TYPE_PLISTEN 2 	 // listen fd但是未加入epoll管理
+#define SOCKET_TYPE_LISTEN 3     // 监听到套接字已经加入epoll管理
 #define SOCKET_TYPE_CONNECTING 4 // 尝试连接的socket fd
 #define SOCKET_TYPE_CONNECTED 5  // 已经建立连接的socket 主动conn或者被动accept的套接字 已经加入epoll管理
 #define SOCKET_TYPE_HALFCLOSE 6  // 已经在应用层关闭了fd 但是数据还没有发送完 还没有close
@@ -46,7 +46,7 @@ struct socket {
 	int64_t wb_size;    // 发送缓冲区未发送的数据
 	uintptr_t opaque;   // 在skynet中用于保存服务的handle
 	struct write_buffer * head; // 发送缓冲区链表头指针和尾指针
-	struct write_buffer * tail;
+	struct write_buffer * tail; //
 };
 
 struct socket_server {
