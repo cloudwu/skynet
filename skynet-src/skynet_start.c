@@ -52,7 +52,7 @@ static void *
 _socket(void *p) {
 	struct monitor * m = p;
 	for (;;) {
-		int r = skynet_socket_poll();
+		int r = skynet_socket_poll(); // ÊÂ¼şÑ­»·
 		if (r==0)
 			break;
 		if (r<0) {

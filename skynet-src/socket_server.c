@@ -15,52 +15,55 @@
 #define MAX_INFO 128
 // MAX_SOCKET will be 2^MAX_SOCKET_P
 #define MAX_SOCKET_P 16
-#define MAX_EVENT 64
-#define MIN_READ_BUFFER 64
-#define SOCKET_TYPE_INVALID 0
-#define SOCKET_TYPE_RESERVE 1
-#define SOCKET_TYPE_PLISTEN 2
-#define SOCKET_TYPE_LISTEN 3
-#define SOCKET_TYPE_CONNECTING 4
-#define SOCKET_TYPE_CONNECTED 5
-#define SOCKET_TYPE_HALFCLOSE 6
-#define SOCKET_TYPE_PACCEPT 7
-#define SOCKET_TYPE_BIND 8
+#define MAX_EVENT 64          // 用于epoll_wait的第三个参数 每次返回事件的多少
+#define MIN_READ_BUFFER 64    // 最小分配的读缓冲大小 为了减少read的调用 尽可能分配大的读缓冲区 muduo是用了reav来减少read系统调用次数的 它可以准备多块缓冲区
+#define SOCKET_TYPE_INVALID 0 // 无效的sock fe
+#define SOCKET_TYPE_RESERVE 1 // 预留已经被申请 即将被使用
+#define SOCKET_TYPE_PLISTEN 2 // listen fd但是未加入epoll管理
+#define SOCKET_TYPE_LISTEN 3  // 监听到套接字已经加入epoll管理
+#define SOCKET_TYPE_CONNECTING 4 // 尝试连接的socket fd
+#define SOCKET_TYPE_CONNECTED 5  // 已经建立连接的socket 主动conn或者被动accept的套接字 已经加入epoll管理
+#define SOCKET_TYPE_HALFCLOSE 6  // 已经在应用层关闭了fd 但是数据还没有发送完 还没有close
+#define SOCKET_TYPE_PACCEPT 7    // accept返回的fd 未加入epoll
+#define SOCKET_TYPE_BIND 8       // 其他类型的fd 如 stdin stdout等
 
-#define MAX_SOCKET (1<<MAX_SOCKET_P)
+#define MAX_SOCKET (1<<MAX_SOCKET_P) // 1 << 16 -> 64K
 
+// 发送缓冲区构成一个链表
 struct write_buffer {
 	struct write_buffer * next;
-	char *ptr;
+	char *ptr; // 指向当前未发送的数据首部
 	int sz;
 	void *buffer;
 };
 
+// 应用层的socket
 struct socket {
-	int fd;
-	int id;
-	int type;
-	int size;
-	int64_t wb_size;
-	uintptr_t opaque;
-	struct write_buffer * head;
+	int fd;   			// 对应内核分配的fd
+	int id;   			// 应用层维护的一个与fd对应的id
+	int type; 			// socket类型或者状态
+	int size; 			// 下一次read操作要分配的缓冲区大小
+	int64_t wb_size;    // 发送缓冲区未发送的数据
+	uintptr_t opaque;   // 在skynet中用于保存服务的handle
+	struct write_buffer * head; // 发送缓冲区链表头指针和尾指针
 	struct write_buffer * tail;
 };
 
 struct socket_server {
-	int recvctrl_fd;
+	int recvctrl_fd;  // 管道读端
 	int sendctrl_fd;
 	int checkctrl;
 	poll_fd event_fd;
 	int alloc_id;
-	int event_n;
-	int event_index;
+	int event_n;      // epoll_wait 返回的事件数
+	int event_index;  // 当前处理的事件序号
 	struct event ev[MAX_EVENT];
-	struct socket slot[MAX_SOCKET];
-	char buffer[MAX_INFO];
-	fd_set rfds;
+	struct socket slot[MAX_SOCKET]; // 应用层预先分配的socket
+	char buffer[MAX_INFO];          // 临时数据的保存 比如保存对等方的地址信息等
+	fd_set rfds; 					// 用于select
 };
 
+// 以下6个结构用于控制包体结构
 struct request_open {
 	int id;
 	int port;
@@ -97,8 +100,9 @@ struct request_start {
 	uintptr_t opaque;
 };
 
+// 控制命令请求包
 struct request_package {
-	uint8_t header[8];	// 6 bytes dummy
+	uint8_t header[8];	// 6 bytes dummy 6个字节未用 [0-5] [6]是type [7]长度 长度指的是包体的长度
 	union {
 		char buffer[256];
 		struct request_open open;
@@ -126,21 +130,26 @@ socket_keepalive(int fd) {
 	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));  
 }
 
+// 从socket池中获取一个空的socket 并为其分配一个id 2^31-1
+// 在socket池中的位置 池的大小是64K socket_id的范围远大与64K
 static int
 reserve_id(struct socket_server *ss) {
 	int i;
 	for (i=0;i<MAX_SOCKET;i++) {
-		int id = __sync_add_and_fetch(&(ss->alloc_id), 1);
+		int id = __sync_add_and_fetch(&(ss->alloc_id), 1); // 原子的++
+		// 小于0 已经最大了 说明 从0开始
 		if (id < 0) {
 			id = __sync_and_and_fetch(&(ss->alloc_id), 0x7fffffff);
 		}
-		struct socket *s = &ss->slot[id % MAX_SOCKET];
+		struct socket *s = &ss->slot[id % MAX_SOCKET];// 从socket池中取出socket
 		if (s->type == SOCKET_TYPE_INVALID) {
+			// 如果相等就交换成 SOCKET_TYPE_RESERVE 设置为已用
+			// 这里由于没有加锁 可能多个线程操作 所以还需要判断一次
 			if (__sync_bool_compare_and_swap(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
 				return id;
-			} else {
-				// retry
-				--i;
+			}
+			else {
+				--i;// retry
 			}
 		}
 	}
@@ -156,11 +165,15 @@ socket_server_create() {
 		fprintf(stderr, "socket-server: create event pool failed.\n");
 		return NULL;
 	}
+
+	// 创建一个管道
 	if (pipe(fd)) {
 		sp_release(efd);
 		fprintf(stderr, "socket-server: create socket pair failed.\n");
 		return NULL;
 	}
+
+	// epoll关注管道读端的可读事件
 	if (sp_add(efd, fd[0], NULL)) {
 		// add recvctrl_fd to event poll
 		fprintf(stderr, "socket-server: can't add server fd to event pool.\n");
@@ -172,10 +185,11 @@ socket_server_create() {
 
 	struct socket_server *ss = MALLOC(sizeof(*ss));
 	ss->event_fd = efd;
-	ss->recvctrl_fd = fd[0];
-	ss->sendctrl_fd = fd[1];
+	ss->recvctrl_fd = fd[0]; // 管道读端
+	ss->sendctrl_fd = fd[1]; // 管道写端
 	ss->checkctrl = 1;
 
+	// 初始化64K个socket
 	for (i=0;i<MAX_SOCKET;i++) {
 		struct socket *s = &ss->slot[i];
 		s->type = SOCKET_TYPE_INVALID;
@@ -185,7 +199,7 @@ socket_server_create() {
 	ss->alloc_id = 0;
 	ss->event_n = 0;
 	ss->event_index = 0;
-	FD_ZERO(&ss->rfds);
+	FD_ZERO(&ss->rfds); // 用于select的fd置为空
 	assert(ss->recvctrl_fd < FD_SETSIZE);
 
 	return ss;
@@ -209,7 +223,10 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 		FREE(tmp);
 	}
 	s->head = s->tail = NULL;
-	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
+
+	// 强制关闭的时候 如果type不为SOCKET_TYPE_PACCEPT SOCKET_TYPE_PACCEPT这2个是没有加入epoll管理的
+	// 这个时候 取消关注
+	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PACCEPT) {
 		sp_del(ss->event_fd, s->fd);
 	}
 	if (s->type != SOCKET_TYPE_BIND) {
@@ -276,6 +293,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 	ai_hints.ai_socktype = SOCK_STREAM;
 	ai_hints.ai_protocol = IPPROTO_TCP;
 
+	// getaddrinfo支持ipv6
 	status = getaddrinfo( request->host, port, &ai_hints, &ai_list );
 	if ( status != 0 ) {
 		goto _failed;
@@ -312,7 +330,8 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		goto _failed;
 	}
 
-	if(status == 0) {
+	// inet_ntop ipv4 ipv6
+	if(status == 0) { // conn ok
 		ns->type = SOCKET_TYPE_CONNECTED;
 		struct sockaddr * addr = ai_ptr->ai_addr;
 		void * sin_addr = (ai_ptr->ai_family == AF_INET) ? (void*)&((struct sockaddr_in *)addr)->sin_addr : (void*)&((struct sockaddr_in6 *)addr)->sin6_addr;
@@ -322,7 +341,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		freeaddrinfo( ai_list );
 		return SOCKET_OPEN;
 	} else {
-		ns->type = SOCKET_TYPE_CONNECTING;
+		ns->type = SOCKET_TYPE_CONNECTING; // 非阻塞套接字处于连接中 应该关注它的可写事件epoll关注它是否连接成功
 		sp_write(ss->event_fd, ns->fd, ns, true);
 	}
 
@@ -402,12 +421,13 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		return -1;
 	}
 	assert(s->type != SOCKET_TYPE_PLISTEN && s->type != SOCKET_TYPE_LISTEN);
+	// 应用层缓冲区 没有数据直接发送
 	if (s->head == NULL) {
 		int n = write(s->fd, request->buffer, request->sz);
 		if (n<0) {
 			switch(errno) {
 			case EINTR:
-			case EAGAIN:
+			case EAGAIN: // 内核缓冲区满了
 				n = 0;
 				break;
 			default:
@@ -416,13 +436,15 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 				return SOCKET_CLOSE;
 			}
 		}
+		// 可以把数据拷贝到内核缓冲区中
 		if (n == request->sz) {
 			FREE(request->buffer);
 			return -1;
 		}
+		// 将未发送的部分添加到应用层缓冲区中 关注可写事件
 		append_sendbuffer(s, request, n);
 		sp_write(ss->event_fd, s->fd, s, true);
-	} else {
+	} else { // 将未发送的数据添加到应用层缓冲区
 		append_sendbuffer(s, request, 0);
 	}
 	return -1;
@@ -537,6 +559,7 @@ block_readpipe(int pipefd, void *buffer, int sz) {
 	}
 }
 
+// 判断管道是否有命名 使用select来管理 没有使用epoll时为了提高命令的检测频率
 static int
 has_cmd(struct socket_server *ss) {
 	struct timeval tv = {0,0};
@@ -552,6 +575,8 @@ has_cmd(struct socket_server *ss) {
 }
 
 // return type
+// 有命令 把命令解析出来 根据相应的类型调用相应的函数
+
 static int
 ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	int fd = ss->recvctrl_fd;
@@ -611,12 +636,13 @@ forward_message(struct socket_server *ss, struct socket *s, struct socket_messag
 		}
 		return -1;
 	}
-	if (n==0) {
+	if (n==0) { // peer close
 		FREE(buffer);
 		force_close(ss, s, result);
 		return SOCKET_CLOSE;
 	}
 
+	// half close 半关闭丢掉消息
 	if (s->type == SOCKET_TYPE_HALFCLOSE) {
 		// discard recv data
 		FREE(buffer);
@@ -636,6 +662,7 @@ forward_message(struct socket_server *ss, struct socket *s, struct socket_messag
 	return SOCKET_DATA;
 }
 
+// 尝试连接中的套接字可写事件 可能失败
 static int
 report_connect(struct socket_server *ss, struct socket *s, struct socket_message *result) {
 	int error;
@@ -701,6 +728,7 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 
 
 // return type
+// 有命令的话 优先检测命令// 没有命令的时候
 int 
 socket_server_poll(struct socket_server *ss, struct socket_message * result, int * more) {
 	for (;;) {
@@ -711,7 +739,8 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 					return type;
 				else
 					continue;
-			} else {
+			}
+			else {
 				ss->checkctrl = 0;
 			}
 		}
@@ -734,7 +763,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			continue;
 		}
 		switch (s->type) {
-		case SOCKET_TYPE_CONNECTING:
+		case SOCKET_TYPE_CONNECTING: // connecting
 			return report_connect(ss, s, result);
 		case SOCKET_TYPE_LISTEN:
 			if (report_accept(ss, s, result)) {
@@ -745,13 +774,13 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			fprintf(stderr, "socket-server: invalid socket\n");
 			break;
 		default:
-			if (e->write) {
+			if (e->write) { // 可写事件 从应用层读取数据
 				int type = send_buffer(ss, s, result);
 				if (type == -1)
 					break;
 				return type;
 			}
-			if (e->read) {
+			if (e->read) { // 可读事件 读取消息
 				int type = forward_message(ss, s, result);
 				if (type == -1)
 					break;
@@ -762,6 +791,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 	}
 }
 
+// 向管道的写端写入数据
 static void
 send_request(struct socket_server *ss, struct request_package *request, char type, int len) {
 	request->header[6] = (uint8_t)type;
@@ -804,6 +834,7 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 	return request.u.open.id;
 }
 
+// 直接调用open_socket
 int 
 socket_server_block_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
 	struct request_package request;
@@ -849,6 +880,7 @@ socket_server_close(struct socket_server *ss, uintptr_t opaque, int id) {
 	send_request(ss, &request, 'K', sizeof(request.u.close));
 }
 
+// 创建套接字绑定监听
 static int
 do_listen(const char * host, int port, int backlog) {
 	// only support ipv4
@@ -890,7 +922,7 @@ socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * ad
 		return -1;
 	}
 	struct request_package request;
-	int id = reserve_id(ss);
+	int id = reserve_id(ss); // 从应用层分配一个id 从socket池中
 	request.u.listen.opaque = opaque;
 	request.u.listen.id = id;
 	request.u.listen.fd = fd;
@@ -916,5 +948,3 @@ socket_server_start(struct socket_server *ss, uintptr_t opaque, int id) {
 	request.u.start.opaque = opaque;
 	send_request(ss, &request, 'S', sizeof(request.u.start));
 }
-
-
