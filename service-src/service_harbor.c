@@ -587,13 +587,13 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 	int harbor_id = 0;
 	sscanf(args,"%s %s %d",master_addr, local_addr, &harbor_id);
 	h->master_addr = strdup(master_addr);
+	h->id = harbor_id;
 	h->master_fd = _connect_to(h, master_addr, true);
 	if (h->master_fd == -1) {
 		fprintf(stderr, "Harbor: Connect to master failed\n");
 		exit(1);
 	}
 	h->local_addr = strdup(local_addr);
-	h->id = harbor_id;
 
 	_launch_gate(ctx, local_addr);
 	skynet_callback(ctx, h, _mainloop);
