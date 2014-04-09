@@ -40,7 +40,7 @@ struct write_buffer {
 // 应用层的socket
 struct socket {
 	int fd;   			// 对应内核分配的fd
-	int id;   			// 应用层维护的一个与fd对应的id
+	int id;   			// 应用层维护的一个与fd对应的id 实际上是在socket池中的id
 	int type; 			// socket类型或者状态
 	int size; 			// 下一次read操作要分配的缓冲区大小
 	int64_t wb_size;    // 发送缓冲区未发送的数据
@@ -50,17 +50,17 @@ struct socket {
 };
 
 struct socket_server {
-	int recvctrl_fd;  // 管道读端
-	int sendctrl_fd;
-	int checkctrl;
-	poll_fd event_fd;
-	int alloc_id;
-	int event_n;      // epoll_wait 返回的事件数
-	int event_index;  // 当前处理的事件序号
-	struct event ev[MAX_EVENT];
+	int recvctrl_fd;  				// 管道读端
+	int sendctrl_fd;                // 管道写端
+	int checkctrl; 					// 释放检测命令
+	poll_fd event_fd;               // epoll fd
+	int alloc_id;                   // 应用层分配id 用的
+	int event_n;      				// epoll_wait 返回的事件数
+	int event_index;  				// 当前处理的事件序号
+	struct event ev[MAX_EVENT];     // epoll_wait返回的事件集
 	struct socket slot[MAX_SOCKET]; // 应用层预先分配的socket
 	char buffer[MAX_INFO];          // 临时数据的保存 比如保存对等方的地址信息等
-	fd_set rfds; 					// 用于select
+	fd_set rfds; 					// 用于select的fd集
 };
 
 // 以下6个结构用于控制包体结构
@@ -160,7 +160,7 @@ struct socket_server *
 socket_server_create() {
 	int i;
 	int fd[2];
-	poll_fd efd = sp_create();
+	poll_fd efd = sp_create(); // epoll_create
 	if (sp_invalid(efd)) {
 		fprintf(stderr, "socket-server: create event pool failed.\n");
 		return NULL;
@@ -199,7 +199,7 @@ socket_server_create() {
 	ss->alloc_id = 0;
 	ss->event_n = 0;
 	ss->event_index = 0;
-	FD_ZERO(&ss->rfds); // 用于select的fd置为空
+	FD_ZERO(&ss->rfds); // 用于select的fd置为空 主要是用于命令通道
 	assert(ss->recvctrl_fd < FD_SETSIZE);
 
 	return ss;
@@ -215,19 +215,19 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 		return;
 	}
 	assert(s->type != SOCKET_TYPE_RESERVE);
+
 	struct write_buffer *wb = s->head;
 	while (wb) {
 		struct write_buffer *tmp = wb;
 		wb = wb->next;
-		FREE(tmp->buffer);
-		FREE(tmp);
+		FREE(tmp->buffer); // 释放节点指向的内存
+		FREE(tmp); // 释放节点本身
 	}
 	s->head = s->tail = NULL;
 
 	// 强制关闭的时候 如果type不为SOCKET_TYPE_PACCEPT SOCKET_TYPE_PACCEPT这2个是没有加入epoll管理的
-	// 这个时候 取消关注
 	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PACCEPT) {
-		sp_del(ss->event_fd, s->fd);
+		sp_del(ss->event_fd, s->fd); // 从epoll中取消关注fd
 	}
 	if (s->type != SOCKET_TYPE_BIND) {
 		close(s->fd);
@@ -235,6 +235,7 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 	s->type = SOCKET_TYPE_INVALID;
 }
 
+// 资源释放
 void 
 socket_server_release(struct socket_server *ss) {
 	int i;
@@ -245,19 +246,20 @@ socket_server_release(struct socket_server *ss) {
 			force_close(ss, s , &dummy);
 		}
 	}
-	close(ss->sendctrl_fd);
+	close(ss->sendctrl_fd); // 关闭管道
 	close(ss->recvctrl_fd);
-	sp_release(ss->event_fd);
+	sp_release(ss->event_fd); // free event fd
 	FREE(ss);
 }
 
+// 从socket池中分配一个fd出来
 static struct socket *
 new_fd(struct socket_server *ss, int id, int fd, uintptr_t opaque, bool add) {
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
 	assert(s->type == SOCKET_TYPE_RESERVE);
 
 	if (add) {
-		if (sp_add(ss->event_fd, fd, s)) {
+		if (sp_add(ss->event_fd, fd, s)) { // 加入到epoll来管理这个fd
 			s->type = SOCKET_TYPE_INVALID;
 			return NULL;
 		}
@@ -382,8 +384,9 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 		FREE(tmp);
 	}
 	s->tail = NULL;
-	sp_write(ss->event_fd, s->fd, s, false);
+	sp_write(ss->event_fd, s->fd, s, false); // 取消关注
 
+	// 这里 在关闭的时候 处理不够完善 因为第二次发送的时候直接关闭了socket 没有继续发送完毕 所以skynet不适合大流量的网络应用
 	if (s->type == SOCKET_TYPE_HALFCLOSE) {
 		force_close(ss, s, result);
 		return SOCKET_CLOSE;
@@ -444,7 +447,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		// 将未发送的部分添加到应用层缓冲区中 关注可写事件
 		append_sendbuffer(s, request, n);
 		sp_write(ss->event_fd, s->fd, s, true);
-	} else { // 将未发送的数据添加到应用层缓冲区
+	} else { // 将未发送的数据添加到应用层缓冲区 应用层缓冲区已经有数据了
 		append_sendbuffer(s, request, 0);
 	}
 	return -1;
@@ -454,7 +457,7 @@ static int
 listen_socket(struct socket_server *ss, struct request_listen * request, struct socket_message *result) {
 	int id = request->id;
 	int listen_fd = request->fd;
-	struct socket *s = new_fd(ss, id, listen_fd, request->opaque, false);
+	struct socket *s = new_fd(ss, id, listen_fd, request->opaque, false); // 没有加入epoll
 	if (s == NULL) {
 		goto _failed;
 	}
@@ -483,7 +486,7 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 		return SOCKET_CLOSE;
 	}
 	if (s->head) { 
-		int type = send_buffer(ss,s,result);
+		int type = send_buffer(ss,s,result); // 关闭socket的时候 如果有未发送的数据 先发送出去
 		if (type != -1)
 			return type;
 	}
@@ -676,7 +679,7 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 		result->opaque = s->opaque;
 		result->id = s->id;
 		result->ud = 0;
-		sp_write(ss->event_fd, s->fd, s, false);
+		sp_write(ss->event_fd, s->fd, s, false); //  取消关注可写事件
 		union sockaddr_all u;
 		socklen_t slen = sizeof(u);
 		if (getpeername(s->fd, &u.s, &slen) == 0) {
@@ -718,6 +721,7 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 	result->ud = id;
 	result->data = NULL;
 
+	// 将对等方的ip port保存下来
 	void * sin_addr = (u.s.sa_family == AF_INET) ? (void*)&u.v4.sin_addr : (void *)&u.v6.sin6_addr;
 	if (inet_ntop(u.s.sa_family, sin_addr, ss->buffer, sizeof(ss->buffer))) {
 		result->data = ss->buffer;
@@ -733,8 +737,8 @@ int
 socket_server_poll(struct socket_server *ss, struct socket_message * result, int * more) {
 	for (;;) {
 		if (ss->checkctrl) {
-			if (has_cmd(ss)) {
-				int type = ctrl_cmd(ss, result);
+			if (has_cmd(ss)) { // has_cmd内部调用select函数 判断管道是否有命令  使用select来管理 没有使用epoll时为了提高命令的检测频率
+				int type = ctrl_cmd(ss, result); // 处理命令
 				if (type != -1)
 					return type;
 				else
@@ -744,7 +748,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				ss->checkctrl = 0;
 			}
 		}
-		if (ss->event_index == ss->event_n) {
+		if (ss->event_index == ss->event_n) { // 当前的处理序号最大了 即处理完了 继续等待事件的到来
 			ss->event_n = sp_wait(ss->event_fd, ss->ev, MAX_EVENT);
 			ss->checkctrl = 1;
 			if (more) {
@@ -797,7 +801,7 @@ send_request(struct socket_server *ss, struct request_package *request, char typ
 	request->header[6] = (uint8_t)type;
 	request->header[7] = (uint8_t)len;
 	for (;;) {
-		int n = write(ss->sendctrl_fd, &request->header[6], len+2);
+		int n = write(ss->sendctrl_fd, &request->header[6], len+2); // 向管道的写端写入数据
 		if (n<0) {
 			if (errno != EINTR) {
 				fprintf(stderr, "socket-server : send ctrl command error %s.\n", strerror(errno));
@@ -826,6 +830,7 @@ open_request(struct socket_server *ss, struct request_package *req, uintptr_t op
 	return len;
 }
 
+// 非阻塞的连接
 int 
 socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
 	struct request_package request;
@@ -834,7 +839,7 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 	return request.u.open.id;
 }
 
-// 直接调用open_socket
+// 直接调用open_socket 阻塞连接服务器 这里阻塞连接服务器后 还是交给epoll来管理读写 非阻塞的读写
 int 
 socket_server_block_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
 	struct request_package request;
@@ -894,6 +899,7 @@ do_listen(const char * host, int port, int backlog) {
 		return -1;
 	}
 	int reuse = 1;
+	// 地址重复利用
 	if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
 		goto _failed;
 	}
