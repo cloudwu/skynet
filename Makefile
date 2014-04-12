@@ -1,47 +1,13 @@
-PLAT ?= none
-PLATS = linux freebsd macosx
+include platform.mk
 
-CC ?= gcc
-
-.PHONY : none $(PLATS) clean lua all
-
-ifneq ($(PLAT), none)
-
-.PHONY : default
-
-default :
-	$(MAKE) $(PLAT)
-
-endif
-
-none :
-	@echo "Please do 'make PLATFORM' where PLATFORM is one of these:"
-	@echo "   $(PLATS)"
-
-LUA_STATICLIB = 3rd/lua/liblua.a
+LUA_STATICLIB := 3rd/lua/liblua.a
 LUA_LIB ?= $(LUA_STATICLIB)
 LUA_INC ?= -I3rd/lua
 LUA_CLIB_PATH ?= luaclib
 CSERVICE_PATH ?= cservice
 SKYNET_BUILD_PATH ?= .
 
-
 CFLAGS = -g -Wall $(LUA_INC) $(MYCFLAGS)
-
-LIBS = -lpthread -lm
-SHARED = -fPIC --shared
-EXPORT = -Wl,-E
-
-$(PLATS) : all 
-
-linux : PLAT = linux
-macosx : PLAT = macosx
-freebsd : PLAT = freebsd
-
-macosx linux : LIBS += -ldl
-macosx : SHARED = -fPIC -dynamiclib -Wl,-undefined,dynamic_lookup
-macosx : EXPORT =
-linux freebsd : LIBS += -lrt
 
 $(LUA_STATICLIB) :
 	cd 3rd/lua && $(MAKE) CC=$(CC) $(PLAT)
