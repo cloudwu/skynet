@@ -23,7 +23,7 @@ local function dispatch()
 			assert(t == '-' or t == '+')
 			session = tonumber(session)
 			local result = cjson.decode(str)
-			print("Response:",session, result)
+			print("Response:",session, result[1], result[2])
 		end
 	end
 end
