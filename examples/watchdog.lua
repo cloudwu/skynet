@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+local netpack = require "netpack"
 
 local CMD = {}
 local SOCKET = {}
@@ -13,7 +14,6 @@ end
 local function close_agent(fd)
 	local a = agent[fd]
 	if a then
-		skynet.call(a, "lua", "exit")
 		skynet.kill(a)
 		agent[fd] = nil
 	end
@@ -27,6 +27,9 @@ end
 function SOCKET.error(fd, msg)
 	print("socket error",fd, msg)
 	close_agent(fd)
+end
+
+function SOCKET.data(fd, msg)
 end
 
 function CMD.start(conf)

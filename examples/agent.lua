@@ -1,29 +1,36 @@
 local skynet = require "skynet"
-local client
+local jsonpack = require "jsonpack"
+local netpack = require "netpack"
+local socket = require "socket"
 
 local CMD = {}
+
+local client_fd
+
+local function send_client(v)
+	socket.write(client_fd, netpack.pack(jsonpack.pack(0,v)))
+end
+
+local function response_client(session,v)
+	socket.write(client_fd, netpack.pack(jsonpack.response(session,v)))
+end
 
 skynet.register_protocol {
 	name = "client",
 	id = skynet.PTYPE_CLIENT,
-	pack = function(...) return ... end,
-	unpack = skynet.tostring,
-	dispatch = function (session, address, text)
-		-- It's client, there is no session
-		local result = skynet.call("SIMPLEDB", "text", text)
-		skynet.ret(result)
+	unpack = function (msg, sz)
+		return jsonpack.unpack(skynet.tostring(msg,sz))
+	end,
+	dispatch = function (_, _, session, args)
+		local result = skynet.call("SIMPLEDB", "lua", table.unpack(args))
+		response_client(session, result)
 	end
 }
 
 function CMD.start(gate , fd)
-	client = skynet.launch("client", fd)
-	skynet.call(gate, "lua", "forward", fd, client)
-	skynet.send(client,"text","Welcome to skynet")
-end
-
-function CMD.exit()
-	skynet.kill(client)
-	client = nil
+	client_fd = fd
+	skynet.call(gate, "lua", "forward", fd)
+	send_client "Welcome to skynet"
 end
 
 skynet.start(function()

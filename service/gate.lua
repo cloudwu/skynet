@@ -8,10 +8,9 @@ local watchdog
 local maxclient
 local client_number = 0
 local CMD = setmetatable({}, { __gc = function() netpack.clear(queue) end })
-local forwarding_address = {}
-local forwarding_client = {}
-local forwarding_map = {}
-local openning = {}
+
+local connection = {}	-- fd -> connection : { fd , client, agent , ip, mode }
+local forwarding = {}	-- agent -> connection
 
 function CMD.open( source , conf )
 	assert(not socket)
@@ -29,72 +28,70 @@ function CMD.close()
 	socket = nil
 end
 
-local function unforward_fd(fd)
-	local address = forwarding_address[fd]
-	if address then
-		local client = forwarding_client[fd]
-		local fm = forwarding_map[address]
-		if type(fm) == "table" then
-			fm[address] = nil
-			if next(fm) == nil then
-				forwarding_map[address] = nil
-			end
-		else
-			forwarding_map[address] = nil
-		end
-		forwarding_address[fd] = nil
-		forwarding_client[fd] = nil
-		return address, client
+local function unforward(c)
+	if c.agent then
+		forwarding[c.agent] = nil
+		c.agent = nil
+		c.client = nil
 	end
 end
 
+local function start(c)
+	if not c.mode then
+		c.mode = "open"
+		socketdriver.start(c.fd)
+	end
+end
 
 function CMD.forward(source, fd, client, address)
-	local addr = address or source
-	if not unforward_fd(fd) then
-		socketdriver.start(fd)
-	end
+	local c = assert(connection[fd])
+	unforward(c)
+	start(c)
 
-	forwarding_address[fd] = addr
-	forwarding_client[fd] = client or 0
-	local fm = forwarding_map[addr]
-	if fm then
-		if type(fm) == "table" then
-			fm[addr] = true
-		else
-			fm[addr] = { [fm] = true, [addr] = true }
-		end
-	else
-		forwarding_map[addr] = fd
-	end
+	c.client = client or 0
+	c.agent = address or source
+
+	forwarding[c.agent] = c
+end
+
+function CMD.accept(source, fd)
+	local c = assert(connection[fd])
+	unforward(c)
+	start(c)
 end
 
 function CMD.kick(source, fd)
-	if not fd then
-		fd = forwarding_map[source]
-		if type(fd) == "table" then
-			for k in pairs(fd) do
-				socketdriver.close(k)
-			end
-			return
-		end
+	local c
+	if fd then
+		c = connection[fd]
+	else
+		c = forwarding[source]
 	end
-	socketdriver.close(fd)
+
+	assert(c)
+
+	if c.mode ~= "close" then
+		c.mode = "close"
+		socketdriver.close(c.fd)
+	end
 end
 
 local MSG = {}
 
 function MSG.data(fd, msg, sz)
-	local address = forwarding_address[fd]
-	local client = forwarding_client[fd]
-	skynet.redirect(address, client, "client", 0, msg, sz)
+	-- recv a package, forward it
+	local c = connection[fd]
+	local agent = c.agent
+	if agent then
+		skynet.redirect(agent, c.client, "client", 0, msg, sz)
+	else
+		skynet.send(watchdog, "lua", "socket", "data", netpack.tostring(msg, sz))
+	end
 end
 
 function MSG.more()
 	for fd, msg, sz in netpack.pop, queue do
-		local address = forwarding_address[fd]
-		local client = forwarding_client[fd]
-		skynet.redirect(address, client, "client", 0, msg, sz)
+		MSG.data(fd, msg, sz)
 	end
 end
 
@@ -103,15 +100,20 @@ function MSG.open(fd, msg)
 		socketdriver.close(fd)
 		return
 	end
-	openning[fd] = true
+	local c = {
+		fd = fd,
+		ip = msg,
+	}
+	connection[fd] = c
 	client_number = client_number + 1
 	skynet.send(watchdog, "lua", "socket", "open", fd, msg)
 end
 
-local function close_fd(fd)
-	local address, client = unforward_fd(fd)
-	if openning[fd] then
-		openning[fd] = nil
+local function close_fd(fd, message)
+	local c = connection[fd]
+	if c then
+		unforward(c)
+		connection[fd] = nil
 		client_number = client_number - 1
 	end
 end
@@ -123,7 +125,7 @@ end
 
 function MSG.error(fd, msg)
 	close_fd(fd)
-	skynet.send(watchdog, "lua", "socket", "error", fd)
+	skynet.send(watchdog, "lua", "socket", "error", fd, msg)
 end
 
 skynet.register_protocol {
