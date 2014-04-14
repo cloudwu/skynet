@@ -175,7 +175,8 @@ save_uncomplete(lua_State *L, int fd) {
 
 static inline int
 read_size(uint8_t * buffer) {
-	return (int)buffer[0] << 8 | (int)buffer[1];
+	int r = (int)buffer[0] << 8 | (int)buffer[1];
+	return r;
 }
 
 static void

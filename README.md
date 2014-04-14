@@ -17,7 +17,7 @@ Run these in different console
 
 ```
 ./skynet examples/config	# Launch first skynet node  (Gate server) and a skynet-master (see config for standalone option)
-./client 127.0.0.1 8888		# Launch a client, and try to input some words.
+lua examples/client.lua 	# Launch a client, and try to input some words.
 ```
 
 ## About Lua
