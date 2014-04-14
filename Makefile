@@ -12,7 +12,7 @@ CFLAGS = -g -Wall -I$(LUA_INC) $(MYCFLAGS)
 $(LUA_STATICLIB) :
 	cd 3rd/lua && $(MAKE) CC=$(CC) $(PLAT)
 
-CSERVICE = snlua logger gate client master multicast tunnel harbor localcast
+CSERVICE = snlua logger gate master multicast tunnel harbor localcast
 LUA_CLIB = skynet socketdriver int64 mcast bson mongo md5 netpack cjson clientsocket
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \

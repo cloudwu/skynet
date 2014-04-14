@@ -22,8 +22,12 @@ skynet.register_protocol {
 		return jsonpack.unpack(skynet.tostring(msg,sz))
 	end,
 	dispatch = function (_, _, session, args)
-		local result = skynet.call("SIMPLEDB", "lua", table.unpack(args))
-		response_client(session, result)
+		local ok, result = pcall(skynet.call,"SIMPLEDB", "lua", table.unpack(args))
+		if ok then
+			response_client(session, { true, result })
+		else
+			response_client(session, { false, "Invalid command" })
+		end
 	end
 }
 
