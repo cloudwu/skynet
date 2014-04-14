@@ -22,7 +22,6 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	if (type == PTYPE_RESPONSE) {
 		// todo: response to client with session, session may be packed into package
 	} else {
-		printf("client %d\n",type);
 		assert(type == PTYPE_TEXT);
 		// todo: support other protocol
 	}

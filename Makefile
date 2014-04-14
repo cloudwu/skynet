@@ -2,18 +2,18 @@ include platform.mk
 
 LUA_STATICLIB := 3rd/lua/liblua.a
 LUA_LIB ?= $(LUA_STATICLIB)
-LUA_INC ?= -I3rd/lua
+LUA_INC ?= 3rd/lua
 LUA_CLIB_PATH ?= luaclib
 CSERVICE_PATH ?= cservice
 SKYNET_BUILD_PATH ?= .
 
-CFLAGS = -g -Wall $(LUA_INC) $(MYCFLAGS)
+CFLAGS = -g -Wall -I$(LUA_INC) $(MYCFLAGS)
 
 $(LUA_STATICLIB) :
 	cd 3rd/lua && $(MAKE) CC=$(CC) $(PLAT)
 
 CSERVICE = snlua logger gate client master multicast tunnel harbor localcast
-LUA_CLIB = skynet socketdriver int64 mcast bson mongo md5
+LUA_CLIB = skynet socketdriver int64 mcast bson mongo md5 netpack cjson clientsocket
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
   skynet_server.c skynet_start.c skynet_timer.c skynet_error.c \
@@ -62,10 +62,14 @@ $(LUA_CLIB_PATH)/mongo.so : lualib-src/lua-mongo.c | $(LUA_CLIB_PATH)
 $(LUA_CLIB_PATH)/md5.so : 3rd/lua-md5/md5.c 3rd/lua-md5/md5lib.c 3rd/lua-md5/compat-5.2.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -O2 -I3rd/lua-md5 $^ -o $@ 
 
-all : $(SKYNET_BUILD_PATH)/client
+$(LUA_CLIB_PATH)/netpack.so : lualib-src/lua-netpack.c | $(LUA_CLIB_PATH)
+	$(CC) $(CFLAGS) $(SHARED) $^ -Iskynet-src -o $@ 
 
-$(SKYNET_BUILD_PATH)/client : client-src/client.c
-	$(CC) $(CFLAGS) $^ -o $@ -lpthread
+$(LUA_CLIB_PATH)/cjson.so : | $(LUA_CLIB_PATH)
+	cd 3rd/lua-cjson && $(MAKE) LUA_INCLUDE_DIR=$(LUA_INC) CC=$(CC) && cp cjson.so ../../$@
+
+$(LUA_CLIB_PATH)/clientsocket.so : lualib-src/lua-clientsocket.c | $(LUA_CLIB_PATH)
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -lpthread
 
 clean :
-	rm -f $(SKYNET_BUILD_PATH)/skynet $(SKYNET_BUILD_PATH)/client $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
+	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
