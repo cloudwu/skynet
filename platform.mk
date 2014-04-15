@@ -32,3 +32,6 @@ macosx linux : LIBS += -ldl
 macosx : SHARED := -fPIC -dynamiclib -Wl,-undefined,dynamic_lookup
 macosx : EXPORT :=
 linux freebsd : LIBS += -lrt
+macosx: CJSON_LDFLAGS="-bundle -undefined dynamic_lookup"
+linux freebsd: CJSON_LDFLAGS="-shared"
+
