@@ -264,6 +264,7 @@ function socket.block(id)
 end
 
 socket.write = assert(driver.send)
+socket.lwrite = assert(driver.lsend)
 
 function socket.invalid(id)
 	return socket_pool[id] == nil

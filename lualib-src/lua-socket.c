@@ -402,25 +402,41 @@ llisten(lua_State *L) {
 	return 1;
 }
 
-static int
-lsend(lua_State *L) {
-	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
-	int id = luaL_checkinteger(L, 1);
+static void *
+get_buffer(lua_State *L, int *sz) {
 	void *buffer;
-	int sz;
 	if (lua_isuserdata(L,2)) {
 		buffer = lua_touserdata(L,2);
-		sz = luaL_checkinteger(L,3);
+		*sz = luaL_checkinteger(L,3);
 	} else {
 		size_t len = 0;
 		const char * str =  luaL_checklstring(L, 2, &len);
 		buffer = malloc(len);
 		memcpy(buffer, str, len);
-		sz = (int)len;
+		*sz = (int)len;
 	}
+	return buffer;
+}
+
+static int
+lsend(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	int sz = 0;
+	void *buffer = get_buffer(L, &sz);
 	int err = skynet_socket_send(ctx, id, buffer, sz);
 	lua_pushboolean(L, !err);
 	return 1;
+}
+
+static int
+lsendlow(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	int sz = 0;
+	void *buffer = get_buffer(L, &sz);
+	skynet_socket_send_lowpriority(ctx, id, buffer, sz);
+	return 0;
 }
 
 static int
@@ -462,6 +478,7 @@ luaopen_socketdriver(lua_State *L) {
 		{ "close", lclose },
 		{ "listen", llisten },
 		{ "send", lsend },
+		{ "lsend", lsendlow },
 		{ "bind", lbind },
 		{ "start", lstart },
 		{ NULL, NULL },
