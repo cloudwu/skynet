@@ -5,3 +5,5 @@ skynet
 3rd/lua/luac
 cservice
 luaclib
+*.so
+*.dSYM
