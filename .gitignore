@@ -5,3 +5,5 @@ skynet
 3rd/lua/luac
 cservice
 luaclib
+3rd/lua-cjson/cjson.so
+*.dSYM/
