@@ -76,3 +76,4 @@ clean :
 
 cleanall: clean
 	cd 3rd/lua-cjson && $(MAKE) clean
+	rm -f $(LUA_STATICLIB)
