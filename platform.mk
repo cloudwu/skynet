@@ -3,7 +3,7 @@ PLATS = linux freebsd macosx
 
 CC ?= gcc
 
-.PHONY : none $(PLATS) clean all
+.PHONY : none $(PLATS) clean all cleanall
 
 ifneq ($(PLAT), none)
 
