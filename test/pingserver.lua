@@ -1,27 +1,23 @@
 local skynet = require "skynet"
 
-local command = {}
-
-function command.PING(hello)
+function response.ping(hello)
+	skynet.sleep(100)
 	return hello
 end
 
-function command.HELLO()
-	skynet.sleep(100)
-	return "hello"
+function subscribe.hello()
+	print "hello"
 end
 
-function command.EXIT()
-	skynet.exit()
-end
-
-function command.ERROR()
+function response.error()
 	error "throw an error"
 end
 
+function init( ... )
+	print ("ping server start:", ...)
+end
 
-skynet.start(function()
-	skynet.dispatch("lua", function(session,addr, cmd, ...)
-		skynet.ret(skynet.pack(command[cmd](...)))
-	end)
-end)
+function exit(...)
+	print ("ping server exit:", ...)
+	return "Exit"
+end

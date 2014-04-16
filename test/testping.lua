@@ -1,10 +1,11 @@
 local skynet = require "skynet"
+local snax = require "snax"
 
 skynet.start(function()
-	local ps = skynet.uniqueservice("pingserver")
-	skynet.watch(ps)
-	print(pcall(skynet.call,ps,"lua","ERROR"))
-	print(skynet.call(ps, "lua", "PING", "hello"))
-	print(skynet.call(ps, "lua", "PING", "hay"))
-	skynet.call(ps, "lua", "EXIT")
+	local ps = snax.newservice ("pingserver", "hello world")
+	print(ps.pub.hello())
+	print(ps.req.ping("foobar"))
+	print(pcall(ps.req.error))
+	print(ps.kill("exit"))
+	skynet.exit()
 end)
