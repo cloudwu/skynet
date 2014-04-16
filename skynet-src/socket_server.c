@@ -29,11 +29,19 @@
 
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
 
+#define PRIORITY_HIGH 0
+#define PRIORITY_LOW 1
+
 struct write_buffer {
 	struct write_buffer * next;
 	char *ptr;
 	int sz;
 	void *buffer;
+};
+
+struct wb_list {
+	struct write_buffer * head;
+	struct write_buffer * tail;
 };
 
 struct socket {
@@ -43,8 +51,8 @@ struct socket {
 	int size;
 	int64_t wb_size;
 	uintptr_t opaque;
-	struct write_buffer * head;
-	struct write_buffer * tail;
+	struct wb_list high;
+	struct wb_list low;
 };
 
 struct socket_server {
@@ -147,6 +155,12 @@ reserve_id(struct socket_server *ss) {
 	return -1;
 }
 
+static inline void
+clear_wb_list(struct wb_list *list) {
+	list->head = NULL;
+	list->tail = NULL;
+}
+
 struct socket_server * 
 socket_server_create() {
 	int i;
@@ -179,8 +193,8 @@ socket_server_create() {
 	for (i=0;i<MAX_SOCKET;i++) {
 		struct socket *s = &ss->slot[i];
 		s->type = SOCKET_TYPE_INVALID;
-		s->head = NULL;
-		s->tail = NULL;
+		clear_wb_list(&s->high);
+		clear_wb_list(&s->low);
 	}
 	ss->alloc_id = 0;
 	ss->event_n = 0;
@@ -189,6 +203,19 @@ socket_server_create() {
 	assert(ss->recvctrl_fd < FD_SETSIZE);
 
 	return ss;
+}
+
+static void
+free_wb_list(struct wb_list *list) {
+	struct write_buffer *wb = list->head;
+	while (wb) {
+		struct write_buffer *tmp = wb;
+		wb = wb->next;
+		FREE(tmp->buffer);
+		FREE(tmp);
+	}
+	list->head = NULL;
+	list->tail = NULL;
 }
 
 static void
@@ -201,14 +228,8 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 		return;
 	}
 	assert(s->type != SOCKET_TYPE_RESERVE);
-	struct write_buffer *wb = s->head;
-	while (wb) {
-		struct write_buffer *tmp = wb;
-		wb = wb->next;
-		FREE(tmp->buffer);
-		FREE(tmp);
-	}
-	s->head = s->tail = NULL;
+	free_wb_list(&s->high);
+	free_wb_list(&s->low);
 	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
 		sp_del(ss->event_fd, s->fd);
 	}
@@ -234,6 +255,12 @@ socket_server_release(struct socket_server *ss) {
 	FREE(ss);
 }
 
+static inline void
+check_wb_list(struct wb_list *s) {
+	assert(s->head == NULL);
+	assert(s->tail == NULL);
+}
+
 static struct socket *
 new_fd(struct socket_server *ss, int id, int fd, uintptr_t opaque, bool add) {
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
@@ -251,8 +278,8 @@ new_fd(struct socket_server *ss, int id, int fd, uintptr_t opaque, bool add) {
 	s->size = MIN_READ_BUFFER;
 	s->opaque = opaque;
 	s->wb_size = 0;
-	assert(s->head == NULL);
-	assert(s->tail == NULL);
+	check_wb_list(&s->high);
+	check_wb_list(&s->low);
 	return s;
 }
 
@@ -335,9 +362,9 @@ _failed:
 }
 
 static int
-send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *result) {
-	while (s->head) {
-		struct write_buffer * tmp = s->head;
+send_list(struct socket_server *ss, struct socket *s, struct wb_list *list, struct socket_message *result) {
+	while (list->head) {
+		struct write_buffer * tmp = list->head;
 		for (;;) {
 			int sz = write(s->fd, tmp->ptr, tmp->sz);
 			if (sz < 0) {
@@ -358,29 +385,87 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 			}
 			break;
 		}
-		s->head = tmp->next;
+		list->head = tmp->next;
 		FREE(tmp->buffer);
 		FREE(tmp);
 	}
-	s->tail = NULL;
-	sp_write(ss->event_fd, s->fd, s, false);
+	list->tail = NULL;
 
-	if (s->type == SOCKET_TYPE_HALFCLOSE) {
-		force_close(ss, s, result);
+	return -1;
+}
+
+static inline int
+list_uncomplete(struct wb_list *s) {
+	struct write_buffer *wb = s->head;
+	if (wb == NULL)
+		return 0;
+	
+	return (void *)wb->ptr != wb->buffer;
+}
+
+static void
+raise_uncomplete(struct socket * s) {
+	struct wb_list *low = &s->low;
+	struct write_buffer *tmp = low->head;
+	low->head = tmp->next;
+	if (low->head == NULL) {
+		low->tail = NULL;
+	}
+
+	// move head of low list (tmp) to the empty high list
+	struct wb_list *high = &s->high;
+	assert(high->head == NULL);
+
+	tmp->next = NULL;
+	high->head = high->tail = tmp;
+}
+
+/*
+	Each socket has two write buffer list, high priority and low priority.
+
+	1. send high list as far as possible.
+	2. If high list is empty, try to send low list.
+	3. If low list head is uncomplete (send a part before), move the head of low list to empty high list (call raise_uncomplete) .
+	4. If two lists are both empty, turn off the event. (call check_close)
+ */
+static int
+send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *result) {
+	assert(!list_uncomplete(&s->low));
+	// step 1
+	if (send_list(ss,s,&s->high,result) == SOCKET_CLOSE) {
 		return SOCKET_CLOSE;
+	}
+	if (s->high.head == NULL) {
+		// step 2
+		if (s->low.head != NULL) {
+			if (send_list(ss,s,&s->low,result) == SOCKET_CLOSE) {
+				return SOCKET_CLOSE;
+			}
+			// step 3
+			if (list_uncomplete(&s->low)) {
+				raise_uncomplete(s);
+			}
+		} else {
+			// step 4
+			sp_write(ss->event_fd, s->fd, s, false);
+
+			if (s->type == SOCKET_TYPE_HALFCLOSE) {
+				force_close(ss, s, result);
+				return SOCKET_CLOSE;
+			}
+		}
 	}
 
 	return -1;
 }
 
-static void
-append_sendbuffer(struct socket *s, struct request_send * request, int n) {
+static int
+append_sendbuffer_(struct wb_list *s, struct request_send * request, int n) {
 	struct write_buffer * buf = MALLOC(sizeof(*buf));
 	buf->ptr = request->buffer+n;
 	buf->sz = request->sz - n;
 	buf->buffer = request->buffer;
 	buf->next = NULL;
-	s->wb_size += buf->sz;
 	if (s->head == NULL) {
 		s->head = s->tail = buf;
 	} else {
@@ -389,10 +474,33 @@ append_sendbuffer(struct socket *s, struct request_send * request, int n) {
 		s->tail->next = buf;
 		s->tail = buf;
 	}
+	return buf->sz;
 }
 
+static inline void
+append_sendbuffer(struct socket *s, struct request_send * request, int n) {
+	s->wb_size += append_sendbuffer_(&s->high, request, n);
+}
+
+static inline void
+append_sendbuffer_low(struct socket *s, struct request_send * request) {
+	s->wb_size += append_sendbuffer_(&s->low, request, 0);
+}
+
+static inline int
+send_buffer_empty(struct socket *s) {
+	return (s->high.head == NULL && s->low.head == NULL);
+}
+
+/*
+	When send a package , we can assign the priority : PRIORITY_HIGH or PRIORITY_LOW
+
+	If socket buffer is empty, write to fd directly.
+		If write a part, append the rest part to high list. (Even priority is PRIORITY_LOW)
+	Else append package to high (PRIORITY_HIGH) or low (PRIORITY_LOW) list.
+ */
 static int
-send_socket(struct socket_server *ss, struct request_send * request, struct socket_message *result) {
+send_socket(struct socket_server *ss, struct request_send * request, struct socket_message *result, int priority) {
 	int id = request->id;
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
 	if (s->type == SOCKET_TYPE_INVALID || s->id != id 
@@ -402,7 +510,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		return -1;
 	}
 	assert(s->type != SOCKET_TYPE_PLISTEN && s->type != SOCKET_TYPE_LISTEN);
-	if (s->head == NULL) {
+	if (send_buffer_empty(s)) {
 		int n = write(s->fd, request->buffer, request->sz);
 		if (n<0) {
 			switch(errno) {
@@ -420,10 +528,14 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			FREE(request->buffer);
 			return -1;
 		}
-		append_sendbuffer(s, request, n);
+		append_sendbuffer(s, request, n);	// add to high priority list, even priority == PRIORITY_LOW
 		sp_write(ss->event_fd, s->fd, s, true);
 	} else {
-		append_sendbuffer(s, request, 0);
+		if (priority == PRIORITY_LOW) {
+			append_sendbuffer_low(s, request);
+		} else {
+			append_sendbuffer(s, request, 0);
+		}
 	}
 	return -1;
 }
@@ -460,12 +572,12 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 		result->data = NULL;
 		return SOCKET_CLOSE;
 	}
-	if (s->head) { 
+	if (!send_buffer_empty(s)) { 
 		int type = send_buffer(ss,s,result);
 		if (type != -1)
 			return type;
 	}
-	if (s->head == NULL) {
+	if (send_buffer_empty(s)) {
 		force_close(ss,s,result);
 		result->id = id;
 		result->opaque = request->opaque;
@@ -581,7 +693,9 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 		result->data = NULL;
 		return SOCKET_EXIT;
 	case 'D':
-		return send_socket(ss, (struct request_send *)buffer, result);
+		return send_socket(ss, (struct request_send *)buffer, result, PRIORITY_HIGH);
+	case 'P':
+		return send_socket(ss, (struct request_send *)buffer, result, PRIORITY_LOW);
 	default:
 		fprintf(stderr, "socket-server: Unknown ctrl %c.\n",type);
 		return -1;
@@ -833,6 +947,22 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 
 	send_request(ss, &request, 'D', sizeof(request.u.send));
 	return s->wb_size;
+}
+
+void 
+socket_server_send_lowpriority(struct socket_server *ss, int id, const void * buffer, int sz) {
+	struct socket * s = &ss->slot[id % MAX_SOCKET];
+	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
+		return;
+	}
+	assert(s->type != SOCKET_TYPE_RESERVE);
+
+	struct request_package request;
+	request.u.send.id = id;
+	request.u.send.sz = sz;
+	request.u.send.buffer = (char *)buffer;
+
+	send_request(ss, &request, 'P', sizeof(request.u.send));
 }
 
 void

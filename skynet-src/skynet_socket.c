@@ -115,6 +115,11 @@ skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz) {
 	return 0;
 }
 
+void
+skynet_socket_send_lowpriority(struct skynet_context *ctx, int id, void *buffer, int sz) {
+	socket_server_send_lowpriority(SOCKET_SERVER, id, buffer, sz);
+}
+
 int 
 skynet_socket_listen(struct skynet_context *ctx, const char *host, int port, int backlog) {
 	uint32_t source = skynet_context_handle(ctx);
