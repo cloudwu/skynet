@@ -394,18 +394,6 @@ send_list(struct socket_server *ss, struct socket *s, struct wb_list *list, stru
 	return -1;
 }
 
-static int
-check_close(struct socket_server *ss, struct socket *s, struct socket_message *result) {
-	sp_write(ss->event_fd, s->fd, s, false);
-
-	if (s->type == SOCKET_TYPE_HALFCLOSE) {
-		force_close(ss, s, result);
-		return SOCKET_CLOSE;
-	}
-
-	return -1;
-}
-
 static inline int
 list_uncomplete(struct wb_list *s) {
 	struct write_buffer *wb = s->head;
@@ -419,23 +407,17 @@ static void
 raise_uncomplete(struct socket * s) {
 	struct wb_list *low = &s->low;
 	struct write_buffer *tmp = low->head;
-	assert(list_uncomplete(&s->low));
-	assert(!list_uncomplete(&s->high));
-	struct wb_list *high = &s->high;
 	low->head = tmp->next;
 	if (low->head == NULL) {
 		low->tail = NULL;
 	}
-	tmp->next = high->head;
-	high->head = tmp;
-	if (tmp->next == NULL) {
-		high->tail = tmp;
-	}
-}
 
-static inline int
-send_buffer_empty(struct socket *s) {
-	return (s->high.head == NULL && s->low.head == NULL);
+	// move head of low list (tmp) to the empty high list
+	struct wb_list *high = &s->high;
+	assert(high->head == NULL);
+
+	tmp->next = NULL;
+	high->head = high->tail = tmp;
 }
 
 /*
@@ -443,27 +425,38 @@ send_buffer_empty(struct socket *s) {
 
 	1. send high list as far as possible.
 	2. If high list is empty, try to send low list.
-	3. If low list head is uncomplete (send a part before), move the head of low list to the head of high list (call raise_uncomplete) .
+	3. If low list head is uncomplete (send a part before), move the head of low list to empty high list (call raise_uncomplete) .
 	4. If two lists are both empty, turn off the event. (call check_close)
  */
 static int
 send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *result) {
 	assert(!list_uncomplete(&s->low));
-	int r = send_list(ss,s,&s->high,result);
-	if (list_uncomplete(&s->high)) {
-		return r;
+	// step 1
+	if (send_list(ss,s,&s->high,result) == SOCKET_CLOSE) {
+		return SOCKET_CLOSE;
 	}
 	if (s->high.head == NULL) {
-		r = send_list(ss,s,&s->low,result);
-		if (list_uncomplete(&s->low)) {
-			raise_uncomplete(s);
+		// step 2
+		if (s->low.head != NULL) {
+			if (send_list(ss,s,&s->low,result) == SOCKET_CLOSE) {
+				return SOCKET_CLOSE;
+			}
+			// step 3
+			if (list_uncomplete(&s->low)) {
+				raise_uncomplete(s);
+			}
+		} else {
+			// step 4
+			sp_write(ss->event_fd, s->fd, s, false);
+
+			if (s->type == SOCKET_TYPE_HALFCLOSE) {
+				force_close(ss, s, result);
+				return SOCKET_CLOSE;
+			}
 		}
 	}
-	if (send_buffer_empty(s)) {
-		return check_close(ss, s, result);
-	}
 
-	return r;
+	return -1;
 }
 
 static int
@@ -492,6 +485,11 @@ append_sendbuffer(struct socket *s, struct request_send * request, int n) {
 static inline void
 append_sendbuffer_low(struct socket *s, struct request_send * request) {
 	s->wb_size += append_sendbuffer_(&s->low, request, 0);
+}
+
+static inline int
+send_buffer_empty(struct socket *s) {
+	return (s->high.head == NULL && s->low.head == NULL);
 }
 
 /*
