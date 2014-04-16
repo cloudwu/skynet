@@ -1,12 +1,16 @@
 local skynet = require "skynet"
 
+local i = 0
+local hello = "hello"
+
 function response.ping(hello)
 	skynet.sleep(100)
 	return hello
 end
 
 function subscribe.hello()
-	print "hello"
+	i = i + 1
+	print (i, hello)
 end
 
 function response.error()

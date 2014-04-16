@@ -21,13 +21,7 @@ function snax.interface(name)
 
 	for _,v in ipairs(si) do
 		local id, group, name, f = table.unpack(v)
-		if group == "system" then
-			if f then
-				ret.system[name] = id
-			end
-		else
-			ret[group][name] = id
-		end
+		ret[group][name] = id
 	end
 
 	typeclass[name] = ret
@@ -65,7 +59,6 @@ local function wrapper(handle, name, type)
 		req = gen_req(type, handle),
 		type = name,
 		handle = handle,
-		kill = function(...) return skynet_call(handle, "lua", type.system.exit, ...) end,
 		}, meta)
 end
 
@@ -93,6 +86,24 @@ function snax.bind(handle, type)
 	ret = wrapper(handle, type, t)
 	handle_cache[handle] = ret
 	return ret
+end
+
+function snax.kill(obj, ...)
+	local t = snax.interface(obj.type)
+	return skynet_call(obj.handle, "lua", t.system.exit, ...)
+end
+
+local function test_result(ok, ...)
+	if ok then
+		return ...
+	else
+		error(...)
+	end
+end
+
+function snax.hotfix(obj, ...)
+	local t = snax.interface(obj.type)
+	test_result(skynet_call(obj.handle, "lua", t.system.hotfix, obj.type, ...))
 end
 
 return snax

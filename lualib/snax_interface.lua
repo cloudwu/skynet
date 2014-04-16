@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 
-return function (name , G)
+return function (name , G, loader)
+	loader = loader or loadfile
 	local mainfunc
 
 	local function func_id(id, group)
@@ -33,7 +34,7 @@ return function (name , G)
 	local env = {}
 	local func = {}
 
-	local system = { "init", "exit" }
+	local system = { "init", "exit", "hotfix" }
 
 	do
 		for k, v in ipairs(system) do
@@ -62,7 +63,7 @@ return function (name , G)
 
 		for pat in string.gmatch(path,"[^;]+") do
 			local filename = string.gsub(pat, "?", name)
-			local f , err = loadfile(filename, "bt", G)
+			local f , err = loader(filename, "bt", G)
 			if f then
 				mainfunc = f
 				break

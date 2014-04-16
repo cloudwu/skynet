@@ -8,13 +8,24 @@ skynet.start(function()
 	skynet.dispatch("lua", function ( _, _, id, ...)
 		local method = func[id]
 		if method[2] == "system" then
-			if method[3] == "init" then
+			local command = method[3]
+			if command == "hotfix" then
+				local hotfix = require "snax_hotfix"
+				local ok, msg = hotfix(func, ...)
+				if ok then
+					local hf = func[id][4]
+					skynet.ret(skynet.pack(pcall(hf, select(2,...))))
+				else
+					skynet.ret(skynet.pack(ok, msg))
+				end
+			elseif command == "init" then
 				assert(not init, "Already init")
 				local initfunc = method[4] or function() end
 				skynet.ret(skynet.pack(initfunc(...)))
 				init = true
 			else
 				assert(init, "Never init")
+				assert(command == "exit")
 				local exitfunc = method[4] or function() end
 				skynet.ret(skynet.pack(exitfunc(...)))
 				init = false
