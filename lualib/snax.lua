@@ -90,7 +90,7 @@ end
 
 function snax.kill(obj, ...)
 	local t = snax.interface(obj.type)
-	return skynet_call(obj.handle, "lua", t.system.exit, ...)
+	skynet_call(obj.handle, "lua", t.system.exit, ...)
 end
 
 local function test_result(ok, ...)

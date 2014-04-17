@@ -19,6 +19,9 @@ end
 
 function init( ... )
 	print ("ping server start:", ...)
+
+-- You can return "queue" for queue service mode
+--	return "queue"
 end
 
 function exit(...)
