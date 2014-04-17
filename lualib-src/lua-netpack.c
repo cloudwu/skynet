@@ -228,6 +228,10 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		int need = uc->pack.size - uc->read;
 		if (size < need) {
 			memcpy(uc->pack.buffer + uc->read, buffer, size);
+			uc->read += size;
+			int h = hash_fd(fd);
+			uc->next = q->hash[h];
+			q->hash[h] = uc;
 			return 1;
 		}
 		memcpy(uc->pack.buffer + uc->read, buffer, need);
@@ -246,7 +250,7 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		free(uc);
 		push_more(L, fd, buffer, size);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_MORE));
-		return 2;		
+		return 2;
 	} else {
 		if (size == 1) {
 			struct uncomplete * uc = save_uncomplete(L, fd);
@@ -282,7 +286,7 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		size -= pack_size;
 		push_more(L, fd, buffer, size);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_MORE));
-		return 2;		
+		return 2;
 	}
 }
 
@@ -290,7 +294,7 @@ static inline int
 filter_data(lua_State *L, int fd, uint8_t * buffer, int size) {
 	int ret = filter_data_(L, fd, buffer, size);
 	// buffer is the data of socket message, it malloc at socket_server.c : function forward_message .
-	// it should be free before return, 
+	// it should be free before return,
 	free(buffer);
 	return ret;
 }
@@ -308,7 +312,7 @@ pushstring(lua_State *L, const char * msg) {
 	userdata queue
 	lightuserdata msg
 	integer size
-	return 
+	return
 		userdata queue
 		integer type
 		integer fd
@@ -359,7 +363,7 @@ lfilter(lua_State *L) {
 
 /*
 	userdata queue
-	return 
+	return
 		integer fd
 		lightuserdata msg
 		integer size
@@ -381,7 +385,7 @@ lpop(lua_State *L) {
 }
 
 /*
-	string msg | lightuserdata/integer 
+	string msg | lightuserdata/integer
 
 	lightuserdata/integer
  */
