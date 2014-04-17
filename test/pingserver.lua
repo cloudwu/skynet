@@ -26,5 +26,4 @@ end
 
 function exit(...)
 	print ("ping server exit:", ...)
-	return "Exit"
 end
