@@ -11,13 +11,7 @@ skynet.start(function()
 			local command = method[3]
 			if command == "hotfix" then
 				local hotfix = require "snax_hotfix"
-				local ok, msg = hotfix(func, ...)
-				if ok then
-					local hf = func[id][4]
-					skynet.ret(skynet.pack(pcall(hf, select(2,...))))
-				else
-					skynet.ret(skynet.pack(ok, msg))
-				end
+				skynet.ret(skynet.pack(hotfix(func, ...)))
 			elseif command == "init" then
 				assert(not init, "Already init")
 				local initfunc = method[4] or function() end

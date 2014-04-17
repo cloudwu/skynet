@@ -101,9 +101,9 @@ local function test_result(ok, ...)
 	end
 end
 
-function snax.hotfix(obj, ...)
+function snax.hotfix(obj, source, ...)
 	local t = snax.interface(obj.type)
-	test_result(skynet_call(obj.handle, "lua", t.system.hotfix, obj.type, ...))
+	return test_result(skynet_call(obj.handle, "lua", t.system.hotfix, source, ...))
 end
 
 return snax

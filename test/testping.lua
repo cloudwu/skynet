@@ -6,7 +6,23 @@ skynet.start(function()
 	print(ps.pub.hello())
 	print(ps.req.ping("foobar"))
 	print(pcall(ps.req.error))
-	snax.hotfix(ps)
+	print("Hotfix (i) :", snax.hotfix(ps, [[
+
+local i
+local hello
+
+function subscribe.hello()
+	i = i + 1
+	print ("fix", i, hello)
+end
+
+function hotfix(...)
+	local temp = i
+	i = 100
+	return temp
+end
+
+	]]))
 	print(ps.pub.hello())
 	print(snax.kill(ps,"exit"))
 	skynet.exit()
