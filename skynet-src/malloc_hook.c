@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-//#include <malloc.h>
 
 #include "malloc_hook.h"
 
@@ -109,12 +108,16 @@ realloc(void *ptr, size_t size) {
     return fill_prefix(newptr);
 }
 
+#ifdef JEMALLOC_OVERRIDE_MEMALIGN
+
 void *
 memalign(size_t alignment, size_t size) {
     void *ptr = je_memalign(alignment, size+PREFIX_SIZE);
     if(!ptr) malloc_oom(size);
     return fill_prefix(ptr);
 }
+
+#endif
 
 void
 free(void *ptr) {
