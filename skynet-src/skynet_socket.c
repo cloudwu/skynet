@@ -1,9 +1,11 @@
+// include skynet.h first for malloc hook
+#include "skynet.h"
+
 #include "skynet_socket.h"
 #include "socket_server.h"
 #include "skynet_server.h"
 #include "skynet_mq.h"
 #include "skynet_harbor.h"
-#include "skynet.h"
 
 #include <assert.h>
 #include <stdlib.h>

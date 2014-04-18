@@ -267,7 +267,7 @@ struct snlua *
 snlua_create(void) {
 	struct snlua * l = malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
-	l->L = luaL_newstate();
+	l->L = lua_newstate(skynet_lalloc, NULL);
 	l->init = _init;
 	return l;
 }

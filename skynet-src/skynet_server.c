@@ -1,3 +1,6 @@
+// include skynet.h first for malloc hook
+#include "skynet.h"
+
 #include "skynet_server.h"
 #include "skynet_module.h"
 #include "skynet_handle.h"
@@ -5,7 +8,6 @@
 #include "skynet_timer.h"
 #include "skynet_harbor.h"
 #include "skynet_env.h"
-#include "skynet.h"
 #include "skynet_monitor.h"
 
 #include <string.h>

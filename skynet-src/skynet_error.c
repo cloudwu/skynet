@@ -29,7 +29,7 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 	int len = vsnprintf(tmp, LOG_MESSAGE_SIZE, msg, ap);
 	va_end(ap);
 	if (len < LOG_MESSAGE_SIZE) {
-		data = strdup(tmp);
+		data = skynet_strdup(tmp);
 	} else {
 		int max_size = LOG_MESSAGE_SIZE;
 		for (;;) {

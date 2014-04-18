@@ -3,10 +3,10 @@
 #include <assert.h>
 
 #include "malloc_hook.h"
-
 #include "jemalloc.h"
 
 #include "skynet.h"
+
 
 static size_t _used_memory = 0;
 static size_t _memory_block = 0;
@@ -19,10 +19,6 @@ typedef struct _mem_data {
 #define PREFIX_SIZE sizeof(uint32_t)
 
 static mem_data mem_stats[SLOT_SIZE];
-
-static void _init() {
-    memset(mem_stats, 0, sizeof(mem_stats));
-}
 
 static size_t*
 get_allocated_field(handle) {
@@ -88,50 +84,6 @@ static void malloc_oom(size_t size) {
     abort();
 }
 
-// hook : malloc, realloc, memalign, free, calloc
-
-void *
-malloc(size_t size) {
-    void* ptr = je_malloc(size + PREFIX_SIZE);
-    if(!ptr) malloc_oom(size);
-    return fill_prefix(ptr);
-}
-
-void *
-realloc(void *ptr, size_t size) {
-    if (ptr == NULL) return malloc(size);
-
-    void* rawptr = clean_prefix(ptr);
-    void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
-    if(!newptr) malloc_oom(size);
-    return fill_prefix(newptr);
-}
-
-#ifdef JEMALLOC_OVERRIDE_MEMALIGN
-
-void *
-memalign(size_t alignment, size_t size) {
-    void *ptr = je_memalign(alignment, size+PREFIX_SIZE);
-    if(!ptr) malloc_oom(size);
-    return fill_prefix(ptr);
-}
-
-#endif
-
-void
-free(void *ptr) {
-    if (ptr == NULL) return;
-    void* rawptr = clean_prefix(ptr);
-    je_free(rawptr);
-}
-
-void *
-calloc(size_t nmemb,size_t size) {
-    void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
-    if(!ptr) malloc_oom(size);
-    return fill_prefix(ptr);
-}
-
 size_t
 malloc_used_memory(void) {
     return _used_memory;
@@ -190,10 +142,54 @@ dump_c_mem() {
     printf("+total: %zdkb\n",total >> 10);
 }
 
-/*
- * init 
- */
-void __attribute__ ((constructor)) malloc_hook_init(void){
-    _init();
+// hook : malloc, realloc, memalign, free, calloc
+
+void *
+skynet_malloc(size_t size) {
+    void* ptr = je_malloc(size + PREFIX_SIZE);
+    if(!ptr) malloc_oom(size);
+    return fill_prefix(ptr);
+}
+
+void *
+skynet_realloc(void *ptr, size_t size) {
+    if (ptr == NULL) return malloc(size);
+
+    void* rawptr = clean_prefix(ptr);
+    void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
+    if(!newptr) malloc_oom(size);
+    return fill_prefix(newptr);
+}
+
+void
+skynet_free(void *ptr) {
+    if (ptr == NULL) return;
+    void* rawptr = clean_prefix(ptr);
+    je_free(rawptr);
+}
+
+void *
+skynet_calloc(size_t nmemb,size_t size) {
+    void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
+    if(!ptr) malloc_oom(size);
+    return fill_prefix(ptr);
+}
+
+char *
+skynet_strdup(const char *str) {
+	size_t sz = strlen(str);
+	char * ret = skynet_malloc(sz+1);
+	memcpy(ret, str, sz+1);
+	return ret;
+}
+
+void * 
+skynet_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+	if (nsize == 0) {
+		skynet_free(ptr);
+		return NULL;
+	} else {
+		return skynet_realloc(ptr, nsize);
+	}
 }
 

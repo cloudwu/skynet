@@ -1,5 +1,6 @@
 #ifndef __MALLOC_HOOK_H
 #define __MALLOC_HOOK_H
+
 #include <stdlib.h>
 
 extern size_t malloc_used_memory(void);
