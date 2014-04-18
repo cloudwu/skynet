@@ -12,7 +12,7 @@ static size_t _used_memory = 0;
 static size_t _memory_block = 0;
 typedef struct _mem_data {
     uint32_t handle;
-    size_t   allocated;
+    ssize_t allocated;
 } mem_data;
 
 #define SLOT_SIZE 0x10000
@@ -24,11 +24,16 @@ static size_t*
 get_allocated_field(uint32_t handle) {
     int h = (int)(handle & (SLOT_SIZE - 1));
     mem_data *data = &mem_stats[h];
-    if(data->handle == 0 || data->allocated == 0) {
-        __sync_synchronize();
-        if(!__sync_bool_compare_and_swap(&data->handle, 0, handle)) {
-            return 0;
-        }
+	uint32_t old_handle = data->handle;
+	ssize_t old_alloc = data->allocated;
+    if(old_handle == 0 || old_alloc <= 0) {
+		// data->allocated may less than zero, because it may not count at start.
+		if(!__sync_bool_compare_and_swap(&data->handle, old_handle, handle)) {
+			return 0;
+		}
+		if (old_alloc < 0) {
+			__sync_bool_compare_and_swap(&data->allocated, old_alloc, 0);
+		}
     }
     if(data->handle != handle) {
         return 0;
