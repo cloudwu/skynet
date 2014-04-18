@@ -3,36 +3,37 @@
 #include <assert.h>
 
 #include "malloc_hook.h"
-
 #include "jemalloc.h"
 
 #include "skynet.h"
+
 
 static size_t _used_memory = 0;
 static size_t _memory_block = 0;
 typedef struct _mem_data {
     uint32_t handle;
-    size_t   allocated;
+    ssize_t allocated;
 } mem_data;
 
-#define SLOT_SIZE 0xffff
+#define SLOT_SIZE 0x10000
 #define PREFIX_SIZE sizeof(uint32_t)
 
 static mem_data mem_stats[SLOT_SIZE];
 
-static void _init() {
-    memset(mem_stats, 0, sizeof(mem_stats));
-}
-
 static size_t*
-get_allocated_field(handle) {
-    int h = (handle & SLOT_SIZE) - 1;
+get_allocated_field(uint32_t handle) {
+    int h = (int)(handle & (SLOT_SIZE - 1));
     mem_data *data = &mem_stats[h];
-    if(data->handle == 0 || data->allocated == 0) {
-        __sync_synchronize();
-        if(!__sync_bool_compare_and_swap(&data->handle, 0, handle)) {
-            return 0;
-        }
+	uint32_t old_handle = data->handle;
+	ssize_t old_alloc = data->allocated;
+    if(old_handle == 0 || old_alloc <= 0) {
+		// data->allocated may less than zero, because it may not count at start.
+		if(!__sync_bool_compare_and_swap(&data->handle, old_handle, handle)) {
+			return 0;
+		}
+		if (old_alloc < 0) {
+			__sync_bool_compare_and_swap(&data->allocated, old_alloc, 0);
+		}
     }
     if(data->handle != handle) {
         return 0;
@@ -73,8 +74,7 @@ fill_prefix(char* ptr) {
 
 inline static void*
 clean_prefix(char* ptr) {
-    uint32_t* rawptr = (uint32_t*)ptr - 1;
-    size_t size = je_malloc_usable_size(rawptr);
+    size_t size = je_malloc_usable_size(ptr);
     uint32_t *p = (uint32_t *)(ptr + size - sizeof(uint32_t));
     uint32_t handle;
     memcpy(&handle, p, sizeof(handle));
@@ -87,50 +87,6 @@ static void malloc_oom(size_t size) {
         size);
     fflush(stderr);
     abort();
-}
-
-// hook : malloc, realloc, memalign, free, calloc
-
-void *
-malloc(size_t size) {
-    void* ptr = je_malloc(size + PREFIX_SIZE);
-    if(!ptr) malloc_oom(size);
-    return fill_prefix(ptr);
-}
-
-void *
-realloc(void *ptr, size_t size) {
-    if (ptr == NULL) return malloc(size);
-
-    void* rawptr = clean_prefix(ptr);
-    void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
-    if(!newptr) malloc_oom(size);
-    return fill_prefix(newptr);
-}
-
-#ifdef JEMALLOC_OVERRIDE_MEMALIGN
-
-void *
-memalign(size_t alignment, size_t size) {
-    void *ptr = je_memalign(alignment, size+PREFIX_SIZE);
-    if(!ptr) malloc_oom(size);
-    return fill_prefix(ptr);
-}
-
-#endif
-
-void
-free(void *ptr) {
-    if (ptr == NULL) return;
-    void* rawptr = clean_prefix(ptr);
-    je_free(rawptr);
-}
-
-void *
-calloc(size_t nmemb,size_t size) {
-    void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
-    if(!ptr) malloc_oom(size);
-    return fill_prefix(ptr);
 }
 
 size_t
@@ -191,10 +147,54 @@ dump_c_mem() {
     printf("+total: %zdkb\n",total >> 10);
 }
 
-/*
- * init 
- */
-void __attribute__ ((constructor)) malloc_hook_init(void){
-    _init();
+// hook : malloc, realloc, memalign, free, calloc
+
+void *
+skynet_malloc(size_t size) {
+    void* ptr = je_malloc(size + PREFIX_SIZE);
+    if(!ptr) malloc_oom(size);
+    return fill_prefix(ptr);
+}
+
+void *
+skynet_realloc(void *ptr, size_t size) {
+    if (ptr == NULL) return malloc(size);
+
+    void* rawptr = clean_prefix(ptr);
+    void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
+    if(!newptr) malloc_oom(size);
+    return fill_prefix(newptr);
+}
+
+void
+skynet_free(void *ptr) {
+    if (ptr == NULL) return;
+    void* rawptr = clean_prefix(ptr);
+    je_free(rawptr);
+}
+
+void *
+skynet_calloc(size_t nmemb,size_t size) {
+    void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
+    if(!ptr) malloc_oom(size);
+    return fill_prefix(ptr);
+}
+
+char *
+skynet_strdup(const char *str) {
+	size_t sz = strlen(str);
+	char * ret = skynet_malloc(sz+1);
+	memcpy(ret, str, sz+1);
+	return ret;
+}
+
+void * 
+skynet_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+	if (nsize == 0) {
+		skynet_free(ptr);
+		return NULL;
+	} else {
+		return skynet_realloc(ptr, nsize);
+	}
 }
 

@@ -1,3 +1,6 @@
+// include skynet.h first for malloc hook
+#include "skynet.h"
+
 #include "skynet_handle.h"
 #include "skynet_server.h"
 #include "rwlock.h"
@@ -204,7 +207,7 @@ _insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
 			end = mid - 1;
 		}
 	}
-	char * result = strdup(name);
+	char * result = skynet_strdup(name);
 
 	_insert_name_before(s, result, handle, begin);
 

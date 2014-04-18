@@ -2,6 +2,9 @@
   https://github.com/cloudwu/lua-serialize
  */
 
+// include skynet.h first for malloc hook
+#include "skynet.h"
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <stdlib.h>

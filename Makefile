@@ -20,7 +20,6 @@ $(LUA_STATICLIB) :
 
 JEMALLOC_STATICLIB := 3rd/jemalloc/lib/libjemalloc_pic.a
 JEMALLOC_INC := 3rd/jemalloc/include/jemalloc
-NOBUILDIN_MALLOC := -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fno-builtin-memalign
 
 all : jemalloc
 .PHONY : jemalloc
@@ -28,10 +27,10 @@ all : jemalloc
 $(JEMALLOC_STATICLIB) : 3rd/jemalloc/Makefile
 	cd 3rd/jemalloc && $(MAKE) CC=$(CC) 
 
-3rd/jemalloc :
+3rd/jemalloc/autogen.sh :
 	git submodule update --init
 
-3rd/jemalloc/Makefile : | 3rd/jemalloc
+3rd/jemalloc/Makefile : | 3rd/jemalloc/autogen.sh
 	cd 3rd/jemalloc && ./autogen.sh --with-jemalloc-prefix=je_ --disable-valgrind
 
 jemalloc : $(JEMALLOC_STATICLIB)
@@ -52,7 +51,7 @@ all : \
   $(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so) 
 
 $(SKYNET_BUILD_PATH)/skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_LIB) $(JEMALLOC_STATICLIB)
-	$(CC) $(CFLAGS) $(NOBUILDIN_MALLOC) -o $@ $^ -Iskynet-src -I$(JEMALLOC_INC) $(LDFLAGS) $(EXPORT) $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ -Iskynet-src -I$(JEMALLOC_INC) $(LDFLAGS) $(EXPORT) $(LIBS)
 
 $(LUA_CLIB_PATH) :
 	mkdir $(LUA_CLIB_PATH)
@@ -77,10 +76,10 @@ $(LUA_CLIB_PATH)/int64.so : 3rd/lua-int64/int64.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
 
 $(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 $(LUA_CLIB_PATH)/mongo.so : lualib-src/lua-mongo.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
 
 $(LUA_CLIB_PATH)/md5.so : 3rd/lua-md5/md5.c 3rd/lua-md5/md5lib.c 3rd/lua-md5/compat-5.2.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -I3rd/lua-md5 $^ -o $@ 

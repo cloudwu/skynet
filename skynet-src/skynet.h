@@ -1,6 +1,8 @@
 #ifndef SKYNET_H
 #define SKYNET_H
 
+#include "skynet_malloc.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
