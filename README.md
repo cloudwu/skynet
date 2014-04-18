@@ -1,5 +1,7 @@
 ## Build
 
+Install autoconf first for jemalloc
+
 ```
 make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd now
 ```

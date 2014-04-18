@@ -52,6 +52,7 @@ struct skynet_node {
 };
 
 static struct skynet_node G_NODE = { 0,0 };
+static __thread uint32_t handle_tls = 0xffffffff;
 
 int 
 skynet_context_total() {
@@ -66,6 +67,11 @@ _context_inc() {
 static void
 _context_dec() {
 	__sync_fetch_and_sub(&G_NODE.total,1);
+}
+
+uint32_t 
+skynet_current_handle(void) {
+	return handle_tls;
 }
 
 static void
@@ -192,11 +198,13 @@ static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
 	CHECKCALLING_BEGIN(ctx)
+	handle_tls = ctx->handle;
 	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
 	size_t sz = msg->sz & HANDLE_MASK;
 	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
 		free(msg->data);
 	}
+	handle_tls = 0xffffffff;
 	CHECKCALLING_END(ctx)
 }
 

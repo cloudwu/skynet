@@ -1,32 +1,55 @@
 include platform.mk
 
-LUA_STATICLIB := 3rd/lua/liblua.a
-LUA_LIB ?= $(LUA_STATICLIB)
-LUA_INC ?= 3rd/lua
 LUA_CLIB_PATH ?= luaclib
 CSERVICE_PATH ?= cservice
+
 SKYNET_BUILD_PATH ?= .
 
 CFLAGS = -g -O2 -Wall -I$(LUA_INC) $(MYCFLAGS)
 
+# lua
+
+LUA_STATICLIB := 3rd/lua/liblua.a
+LUA_LIB ?= $(LUA_STATICLIB)
+LUA_INC ?= 3rd/lua
+
 $(LUA_STATICLIB) :
 	cd 3rd/lua && $(MAKE) CC=$(CC) $(PLAT)
 
+# jemalloc 
+
+JEMALLOC_STATICLIB := 3rd/jemalloc/lib/libjemalloc_pic.a
+JEMALLOC_INC := 3rd/jemalloc/include/jemalloc
+NOBUILDIN_MALLOC := -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free -fno-builtin-memalign
+
+all : jemalloc
+.PHONY : jemalloc
+
+$(JEMALLOC_STATICLIB) : 3rd/jemalloc/Makefile
+	cd 3rd/jemalloc && $(MAKE) CC=$(CC) 
+
+3rd/jemalloc/Makefile :
+	cd 3rd/jemalloc && ./autogen.sh --with-jemalloc-prefix=je_ --disable-valgrind
+
+jemalloc : $(JEMALLOC_STATICLIB)
+
+# skynet
+
 CSERVICE = snlua logger gate master harbor
-LUA_CLIB = skynet socketdriver int64 bson mongo md5 netpack cjson clientsocket
+LUA_CLIB = skynet socketdriver int64 bson mongo md5 netpack cjson clientsocket memory
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
   skynet_server.c skynet_start.c skynet_timer.c skynet_error.c \
-  skynet_harbor.c skynet_env.c \
-  skynet_monitor.c skynet_socket.c socket_server.c
+  skynet_harbor.c skynet_env.c skynet_monitor.c skynet_socket.c socket_server.c \
+  malloc_hook.c
 
 all : \
   $(SKYNET_BUILD_PATH)/skynet \
   $(foreach v, $(CSERVICE), $(CSERVICE_PATH)/$(v).so) \
   $(foreach v, $(LUA_CLIB), $(LUA_CLIB_PATH)/$(v).so) 
 
-$(SKYNET_BUILD_PATH)/skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_LIB)
-	$(CC) $(CFLAGS) -o $@ $^ -Iskynet-src $(LDFLAGS) $(EXPORT) $(LIBS)
+$(SKYNET_BUILD_PATH)/skynet : $(foreach v, $(SKYNET_SRC), skynet-src/$(v)) $(LUA_LIB) $(JEMALLOC_STATICLIB)
+	$(CC) $(CFLAGS) $(NOBUILDIN_MALLOC) -o $@ $^ -Iskynet-src -I$(JEMALLOC_INC) $(LDFLAGS) $(EXPORT) $(LIBS)
 
 $(LUA_CLIB_PATH) :
 	mkdir $(LUA_CLIB_PATH)
@@ -68,9 +91,14 @@ $(LUA_CLIB_PATH)/cjson.so : | $(LUA_CLIB_PATH)
 $(LUA_CLIB_PATH)/clientsocket.so : lualib-src/lua-clientsocket.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -lpthread
 
+$(LUA_CLIB_PATH)/memory.so : lualib-src/lua-memory.c | $(LUA_CLIB_PATH)
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@ 
+
 clean :
 	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
 
 cleanall: clean
 	cd 3rd/lua-cjson && $(MAKE) clean
+	cd 3rd/jemalloc && $(MAKE) clean
 	rm -f $(LUA_STATICLIB)
+
