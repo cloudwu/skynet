@@ -1,7 +1,6 @@
 #include "skynet.h"
 #include "skynet_mq.h"
 #include "skynet_handle.h"
-#include "skynet_multicast.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -287,13 +286,7 @@ _drop_queue(struct message_queue *q) {
 	int s = 0;
 	while(!skynet_mq_pop(q, &msg)) {
 		++s;
-		int type = msg.sz >> HANDLE_REMOTE_SHIFT;
-		if (type == PTYPE_MULTICAST) {
-			assert((msg.sz & HANDLE_MASK) == 0);
-			skynet_multicast_dispatch((struct skynet_multicast_message *)msg.data, NULL, NULL);
-		} else {
-			free(msg.data);
-		}
+		free(msg.data);
 	}
 	_release(q);
 	return s;

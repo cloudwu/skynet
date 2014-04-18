@@ -22,6 +22,7 @@ logger.CRITICAL = 50
 logger.FATAL = 60
 
 local function log_to_disk(...)
+	-- implement your .lualog service
 	Skynet.send(".lualog" , "lua" , ...)
 end
 

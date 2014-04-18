@@ -105,11 +105,9 @@ function COMMAND.help()
 		list = "List all the service",
 		stat = "Dump all stats",
 		info = "Info address : get service infomation",
-		timing = "timing address : get service timing infomation",
 		kill = "kill address : kill service",
 		mem = "mem : show memory status",
 		gc = "gc : force every lua service do garbage collect",
-		reload = "reload address : reload a lua service",
 		start = "lanuch a new lua service",
 		clearcache = "clear lua code cache",
 	}

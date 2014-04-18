@@ -6,7 +6,6 @@
 #include "skynet_module.h"
 #include "skynet_timer.h"
 #include "skynet_harbor.h"
-#include "skynet_group.h"
 #include "skynet_monitor.h"
 #include "skynet_socket.h"
 
@@ -188,7 +187,6 @@ _start_master(const char * master) {
 
 void 
 skynet_start(struct skynet_config * config) {
-	skynet_group_init();
 	skynet_harbor_init(config->harbor);
 	skynet_handle_init(config->harbor);
 	skynet_mq_init();
@@ -215,11 +213,6 @@ skynet_start(struct skynet_config * config) {
 		return;
 	}
 
-	ctx = skynet_context_new("localcast", NULL);
-	if (ctx == NULL) {
-		fprintf(stderr,"launch local cast error");
-		exit(1);
-	}
 	ctx = skynet_context_new("snlua", "launcher");
 	if (ctx) {
 		skynet_command(ctx, "REG", ".launcher");
