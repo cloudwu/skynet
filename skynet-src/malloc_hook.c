@@ -21,8 +21,8 @@ typedef struct _mem_data {
 static mem_data mem_stats[SLOT_SIZE];
 
 static size_t*
-get_allocated_field(handle) {
-    int h = (handle & (SLOT_SIZE - 1));
+get_allocated_field(uint32_t handle) {
+    int h = (int)(handle & (SLOT_SIZE - 1));
     mem_data *data = &mem_stats[h];
     if(data->handle == 0 || data->allocated == 0) {
         __sync_synchronize();
