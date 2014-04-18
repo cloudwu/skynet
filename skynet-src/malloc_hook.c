@@ -15,14 +15,14 @@ typedef struct _mem_data {
     size_t   allocated;
 } mem_data;
 
-#define SLOT_SIZE 0xffff
+#define SLOT_SIZE 0x10000
 #define PREFIX_SIZE sizeof(uint32_t)
 
 static mem_data mem_stats[SLOT_SIZE];
 
 static size_t*
 get_allocated_field(handle) {
-    int h = (handle & SLOT_SIZE) - 1;
+    int h = (handle & (SLOT_SIZE - 1));
     mem_data *data = &mem_stats[h];
     if(data->handle == 0 || data->allocated == 0) {
         __sync_synchronize();
