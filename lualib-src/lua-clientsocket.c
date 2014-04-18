@@ -193,7 +193,10 @@ readline_stdin(void * arg) {
 	struct queue * q = arg;
 	char tmp[1024];
 	while (!feof(stdin)) {
-		fgets(tmp,sizeof(tmp),stdin);
+		if (fgets(tmp,sizeof(tmp),stdin) == NULL) {
+			// read stdin failed
+			exit(1);
+		}
 		int n = strlen(tmp) -1;
 
 		char * str = malloc(n+1);

@@ -6,8 +6,6 @@
 #include "skynet_harbor.h"
 #include "skynet_env.h"
 #include "skynet.h"
-#include "skynet_multicast.h"
-#include "skynet_group.h"
 #include "skynet_monitor.h"
 
 #include <string.h>
@@ -41,7 +39,6 @@ struct skynet_context {
 	void * cb_ud;
 	skynet_cb cb;
 	int session_id;
-	uint32_t forward;
 	struct message_queue *queue;
 	bool init;
 	bool endless;
@@ -102,7 +99,6 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->cb_ud = NULL;
 	ctx->session_id = 0;
 
-	ctx->forward = 0;
 	ctx->init = false;
 	ctx->endless = false;
 	ctx->handle = skynet_handle_register(ctx);
@@ -193,65 +189,13 @@ skynet_isremote(struct skynet_context * ctx, uint32_t handle, int * harbor) {
 }
 
 static void
-_send_message(uint32_t des, struct skynet_message *msg) {
-	if (skynet_harbor_message_isremote(des)) {
-			struct remote_message * rmsg = malloc(sizeof(*rmsg));
-			rmsg->destination.handle = des;
-			rmsg->message = msg->data;
-			rmsg->sz = msg->sz;
-			skynet_harbor_send(rmsg, msg->source, msg->session);
-	} else {
-		if (skynet_context_push(des, msg)) {
-			free(msg->data);
-			skynet_error(NULL, "Drop message from %x forward to %x (size=%d)", msg->source, des, (int)msg->sz);
-		}
-	}
-}
-
-static int
-_forwarding(struct skynet_context *ctx, struct skynet_message *msg) {
-	if (ctx->forward) {
-		uint32_t des = ctx->forward;
-		ctx->forward = 0;
-		_send_message(des, msg);
-		return 1;
-	}
-	return 0;
-}
-
-static void
-_mc(void *ud, uint32_t source, const void * msg, size_t sz) {
-	struct skynet_context * ctx = ud;
-	int type = sz >> HANDLE_REMOTE_SHIFT;
-	sz &= HANDLE_MASK;
-	ctx->cb(ctx, ctx->cb_ud, type, 0, source, msg, sz);
-	if (ctx->forward) {
-		uint32_t des = ctx->forward;
-		ctx->forward = 0;
-		struct skynet_message message;
-		message.source = source;
-		message.session = 0;
-		message.data = malloc(sz);
-		memcpy(message.data, msg, sz);
-		message.sz = sz  | (type << HANDLE_REMOTE_SHIFT);
-		_send_message(des, &message);
-	}
-}
-
-static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
 	CHECKCALLING_BEGIN(ctx)
 	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
 	size_t sz = msg->sz & HANDLE_MASK;
-	if (type == PTYPE_MULTICAST) {
-		skynet_multicast_dispatch((struct skynet_multicast_message *)msg->data, ctx, _mc);
-	} else {
-		int reserve = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
-		reserve |= _forwarding(ctx, msg);
-		if (!reserve) {
-			free(msg->data);
-		}
+	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
+		free(msg->data);
 	}
 	CHECKCALLING_END(ctx)
 }
@@ -306,41 +250,6 @@ _copy_name(char name[GLOBALNAME_LENGTH], const char * addr) {
 	for (;i<GLOBALNAME_LENGTH;i++) {
 		name[i] = '\0';
 	}
-}
-
-static const char *
-_group_command(struct skynet_context * ctx, const char * cmd, int handle, uint32_t v) {
-	uint32_t self;
-	if (v != 0) {
-		if (skynet_harbor_message_isremote(v)) {
-			skynet_error(ctx, "Can't add remote handle %x",v);
-			return NULL;
-		}
-		self = v;
-	} else {
-		self = ctx->handle;
-	}
-	if (strcmp(cmd, "ENTER") == 0) {
-		skynet_group_enter(handle, self);
-		return NULL;
-	}
-	if (strcmp(cmd, "LEAVE") == 0) {
-		skynet_group_leave(handle, self);
-		return NULL;
-	}
-	if (strcmp(cmd, "QUERY") == 0) {
-		uint32_t addr = skynet_group_query(handle);
-		if (addr == 0) {
-			return NULL;
-		}
-		_id_to_hex(ctx->result, addr);
-		return ctx->result;
-	}
-	if (strcmp(cmd, "CLEAR") == 0) {
-		skynet_group_clear(handle);
-		return NULL;
-	}
-	return NULL;
 }
 
 uint32_t 
@@ -514,18 +423,6 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		return context->result;
 	}
 
-	if (strcmp(cmd,"GROUP") == 0) {
-		int sz = strlen(param);
-		char tmp[sz+1];
-		strcpy(tmp,param);
-		tmp[sz] = '\0';
-		char cmd[sz+1];
-		int handle=0;
-		uint32_t addr=0;
-		sscanf(tmp, "%s %d :%x",cmd,&handle,&addr);
-		return _group_command(context, cmd, handle,addr);
-	}
-
 	if (strcmp(cmd,"ENDLESS") == 0) {
 		if (context->endless) {
 			strcpy(context->result, "1");
@@ -570,16 +467,6 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	}
 
 	return NULL;
-}
-
-void 
-skynet_forward(struct skynet_context * context, uint32_t destination) {
-	assert(context->forward == 0);
-	if (destination == 0) {
-		context->forward = context->handle;
-	} else {
-		context->forward = destination;
-	}
 }
 
 static void
