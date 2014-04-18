@@ -194,8 +194,9 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	CHECKCALLING_BEGIN(ctx)
 	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
 	size_t sz = msg->sz & HANDLE_MASK;
-	ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
-	free(msg->data);
+	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
+		free(msg->data);
+	}
 	CHECKCALLING_END(ctx)
 }
 
