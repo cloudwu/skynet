@@ -20,7 +20,7 @@ typedef struct _mem_data {
 
 static mem_data mem_stats[SLOT_SIZE];
 
-static size_t*
+static ssize_t*
 get_allocated_field(uint32_t handle) {
     int h = (int)(handle & (SLOT_SIZE - 1));
     mem_data *data = &mem_stats[h];
@@ -45,7 +45,7 @@ inline static void
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
     __sync_add_and_fetch(&_used_memory, __n);
     __sync_add_and_fetch(&_memory_block, 1); 
-    size_t* allocated = get_allocated_field(handle);
+    ssize_t* allocated = get_allocated_field(handle);
     if(allocated) {
         __sync_add_and_fetch(allocated, __n);
     }
@@ -55,7 +55,7 @@ inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
     __sync_sub_and_fetch(&_used_memory, __n);
     __sync_sub_and_fetch(&_memory_block, 1);
-    size_t* allocated = get_allocated_field(handle);
+    ssize_t* allocated = get_allocated_field(handle);
     if(allocated) {
         __sync_sub_and_fetch(allocated, __n);
     }
