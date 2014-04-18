@@ -39,7 +39,7 @@ jemalloc : $(JEMALLOC_STATICLIB)
 # skynet
 
 CSERVICE = snlua logger gate master harbor
-LUA_CLIB = skynet socketdriver int64 bson mongo md5 netpack cjson clientsocket memory
+LUA_CLIB = skynet socketdriver int64 bson mongo md5 netpack cjson clientsocket # memory
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
   skynet_server.c skynet_start.c skynet_timer.c skynet_error.c \

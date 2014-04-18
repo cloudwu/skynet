@@ -73,8 +73,7 @@ fill_prefix(char* ptr) {
 
 inline static void*
 clean_prefix(char* ptr) {
-    uint32_t* rawptr = (uint32_t*)ptr - 1;
-    size_t size = je_malloc_usable_size(rawptr);
+    size_t size = je_malloc_usable_size(ptr);
     uint32_t *p = (uint32_t *)(ptr + size - sizeof(uint32_t));
     uint32_t handle;
     memcpy(&handle, p, sizeof(handle));
