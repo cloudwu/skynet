@@ -4,7 +4,6 @@ Install autoconf first for jemalloc
 
 ```
 git clone git@github.com:cloudwu/skynet.git
-git submodule update --init
 cd skynet
 make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd now
 ```
