@@ -110,6 +110,7 @@ function COMMAND.help()
 		gc = "gc : force every lua service do garbage collect",
 		start = "lanuch a new lua service",
 		clearcache = "clear lua code cache",
+		service = "List unique service",
 	}
 end
 
@@ -126,4 +127,6 @@ function COMMAND.start(...)
 	end
 end
 
-
+function COMMAND.service()
+	return skynet.call("SERVICE", "lua", "LIST")
+end

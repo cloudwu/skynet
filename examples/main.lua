@@ -8,7 +8,7 @@ skynet.start(function()
 	skynet.monitor "simplemonitor"
 	local lualog = skynet.newservice("lualog")
 	local console = skynet.newservice("console")
---	skynet.newservice("debug_console",8000)
+	skynet.newservice("debug_console",8000)
 	skynet.newservice("simpledb")
 	local watchdog = skynet.newservice("watchdog")
 	skynet.call(watchdog, "lua", "start", {

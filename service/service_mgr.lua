@@ -58,36 +58,107 @@ local function waitfor(name , func, ...)
 	return s
 end
 
-function cmd.LAUNCH(service_name, subname, ...)
-	if service_name == "snaxd" then
-		return waitfor("snax."..subname, snax.rawnewservice, subname, ...)
+local function read_name(service_name)
+	if string.byte(service_name) == 64 then -- '@'
+		return string.sub(service_name , 2)
 	else
-		return waitfor(service_name, skynet.newservice, service_name, subname, ...)
+		return service_name
+	end
+end
+
+function cmd.LAUNCH(service_name, subname, ...)
+	local realname = read_name(service_name)
+
+	if realname == "snaxd" then
+		return waitfor(service_name.."."..subname, snax.rawnewservice, subname, ...)
+	else
+		return waitfor(service_name, skynet.newservice, realname, subname, ...)
 	end
 end
 
 function cmd.QUERY(service_name, subname)
-	if service_name == "snaxd" then
-		return waitfor("snax."..subname)
+	local realname = read_name(service_name)
+
+	if realname == "snaxd" then
+		return waitfor(service_name.."."..subname)
 	else
 		return waitfor(service_name)
 	end
 end
 
-function cmd.GLAUNCH(...)
-	if GLOBAL then
-		return cmd.LAUNCH(...)
-	else
-		return waitfor(service_name, skynet.call, "SERVICE", "lua", "LAUNCH", ...)
+local function list_service()
+	local result = {}
+	for k,v in pairs(service) do
+		if type(v) == "string" then
+			v = "Error: " .. v
+		elseif type(v) == "table" then
+			v = "Querying"
+		else
+			v = skynet.address(v)
+		end
+
+		result[k] = v
+	end
+
+	return result
+end
+
+
+local function register_global()
+	function cmd.GLAUNCH(name, ...)
+		local global_name = "@" .. name
+		return cmd.LAUNCH(global_name, ...)
+	end
+
+	function cmd.GQUERY(name, ...)
+		local global_name = "@" .. name
+		return cmd.QUERY(global_name, ...)
+	end
+
+	local mgr = {}
+
+	function cmd.REPORT(m)
+		mgr[m] = true
+		skynet.watch(m)
+	end
+
+	local function add_list(all, m)
+		local harbor = "@" .. skynet.harbor(m)
+		local result = skynet.call(m, "lua", "LIST")
+		for k,v in pairs(result) do
+			all[k .. harbor] = v
+		end
+	end
+
+	function cmd.LIST()
+		local result = {}
+		for k in pairs(mgr) do
+			pcall(add_list, result, k)
+		end
+		local l = list_service()
+		for k, v in pairs(l) do
+			result[k] = v
+		end
+		return result
 	end
 end
 
-function cmd.GQUERY(...)
-	if GLOBAL then
-		return cmd.QUERY(...)
-	else
-		return waitfor(service_name, skynet.call, "SERVICE", "lua", "QUERY", ...)
+local function register_local()
+	function cmd.GLAUNCH(name, ...)
+		local global_name = "@" .. name
+		return waitfor(global_name, skynet.call, "SERVICE", "lua", "LAUNCH", global_name, ...)
 	end
+
+	function cmd.GQUERY(name, ...)
+		local global_name = "@" .. name
+		return waitfor(global_name, skynet.call, "SERVICE", "lua", "QUERY", global_name, ...)
+	end
+
+	function cmd.LIST()
+		return list_service()
+	end
+
+	skynet.call("SERVICE", "lua", "REPORT", skynet.self())
 end
 
 skynet.start(function()
@@ -110,5 +181,8 @@ skynet.start(function()
 	if skynet.getenv "standalone" then
 		GLOBAL = true
 		skynet.register("SERVICE")
+		register_global()
+	else
+		register_local()
 	end
 end)
