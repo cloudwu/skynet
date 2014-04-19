@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+local snax = require "snax"
 
 local cmd = {}
 local service = {}
@@ -57,33 +58,47 @@ local function waitfor(name , func, ...)
 	return s
 end
 
-function cmd.LAUNCH(service_name, ...)
-	return waitfor(service_name, skynet.newservice, service_name, ...)
+function cmd.LAUNCH(service_name, subname, ...)
+	if service_name == "snaxd" then
+		return waitfor("snax."..subname, snax.rawnewservice, subname, ...)
+	else
+		return waitfor(service_name, skynet.newservice, service_name, subname, ...)
+	end
 end
 
-function cmd.QUERY(service_name)
-	return waitfor(service_name)
+function cmd.QUERY(service_name, subname)
+	if service_name == "snaxd" then
+		return waitfor("snax."..subname)
+	else
+		return waitfor(service_name)
+	end
+end
+
+function cmd.GLAUNCH(...)
+	if GLOBAL then
+		return cmd.LAUNCH(...)
+	else
+		return waitfor(service_name, skynet.call, "SERVICE", "lua", "LAUNCH", ...)
+	end
+end
+
+function cmd.GQUERY(...)
+	if GLOBAL then
+		return cmd.QUERY(...)
+	else
+		return waitfor(service_name, skynet.call, "SERVICE", "lua", "QUERY", ...)
+	end
 end
 
 skynet.start(function()
-	skynet.dispatch("lua", function(session, address, command, global, service_name , ...)
+	skynet.dispatch("lua", function(session, address, command, ...)
 		local f = cmd[command]
 		if f == nil then
 			skynet.ret(skynet.pack(nil, "Invalid command " .. command))
 			return
 		end
 
-		local ok, r
-		if global == true then
-			if GLOBAL then
-				ok, r = pcall(f, service_name, ...)
-			else
-				return waitfor(service_name, skynet.call, "SERVICE", "lua", command, service_name, ...)
-			end
-		else
-			assert(type(global) == "string")	-- global is service_name
-			ok, r = pcall(f, global, service_name, ...)
-		end
+		local ok, r = pcall(f, ...)
 
 		if ok then
 			skynet.ret(skynet.pack(r))
