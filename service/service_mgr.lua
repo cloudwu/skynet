@@ -77,6 +77,7 @@ function cmd.LAUNCH(global, service_name, ...)
 	if global == true then
 		return GLAUNCH(service_name, ...)
 	else
+		assert(type(global) == "string")
 		return waitfor(global, skynet.newservice, global, service_name, ...)
 	end
 end
@@ -84,8 +85,10 @@ end
 function cmd.QUERY(global, service_name)
 	if global == true then
 		return GQUERY(service_name)
+	else
+		assert(type(global) == "string")
+		return waitfor(global)
 	end
-	return waitfor(global)
 end
 
 skynet.start(function()
