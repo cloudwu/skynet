@@ -414,8 +414,8 @@ function skynet.uniqueservice(...)
 	return assert(skynet.call(".service", "lua", "LAUNCH", ...))
 end
 
-function skynet.queryservice(global, name)
-	return assert(skynet.call(".service", "lua", "QUERY", global, name))
+function skynet.queryservice(...)
+	return assert(skynet.call(".service", "lua", "QUERY", ...))
 end
 
 local function group_command(cmd, handle, address)
