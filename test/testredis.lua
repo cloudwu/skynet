@@ -1,8 +1,14 @@
 local skynet = require "skynet"
 local redis = require "redis"
 
+local conf = {
+	host = "127.0.0.1" ,
+	port = 6379 ,
+	db = 0
+}
+
 local function watching()
-	local w = redis.watch "main"
+	local w = redis.watch(conf)
 	w:subscribe "foo"
 	w:psubscribe "hello.*"
 	while true do
@@ -12,7 +18,7 @@ end
 
 skynet.start(function()
 	skynet.fork(watching)
-	local db = redis.connect "main"
+	local db = redis.connect(conf)
 
 	db:del "C"
 	db:set("A", "hello")
