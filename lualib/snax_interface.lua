@@ -31,7 +31,8 @@ return function (name , G, loader)
 		assert(G.response == nil)
 	end
 
-	local env = {}
+	local temp_global = {}
+	local env = setmetatable({} , { __index = temp_global })
 	local func = {}
 
 	local system = { "init", "exit", "hotfix" }
@@ -47,11 +48,15 @@ return function (name , G, loader)
 	env.response = func_id(func, "response")
 
 	local function init_system(t, name, f)
-		local index = assert(system[name] , string.format("Not support global var %s", name))
-		if type(f) ~= "function" then
-			error (string.format("%s must be a function", name))
+		local index = system[name]
+		if index then
+			if type(f) ~= "function" then
+				error (string.format("%s must be a function", name))
+			end
+			func[index][4] = f
+		else
+			temp_global[name] = f
 		end
-		func[index][4] = f
 	end
 
 	setmetatable(G,	{ __index = env , __newindex = init_system })
@@ -80,6 +85,10 @@ return function (name , G, loader)
 	mainfunc()
 
 	setmetatable(G, nil)
+
+	for k,v in pairs(temp_global) do
+		G[k] = v
+	end
 
 	return func
 end
