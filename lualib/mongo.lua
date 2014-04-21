@@ -89,14 +89,18 @@ local function mongo_auth(mongoc)
 	end
 end
 
-function mongo.client( obj )
-	obj.port = obj.port or 27017
+function mongo.client( conf )
+	local obj = {
+		host = conf.host,
+		port = conf.port or 27017,
+	}
+
 	obj.__id = 0
 	obj.__sock = socketchannel.channel {
 		host = obj.host,
 		port = obj.port,
 		response = dispatch_reply,
-		auth = mongo_auth(obj),
+		auth = mongo_auth(conf),
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect()
