@@ -491,7 +491,7 @@ luaopen_socketdriver(lua_State *L) {
 	if (lua == NULL || lua->ctx == NULL) {
 		return luaL_error(L, "Init skynet context first");
 	}
-	assert(lua->L == L);
+	// assert(lua->L == L);
 	lua_pop(L,1);
 
 	lua_pushlightuserdata(L, lua->ctx);
