@@ -1,7 +1,6 @@
 #include <lua.h>
 #include <lauxlib.h>
 
-
 #include <time.h>
 
 #if defined(__APPLE__)
@@ -25,7 +24,9 @@ get_time() {
 #else
 	struct task_thread_times_info aTaskInfo;
 	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
-	assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
+	if (KERN_SUCCESS != task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount)) {
+		return 0;
+	}
 
 	int sec = aTaskInfo.user_time.seconds & 0xffff;
 	int msec = aTaskInfo.user_time.microseconds;
