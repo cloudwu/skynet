@@ -11,7 +11,7 @@ struct logger {
 
 struct logger *
 logger_create(void) {
-	struct logger * inst = malloc(sizeof(*inst));
+	struct logger * inst = skynet_malloc(sizeof(*inst));
 	inst->handle = NULL;
 	inst->close = 0;
 	return inst;
@@ -22,7 +22,7 @@ logger_release(struct logger * inst) {
 	if (inst->close) {
 		fclose(inst->handle);
 	}
-	free(inst);
+	skynet_free(inst);
 }
 
 static int

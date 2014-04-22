@@ -39,7 +39,7 @@ messagepool_free(struct messagepool *pool) {
 	while(p) {
 		struct messagepool_list *tmp = p;
 		p=p->next;
-		free(tmp);
+		skynet_free(tmp);
 	}
 	pool->pool = NULL;
 	pool->freelist = NULL;
@@ -54,7 +54,7 @@ _return_message(struct databuffer *db, struct messagepool *mp) {
 	} else {
 		db->head = m->next;
 	}
-	free(m->buffer);
+	skynet_free(m->buffer);
 	m->buffer = NULL;
 	m->size = 0;
 	m->next = mp->freelist;
@@ -95,7 +95,7 @@ databuffer_push(struct databuffer *db, struct messagepool *mp, void *data, int s
 		m = mp->freelist;
 		mp->freelist = m->next;
 	} else {
-		struct messagepool_list * mpl = malloc(sizeof(*mpl));
+		struct messagepool_list * mpl = skynet_malloc(sizeof(*mpl));
 		struct message * temp = mpl->pool;
 		int i;
 		for (i=1;i<MESSAGEPOOL;i++) {

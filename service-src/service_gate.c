@@ -36,7 +36,7 @@ struct gate {
 
 struct gate *
 gate_create(void) {
-	struct gate * g = malloc(sizeof(*g));
+	struct gate * g = skynet_malloc(sizeof(*g));
 	memset(g,0,sizeof(*g));
 	g->listen_id = -1;
 	return g;
@@ -57,8 +57,8 @@ gate_release(struct gate *g) {
 	}
 	messagepool_free(&g->mp);
 	hashid_clear(&g->hash);
-	free(g->conn);
-	free(g);
+	skynet_free(g->conn);
+	skynet_free(g);
 }
 
 static void
@@ -164,17 +164,17 @@ static void
 _forward(struct gate *g, struct connection * c, int size) {
 	struct skynet_context * ctx = g->ctx;
 	if (g->broker) {
-		void * temp = malloc(size);
+		void * temp = skynet_malloc(size);
 		databuffer_read(&c->buffer,&g->mp,temp, size);
 		skynet_send(ctx, 0, g->broker, g->client_tag | PTYPE_TAG_DONTCOPY, 0, temp, size);
 		return;
 	}
 	if (c->agent) {
-		void * temp = malloc(size);
+		void * temp = skynet_malloc(size);
 		databuffer_read(&c->buffer,&g->mp,temp, size);
 		skynet_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONTCOPY, 0 , temp, size);
 	} else if (g->watchdog) {
-		char * tmp = malloc(size + 32);
+		char * tmp = skynet_malloc(size + 32);
 		int n = snprintf(tmp,32,"%d data ",c->id);
 		databuffer_read(&c->buffer,&g->mp,tmp+n,size);
 		skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT | PTYPE_TAG_DONTCOPY, 0, tmp, size + n);
@@ -215,7 +215,7 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 		} else {
 			skynet_error(ctx, "Drop unknown connection %d message", message->id);
 			skynet_socket_close(ctx, message->id);
-			free(message->buffer);
+			skynet_free(message->buffer);
 		}
 		break;
 	}
@@ -369,7 +369,7 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	g->ctx = ctx;
 
 	hashid_init(&g->hash, max);
-	g->conn = malloc(max * sizeof(struct connection));
+	g->conn = skynet_malloc(max * sizeof(struct connection));
 	memset(g->conn, 0, max *sizeof(struct connection));
 	g->max_connection = max;
 	int i;

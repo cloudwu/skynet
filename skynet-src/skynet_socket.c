@@ -1,4 +1,3 @@
-// include skynet.h first for malloc hook
 #include "skynet.h"
 
 #include "skynet_socket.h"
@@ -43,7 +42,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 			sz += 1;
 		}
 	}
-	sm = (struct skynet_socket_message *)malloc(sz);
+	sm = (struct skynet_socket_message *)skynet_malloc(sz);
 	sm->type = type;
 	sm->id = result->id;
 	sm->ud = result->ud;
@@ -63,7 +62,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	if (skynet_context_push((uint32_t)result->opaque, &message)) {
 		// todo: report somewhere to close socket
 		// don't call skynet_socket_close here (It will block mainloop)
-		free(sm);
+		skynet_free(sm);
 	}
 }
 
@@ -106,7 +105,7 @@ int
 skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz) {
 	int64_t wsz = socket_server_send(SOCKET_SERVER, id, buffer, sz);
 	if (wsz < 0) {
-		free(buffer);
+		skynet_free(buffer);
 		return -1;
 	} else if (wsz > 1024 * 1024) {
 		int kb4 = wsz / 1024 / 4;
