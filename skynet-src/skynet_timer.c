@@ -1,4 +1,3 @@
-// include skynet.h first for malloc hook
 #include "skynet.h"
 
 #include "skynet_timer.h"
@@ -93,7 +92,7 @@ add_node(struct timer *T,struct timer_node *node)
 static void
 timer_add(struct timer *T,void *arg,size_t sz,int time)
 {
-	struct timer_node *node = (struct timer_node *)malloc(sizeof(*node)+sz);
+	struct timer_node *node = (struct timer_node *)skynet_malloc(sizeof(*node)+sz);
 	memcpy(node+1,arg,sz);
 
 	while (__sync_lock_test_and_set(&T->lock,1)) {};
@@ -147,7 +146,7 @@ timer_execute(struct timer *T) {
 			
 			struct timer_node * temp = current;
 			current=current->next;
-			free(temp);	
+			skynet_free(temp);	
 		} while (current);
 	}
 }
@@ -170,7 +169,7 @@ timer_update(struct timer *T)
 static struct timer *
 timer_create_timer()
 {
-	struct timer *r=(struct timer *)malloc(sizeof(struct timer));
+	struct timer *r=(struct timer *)skynet_malloc(sizeof(struct timer));
 	memset(r,0,sizeof(*r));
 
 	int i,j;

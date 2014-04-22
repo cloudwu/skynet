@@ -32,7 +32,7 @@ struct master {
 
 struct master *
 master_create() {
-	struct master *m = malloc(sizeof(*m));
+	struct master *m = skynet_malloc(sizeof(*m));
 	int i;
 	for (i=0;i<REMOTE_MAX;i++) {
 		m->remote_fd[i] = -1;
@@ -53,17 +53,17 @@ master_release(struct master * m) {
 			assert(ctx);
 			skynet_socket_close(ctx, fd);
 		}
-		free(m->remote_addr[i]);
+		skynet_free(m->remote_addr[i]);
 	}
 	for (i=0;i<HASH_SIZE;i++) {
 		struct name * node = m->map.node[i];
 		while (node) {
 			struct name * next = node->next;
-			free(node);
+			skynet_free(node);
 			node = next;
 		}
 	}
-	free(m);
+	skynet_free(m);
 }
 
 static struct name *
@@ -85,7 +85,7 @@ _insert_name(struct master *m, char name[GLOBALNAME_LENGTH]) {
 	uint32_t *ptr = (uint32_t *)name;
 	uint32_t h = ptr[0] ^ ptr[1] ^ ptr[2] ^ ptr[3];
 	struct name **pname = &m->map.node[h % HASH_SIZE];
-	struct name * node = malloc(sizeof(*node));
+	struct name * node = skynet_malloc(sizeof(*node));
 	memcpy(node->key, name, GLOBALNAME_LENGTH);
 	node->next = *pname;
 	node->hash = h;
@@ -133,7 +133,7 @@ to_bigendian(uint8_t *buffer, uint32_t n) {
 
 static void
 _send_to(struct master *m, int id, const void * buf, int sz, uint32_t handle) {
-	uint8_t * buffer= (uint8_t *)malloc(4 + sz + 12);
+	uint8_t * buffer= (uint8_t *)skynet_malloc(4 + sz + 12);
 	to_bigendian(buffer, sz+12);
 	memcpy(buffer+4, buf, sz);
 	to_bigendian(buffer+4+sz, 0);
@@ -196,8 +196,8 @@ _update_address(struct master *m, int harbor_id, const char * buffer, size_t sz)
 	if (m->remote_fd[harbor_id] >= 0) {
 		close_harbor(m, harbor_id);
 	}
-	free(m->remote_addr[harbor_id]);
-	char * addr = malloc(sz+1);
+	skynet_free(m->remote_addr[harbor_id]);
+	char * addr = skynet_malloc(sz+1);
 	memcpy(addr, buffer, sz);
 	addr[sz] = '\0';
 	m->remote_addr[harbor_id] = addr;

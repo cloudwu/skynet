@@ -1,5 +1,4 @@
-// include skynet.h first for malloc hook
-#include "skynet.h"
+#include "skynet_malloc.h"
 
 #include "skynet_socket.h"
 
@@ -51,7 +50,7 @@ clear_list(struct uncomplete * uc) {
 	while (uc) {
 		void * tmp = uc;
 		uc = uc->next;
-		free(tmp);
+		skynet_free(tmp);
 	}
 }
 
@@ -71,7 +70,7 @@ lclear(lua_State *L) {
 	}
 	for (i=q->head;i<q->tail;i++) {
 		struct netpack *np = &q->queue[i % q->cap];
-		free(np->buffer);
+		skynet_free(np->buffer);
 	}
 	q->head = q->tail = 0;
 
@@ -147,7 +146,7 @@ expand_queue(lua_State *L, struct queue *q) {
 static void
 push_data(lua_State *L, int fd, void *buffer, int size, int clone) {
 	if (clone) {
-		void * tmp = malloc(size);
+		void * tmp = skynet_malloc(size);
 		memcpy(tmp, buffer, size);
 		buffer = tmp;
 	}
@@ -167,7 +166,7 @@ static struct uncomplete *
 save_uncomplete(lua_State *L, int fd) {
 	struct queue *q = get_queue(L);
 	int h = hash_fd(fd);
-	struct uncomplete * uc = malloc(sizeof(struct uncomplete));
+	struct uncomplete * uc = skynet_malloc(sizeof(struct uncomplete));
 	memset(uc, 0, sizeof(*uc));
 	uc->next = q->hash[h];
 	uc->pack.id = fd;
@@ -198,7 +197,7 @@ push_more(lua_State *L, int fd, uint8_t *buffer, int size) {
 		struct uncomplete * uc = save_uncomplete(L, fd);
 		uc->read = size;
 		uc->pack.size = pack_size;
-		uc->pack.buffer = malloc(pack_size);
+		uc->pack.buffer = skynet_malloc(pack_size);
 		memcpy(uc->pack.buffer, buffer, size);
 		return;
 	}
@@ -225,7 +224,7 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 			++buffer;
 			--size;
 			uc->pack.size = pack_size;
-			uc->pack.buffer = malloc(pack_size);
+			uc->pack.buffer = skynet_malloc(pack_size);
 			uc->read = 0;
 		}
 		int need = uc->pack.size - uc->read;
@@ -245,12 +244,12 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 			lua_pushinteger(L, fd);
 			lua_pushlightuserdata(L, uc->pack.buffer);
 			lua_pushinteger(L, uc->pack.size);
-			free(uc);
+			skynet_free(uc);
 			return 5;
 		}
 		// more data
 		push_data(L, fd, uc->pack.buffer, uc->pack.size, 0);
-		free(uc);
+		skynet_free(uc);
 		push_more(L, fd, buffer, size);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_MORE));
 		return 2;
@@ -269,7 +268,7 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 			struct uncomplete * uc = save_uncomplete(L, fd);
 			uc->read = size;
 			uc->pack.size = pack_size;
-			uc->pack.buffer = malloc(pack_size);
+			uc->pack.buffer = skynet_malloc(pack_size);
 			memcpy(uc->pack.buffer, buffer, size);
 			return 1;
 		}
@@ -277,7 +276,7 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 			// just one package
 			lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
 			lua_pushinteger(L, fd);
-			void * result = malloc(pack_size);
+			void * result = skynet_malloc(pack_size);
 			memcpy(result, buffer, size);
 			lua_pushlightuserdata(L, result);
 			lua_pushinteger(L, size);
@@ -298,7 +297,7 @@ filter_data(lua_State *L, int fd, uint8_t * buffer, int size) {
 	int ret = filter_data_(L, fd, buffer, size);
 	// buffer is the data of socket message, it malloc at socket_server.c : function forward_message .
 	// it should be free before return,
-	free(buffer);
+	skynet_free(buffer);
 	return ret;
 }
 
@@ -419,7 +418,7 @@ lpack(lua_State *L) {
 		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
 	}
 
-	uint8_t * buffer = malloc(len + 2);
+	uint8_t * buffer = skynet_malloc(len + 2);
 	write_size(buffer, len);
 	memcpy(buffer+2, ptr, len);
 
@@ -460,7 +459,7 @@ ltostring(lua_State *L) {
 		lua_pushliteral(L, "");
 	} else {
 		lua_pushlstring(L, (const char *)ptr, size);
-		free(ptr);
+		skynet_free(ptr);
 	}
 	return 1;
 }
