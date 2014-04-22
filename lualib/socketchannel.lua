@@ -146,11 +146,13 @@ local function connect_once(self)
 	return true
 end
 
-local function try_connect(self)
+local function try_connect(self , once)
 	local t = 100
 	while not self.__closed do
 		if connect_once(self) then
 			return
+		elseif once then
+			error(string.format("Connect to %s:%d failed", self.__host, self.__port))
 		end
 		if t > 1000 then
 			print("socket: try to reconnect", self.__host, self.__port)
@@ -163,7 +165,7 @@ local function try_connect(self)
 	end
 end
 
-local function block_connect(self)
+local function block_connect(self, once)
 	if self.__sock then
 		local authco = self.__authcoroutine
 		if not authco then
@@ -183,11 +185,11 @@ local function block_connect(self)
 		table.insert(self.__connecting, co)
 		skynet.wait()
 		-- check connection again
-		return block_connect(self)
+		return block_connect(self, once)
 	end
 
 	self.__connecting[1] = true
-	try_connect(self)
+	try_connect(self, once)
 	self.__connecting[1] = nil
 	for i=2, #self.__connecting do
 		local co = self.__connecting[i]
@@ -196,15 +198,15 @@ local function block_connect(self)
 	end
 
 	-- check again
-	return block_connect(self)
+	return block_connect(self, once)
 end
 
-function channel:connect()
+function channel:connect(once)
 	if self.__closed then
 		self.__closed = false
 	end
 
-	return block_connect(self)
+	return block_connect(self, once)
 end
 
 function channel:request(request, response)
