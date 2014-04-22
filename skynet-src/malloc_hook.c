@@ -158,7 +158,7 @@ skynet_malloc(size_t size) {
 
 void *
 skynet_realloc(void *ptr, size_t size) {
-    if (ptr == NULL) return malloc(size);
+    if (ptr == NULL) return skynet_malloc(size);
 
     void* rawptr = clean_prefix(ptr);
     void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);

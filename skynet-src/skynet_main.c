@@ -1,4 +1,3 @@
-// include skynet.h first for malloc hook
 #include "skynet.h"
 
 #include "skynet_imp.h"
@@ -94,7 +93,7 @@ main(int argc, char *argv[]) {
 
 	struct skynet_config config;
 
-	struct lua_State *L = luaL_newstate();
+	struct lua_State *L = lua_newstate(skynet_lalloc, NULL);
 	luaL_openlibs(L);	// link lua lib
 	lua_close(L);
 

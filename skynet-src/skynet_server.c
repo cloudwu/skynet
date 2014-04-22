@@ -1,4 +1,3 @@
-// include skynet.h first for malloc hook
 #include "skynet.h"
 
 #include "skynet_server.h"
@@ -97,7 +96,7 @@ skynet_context_new(const char * name, const char *param) {
 	void *inst = skynet_module_instance_create(mod);
 	if (inst == NULL)
 		return NULL;
-	struct skynet_context * ctx = malloc(sizeof(*ctx));
+	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
 	CHECKCALLING_INIT(ctx)
 
 	ctx->mod = mod;
@@ -152,7 +151,7 @@ static void
 _delete_context(struct skynet_context *ctx) {
 	skynet_module_instance_release(ctx->mod, ctx->instance);
 	skynet_mq_mark_release(ctx->queue);
-	free(ctx);
+	skynet_free(ctx);
 	_context_dec();
 }
 
@@ -204,7 +203,7 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
 	size_t sz = msg->sz & HANDLE_MASK;
 	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
-		free(msg->data);
+		skynet_free(msg->data);
 	}
 	handle_tls = 0xffffffff;
 	CHECKCALLING_END(ctx)
@@ -236,7 +235,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm) {
 	skynet_monitor_trigger(sm, msg.source , handle);
 
 	if (ctx->cb == NULL) {
-		free(msg.data);
+		skynet_free(msg.data);
 		skynet_error(NULL, "Drop message from %x to %x without callback , size = %d",msg.source, handle, (int)msg.sz);
 	} else {
 		_dispatch_message(ctx, &msg);
@@ -323,7 +322,7 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 			return skynet_handle_namehandle(context->handle, param + 1);
 		} else {
 			assert(context->handle!=0);
-			struct remote_name *rname = malloc(sizeof(*rname));
+			struct remote_name *rname = skynet_malloc(sizeof(*rname));
 			_copy_name(rname->name, param);
 			rname->handle = context->handle;
 			skynet_harbor_register(rname);
@@ -355,7 +354,7 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		if (name[0] == '.') {
 			return skynet_handle_namehandle(handle_id, name + 1);
 		} else {
-			struct remote_name *rname = malloc(sizeof(*rname));
+			struct remote_name *rname = skynet_malloc(sizeof(*rname));
 			_copy_name(rname->name, name);
 			rname->handle = handle_id;
 			skynet_harbor_register(rname);
@@ -491,7 +490,7 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 	}
 
 	if (needcopy && *data) {
-		char * msg = malloc(*sz+1);
+		char * msg = skynet_malloc(*sz+1);
 		memcpy(msg, *data, *sz);
 		msg[*sz] = '\0';
 		*data = msg;
@@ -513,7 +512,7 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 		return session;
 	}
 	if (skynet_harbor_message_isremote(destination)) {
-		struct remote_message * rmsg = malloc(sizeof(*rmsg));
+		struct remote_message * rmsg = skynet_malloc(sizeof(*rmsg));
 		rmsg->destination.handle = destination;
 		rmsg->message = data;
 		rmsg->sz = sz;
@@ -526,7 +525,7 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 		smsg.sz = sz;
 
 		if (skynet_context_push(destination, &smsg)) {
-			free(data);
+			skynet_free(data);
 			skynet_error(NULL, "Drop message from %x to %x (type=%d)(size=%d)", source, destination, type&0xff, (int)(sz & HANDLE_MASK));
 			return -1;
 		}
@@ -544,7 +543,7 @@ skynet_sendname(struct skynet_context * context, const char * addr , int type, i
 		des = skynet_handle_findname(addr + 1);
 		if (des == 0) {
 			if (type & PTYPE_TAG_DONTCOPY) {
-  			free(data);
+  			skynet_free(data);
   		}
 			skynet_error(context, "Drop message to %s", addr);
 			return session;
@@ -552,7 +551,7 @@ skynet_sendname(struct skynet_context * context, const char * addr , int type, i
 	} else {
 		_filter_args(context, type, &session, (void **)&data, &sz);
 
-		struct remote_message * rmsg = malloc(sizeof(*rmsg));
+		struct remote_message * rmsg = skynet_malloc(sizeof(*rmsg));
 		_copy_name(rmsg->destination.name, addr);
 		rmsg->destination.handle = 0;
 		rmsg->message = data;

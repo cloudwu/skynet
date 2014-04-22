@@ -253,7 +253,7 @@ _launch(struct skynet_context * context, void *ud, int type, int session, uint32
 int
 snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	int sz = strlen(args);
-	char * tmp = malloc(sz+1);
+	char * tmp = skynet_malloc(sz+1);
 	memcpy(tmp, args, sz+1);
 	skynet_callback(ctx, l , _launch);
 	const char * self = skynet_command(ctx, "REG", NULL);
@@ -265,7 +265,7 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 
 struct snlua *
 snlua_create(void) {
-	struct snlua * l = malloc(sizeof(*l));
+	struct snlua * l = skynet_malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
 	l->L = lua_newstate(skynet_lalloc, NULL);
 	l->init = _init;
@@ -275,5 +275,5 @@ snlua_create(void) {
 void
 snlua_release(struct snlua *l) {
 	lua_close(l->L);
-	free(l);
+	skynet_free(l);
 }

@@ -72,8 +72,8 @@ free_monitor(struct monitor *m) {
 	}
 	pthread_mutex_destroy(&m->mutex);
 	pthread_cond_destroy(&m->cond);
-	free(m->m);
-	free(m);
+	skynet_free(m->m);
+	skynet_free(m);
 }
 
 static void *
@@ -140,12 +140,12 @@ static void
 _start(int thread) {
 	pthread_t pid[thread+3];
 
-	struct monitor *m = malloc(sizeof(*m));
+	struct monitor *m = skynet_malloc(sizeof(*m));
 	memset(m, 0, sizeof(*m));
 	m->count = thread;
 	m->sleep = 0;
 
-	m->m = malloc(thread * sizeof(struct skynet_monitor *));
+	m->m = skynet_malloc(thread * sizeof(struct skynet_monitor *));
 	int i;
 	for (i=0;i<thread;i++) {
 		m->m[i] = skynet_monitor_new();

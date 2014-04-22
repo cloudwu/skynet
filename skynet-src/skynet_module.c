@@ -1,4 +1,3 @@
-// include skynet.h first for malloc hook
 #include "skynet.h"
 
 #include "skynet_module.h"
@@ -153,7 +152,7 @@ skynet_module_instance_release(struct skynet_module *m, void *inst) {
 
 void 
 skynet_module_init(const char *path) {
-	struct modules *m = malloc(sizeof(*m));
+	struct modules *m = skynet_malloc(sizeof(*m));
 	m->count = 0;
 	m->path = skynet_strdup(path);
 	m->lock = 0;
