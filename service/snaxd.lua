@@ -1,12 +1,24 @@
 local skynet = require "skynet"
 local c = require "skynet.c"
 local snax_interface = require "snax_interface"
+local profile = require "profile"
 
 local func = snax_interface(tostring(...), _ENV)
 local mode
 local thread_id
 local message_queue = {}
 local init = false
+local profile_table = {}
+
+local function update_stat(name, ti)
+	local t = profile_table[name]
+	if t == nil then
+		t = { count = 0,  time = 0 }
+		profile_table[name] = t
+	end
+	t.count = t.count + 1
+	t.time = t.time + ti
+end
 
 local function do_func(f, msg)
 	return pcall(f, table.unpack(msg))
@@ -28,12 +40,18 @@ local function message_dispatch()
 			if f then
 				if method[2] == "accept" then
 					-- no return
+					profile.start()
 					local ok, data = pcall(f, table.unpack(msg))
+					local ti = profile.stop()
+					update_stat(method[3], ti)
 					if not ok then
 						print(string.format("Error on [:%x] to [:%x] %s", msg.source, skynet.self(), tostring(data)))
 					end
 				else
+					profile.start()
 					local ok, data, size = pcall(dispatch, f, table.unpack(msg))
+					local ti = profile.stop()
+					update_stat(method[3], ti)
 					if ok then
 						-- skynet.PTYPE_RESPONSE == 1
 						c.send(msg.source, 1, msg.session, data, size)
@@ -61,6 +79,24 @@ local function queue( session, source, method, ...)
 	end
 end
 
+local function return_f(f, ...)
+	return skynet.ret(skynet.pack(f(...)))
+end
+
+local function timing( method, ... )
+	local err, msg
+	profile.start()
+	if method[2] == "accept" then
+		-- no return
+		err,msg = pcall(method[4], ...)
+	else
+		err,msg = pcall(return_f, method[4], ...)
+	end
+	local ti = profile.stop()
+	update_stat(method[3], ti)
+	assert(err,msg)
+end
+
 skynet.start(function()
 	skynet.dispatch("lua", function ( session , source , id, ...)
 		local method = func[id]
@@ -78,6 +114,9 @@ skynet.start(function()
 					skynet.fork(message_dispatch)
 				end
 				skynet.ret()
+				skynet.info_func(function()
+					return profile_table
+				end)
 				init = true
 			elseif mode == "queue" then
 				queue( session, source, method , ...)
@@ -94,11 +133,8 @@ skynet.start(function()
 			assert(init, "Init first")
 			if mode == "queue" then
 				queue(session, source, method , ...)
-			elseif method[2] == "accept" then
-				-- no return
-				method[4](...)
 			else
-				skynet.ret(skynet.pack(method[4](...)))
+				timing(method, ...)
 			end
 		end
 	end)
