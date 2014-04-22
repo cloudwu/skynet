@@ -10,6 +10,7 @@
 #endif
 
 #define NANOSEC 1000000000
+#define MICROSEC 1000000
 
 static double
 get_time() {
@@ -20,7 +21,7 @@ get_time() {
 	int sec = ti.tv_sec & 0xffff;
 	int nsec = ti.tv_nsec;
 
-	return (double)sec + (double)nsec / 1000000000;	
+	return (double)sec + (double)nsec / NANOSEC;	
 #else
 	struct task_thread_times_info aTaskInfo;
 	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
@@ -29,7 +30,7 @@ get_time() {
 	int sec = aTaskInfo.user_time.seconds & 0xffff;
 	int msec = aTaskInfo.user_time.microseconds;
 
-	return (double)sec + (double)msec / 1000000;
+	return (double)sec + (double)msec / MICROSEC;
 #endif
 }
 
