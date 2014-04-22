@@ -6,6 +6,11 @@ local assert = assert
 local pairs = pairs
 local pcall = pcall
 
+local profile = require "profile"
+
+coroutine.resume = profile.resume
+coroutine.yield = profile.yield
+
 local proto = {}
 local skynet = {
 	-- read skynet.h
@@ -475,6 +480,12 @@ function skynet.error(...)
 end
 
 ----- debug
+
+local internal_info_func
+
+function skynet.info_func(func)
+	internal_info_func = func
+end
 
 local dbgcmd = {}
 

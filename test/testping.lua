@@ -24,6 +24,13 @@ end
 
 	]]))
 	print(ps.post.hello())
+
+	local info = skynet.call(ps.handle, "debug", "INFO")
+
+	for name,v in pairs(info) do
+		print(string.format("%s\tcount:%d time:%f", name, v.count, v.time))
+	end
+
 	print(snax.kill(ps,"exit"))
 	skynet.exit()
 end)
