@@ -3,10 +3,14 @@
 
 #include <stddef.h>
 
+#ifdef SKYNET_MALLOC_RENAME
+
 #define malloc skynet_malloc
 #define calloc skynet_calloc
 #define realloc skynet_realloc
 #define free skynet_free
+
+#endif
 
 void * skynet_malloc(size_t sz);
 void * skynet_calloc(size_t nmemb,size_t size);

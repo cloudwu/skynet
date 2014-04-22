@@ -1,5 +1,4 @@
-// include skynet.h first for malloc hook
-#include "skynet.h"
+#include "skynet_malloc.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -68,7 +67,7 @@ get_length(const document buffer) {
 static inline void
 buffer_destroy(struct buffer *b) {
 	if (b->ptr != b->buffer) {
-		free(b->ptr);
+		skynet_free(b->ptr);
 	}
 }
 
@@ -88,10 +87,10 @@ buffer_reserve(struct buffer *b, int sz) {
 	} while (b->cap <= b->size + sz);
 
 	if (b->ptr == b->buffer) {
-		b->ptr = malloc(b->cap);
+		b->ptr = skynet_malloc(b->cap);
 		memcpy(b->ptr, b->buffer, b->size);
 	} else {
-		b->ptr = realloc(b->ptr, b->cap);
+		b->ptr = skynet_realloc(b->ptr, b->cap);
 	}
 }
 
