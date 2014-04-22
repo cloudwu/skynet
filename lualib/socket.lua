@@ -139,9 +139,13 @@ function socket.open(addr, port)
 	return connect(id)
 end
 
-function socket.stdin()
-	local id = driver.bind(1)
+function socket.bind(os_fd)
+	local id = driver.bind(os_fd)
 	return connect(id)
+end
+
+function socket.stdin()
+	return socket.bind(1)
 end
 
 function socket.start(id, func)
