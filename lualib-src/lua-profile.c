@@ -93,7 +93,8 @@ lresume(lua_State *L) {
 	} else {
 		lua_pop(L,1);
 		lua_pushvalue(L,1);
-		lua_pushnumber(L, get_time());
+		double ti = get_time();
+		lua_pushnumber(L, ti);
 		lua_rawset(L, lua_upvalueindex(1));	// set start time
 	}
 
@@ -121,7 +122,7 @@ lyield(lua_State *L) {
 
 		lua_pushthread(L);
 		lua_pushnumber(L, ti);
-		lua_rawset(L, lua_upvalueindex(1));
+		lua_rawset(L, lua_upvalueindex(2));
 	}
 
 	lua_CFunction co_yield = lua_tocfunction(L, lua_upvalueindex(3));

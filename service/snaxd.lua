@@ -40,7 +40,10 @@ local function message_dispatch()
 			if f then
 				if method[2] == "accept" then
 					-- no return
+					profile.start()
 					local ok, data = pcall(f, table.unpack(msg))
+					local ti = profile.stop()
+					update_stat(method[3], ti)
 					if not ok then
 						print(string.format("Error on [:%x] to [:%x] %s", msg.source, skynet.self(), tostring(data)))
 					end
