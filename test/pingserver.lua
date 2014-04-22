@@ -8,7 +8,7 @@ function response.ping(hello)
 	return hello
 end
 
-function subscribe.hello()
+function accept.hello()
 	i = i + 1
 	print (i, hello)
 end

@@ -14,7 +14,7 @@ function snax.interface(name)
 	local si = snax_interface(name, G)
 
 	local ret = {
-		subscribe = {},
+		accept = {},
 		response = {},
 		system = {},
 	}
@@ -33,10 +33,10 @@ local meta = { __tostring = function(v) return string.format("[%s:%x]", v.type, 
 local skynet_send = skynet.send
 local skynet_call = skynet.call
 
-local function gen_pub(type, handle)
+local function gen_post(type, handle)
 	return setmetatable({} , {
 		__index = function( t, k )
-			local id = assert(type.subscribe[k] , string.format("publish %s no exist", k))
+			local id = assert(type.accept[k] , string.format("post %s no exist", k))
 			return function(...)
 				skynet_send(handle, "lua", id, ...)
 			end
@@ -55,7 +55,7 @@ end
 
 local function wrapper(handle, name, type)
 	return setmetatable ({
-		pub = gen_pub(type, handle),
+		post = gen_post(type, handle),
 		req = gen_req(type, handle),
 		type = name,
 		handle = handle,

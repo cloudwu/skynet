@@ -26,7 +26,7 @@ local function message_dispatch()
 			local method = msg.method
 			local f = method[4]
 			if f then
-				if method[2] == "subscribe" then
+				if method[2] == "accept" then
 					-- no return
 					local ok, data = pcall(f, table.unpack(msg))
 					if not ok then
@@ -94,7 +94,7 @@ skynet.start(function()
 			assert(init, "Init first")
 			if mode == "queue" then
 				queue(session, source, method , ...)
-			elseif method[2] == "subscribe" then
+			elseif method[2] == "accept" then
 				-- no return
 				method[4](...)
 			else

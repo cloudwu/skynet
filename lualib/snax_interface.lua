@@ -27,7 +27,7 @@ return function (name , G, loader)
 		assert(G.init == nil)
 		assert(G.exit == nil)
 
-		assert(G.subscribe == nil)
+		assert(G.accept == nil)
 		assert(G.response == nil)
 	end
 
@@ -44,7 +44,7 @@ return function (name , G, loader)
 		end
 	end
 
-	env.subscribe = func_id(func, "subscribe")
+	env.accept = func_id(func, "accept")
 	env.response = func_id(func, "response")
 
 	local function init_system(t, name, f)
