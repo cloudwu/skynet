@@ -5,6 +5,7 @@ harbor = 1
 address = "127.0.0.1:2526"
 master = "127.0.0.1:2013"
 start = "main"
+preload = "preload example"	-- run preload.lua helloworld before every lua service start
 standalone = "0.0.0.0:2013"
 luaservice = root.."service/?.lua;"..root.."test/?.lua;"..root.."examples/?.lua"
 snax = root.."examples/?.lua;"..root.."test/?.lua"

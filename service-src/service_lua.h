@@ -4,7 +4,7 @@
 struct snlua {
 	lua_State * L;
 	struct skynet_context * ctx;
-	int (*init)(struct snlua *l, struct skynet_context *ctx, const char * args);
+	const char * preload;
 };
 
 #endif

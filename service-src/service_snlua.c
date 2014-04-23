@@ -37,42 +37,6 @@ codecache(lua_State *L) {
 
 #endif
 
-// time
-
-#include <time.h>
-#define NANOSEC 1000000000
-
-#if defined(__APPLE__)
-#include <mach/task.h>
-#include <mach/mach.h>
-#endif
-
-static void
-current_time(struct timespec *ti) {
-#if  !defined(__APPLE__)
-	clock_gettime(CLOCK_THREAD_CPUTIME_ID, ti);
-#else
-	struct task_thread_times_info aTaskInfo;
-	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
-	assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
-	ti->tv_sec = aTaskInfo.user_time.seconds;
-	ti->tv_nsec = aTaskInfo.user_time.microseconds * 1000;
-#endif
-}
-
-static double
-diff_time(struct timespec *ti) {
-	struct timespec end;
-	current_time(&end);
-	int diffsec = end.tv_sec - ti->tv_sec;
-	int diffnsec = end.tv_nsec - ti->tv_nsec;
-	if (diffnsec < 0) {
-		--diffsec;
-		diffnsec += NANOSEC;
-	}
-	return (double)diffsec + (double)diffnsec / NANOSEC;
-}
-
 static int
 _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
 	int namelen = strlen(name);
@@ -182,24 +146,11 @@ _report_launcher_error(struct skynet_context *ctx) {
 }
 
 static int
-_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
-	lua_State *L = l->L;
-	l->ctx = ctx;
-	lua_gc(L, LUA_GCSTOP, 0);
-	luaL_openlibs(L);
-	lua_pushlightuserdata(L, l);
-	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_lua");
-	luaL_requiref(L, "skynet.codecache", codecache , 0);
-	lua_pop(L,1);
-	lua_gc(L, LUA_GCRESTART, 0);
-
+dofile(lua_State *L, struct skynet_context *ctx, const char * args) {
+	int traceback_index = 1;
 	char tmp[strlen(args)+1];
 	char *parm = tmp;
 	strcpy(parm,args);
-
-	lua_pushcfunction(L, traceback);
-	int traceback_index = lua_gettop(L);
-	assert(traceback_index == 1);
 
 	const char * filename = parm;
 	int r = _load(L, &parm);
@@ -233,16 +184,43 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 }
 
 static int
+_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
+	lua_State *L = l->L;
+	l->ctx = ctx;
+	lua_gc(L, LUA_GCSTOP, 0);
+	luaL_openlibs(L);
+	lua_pushlightuserdata(L, l);
+	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_lua");
+	luaL_requiref(L, "skynet.codecache", codecache , 0);
+	lua_pop(L,1);
+
+	lua_pushcfunction(L, traceback);
+	assert(lua_gettop(L) == 1);
+
+	if (l->preload) {
+		size_t l1 = strlen(l->preload);
+		size_t l2 = strlen(args);
+		char tmp[l1 + l2 + 2];
+		sprintf(tmp, "%s %s", l->preload, args);
+		if (dofile(L, ctx, tmp)) {
+			return 1;
+		}
+	}
+	if (dofile(L, ctx, args)) {
+		return 1;
+	}
+
+	lua_gc(L, LUA_GCRESTART, 0);
+
+	return 0;
+}
+
+static int
 _launch(struct skynet_context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz) {
 	assert(type == 0 && session == 0);
 	struct snlua *l = ud;
 	skynet_callback(context, NULL, NULL);
-	struct timespec ti;
-	current_time(&ti);
 	int err = _init(l, context, msg);
-	double t = diff_time(&ti);
-	lua_pushnumber(l->L, t);
-	lua_setfield(l->L, LUA_REGISTRYINDEX, "skynet_boottime");
 	if (err) {
 		skynet_command(context, "EXIT", NULL);
 	}
@@ -252,6 +230,10 @@ _launch(struct skynet_context * context, void *ud, int type, int session, uint32
 
 int
 snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
+	const char * preload = skynet_command(ctx, "GETENV", "preload");
+	if (preload && preload[0]) {
+		l->preload = skynet_strdup(preload);
+	}
 	int sz = strlen(args);
 	char * tmp = skynet_malloc(sz+1);
 	memcpy(tmp, args, sz+1);
@@ -268,12 +250,13 @@ snlua_create(void) {
 	struct snlua * l = skynet_malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
 	l->L = lua_newstate(skynet_lalloc, NULL);
-	l->init = _init;
+	l->preload = NULL;
 	return l;
 }
 
 void
 snlua_release(struct snlua *l) {
 	lua_close(l->L);
+	skynet_free((void*)l->preload);
 	skynet_free(l);
 }
