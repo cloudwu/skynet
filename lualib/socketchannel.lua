@@ -51,17 +51,28 @@ local function close_channel_socket(self)
 end
 
 local function wakeup_all(self, errmsg)
-	for i = 1, #self.__request do
-		self.__request[i] = nil
-	end
-	for i = 1, #self.__thread do
-		local co = self.__thread[i]
-		self.__thread[i] = nil
-		self.__result[co] = socket_error
-		self.__result_data[co] = errmsg
-		skynet.wakeup(co)
+	if self.__response then
+		for k,co in pairs(self.__thread) do
+			self.__thread[k] = nil
+			self.__result[co] = socket_error
+			self.__result_data[co] = errmsg
+			skynet.wakeup(co)
+		end
+	else
+		for i = 1, #self.__request do
+			self.__request[i] = nil
+		end
+		for i = 1, #self.__thread do
+			local co = self.__thread[i]
+			self.__thread[i] = nil
+			self.__result[co] = socket_error
+			self.__result_data[co] = errmsg
+			skynet.wakeup(co)
+		end
 	end
 end
+
+
 
 local function dispatch_response(self)
 	local response = self.__response
@@ -85,13 +96,7 @@ local function dispatch_response(self)
 				if session ~= socket_error then
 					errormsg = session
 				end
-				for k,co in pairs(self.__thread) do
-					-- throw error (errormsg)
-					self.__thread[k] = nil
-					self.__result[co] = socket_error
-					self.__result_data[co] = errormsg
-					skynet.wakeup(co)
-				end
+				wakeup_all(self, errormsg)
 			end
 		end
 	else
@@ -153,6 +158,9 @@ local function try_connect(self , once)
 	local t = 100
 	while not self.__closed do
 		if connect_once(self) then
+			if not once then
+				print("socket: connect to", self.__host, self.__port)
+			end
 			return
 		elseif once then
 			error(string.format("Connect to %s:%d failed", self.__host, self.__port))
@@ -182,6 +190,7 @@ local function block_connect(self, once)
 	if self.__closed then
 		return false
 	end
+
 	if #self.__connecting > 0 then
 		-- connecting in other coroutine
 		local co = coroutine.running()
@@ -190,7 +199,6 @@ local function block_connect(self, once)
 		-- check connection again
 		return block_connect(self, once)
 	end
-
 	self.__connecting[1] = true
 	try_connect(self, once)
 	self.__connecting[1] = nil
@@ -216,6 +224,8 @@ function channel:request(request, response)
 	assert(block_connect(self))
 
 	if not socket.write(self.__sock[1], request) then
+		close_channel_socket(self)
+		wakeup_all(self)
 		error(socket_error)
 	end
 
@@ -242,9 +252,9 @@ function channel:request(request, response)
 	self.__result_data[co] = nil
 
 	if result == socket_error then
-		if result_data then
-			print("socket: dispatch", request, result_data)
-		end
+--		if result_data then
+--			print("socket: dispatch", request, result_data)
+--		end
 		error(socket_error)
 	else
 		assert(result, result_data)
@@ -269,9 +279,9 @@ function channel:response(response)
 	self.__result_data[co] = nil
 
 	if result == socket_error then
-		if result_data then
-			print("socket: dispatch", request, result_data)
-		end
+--		if result_data then
+--			print("socket: dispatch", request, result_data)
+--		end
 		error(socket_error)
 	else
 		assert(result, result_data)

@@ -39,9 +39,7 @@ local client_meta = {
 
 		return "[mongo client : " .. self.host .. port_string .."]"
 	end,
-	__gc = function(self)
-		self:disconnect()
-	end
+	-- DO NOT need disconnect, because channel will shutdown during gc
 }
 
 local mongo_db = {}
