@@ -8,6 +8,9 @@
 #include "skynet_harbor.h"
 #include "skynet_env.h"
 #include "skynet_monitor.h"
+#include "skynet_imp.h"
+
+#include <pthread.h>
 
 #include <string.h>
 #include <assert.h>
@@ -50,10 +53,10 @@ struct skynet_context {
 struct skynet_node {
 	int total;
 	uint32_t monitor_exit;
+	pthread_key_t handle_key;
 };
 
-static struct skynet_node G_NODE = { 0,0 };
-static __thread uint32_t handle_tls = 0xffffffff;
+static struct skynet_node G_NODE;
 
 int 
 skynet_context_total() {
@@ -72,7 +75,8 @@ _context_dec() {
 
 uint32_t 
 skynet_current_handle(void) {
-	return handle_tls;
+	void * handle = pthread_getspecific(G_NODE.handle_key);
+	return (uint32_t)(uintptr_t)handle;
 }
 
 static void
@@ -199,13 +203,12 @@ static void
 _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
 	CHECKCALLING_BEGIN(ctx)
-	handle_tls = ctx->handle;
+	pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx->handle));
 	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
 	size_t sz = msg->sz & HANDLE_MASK;
 	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
 		skynet_free(msg->data);
 	}
-	handle_tls = 0xffffffff;
 	CHECKCALLING_END(ctx)
 }
 
@@ -590,3 +593,27 @@ skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t
 
 	skynet_mq_push(ctx->queue, &smsg);
 }
+
+void 
+skynet_globalinit(void) {
+	G_NODE.total = 0;
+	G_NODE.monitor_exit = 0;
+	if (pthread_key_create(&G_NODE.handle_key, NULL)) {
+		fprintf(stderr, "pthread_key_create failed");
+		exit(1);
+	}
+	// set mainthread's key
+	skynet_initthread(THREAD_MAIN);
+}
+
+void 
+skynet_globalexit(void) {
+	pthread_key_delete(G_NODE.handle_key);
+}
+
+void
+skynet_initthread(int m) {
+	uintptr_t v = (uint32_t)(-m);
+	pthread_setspecific(G_NODE.handle_key, (void *)v);
+}
+

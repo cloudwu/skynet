@@ -50,6 +50,7 @@ wakeup(struct monitor *m, int busy) {
 static void *
 _socket(void *p) {
 	struct monitor * m = p;
+	skynet_initthread(THREAD_SOCKET);
 	for (;;) {
 		int r = skynet_socket_poll();
 		if (r==0)
@@ -81,6 +82,7 @@ _monitor(void *p) {
 	struct monitor * m = p;
 	int i;
 	int n = m->count;
+	skynet_initthread(THREAD_MONITOR);
 	for (;;) {
 		CHECK_ABORT
 		for (i=0;i<n;i++) {
@@ -98,6 +100,7 @@ _monitor(void *p) {
 static void *
 _timer(void *p) {
 	struct monitor * m = p;
+	skynet_initthread(THREAD_TIMER);
 	for (;;) {
 		skynet_updatetime();
 		CHECK_ABORT
@@ -117,6 +120,7 @@ _worker(void *p) {
 	int id = wp->id;
 	struct monitor *m = wp->m;
 	struct skynet_monitor *sm = m->m[id];
+	skynet_initthread(THREAD_WORKER);
 	for (;;) {
 		if (skynet_context_message_dispatch(sm)) {
 			CHECK_ABORT
