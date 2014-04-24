@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local codecache = require "skynet.codecache"
 local socket = require "socket"
+local snax = require "snax"
 
 local port = tonumber(...)
 local COMMAND = {}
@@ -109,6 +110,7 @@ function COMMAND.help()
 		mem = "mem : show memory status",
 		gc = "gc : force every lua service do garbage collect",
 		start = "lanuch a new lua service",
+		snax = "lanuch a new snax service",
 		clearcache = "clear lua code cache",
 	}
 end
@@ -126,4 +128,12 @@ function COMMAND.start(...)
 	end
 end
 
-
+function COMMAND.snax(...)
+	local s = snax.newservice(...)
+	if s then
+		local addr = s.handle
+		return { [skynet.address(addr)] = ... }
+	else
+		return "Failed"
+	end
+end
