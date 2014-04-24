@@ -51,6 +51,9 @@ local function close_channel_socket(self)
 end
 
 local function wakeup_all(self, errmsg)
+	for i = 1, #self.__request do
+		self.__request[i] = nil
+	end
 	for i = 1, #self.__thread do
 		local co = self.__thread[i]
 		self.__thread[i] = nil
