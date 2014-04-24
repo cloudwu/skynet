@@ -9,9 +9,7 @@ local redis = {}
 local command = {}
 local meta = {
 	__index = command,
-	__gc = function(self)
-		self[1]:close()
-	end,
+	-- DO NOT close channel in __gc
 }
 
 ---------- redis response
