@@ -10,7 +10,6 @@
 #include <lauxlib.h>
 
 #include "skynet_socket.h"
-#include "service_lua.h"
 
 #define BACKLOG 32
 // 2 ** 12 == 4096
@@ -485,15 +484,12 @@ luaopen_socketdriver(lua_State *L) {
 		{ "start", lstart },
 		{ NULL, NULL },
 	};
-	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_lua");
-	struct snlua *lua = lua_touserdata(L,-1);
-	if (lua == NULL || lua->ctx == NULL) {
+	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
+	struct skynet_context *ctx = lua_touserdata(L,-1);
+	if (ctx == NULL) {
 		return luaL_error(L, "Init skynet context first");
 	}
-	// assert(lua->L == L);
-	lua_pop(L,1);
 
-	lua_pushlightuserdata(L, lua->ctx);
 	luaL_setfuncs(L,l2,1);
 
 	return 1;

@@ -1,6 +1,5 @@
 #include "skynet.h"
 #include "lua-seri.h"
-#include "service_lua.h"
 
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
@@ -10,6 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+
+struct snlua {
+	lua_State * L;
+	struct skynet_context * ctx;
+	const char * preload;
+};
 
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
@@ -290,15 +295,14 @@ luaopen_skynet_c(lua_State *L) {
 		{ NULL, NULL },
 	};
 
-	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_lua");
-	struct snlua *lua = lua_touserdata(L,-1);
-	if (lua == NULL || lua->ctx == NULL) {
+	luaL_newlibtable(L, l);
+
+	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
+	struct skynet_context *ctx = lua_touserdata(L,-1);
+	if (ctx == NULL) {
 		return luaL_error(L, "Init skynet context first");
 	}
-	assert(lua->L == L);
 
-	luaL_newlibtable(L, l);
-	lua_pushlightuserdata(L, lua->ctx);
 	luaL_setfuncs(L,l,1);
 
 	return 1;

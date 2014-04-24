@@ -4,12 +4,17 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include <assert.h>
-#include "service_lua.h"
 
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+struct snlua {
+	lua_State * L;
+	struct skynet_context * ctx;
+	const char * preload;
+};
 
 // LUA_CACHELIB may defined in patched lua for shared proto
 #ifdef LUA_CACHELIB
@@ -189,8 +194,8 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	l->ctx = ctx;
 	lua_gc(L, LUA_GCSTOP, 0);
 	luaL_openlibs(L);
-	lua_pushlightuserdata(L, l);
-	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_lua");
+	lua_pushlightuserdata(L, ctx);
+	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_context");
 	luaL_requiref(L, "skynet.codecache", codecache , 0);
 	lua_pop(L,1);
 
