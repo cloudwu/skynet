@@ -19,18 +19,6 @@ function command.LIST()
 	return list
 end
 
-function command.RELOAD(handle)
-	handle = handle_to_address(handle)
-	local cmd = string.match(services[handle], "snlua (.+)")
-	print(services[handle],cmd)
-	if cmd then
-		skynet.send(handle,"debug","RELOAD",cmd)
-		return {cmd}
-	else
-		return {"Support only snlua"}
-	end
-end
-
 function command.STAT()
 	local list = {}
 	for k,v in pairs(services) do
@@ -46,22 +34,6 @@ function command.INFO(handle)
 		return
 	else
 		local result = skynet.call(handle,"debug","INFO")
-		return result
-	end
-end
-
-function command.TIMING(handle)
-	handle = handle_to_address(handle)
-	if services[handle] == nil then
-		return
-	else
-		local r = skynet.call(handle,"debug","TIMING")
-		local result = {}
-		for k,v in pairs(r) do
-			v.name = services[k]
-			v.avg = v.ti/v.n
-			result[skynet.address(k)] = v
-		end
 		return result
 	end
 end
