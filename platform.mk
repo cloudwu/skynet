@@ -31,4 +31,7 @@ freebsd : PLAT = freebsd
 macosx linux : LIBS += -ldl
 macosx : SHARED := -fPIC -dynamiclib -Wl,-undefined,dynamic_lookup
 macosx : EXPORT :=
+macosx : MALLOC_STATICLIB :=
+macosx : SKYNET_DEFINES :=-DNOUSE_JEMALLOC
 linux freebsd : LIBS += -lrt
+linux freebsd : MALLOC_STATICLIB = $(JEMALLOC_STATICLIB)
