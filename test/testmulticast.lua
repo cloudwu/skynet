@@ -10,7 +10,7 @@ skynet.start(function()
 		assert(cmd == "init")
 		mc.subscribe(channel, {
 			dispatch = function (channel, source, ...)
-				print(string.format("%s ===> %s (%d)",skynet.address(source), skynet.address(skynet.self()), channel), ...)
+				print(string.format("%s <=== %s (%d)",skynet.address(skynet.self()),skynet.address(source), channel), ...)
 			end
 		})
 	end)
@@ -26,6 +26,7 @@ skynet.start(function()
 		skynet.send(sub, "lua", "init", channel)
 	end
 
+	print(skynet.address(skynet.self()), "===>", channel)
 	mc.publish(channel, "Hello World")
 end)
 

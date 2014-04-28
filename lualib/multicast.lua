@@ -20,6 +20,12 @@ function multicast.newchannel(conf)
 	return channel
 end
 
+function multicast.bind(channel, conf)
+	assert(multicastd, "Init first")
+	assert(not dispatch[channel])
+	dispatch[channel] = default_conf(conf)
+end
+
 function multicast.publish(channel, ...)
 	local conf = assert(dispatch[channel])
 	skynet.call(multicastd, "lua", "PUB", channel, c.pack(conf.pack(...)))
