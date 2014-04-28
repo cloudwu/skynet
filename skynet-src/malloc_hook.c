@@ -3,32 +3,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#ifdef __APPLE__
-#include <malloc/malloc.h>
-#define malloc_usable_size(ptr) malloc_size(ptr)
-#endif
-
-#ifdef __FreeBSD__
-#include <malloc_np.h>
-#endif
-
-#ifdef NOUSE_JEMALLOC
-
-#define je_malloc malloc
-#define je_free free
-#define je_calloc calloc
-#define je_realloc realloc
-#define je_malloc_usable_size malloc_usable_size
-
-#else
-
-#include "jemalloc.h"
-
-#endif
-
 #include "malloc_hook.h"
 #include "skynet.h"
-
 
 static size_t _used_memory = 0;
 static size_t _memory_block = 0;
@@ -41,6 +17,11 @@ typedef struct _mem_data {
 #define PREFIX_SIZE sizeof(uint32_t)
 
 static mem_data mem_stats[SLOT_SIZE];
+
+
+#ifndef NOUSE_JEMALLOC
+
+#include "jemalloc.h"
 
 static ssize_t*
 get_allocated_field(uint32_t handle) {
@@ -111,37 +92,6 @@ static void malloc_oom(size_t size) {
 	abort();
 }
 
-size_t
-malloc_used_memory(void) {
-	return _used_memory;
-}
-
-size_t
-malloc_memory_block(void) {
-	return _memory_block;
-}
-
-#ifdef NOUSE_JEMALLOC
-
-void 
-memory_info_dump(void) {
-	skynet_error(NULL, "No jemalloc");
-}
-
-size_t 
-mallctl_int64(const char* name, size_t* newval) {
-	skynet_error(NULL, "No jemalloc : mallctl_int64 %s.", name);
-	return 0;
-}
-
-int 
-mallctl_opt(const char* name, int* newval) {
-	skynet_error(NULL, "No jemalloc : mallctl_opt %s.", name);
-	return 0;
-}
-
-#else
-
 void 
 memory_info_dump(void) {
 	je_malloc_stats_print(0,0,0);
@@ -178,23 +128,6 @@ mallctl_opt(const char* name, int* newval) {
 	return v;
 }
 
-#endif
-
-void
-dump_c_mem() {
-	int i;
-	size_t total = 0;
-	printf("dump all service mem:\n");
-	for(i=0; i<SLOT_SIZE; i++) {
-		mem_data* data = &mem_stats[i];
-		if(data->handle != 0 && data->allocated != 0) {
-			total += data->allocated;
-			printf("0x%x -> %zdkb\n", data->handle, data->allocated >> 10);
-		}
-	}
-	printf("+total: %zdkb\n",total >> 10);
-}
-
 // hook : malloc, realloc, free, calloc
 
 void *
@@ -226,6 +159,52 @@ skynet_calloc(size_t nmemb,size_t size) {
 	void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
 	if(!ptr) malloc_oom(size);
 	return fill_prefix(ptr);
+}
+
+#else
+
+void 
+memory_info_dump(void) {
+	skynet_error(NULL, "No jemalloc");
+}
+
+size_t 
+mallctl_int64(const char* name, size_t* newval) {
+	skynet_error(NULL, "No jemalloc : mallctl_int64 %s.", name);
+	return 0;
+}
+
+int 
+mallctl_opt(const char* name, int* newval) {
+	skynet_error(NULL, "No jemalloc : mallctl_opt %s.", name);
+	return 0;
+}
+
+#endif
+
+size_t
+malloc_used_memory(void) {
+	return _used_memory;
+}
+
+size_t
+malloc_memory_block(void) {
+	return _memory_block;
+}
+
+void
+dump_c_mem() {
+	int i;
+	size_t total = 0;
+	printf("dump all service mem:\n");
+	for(i=0; i<SLOT_SIZE; i++) {
+		mem_data* data = &mem_stats[i];
+		if(data->handle != 0 && data->allocated != 0) {
+			total += data->allocated;
+			printf("0x%x -> %zdkb\n", data->handle, data->allocated >> 10);
+		}
+	}
+	printf("+total: %zdkb\n",total >> 10);
 }
 
 char *

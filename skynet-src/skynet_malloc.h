@@ -3,12 +3,12 @@
 
 #include <stddef.h>
 
-#ifdef SKYNET_MALLOC_RENAME
+#ifdef NOUSE_JEMALLOC
 
-#define malloc skynet_malloc
-#define calloc skynet_calloc
-#define realloc skynet_realloc
-#define free skynet_free
+#define skynet_malloc malloc
+#define skynet_calloc calloc
+#define skynet_realloc realloc
+#define skynet_free free
 
 #endif
 
