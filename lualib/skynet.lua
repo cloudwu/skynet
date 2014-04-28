@@ -16,7 +16,7 @@ local skynet = {
 	-- read skynet.h
 	PTYPE_TEXT = 0,
 	PTYPE_RESPONSE = 1,
---	PTYPE_MULTICAST = 2, -- DEPRECATED
+	PTYPE_MULTICAST = 2,
 	PTYPE_CLIENT = 3,
 	PTYPE_SYSTEM = 4,
 	PTYPE_HARBOR = 5,
