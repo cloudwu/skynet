@@ -2,6 +2,7 @@ local skynet = require "skynet"
 local c = require "skynet.c"
 local snax_interface = require "snax_interface"
 local profile = require "profile"
+local snax = require "snax"
 
 local func = snax_interface(tostring(...), _ENV)
 local mode
@@ -98,7 +99,7 @@ local function timing( method, ... )
 end
 
 skynet.start(function()
-	skynet.dispatch("lua", function ( session , source , id, ...)
+	skynet.dispatch("snax", function ( session , source , id, ...)
 		local method = func[id]
 
 		if method[2] == "system" then

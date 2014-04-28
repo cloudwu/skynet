@@ -24,7 +24,8 @@ local skynet = {
 	PTYPE_ERROR = 7,
 	PTYPE_QUEUE = 8,
 	PTYPE_DEBUG = 9,
-	PTYPE_LUA = 10
+	PTYPE_LUA = 10,
+	PTYPE_SNAX = 11,
 }
 
 -- code cache

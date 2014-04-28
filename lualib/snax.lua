@@ -6,6 +6,14 @@ local typeclass = {}
 
 local G = { require = function() end }
 
+skynet.register_protocol {
+	name = "snax",
+	id = skynet.PTYPE_SNAX,
+	pack = skynet.pack,
+	unpack = skynet.unpack,
+}
+
+
 function snax.interface(name)
 	if typeclass[name] then
 		return typeclass[name]
@@ -38,7 +46,7 @@ local function gen_post(type, handle)
 		__index = function( t, k )
 			local id = assert(type.accept[k] , string.format("post %s no exist", k))
 			return function(...)
-				skynet_send(handle, "lua", id, ...)
+				skynet_send(handle, "snax", id, ...)
 			end
 		end })
 end
@@ -48,7 +56,7 @@ local function gen_req(type, handle)
 		__index = function( t, k )
 			local id = assert(type.response[k] , string.format("request %s no exist", k))
 			return function(...)
-				return skynet_call(handle, "lua", id, ...)
+				return skynet_call(handle, "snax", id, ...)
 			end
 		end })
 end
@@ -69,7 +77,7 @@ function snax.newservice(name, ...)
 	local handle = skynet.newservice("snaxd", name)
 	assert(handle_cache[handle] == nil)
 	if t.system.init then
-		skynet.call(handle, "lua", t.system.init, ...)
+		skynet.call(handle, "snax", t.system.init, ...)
 	end
 	local ret = wrapper(handle, name, t)
 	handle_cache[handle] = ret
@@ -90,7 +98,7 @@ end
 
 function snax.kill(obj, ...)
 	local t = snax.interface(obj.type)
-	skynet_call(obj.handle, "lua", t.system.exit, ...)
+	skynet_call(obj.handle, "snax", t.system.exit, ...)
 end
 
 local function test_result(ok, ...)
@@ -103,7 +111,7 @@ end
 
 function snax.hotfix(obj, source, ...)
 	local t = snax.interface(obj.type)
-	return test_result(skynet_call(obj.handle, "lua", t.system.hotfix, source, ...))
+	return test_result(skynet_call(obj.handle, "snax", t.system.hotfix, source, ...))
 end
 
 return snax
