@@ -3,7 +3,6 @@
 #include "skynet_imp.h"
 #include "skynet_env.h"
 #include "skynet_server.h"
-#include "malloc_hook.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,8 +89,6 @@ main(int argc, char *argv[]) {
 		config_file = argv[1];
 	}
 	skynet_globalinit();
-
-	malloc_inithook();
 	skynet_env_init();
 
 	sigign();
