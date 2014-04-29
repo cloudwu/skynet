@@ -89,7 +89,8 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz)
 	const char *service = optstring(ctx, "luaservice", "./service/?.lua");
 	lua_pushstring(L, service);
 	lua_setglobal(L, "LUA_SERVICE");
-	const char *preload = skynet_command(ctx, "preload");
+	const char *preload = skynet_command(ctx, "GETENV", "preload");
+	lua_pushstring(L, preload);
 	lua_setglobal(L, "LUA_PRELOAD");
 
 	lua_pushcfunction(L, traceback);
