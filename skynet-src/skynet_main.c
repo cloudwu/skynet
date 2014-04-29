@@ -113,12 +113,6 @@ main(int argc, char *argv[]) {
   printf("Skynet lua code cache enable\n");
 #endif
 
-	const char *path = optstring("lua_path","./lualib/?.lua;./lualib/?/init.lua");
-	setenv("LUA_PATH",path,1);
-	const char *cpath = optstring("lua_cpath","./luaclib/?.so");
-	setenv("LUA_CPATH",cpath,1);
-	optstring("luaservice","./service/?.lua");
-
 	config.thread =  optint("thread",8);
 	config.module_path = optstring("cpath","./cservice/?.so");
 	config.logger = optstring("logger",NULL);

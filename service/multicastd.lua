@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local mc = require "multicast.c"
+local datacenter = require "datacenter"
 
 local command = {}
 local channel = {}
@@ -49,4 +50,8 @@ skynet.start(function()
 		local f = assert(command[cmd])
 		skynet.ret(skynet.pack(f(source, ...)))
 	end)
+	local self = skynet.self()
+	local id = skynet.harbor(self)
+	assert(datacenter.set("multicast", id, self) == nil)
 end)
+

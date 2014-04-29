@@ -16,18 +16,30 @@ struct snlua {
 	const char * preload;
 };
 
+static int 
+traceback (lua_State *L) {
+	const char *msg = lua_tostring(L, 1);
+	if (msg)
+		luaL_traceback(L, L, msg, 1);
+	else {
+		lua_pushliteral(L, "(no error message)");
+	}
+	return 1;
+}
+
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	lua_State *L = ud;
 	int trace = 1;
 	int r;
 	int top = lua_gettop(L);
-	if (top == 1) {
+	if (top == 0) {
+		lua_pushcfunction(L, traceback);
 		lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
 	} else {
 		assert(top == 2);
-		lua_pushvalue(L,2);
 	}
+	lua_pushvalue(L,2);
 
 	lua_pushinteger(L, type);
 	lua_pushlightuserdata(L, (void *)msg);
