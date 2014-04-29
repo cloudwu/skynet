@@ -7,8 +7,8 @@ skynet.start(function()
 	if skynet.getenv "standalone" then
 		local datacenter = assert(skynet.newservice "datacenterd")
 		skynet.name("DATACENTER", datacenter)
-		local smgr = assert(skynet.newservice "service_mgr")
 	end
+	assert(skynet.newservice "service_mgr")
 	skynet.uniqueservice("multicastd")
 	assert(skynet.newservice(skynet.getenv "start" or "main"))
 	skynet.exit()

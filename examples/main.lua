@@ -14,5 +14,7 @@ skynet.start(function()
 		maxclient = max_client,
 	})
 
+	skynet.newservice("testmulticast")
+
 	skynet.exit()
 end)

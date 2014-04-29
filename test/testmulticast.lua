@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local mc = require "multicast"
+local dc = require "datacenter"
 
 local mode = ...
 
@@ -13,6 +14,7 @@ skynet.start(function()
 				print(string.format("%s <=== %s (%d)",skynet.address(skynet.self()),skynet.address(source), channel), ...)
 			end
 		})
+		skynet.ret(skynet.pack())
 	end)
 end)
 
@@ -23,8 +25,11 @@ skynet.start(function()
 	print("New channel", channel)
 	for i=1,10 do
 		local sub = skynet.newservice("testmulticast", "sub")
-		skynet.send(sub, "lua", "init", channel)
+		skynet.call(sub, "lua", "init", channel)
 	end
+
+	print("set channel", channel)
+	dc.set("CHANNEL", channel)
 
 	print(skynet.address(skynet.self()), "===>", channel)
 	mc.publish(channel, "Hello World")
