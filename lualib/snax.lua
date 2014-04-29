@@ -72,16 +72,14 @@ end
 
 local handle_cache = setmetatable( {} , { __mode = "kv" } )
 
-function snax.newservice(name, ...)
+function snax.rawnewservice(name, ...)
 	local t = snax.interface(name)
 	local handle = skynet.newservice("snaxd", name)
 	assert(handle_cache[handle] == nil)
 	if t.system.init then
 		skynet.call(handle, "snax", t.system.init, ...)
 	end
-	local ret = wrapper(handle, name, t)
-	handle_cache[handle] = ret
-	return ret
+	return handle
 end
 
 function snax.bind(handle, type)
@@ -94,6 +92,39 @@ function snax.bind(handle, type)
 	ret = wrapper(handle, type, t)
 	handle_cache[handle] = ret
 	return ret
+end
+
+function snax.newservice(name, ...)
+	local handle = snax.rawnewservice(name, ...)
+	return snax.bind(handle, name)
+end
+
+local function service_name(global, name, ...)
+	if global == true then
+		return name
+	else
+		return global
+	end
+end
+
+function snax.uniqueservice(name, ...)
+	local handle = assert(skynet.call(".service", "lua", "LAUNCH", "snaxd", name, ...))
+	return snax.bind(handle, name)
+end
+
+function snax.globalservice(name, ...)
+	local handle = assert(skynet.call(".service", "lua", "GLAUNCH", "snaxd", name, ...))
+	return snax.bind(handle, name)
+end
+
+function snax.queryservice(name)
+	local handle = assert(skynet.call(".service", "lua", "QUERY", "snaxd", name))
+	return snax.bind(handle, name)
+end
+
+function snax.queryglobal(name)
+	local handle = assert(skynet.call(".service", "lua", "GQUERY", "snaxd", name))
+	return snax.bind(handle, name)
 end
 
 function snax.kill(obj, ...)

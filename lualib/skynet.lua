@@ -436,25 +436,19 @@ function skynet.newservice(name, ...)
 end
 
 function skynet.uniqueservice(global, ...)
-	local handle
 	if global == true then
-		handle = skynet.call("SERVICE", "lua", "LAUNCH", ...)
+		return assert(skynet.call(".service", "lua", "GLAUNCH", ...))
 	else
-		handle = skynet.call(".service", "lua", "LAUNCH", global, ...)
+		return assert(skynet.call(".service", "lua", "LAUNCH", global, ...))
 	end
-	assert(handle , "Unique service launch failed")
-	return handle
 end
 
 function skynet.queryservice(global, ...)
-	local handle
 	if global == true then
-		handle = skynet.call("SERVICE", "lua", "QUERY", ...)
+		return assert(skynet.call(".service", "lua", "GQUERY", ...))
 	else
-		handle = skynet.call(".service", "lua", "QUERY", global, ...)
+		return assert(skynet.call(".service", "lua", "QUERY", global, ...))
 	end
-	assert(handle , "Unique service query failed")
-	return handle
 end
 
 local function group_command(cmd, handle, address)

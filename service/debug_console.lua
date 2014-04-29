@@ -112,6 +112,7 @@ function COMMAND.help()
 		start = "lanuch a new lua service",
 		snax = "lanuch a new snax service",
 		clearcache = "clear lua code cache",
+		service = "List unique service",
 	}
 end
 
@@ -136,4 +137,8 @@ function COMMAND.snax(...)
 	else
 		return "Failed"
 	end
+end
+
+function COMMAND.service()
+	return skynet.call("SERVICE", "lua", "LIST")
 end

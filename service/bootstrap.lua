@@ -8,7 +8,6 @@ skynet.start(function()
 		local datacenter = assert(skynet.newservice "datacenter")
 		skynet.name("DATACENTER", datacenter)
 		local smgr = assert(skynet.newservice "service_mgr")
-		skynet.name("SERVICE", smgr)
 	end
 	assert(skynet.newservice(skynet.getenv "start" or "main"))
 	skynet.exit()
