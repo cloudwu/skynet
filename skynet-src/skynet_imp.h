@@ -8,7 +8,7 @@ struct skynet_config {
 	const char * module_path;
 	const char * master;
 	const char * local;
-	const char * start;
+	const char * bootstrap;
 	const char * standalone;
 };
 

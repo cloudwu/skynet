@@ -189,6 +189,14 @@ _start_master(const char * master) {
 	return 0;	
 }
 
+static void
+bootstrap(struct skynet_context * ctx, const char * cmdline) {
+	if (!skynet_command(ctx, "LAUNCH", cmdline)) {
+		fprintf(stderr, "Bootstrap error : %s\n", cmdline);
+		exit(1);
+	}
+}
+
 void 
 skynet_start(struct skynet_config * config) {
 	skynet_harbor_init(config->harbor);
@@ -201,29 +209,24 @@ skynet_start(struct skynet_config * config) {
 	struct skynet_context *ctx;
 	ctx = skynet_context_new("logger", config->logger);
 	if (ctx == NULL) {
-		fprintf(stderr,"launch logger error");
+		fprintf(stderr,"launch logger error\n");
 		exit(1);
 	}
 
 	if (config->standalone) {
 		if (_start_master(config->standalone)) {
-			fprintf(stderr, "Init fail : mater");
+			fprintf(stderr, "Init failed : master\n");
 			return;
 		}
 	}
 	// harbor must be init first
 	if (skynet_harbor_start(config->master , config->local)) {
-		fprintf(stderr, "Init fail : no master");
+		fprintf(stderr, "Init failed : no master\n");
 		return;
 	}
 
-	ctx = skynet_context_new("snlua", "launcher");
-	if (ctx) {
-		skynet_command(ctx, "REG", ".launcher");
-		ctx = skynet_context_new("snlua", config->start);
-	}
+	bootstrap(ctx, config->bootstrap);
 
 	_start(config->thread);
 	skynet_socket_free();
 }
-

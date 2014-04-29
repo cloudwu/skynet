@@ -210,7 +210,7 @@ function skynet.register(name)
 end
 
 function skynet.name(name, handle)
-	c.command("NAME", name .. " " .. handle)
+	c.command("NAME", name .. " " .. skynet.address(handle))
 end
 
 local self_handle
@@ -255,7 +255,12 @@ function skynet.kill(name)
 end
 
 function skynet.getenv(key)
-	return c.command("GETENV",key)
+	local ret = c.command("GETENV",key)
+	if ret == "" then
+		return
+	else
+		return ret
+	end
 end
 
 function skynet.setenv(key, value)

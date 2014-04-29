@@ -124,7 +124,7 @@ main(int argc, char *argv[]) {
 	config.logger = optstring("logger",NULL);
 	config.harbor = optint("harbor", 1);
 	config.master = optstring("master","127.0.0.1:2012");
-	config.start = optstring("start","main.lua");
+	config.bootstrap = optstring("bootstrap","snlua bootstrap");
 	config.local = optstring("address","127.0.0.1:2525");
 	config.standalone = optstring("standalone",NULL);
 

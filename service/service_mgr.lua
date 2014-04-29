@@ -65,8 +65,11 @@ skynet.start(function()
 			skynet.ret(skynet.pack(nil))
 		end
 	end)
-	skynet.register(".service")
-	if skynet.getenv "standalone" then
-		skynet.register("SERVICE")
+	local handle = skynet.localname ".service"
+	if  handle ~= 0 then
+		skynet.error(".service is already register by ", skynet.address(handle))
+		skynet.exit()
+	else
+		skynet.register(".service")
 	end
 end)
