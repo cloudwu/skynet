@@ -5,6 +5,8 @@ skynet.start(function()
 	skynet.name(".launcher", launcher)
 
 	if skynet.getenv "standalone" then
+		local datacenter = assert(skynet.newservice "datacenter")
+		skynet.name("DATACENTER", datacenter)
 		local smgr = assert(skynet.newservice "service_mgr")
 		skynet.name("SERVICE", smgr)
 	end
