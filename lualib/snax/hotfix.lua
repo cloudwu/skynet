@@ -1,4 +1,4 @@
-local si = require "snax_interface"
+local si = require "snax.interface"
 local io = io
 
 local hotfix = {}

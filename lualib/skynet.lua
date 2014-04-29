@@ -399,7 +399,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			session_coroutine_address[co] = source
 			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
 		else
-            unknown_request(session, source, msg, sz)
+			unknown_request(session, source, msg, sz)
 		end
 	end
 end
@@ -426,8 +426,7 @@ local function dispatch_message(...)
 end
 
 function skynet.newservice(name, ...)
-	local param =  table.concat({"snlua", name, ...}, " ")
-	local handle = skynet.call(".launcher", "text" , param)
+	local handle = skynet.tostring(skynet.rawcall(".launcher", "lua" , skynet.pack("LAUNCH", "snlua", name, ...)))
 	if handle == "" then
 		return nil
 	else
@@ -451,14 +450,6 @@ function skynet.queryservice(global, ...)
 	end
 end
 
-local function group_command(cmd, handle, address)
-	if address then
-		return string.format("%s %d :%x",cmd, handle, address)
-	else
-		return string.format("%s %d",cmd,handle)
-	end
-end
-
 function skynet.address(addr)
 	if type(addr) == "number" then
 		return string.format(":%x",addr)
@@ -479,65 +470,9 @@ function skynet.error(...)
 	return c.error(table.concat(t, " "))
 end
 
------ debug
-
-local internal_info_func
-
-function skynet.info_func(func)
-	internal_info_func = func
-end
-
-local dbgcmd = {}
-
-function dbgcmd.MEM()
-	local kb, bytes = collectgarbage "count"
-	skynet.ret(skynet.pack(kb,bytes))
-end
-
-function dbgcmd.GC()
-	coroutine_pool = {}
-	collectgarbage "collect"
-end
-
-function dbgcmd.STAT()
-	local stat = {}
-	stat.mqlen = skynet.mqlen()
-	skynet.ret(skynet.pack(stat))
-end
-
-function dbgcmd.INFO()
-	if internal_info_func then
-		skynet.ret(skynet.pack(internal_info_func()))
-	else
-		skynet.ret(skynet.pack(nil))
-	end
-end
-
-local function _debug_dispatch(session, address, cmd, ...)
-	local f = dbgcmd[cmd]
-	assert(f, cmd)
-	f(...)
-end
-
 ----- register protocol
 do
 	local REG = skynet.register_protocol
-
-	REG {
-		name = "text",
-		id = skynet.PTYPE_TEXT,
-		pack = function (...)
-			local n = select ("#" , ...)
-			if n == 0 then
-				return ""
-			elseif n == 1 then
-				return tostring(...)
-			else
-				return table.concat({...}," ")
-			end
-		end,
-		unpack = c.tostring
-	}
 
 	REG {
 		name = "lua",
@@ -549,14 +484,6 @@ do
 	REG {
 		name = "response",
 		id = skynet.PTYPE_RESPONSE,
-	}
-
-	REG {
-		name = "debug",
-		id = skynet.PTYPE_DEBUG,
-		pack = skynet.pack,
-		unpack = skynet.unpack,
-		dispatch = _debug_dispatch,
 	}
 
 	REG {
@@ -603,10 +530,10 @@ local function init_service(start)
 	local ok, err = xpcall(init_template, debug.traceback, start)
 	if not ok then
 		print("init service failed:", err)
-		skynet.send(".launcher","text", "ERROR")
+		skynet.send(".launcher","lua", "ERROR")
 		skynet.exit()
 	else
-		skynet.send(".launcher","text", "")
+		skynet.send(".launcher","lua", "LAUNCHOK")
 	end
 end
 
@@ -648,5 +575,9 @@ end
 function skynet.mqlen()
 	return tonumber(c.command "MQLEN")
 end
+
+-- Inject internal debug framework
+local debug = require "skynet.debug"
+debug(skynet)
 
 return skynet

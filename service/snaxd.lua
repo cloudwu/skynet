@@ -1,6 +1,6 @@
 local skynet = require "skynet"
 local c = require "skynet.c"
-local snax_interface = require "snax_interface"
+local snax_interface = require "snax.interface"
 local profile = require "profile"
 local snax = require "snax"
 
@@ -21,8 +21,10 @@ local function update_stat(name, ti)
 	t.time = t.time + ti
 end
 
+local traceback = debug.traceback
+
 local function do_func(f, msg)
-	return pcall(f, table.unpack(msg))
+	return xpcall(f, traceback, table.unpack(msg))
 end
 
 local function dispatch(f, ...)
@@ -42,7 +44,7 @@ local function message_dispatch()
 				if method[2] == "accept" then
 					-- no return
 					profile.start()
-					local ok, data = pcall(f, table.unpack(msg))
+					local ok, data = xpcall(f, traceback, table.unpack(msg))
 					local ti = profile.stop()
 					update_stat(method[3], ti)
 					if not ok then
@@ -50,7 +52,7 @@ local function message_dispatch()
 					end
 				else
 					profile.start()
-					local ok, data, size = pcall(dispatch, f, table.unpack(msg))
+					local ok, data, size = xpcall(dispatch, traceback, f, table.unpack(msg))
 					local ti = profile.stop()
 					update_stat(method[3], ti)
 					if ok then
@@ -89,9 +91,9 @@ local function timing( method, ... )
 	profile.start()
 	if method[2] == "accept" then
 		-- no return
-		err,msg = pcall(method[4], ...)
+		err,msg = xpcall(method[4], traceback, ...)
 	else
-		err,msg = pcall(return_f, method[4], ...)
+		err,msg = xpcall(return_f, traceback, method[4], ...)
 	end
 	local ti = profile.stop()
 	update_stat(method[3], ti)
@@ -105,7 +107,7 @@ skynet.start(function()
 		if method[2] == "system" then
 			local command = method[3]
 			if command == "hotfix" then
-				local hotfix = require "snax_hotfix"
+				local hotfix = require "snax.hotfix"
 				skynet.ret(skynet.pack(hotfix(func, ...)))
 			elseif command == "init" then
 				assert(not init, "Already init")

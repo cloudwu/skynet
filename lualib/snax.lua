@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local snax_interface = require "snax_interface"
+local snax_interface = require "snax.interface"
 
 local snax = {}
 local typeclass = {}
