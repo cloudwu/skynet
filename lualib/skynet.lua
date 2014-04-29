@@ -649,12 +649,4 @@ function skynet.mqlen()
 	return tonumber(c.command "MQLEN")
 end
 
-function skynet.globalget(...)
-	return skynet.call("DATACENTER", "lua", "QUERY", ...)
-end
-
-function skynet.globalset(...)
-	return skynet.call("DATACENTER", "lua", "UPDATE", ...)
-end
-
 return skynet
