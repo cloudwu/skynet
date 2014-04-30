@@ -3,17 +3,12 @@ local mc = require "multicast.c"
 
 local multicastd
 local multicast = {}
-local dispatch = {}
+local dispatch = setmetatable({} , {__mode = "kv" })
 
 local chan = {}
 local chan_meta = {
 	__index = chan,
-	__gc = function(self)
-		self:unsubscribe()
-		local c = self.channel
-		self.channel = nil
-		dispatch[c] = nil
-	end,
+	__gc = unsubscribe,
 	__tostring = function (self)
 		return string.format("[Multicast:%x]",self.channel)
 	end,
