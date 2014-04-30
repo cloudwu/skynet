@@ -1,7 +1,5 @@
-Dev 
-===
-
-Major Changes
+Dev version
+-----------
 
 * Rewrite malloc hook , use `pthread_getspecific` instead of `__thread` to get current service handle.
 * Optimize global unique service query, rewrite `service_mgr` .
@@ -13,16 +11,18 @@ Major Changes
 * Add multicast api.
 
 v0.1.1 (2014-4-28)
-======
+------------------
 
-Major Changes
-
-* socket channel reconnect should clear request queue.
-* socket close may block the coroutine.
-* jemalloc api may crash on macosx (disable jemalloc on macosx).
+* Socket channel should clear request queue when reconnect.
+* Fix the issue that socket close may block the coroutine.
+* Fix the issue that jemalloc api may crash on macosx (disable jemalloc on macosx).
 
 v0.1.0 (2014-4-23)
-======
+------------------
+
+* First release version.
 
 First public version (2012-8-1)
-======
+------------------
+
+* Make skynet from a private project to public.
