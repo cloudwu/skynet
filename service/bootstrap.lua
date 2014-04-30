@@ -9,7 +9,6 @@ skynet.start(function()
 		skynet.name("DATACENTER", datacenter)
 	end
 	assert(skynet.newservice "service_mgr")
-	skynet.uniqueservice("multicastd")
 	assert(skynet.newservice(skynet.getenv "start" or "main"))
 	skynet.exit()
 end)
