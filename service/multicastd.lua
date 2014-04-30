@@ -137,8 +137,11 @@ function command.SUB(source, c)
 			if skynet.call(node_address[node], "lua", "SUBR", c) then
 				return
 			end
-			channel[c] = {}
-			channel_n[c] = 0
+			if channel[c] == nil then
+				-- double check, because skynet.call whould yield, other SUB may occur.
+				channel[c] = {}
+				channel_n[c] = 0
+			end
 		end
 	end
 	local group = channel[c]
