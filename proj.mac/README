@@ -1,0 +1,5 @@
+HOW TO BUILD
+1.run make in root directory (cservice/*.so, luaclib/*.so)
+2.open proj.mac/skynet.xcodeproj
+  2.1 edit skynet scheme - Arguments - Arguments Passwd On Luanch + examples/config
+  2.2 click "build and run" menu
