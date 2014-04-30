@@ -9,11 +9,14 @@ if mode == "sub" then
 skynet.start(function()
 	skynet.dispatch("lua", function (_,_, cmd, channel)
 		assert(cmd == "init")
-		mc.subscribe(channel, {
+		local c = mc.new {
+			channel = channel ,
 			dispatch = function (channel, source, ...)
-				print(string.format("%s <=== %s (%d)",skynet.address(skynet.self()),skynet.address(source), channel), ...)
+				print(string.format("%s <=== %s %s",skynet.address(skynet.self()),skynet.address(source), channel), ...)
 			end
-		})
+		}
+		print(skynet.address(skynet.self()), "sub", c)
+		c:subscribe()
 		skynet.ret(skynet.pack())
 	end)
 end)
@@ -21,18 +24,17 @@ end)
 else
 
 skynet.start(function()
-	local channel = mc.newchannel()
+	local channel = mc.new()
 	print("New channel", channel)
 	for i=1,10 do
 		local sub = skynet.newservice("testmulticast", "sub")
-		skynet.call(sub, "lua", "init", channel)
+		skynet.call(sub, "lua", "init", channel.channel)
 	end
 
-	print("set channel", channel)
-	dc.set("CHANNEL", channel)
+	dc.set("MCCHANNEL", channel.channel)	-- for multi node test
 
 	print(skynet.address(skynet.self()), "===>", channel)
-	mc.publish(channel, "Hello World")
+	channel:publish("Hello World")
 end)
 
 end

@@ -1,9 +1,23 @@
 local skynet = require "skynet"
-local c = require "multicast.c"
+local mc = require "multicast.c"
 
 local multicastd
 local multicast = {}
 local dispatch = {}
+
+local chan = {}
+local chan_meta = {
+	__index = chan,
+	__gc = function(self)
+		self:unsubscribe()
+		local c = self.channel
+		self.channel = nil
+		dispatch[c] = nil
+	end,
+	__tostring = function (self)
+		return string.format("[Multicast:%x]",self.channel)
+	end,
+}
 
 local function default_conf(conf)
 	conf = conf or {}
@@ -13,48 +27,69 @@ local function default_conf(conf)
 	return conf
 end
 
-function multicast.newchannel(conf)
+function multicast.new(conf)
 	assert(multicastd, "Init first")
-	local channel = skynet.call(multicastd, "lua", "NEW")
-	dispatch[channel] = default_conf(conf)
-	return channel
+	local self = {}
+	conf = conf or self
+	self.channel = conf.channel
+	if self.channel == nil then
+		self.channel = skynet.call(multicastd, "lua", "NEW")
+	end
+	self.__pack = conf.pack or skynet.pack
+	self.__unpack = conf.unpack or skynet.unpack
+	self.__dispatch = conf.dispatch
+
+	return setmetatable(self, chan_meta)
 end
 
-function multicast.bind(channel, conf)
-	assert(multicastd, "Init first")
-	assert(not dispatch[channel])
-	dispatch[channel] = default_conf(conf)
+function chan:delete()
+	local c = assert(self.channel)
+	skynet.send(multicastd, "lua", "DEL", c)
+	self.channel = nil
+	self.__subscribe = nil
 end
 
-function multicast.publish(channel, ...)
-	local conf = assert(dispatch[channel])
-	skynet.call(multicastd, "lua", "PUB", channel, c.pack(conf.pack(...)))
+function chan:publish(...)
+	local c = assert(self.channel)
+	skynet.call(multicastd, "lua", "PUB", c, mc.pack(self.__pack(...)))
 end
 
-function multicast.subscribe(channel, conf)
-	assert(multicastd, "Init first")
-	assert(conf.dispatch)
-	skynet.call(multicastd, "lua", "SUB", channel)
-	dispatch[channel] = default_conf(conf)
+function chan:subscribe()
+	local c = assert(self.channel)
+	if self.__subscribe then
+		-- already subscribe
+		return
+	end
+	skynet.call(multicastd, "lua", "SUB", c)
+	self.__subscribe = true
+	dispatch[c] = self
 end
 
-function multicast.unsubscribe(channel)
-	assert(multicastd, "Init first")
-	assert(dispatch[channel])
-	dispatch[channel] = nil
-	skynet.call(multicastd, "lua", "USUB", channel)
+function chan:unsubscribe()
+	if not self.__subscribe then
+		-- already unsubscribe
+		return
+	end
+	local c = assert(self.channel)
+	skynet.send(multicastd, "lua", "USUB", c)
+	self.__subscribe = nil
 end
 
 local function dispatch_subscribe(channel, source, pack, msg, sz)
-	local conf = dispatch[channel]
-	if not conf then
-		c.close(pack)
+	local self = dispatch[channel]
+	if not self then
+		mc.close(pack)
 		error ("Unknown channel " .. channel)
 	end
 
-	local ok, err = pcall(conf.dispatch, channel, source, conf.unpack(msg, sz))
-	c.close(pack)
-	assert(ok, err)
+	if self.__subscribe then
+		local ok, err = pcall(self.__dispatch, self, source, self.__unpack(msg, sz))
+		mc.close(pack)
+		assert(ok, err)
+	else
+		-- maybe unsubscribe first, but the message is send out. drop the message unneed
+		mc.close(pack)
+	end
 end
 
 local function init()
@@ -62,7 +97,7 @@ local function init()
 	skynet.register_protocol {
 		name = "multicast",
 		id = skynet.PTYPE_MULTICAST,
-		unpack = c.unpack,
+		unpack = mc.unpack,
 		dispatch = dispatch_subscribe,
 	}
 end

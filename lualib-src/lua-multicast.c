@@ -139,6 +139,15 @@ mc_remote(lua_State *L) {
 	return 2;
 }
 
+static int
+mc_nextid(lua_State *L) {
+	uint32_t id = luaL_checkunsigned(L, 1);
+	id += 256;
+	lua_pushunsigned(L, id);
+
+	return 1;
+}
+
 int
 luaopen_multicast_c(lua_State *L) {
 	luaL_Reg l[] = {
@@ -149,6 +158,7 @@ luaopen_multicast_c(lua_State *L) {
 		{ "remote", mc_remote },
 		{ "packstring", mc_packstring },
 		{ "packremote", mc_packremote },
+		{ "nextid", mc_nextid },
 		{ NULL, NULL },
 	};
 	luaL_checkversion(L);
