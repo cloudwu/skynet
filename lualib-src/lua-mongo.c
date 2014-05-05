@@ -55,7 +55,7 @@ little_endian(uint32_t v) {
 typedef void * document;
 
 static inline uint32_t
-get_length(const document buffer) {
+get_length(document buffer) {
 	union {
 		uint32_t v;
 		uint8_t b[4];
@@ -243,7 +243,7 @@ op_reply(lua_State *L) {
 			lua_pushlightuserdata(L, (void *)doc);
 			lua_rawseti(L, 2, i);
 
-			int32_t doc_len = get_length((const document)doc);
+			int32_t doc_len = get_length((document)doc);
 
 			doc += doc_len;
 			sz -= doc_len;
