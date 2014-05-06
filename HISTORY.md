@@ -9,6 +9,9 @@ Dev version
 * Support preload a file before each lua serivce start.
 * Add datacenter serivce.
 * Add multicast api.
+* Remove skynet.blockcall , simplify the implement of message queue.
+* When dropping message queue (at service exit) , dispatcher will post an error back to the source of each message.
+* Remove skynet.watch , monitor is not necessary for watching skynet.call . so simplemonitor.lua is move to examples.
 
 v0.1.1 (2014-4-28)
 ------------------
