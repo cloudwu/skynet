@@ -253,7 +253,6 @@ skynet_context_message_dispatch(struct skynet_monitor *sm) {
 
 	if (ctx->cb == NULL) {
 		skynet_free(msg.data);
-		skynet_error(NULL, "Drop message from %x to %x without callback , size = %d",msg.source, handle, (int)msg.sz);
 	} else {
 		_dispatch_message(ctx, &msg);
 	}
@@ -527,10 +526,6 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 
 		if (skynet_context_push(destination, &smsg)) {
 			skynet_free(data);
-			if (destination) {
-				// don't report the message to 0 (system service)
-				skynet_error(NULL, "Drop message from %x to %x (type=%d)(size=%d)", source, destination, type&0xff, (int)(sz & HANDLE_MASK));
-			}
 			return -1;
 		}
 	}
@@ -547,9 +542,8 @@ skynet_sendname(struct skynet_context * context, const char * addr , int type, i
 		des = skynet_handle_findname(addr + 1);
 		if (des == 0) {
 			if (type & PTYPE_TAG_DONTCOPY) {
-  			skynet_free(data);
-  		}
-			skynet_error(context, "Drop message to %s", addr);
+				skynet_free(data);
+			}
 			return session;
 		}
 	} else {
