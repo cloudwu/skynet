@@ -222,7 +222,7 @@ _drop_queue(struct message_queue *q, message_drop drop_func, void *ud) {
 	int s = 0;
 	while(!skynet_mq_pop(q, &msg)) {
 		++s;
-		drop_func(ud, &msg);
+		drop_func(&msg, ud);
 	}
 	_release(q);
 	return s;
