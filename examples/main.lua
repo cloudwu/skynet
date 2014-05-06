@@ -4,7 +4,6 @@ local max_client = 64
 
 skynet.start(function()
 	print("Server start")
-	skynet.monitor "simplemonitor"
 	local console = skynet.newservice("console")
 	skynet.newservice("debug_console",8000)
 	skynet.newservice("simpledb")

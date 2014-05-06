@@ -20,7 +20,7 @@ void skynet_mq_mark_release(struct message_queue *q);
 
 typedef void (*message_drop)(struct skynet_message *, void *);
 
-int skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud);
+void skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud);
 uint32_t skynet_mq_handle(struct message_queue *);
 
 // 0 for success

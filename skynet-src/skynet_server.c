@@ -90,9 +90,18 @@ _id_to_hex(char * str, uint32_t id) {
 	str[9] = '\0';
 }
 
+struct drop_t {
+	uint32_t handle;
+};
+
 static void
 drop_message(struct skynet_message *msg, void *ud) {
+	struct drop_t *d = ud;
 	skynet_free(msg->data);
+	uint32_t source = d->handle;
+	assert(source);
+	// report error to the message source
+	skynet_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
 }
 
 struct skynet_context * 
@@ -137,9 +146,11 @@ skynet_context_new(const char * name, const char *param) {
 		return ret;
 	} else {
 		skynet_error(ctx, "FAILED launch %s", name);
+		uint32_t handle = ctx->handle;
 		skynet_context_release(ctx);
-		skynet_handle_retire(ctx->handle);
-		skynet_mq_release(queue, drop_message, NULL);
+		skynet_handle_retire(handle);
+		struct drop_t d = { handle };
+		skynet_mq_release(queue, drop_message, &d);
 		return NULL;
 	}
 }
@@ -227,10 +238,8 @@ skynet_context_message_dispatch(struct skynet_monitor *sm) {
 
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
-		int s = skynet_mq_release(q, drop_message, NULL);
-		if (s>0) {
-			skynet_error(NULL, "Drop message queue %x (%d messages)", handle,s);
-		}
+		struct drop_t d = { handle };
+		skynet_mq_release(q, drop_message, &d);
 		return 0;
 	}
 
@@ -518,7 +527,10 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 
 		if (skynet_context_push(destination, &smsg)) {
 			skynet_free(data);
-			skynet_error(NULL, "Drop message from %x to %x (type=%d)(size=%d)", source, destination, type&0xff, (int)(sz & HANDLE_MASK));
+			if (destination) {
+				// don't report the message to 0 (system service)
+				skynet_error(NULL, "Drop message from %x to %x (type=%d)(size=%d)", source, destination, type&0xff, (int)(sz & HANDLE_MASK));
+			}
 			return -1;
 		}
 	}

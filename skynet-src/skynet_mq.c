@@ -162,7 +162,7 @@ void
 skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	assert(message);
 	LOCK(q)
-	
+
 	q->queue[q->tail] = *message;
 	if (++ q->tail >= q->cap) {
 		q->tail = 0;
@@ -216,30 +216,24 @@ skynet_mq_mark_release(struct message_queue *q) {
 	UNLOCK(q)
 }
 
-static int
+static void
 _drop_queue(struct message_queue *q, message_drop drop_func, void *ud) {
 	struct skynet_message msg;
-	int s = 0;
 	while(!skynet_mq_pop(q, &msg)) {
-		++s;
 		drop_func(&msg, ud);
 	}
 	_release(q);
-	return s;
 }
 
-int 
+void 
 skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud) {
-	int ret = 0;
 	LOCK(q)
 	
 	if (q->release) {
 		UNLOCK(q)
-		ret = _drop_queue(q, drop_func, ud);
+		_drop_queue(q, drop_func, ud);
 	} else {
 		skynet_mq_force_push(q);
 		UNLOCK(q)
 	}
-	
-	return ret;
 }

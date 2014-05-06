@@ -402,9 +402,8 @@ _remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int
 		_send_remote(context, fd, msg,sz,&cookie);
 	} else {
 		// throw an error return to source
-		if (session != 0) {
-			skynet_send(context, destination, source, PTYPE_RESERVED_ERROR, session, NULL, 0);
-		}
+		// report the destination is dead
+		skynet_send(context, destination, source, PTYPE_ERROR, 0 , NULL, 0);
 		skynet_error(context, "Drop message to harbor %d from %x to %x (session = %d, msgsz = %d)",harbor_id, source, destination,session,(int)sz);
 	}
 	return 0;

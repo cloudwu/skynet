@@ -69,13 +69,13 @@ local function dispatch_error_queue()
 	end
 end
 
-local function _error_dispatch(error_session, monitor, service)
-	if service then
+local function _error_dispatch(error_session, error_source)
+	if error_session == 0 then
 		-- service is down
 		--  Don't remove from watching_service , because user may call dead service
-		watching_service[service] = false
+		watching_service[error_source] = false
 		for session, srv in pairs(watching_session) do
-			if srv == service then
+			if srv == error_source then
 				table.insert(error_queue, session)
 			end
 		end
@@ -84,21 +84,6 @@ local function _error_dispatch(error_session, monitor, service)
 		if watching_session[error_session] then
 			table.insert(error_queue, error_session)
 		end
-	end
-end
-
-local watch_monitor
-
-function skynet.watch(service)
-	assert(type(service) == "number")
-	if watch_monitor == nil then
-		watch_monitor = string_to_handle(c.command("MONITOR"))
-		assert(watch_monitor, "Need a monitor")
-	end
-	if watching_service[service] == nil then
-		watching_service[service] = true
-		-- read lualib/simplemonitor.lua
-		assert(skynet.call(watch_monitor, "lua", "WATCH", service), "watch a dead service")
 	end
 end
 
@@ -289,7 +274,7 @@ local function yield_call(service, session)
 	watching_session[session] = service
 	local succ, msg, sz = coroutine_yield("CALL", session)
 	watching_session[session] = nil
-	assert(succ, "Capture an error")
+	assert(succ, debug.traceback())
 	return msg,sz
 end
 
@@ -478,8 +463,7 @@ do
 	REG {
 		name = "error",
 		id = skynet.PTYPE_ERROR,
-		pack = skynet.pack,
-		unpack = skynet.unpack,
+		unpack = function(...) return ... end,
 		dispatch = _error_dispatch,
 	}
 end
