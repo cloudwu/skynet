@@ -13,12 +13,8 @@
 
 // 0 means mq is not in global mq.
 // 1 means mq is in global mq , or the message is dispatching.
-// 2 means message is dispatching with locked session set.
-// 3 means mq is not in global mq, and locked session has been set.
 
 #define MQ_IN_GLOBAL 1
-#define MQ_DISPATCHING 2
-#define MQ_LOCKED 3
 
 struct message_queue {
 	uint32_t handle;
@@ -27,7 +23,6 @@ struct message_queue {
 	int tail;
 	int lock;
 	int release;
-	int lock_session;
 	int in_global;
 	struct skynet_message *queue;
 };
@@ -89,9 +84,11 @@ skynet_mq_create(uint32_t handle) {
 	q->head = 0;
 	q->tail = 0;
 	q->lock = 0;
+	// When the queue is create (always between service create and service init) ,
+	// set in_global flag to avoid push it to global queue .
+	// If the service init success, skynet_context_new will call skynet_mq_force_push to push it to global queue.
 	q->in_global = MQ_IN_GLOBAL;
 	q->release = 0;
-	q->lock_session = 0;
 	q->queue = skynet_malloc(sizeof(struct skynet_message) * q->cap);
 
 	return q;
@@ -161,79 +158,25 @@ expand_queue(struct message_queue *q) {
 	q->queue = new_queue;
 }
 
-static void
-_unlock(struct message_queue *q) {
-	// this api use in push a unlock message, so the in_global flags must not be 0 , 
-	// but the q is not exist in global queue.
-	if (q->in_global == MQ_LOCKED) {
-		skynet_globalmq_push(q);
-		q->in_global = MQ_IN_GLOBAL;
-	} else {
-		assert(q->in_global == MQ_DISPATCHING);
-	}
-	q->lock_session = 0;
-}
-
-static void 
-_pushhead(struct message_queue *q, struct skynet_message *message) {
-	int head = q->head - 1;
-	if (head < 0) {
-		head = q->cap - 1;
-	}
-	if (head == q->tail) {
-		expand_queue(q);
-		--q->tail;
-		head = q->cap - 1;
-	}
-
-	q->queue[head] = *message;
-	q->head = head;
-
-	_unlock(q);
-}
-
 void 
 skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	assert(message);
 	LOCK(q)
 	
-	if (q->lock_session !=0 && message->session == q->lock_session) {
-		_pushhead(q,message);
-	} else {
-		q->queue[q->tail] = *message;
-		if (++ q->tail >= q->cap) {
-			q->tail = 0;
-		}
+	q->queue[q->tail] = *message;
+	if (++ q->tail >= q->cap) {
+		q->tail = 0;
+	}
 
-		if (q->head == q->tail) {
-			expand_queue(q);
-		}
+	if (q->head == q->tail) {
+		expand_queue(q);
+	}
 
-		if (q->lock_session == 0) {
-			if (q->in_global == 0) {
-				q->in_global = MQ_IN_GLOBAL;
-				skynet_globalmq_push(q);
-			}
-		}
+	if (q->in_global == 0) {
+		q->in_global = MQ_IN_GLOBAL;
+		skynet_globalmq_push(q);
 	}
 	
-	UNLOCK(q)
-}
-
-void
-skynet_mq_lock(struct message_queue *q, int session) {
-	LOCK(q)
-	assert(q->lock_session == 0);
-	assert(q->in_global == MQ_IN_GLOBAL);
-	q->in_global = MQ_DISPATCHING;
-	q->lock_session = session;
-	UNLOCK(q)
-}
-
-void
-skynet_mq_unlock(struct message_queue *q) {
-	LOCK(q)
-	_unlock(q);
 	UNLOCK(q)
 }
 
@@ -257,14 +200,8 @@ void
 skynet_mq_pushglobal(struct message_queue *queue) {
 	LOCK(queue)
 	assert(queue->in_global);
-	if (queue->in_global == MQ_DISPATCHING) {
-		// lock message queue just now.
-		queue->in_global = MQ_LOCKED;
-	}
-	if (queue->lock_session == 0) {
-		skynet_globalmq_push(queue);
-		queue->in_global = MQ_IN_GLOBAL;
-	}
+	skynet_globalmq_push(queue);
+	queue->in_global = MQ_IN_GLOBAL;
 	UNLOCK(queue)
 }
 
@@ -280,26 +217,25 @@ skynet_mq_mark_release(struct message_queue *q) {
 }
 
 static int
-_drop_queue(struct message_queue *q) {
-	// todo: send message back to message source
+_drop_queue(struct message_queue *q, message_drop drop_func, void *ud) {
 	struct skynet_message msg;
 	int s = 0;
 	while(!skynet_mq_pop(q, &msg)) {
 		++s;
-		skynet_free(msg.data);
+		drop_func(ud, &msg);
 	}
 	_release(q);
 	return s;
 }
 
 int 
-skynet_mq_release(struct message_queue *q) {
+skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud) {
 	int ret = 0;
 	LOCK(q)
 	
 	if (q->release) {
 		UNLOCK(q)
-		ret = _drop_queue(q);
+		ret = _drop_queue(q, drop_func, ud);
 	} else {
 		skynet_mq_force_push(q);
 		UNLOCK(q)

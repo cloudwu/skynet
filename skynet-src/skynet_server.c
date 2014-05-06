@@ -90,6 +90,11 @@ _id_to_hex(char * str, uint32_t id) {
 	str[9] = '\0';
 }
 
+static void
+drop_message(struct skynet_message *msg, void *ud) {
+	skynet_free(msg->data);
+}
+
 struct skynet_context * 
 skynet_context_new(const char * name, const char *param) {
 	struct skynet_module * mod = skynet_module_query(name);
@@ -134,7 +139,7 @@ skynet_context_new(const char * name, const char *param) {
 		skynet_error(ctx, "FAILED launch %s", name);
 		skynet_context_release(ctx);
 		skynet_handle_retire(ctx->handle);
-		skynet_mq_release(queue);
+		skynet_mq_release(queue, drop_message, NULL);
 		return NULL;
 	}
 }
@@ -222,7 +227,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm) {
 
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
-		int s = skynet_mq_release(q);
+		int s = skynet_mq_release(q, drop_message, NULL);
 		if (s>0) {
 			skynet_error(NULL, "Drop message queue %x (%d messages)", handle,s);
 		}
@@ -299,22 +304,6 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		skynet_timeout(context->handle, ti, session);
 		sprintf(context->result, "%d", session);
 		return context->result;
-	}
-
-	if (strcmp(cmd,"LOCK") == 0) {
-		if (context->init == false) {
-			return NULL;
-		}
-		skynet_mq_lock(context->queue, context->session_id+1);
-		return NULL;
-	}
-
-	if (strcmp(cmd,"UNLOCK") == 0) {
-		if (context->init == false) {
-			return NULL;
-		}
-		skynet_mq_unlock(context->queue);
-		return NULL;
 	}
 
 	if (strcmp(cmd,"REG") == 0) {

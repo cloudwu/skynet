@@ -305,17 +305,6 @@ function skynet.call(addr, typename, ...)
 	return p.unpack(yield_call(addr, session))
 end
 
-function skynet.blockcall(addr, typename , ...)
-	local p = proto[typename]
-	c.command("LOCK")
-	local session = c.send(addr, p.id , nil , p.pack(...))
-	if session == nil then
-		c.command("UNLOCK")
-		error("call to invalid address " .. skynet.address(addr))
-	end
-	return p.unpack(yield_call(addr, session))
-end
-
 function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
@@ -328,7 +317,7 @@ function skynet.ret(msg, sz)
 end
 
 function skynet.retpack(...)
-    return skynet.ret(skynet.pack(...))
+	return skynet.ret(skynet.pack(...))
 end
 
 function skynet.wakeup(co)
@@ -345,14 +334,14 @@ function skynet.dispatch(typename, func)
 end
 
 local function unknown_request(session, address, msg, sz)
-    print("Unknown request :" , c.tostring(msg,sz))
+	print("Unknown request :" , c.tostring(msg,sz))
 	error(string.format("Unknown session : %d from %x", session, address))
 end
 
 function skynet.dispatch_unknown_request(unknown)
-    local prev = unknown_request
-    unknown_request = unknown
-    return prev
+	local prev = unknown_request
+	unknown_request = unknown
+	return prev
 end
 
 local function unknown_response(session, address, msg, sz)
