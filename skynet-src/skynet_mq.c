@@ -31,6 +31,8 @@ struct global_queue {
 	uint32_t head;
 	uint32_t tail;
 	struct message_queue ** queue;
+	// We use a separated flag array to ensure the mq is pushed.
+	// See the comments below.
 	bool * flag;
 
 };
@@ -47,6 +49,9 @@ skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
 	uint32_t tail = GP(__sync_fetch_and_add(&q->tail,1));
+	// The thread would suspend here, and the q->queue[tail] is last version ,
+	// but the queue tail is increased.
+	// So we set q->flag[tail] after changing q->queue[tail].
 	q->queue[tail] = queue;
 	__sync_synchronize();
 	q->flag[tail] = true;
@@ -61,6 +66,7 @@ skynet_globalmq_pop() {
 		return NULL;
 	}
 
+	// Check the flag first, if the flag is false, the pushing may not complete.
 	if(!q->flag[head_ptr]) {
 		return NULL;
 	}
