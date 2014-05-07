@@ -25,6 +25,7 @@ struct message_queue {
 	int release;
 	int in_global;
 	struct skynet_message *queue;
+	struct message_queue *next;
 };
 
 struct global_queue {
@@ -34,7 +35,7 @@ struct global_queue {
 	// We use a separated flag array to ensure the mq is pushed.
 	// See the comments below.
 	bool * flag;
-
+	struct message_queue *list;
 };
 
 static struct global_queue *Q = NULL;
@@ -47,6 +48,18 @@ static struct global_queue *Q = NULL;
 static void 
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
+
+	if (q->flag[GP(q->tail)]) {
+		// The queue may full seldom, save queue in list
+		assert(queue->next == NULL);
+		struct message_queue * last;
+		do {
+			last = q->list;
+			queue->next = last;
+		} while(!__sync_bool_compare_and_swap(&q->list, last, queue));
+
+		return;
+	}
 
 	uint32_t tail = GP(__sync_fetch_and_add(&q->tail,1));
 	// The thread would suspend here, and the q->queue[tail] is last version ,
@@ -61,9 +74,23 @@ struct message_queue *
 skynet_globalmq_pop() {
 	struct global_queue *q = Q;
 	uint32_t head =  q->head;
-	uint32_t head_ptr = GP(head);
-	if (head_ptr == GP(q->tail)) {
+
+	if (head == q->tail) {
+		// The queue is empty.
 		return NULL;
+	}
+
+	uint32_t head_ptr = GP(head);
+
+	struct message_queue * list = q->list;
+	if (list) {
+		// If q->list is not empty, try to load it back to the queue
+		struct message_queue *newhead = list->next;
+		if (__sync_bool_compare_and_swap(&q->list, list, newhead)) {
+			// try load list only once, if success , push it back to the queue.
+			list->next = NULL;
+			skynet_globalmq_push(list);
+		}
 	}
 
 	// Check the flag first, if the flag is false, the pushing may not complete.
@@ -96,12 +123,14 @@ skynet_mq_create(uint32_t handle) {
 	q->in_global = MQ_IN_GLOBAL;
 	q->release = 0;
 	q->queue = skynet_malloc(sizeof(struct skynet_message) * q->cap);
+	q->next = NULL;
 
 	return q;
 }
 
 static void 
 _release(struct message_queue *q) {
+	assert(q->next == NULL);
 	skynet_free(q->queue);
 	skynet_free(q);
 }

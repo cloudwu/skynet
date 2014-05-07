@@ -12,6 +12,7 @@ Dev version
 * Remove skynet.blockcall , simplify the implement of message queue.
 * When dropping message queue (at service exit) , dispatcher will post an error back to the source of each message.
 * Remove skynet.watch , monitor is not necessary for watching skynet.call . so simplemonitor.lua is move to examples.
+* Remove the limit of global queue size (64K actived service limit before).
 
 v0.1.1 (2014-4-28)
 ------------------
