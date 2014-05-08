@@ -115,12 +115,8 @@ main(int argc, char *argv[]) {
 
 	config.thread =  optint("thread",8);
 	config.module_path = optstring("cpath","./cservice/?.so");
-	config.logger = optstring("logger",NULL);
 	config.harbor = optint("harbor", 1);
-	config.master = optstring("master","127.0.0.1:2012");
 	config.bootstrap = optstring("bootstrap","snlua bootstrap");
-	config.local = optstring("address","127.0.0.1:2525");
-	config.standalone = optstring("standalone",NULL);
 
 	lua_close(L);
 

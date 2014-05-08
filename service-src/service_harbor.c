@@ -592,6 +592,8 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 		fprintf(stderr, "Harbor: Connect to master failed\n");
 		exit(1);
 	}
+	skynet_harbor_start(ctx);
+
 	h->local_addr = skynet_strdup(local_addr);
 
 	_launch_gate(ctx, local_addr);

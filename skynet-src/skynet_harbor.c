@@ -34,6 +34,7 @@ skynet_harbor_register(struct remote_name *rname) {
 
 int 
 skynet_harbor_message_isremote(uint32_t handle) {
+	assert(HARBOR != 0);
 	int h = (handle & ~HANDLE_MASK);
 	return h != HARBOR && h !=0;
 }
@@ -43,16 +44,7 @@ skynet_harbor_init(int harbor) {
 	HARBOR = (unsigned int)harbor << HANDLE_REMOTE_SHIFT;
 }
 
-int
-skynet_harbor_start(const char * master, const char *local) {
-	size_t sz = strlen(master) + strlen(local) + 32;
-	char args[sz];
-	sprintf(args, "%s %s %d",master,local,HARBOR >> HANDLE_REMOTE_SHIFT);
-	struct skynet_context * inst = skynet_context_new("harbor",args);
-	if (inst == NULL) {
-		return 1;
-	}
-	REMOTE = inst;
-
-	return 0;
+void
+skynet_harbor_start(void *ctx) {
+	REMOTE = ctx;
 }

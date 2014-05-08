@@ -5,7 +5,6 @@
 #include "skynet_handle.h"
 #include "skynet_module.h"
 #include "skynet_timer.h"
-#include "skynet_harbor.h"
 #include "skynet_monitor.h"
 #include "skynet_socket.h"
 
@@ -181,18 +180,15 @@ _start(int thread) {
 	free_monitor(m);
 }
 
-static int
-_start_master(const char * master) {
-	struct skynet_context *ctx = skynet_context_new("master", master);
-	if (ctx == NULL)
-		return 1;
-	return 0;	
-}
-
 static void
-bootstrap(struct skynet_context * ctx, const char * cmdline) {
-	if (!skynet_command(ctx, "LAUNCH", cmdline)) {
-		fprintf(stderr, "Bootstrap error : %s\n", cmdline);
+bootstrap(const char * cmdline) {
+	int sz = strlen(cmdline);
+	char name[sz+1];
+	char args[sz+1];
+	sscanf(cmdline, "%s %s", name, args);
+	struct skynet_context *ctx = skynet_context_new(name, args);
+	if (ctx == NULL) {
+		skynet_error(NULL, "Bootstrap error : %s\n", cmdline);
 		exit(1);
 	}
 }
@@ -206,26 +202,7 @@ skynet_start(struct skynet_config * config) {
 	skynet_timer_init();
 	skynet_socket_init();
 
-	struct skynet_context *ctx;
-	ctx = skynet_context_new("logger", config->logger);
-	if (ctx == NULL) {
-		fprintf(stderr,"launch logger error\n");
-		exit(1);
-	}
-
-	if (config->standalone) {
-		if (_start_master(config->standalone)) {
-			fprintf(stderr, "Init failed : master\n");
-			return;
-		}
-	}
-	// harbor must be init first
-	if (skynet_harbor_start(config->master , config->local)) {
-		fprintf(stderr, "Init failed : no master\n");
-		return;
-	}
-
-	bootstrap(ctx, config->bootstrap);
+	bootstrap(config->bootstrap);
 
 	_start(config->thread);
 	skynet_socket_free();

@@ -4,12 +4,8 @@
 struct skynet_config {
 	int thread;
 	int harbor;
-	const char * logger;
 	const char * module_path;
-	const char * master;
-	const char * local;
 	const char * bootstrap;
-	const char * standalone;
 };
 
 #define THREAD_WORKER 0
