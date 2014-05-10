@@ -2,7 +2,7 @@ local skynet = require "skynet"
 local snax = require "snax"
 
 skynet.start(function()
-	local ps = snax.newservice ("pingserver", "hello world")
+	local ps = snax.uniqueservice ("pingserver", "hello world")
 	print(ps.req.ping("foobar"))
 	print(ps.post.hello())
 	print(pcall(ps.req.error))

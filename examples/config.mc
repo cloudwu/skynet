@@ -1,12 +1,12 @@
 root = "./"
 thread = 8
 logger = nil
-harbor = 1
-address = "127.0.0.1:2526"
+harbor = 2
+address = "127.0.0.1:2527"
 master = "127.0.0.1:2013"
-start = "main"	-- main script
+start = "testmulticast2"	-- main script
 bootstrap = "snlua bootstrap"	-- The service for bootstrap
-standalone = "0.0.0.0:2013"
+--standalone = "0.0.0.0:2013"
 luaservice = root.."service/?.lua;"..root.."test/?.lua;"..root.."examples/?.lua"
 lualoader = "lualib/loader.lua"
 -- preload = "./examples/preload.lua"	-- run preload.lua before every lua service run

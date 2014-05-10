@@ -1,10 +1,18 @@
 local skynet = require "skynet"
-local snax_interface = require "snax_interface"
+local snax_interface = require "snax.interface"
 
 local snax = {}
 local typeclass = {}
 
 local G = { require = function() end }
+
+skynet.register_protocol {
+	name = "snax",
+	id = skynet.PTYPE_SNAX,
+	pack = skynet.pack,
+	unpack = skynet.unpack,
+}
+
 
 function snax.interface(name)
 	if typeclass[name] then
@@ -38,7 +46,7 @@ local function gen_post(type, handle)
 		__index = function( t, k )
 			local id = assert(type.accept[k] , string.format("post %s no exist", k))
 			return function(...)
-				skynet_send(handle, "lua", id, ...)
+				skynet_send(handle, "snax", id, ...)
 			end
 		end })
 end
@@ -48,7 +56,7 @@ local function gen_req(type, handle)
 		__index = function( t, k )
 			local id = assert(type.response[k] , string.format("request %s no exist", k))
 			return function(...)
-				return skynet_call(handle, "lua", id, ...)
+				return skynet_call(handle, "snax", id, ...)
 			end
 		end })
 end
@@ -64,16 +72,14 @@ end
 
 local handle_cache = setmetatable( {} , { __mode = "kv" } )
 
-function snax.newservice(name, ...)
+function snax.rawnewservice(name, ...)
 	local t = snax.interface(name)
 	local handle = skynet.newservice("snaxd", name)
 	assert(handle_cache[handle] == nil)
 	if t.system.init then
-		skynet.call(handle, "lua", t.system.init, ...)
+		skynet.call(handle, "snax", t.system.init, ...)
 	end
-	local ret = wrapper(handle, name, t)
-	handle_cache[handle] = ret
-	return ret
+	return handle
 end
 
 function snax.bind(handle, type)
@@ -88,9 +94,42 @@ function snax.bind(handle, type)
 	return ret
 end
 
+function snax.newservice(name, ...)
+	local handle = snax.rawnewservice(name, ...)
+	return snax.bind(handle, name)
+end
+
+local function service_name(global, name, ...)
+	if global == true then
+		return name
+	else
+		return global
+	end
+end
+
+function snax.uniqueservice(name, ...)
+	local handle = assert(skynet.call(".service", "lua", "LAUNCH", "snaxd", name, ...))
+	return snax.bind(handle, name)
+end
+
+function snax.globalservice(name, ...)
+	local handle = assert(skynet.call(".service", "lua", "GLAUNCH", "snaxd", name, ...))
+	return snax.bind(handle, name)
+end
+
+function snax.queryservice(name)
+	local handle = assert(skynet.call(".service", "lua", "QUERY", "snaxd", name))
+	return snax.bind(handle, name)
+end
+
+function snax.queryglobal(name)
+	local handle = assert(skynet.call(".service", "lua", "GQUERY", "snaxd", name))
+	return snax.bind(handle, name)
+end
+
 function snax.kill(obj, ...)
 	local t = snax.interface(obj.type)
-	skynet_call(obj.handle, "lua", t.system.exit, ...)
+	skynet_call(obj.handle, "snax", t.system.exit, ...)
 end
 
 local function test_result(ok, ...)
@@ -103,7 +142,7 @@ end
 
 function snax.hotfix(obj, source, ...)
 	local t = snax.interface(obj.type)
-	return test_result(skynet_call(obj.handle, "lua", t.system.hotfix, source, ...))
+	return test_result(skynet_call(obj.handle, "snax", t.system.hotfix, source, ...))
 end
 
 return snax
