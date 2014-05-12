@@ -9,6 +9,7 @@ struct skynet_context;
 #define SKYNET_SOCKET_TYPE_ACCEPT 4
 #define SKYNET_SOCKET_TYPE_ERROR 5
 
+// skynet的socket消息结构
 struct skynet_socket_message {
 	int type;
 	int id;

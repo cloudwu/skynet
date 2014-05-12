@@ -41,6 +41,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 			sz += 1;
 		}
 	}
+
 	sm = (struct skynet_socket_message *)malloc(sz);
 	sm->type = type;
 	sm->id = result->id;
@@ -58,12 +59,16 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	message.data = sm;
 	message.sz = sz | PTYPE_SOCKET << HANDLE_REMOTE_SHIFT;
 	
+	// 将这个消息推送到对应的 handler
+	// 不要调用 skynet_socket_close 那会阻塞整个事件循环
 	if (skynet_context_push((uint32_t)result->opaque, &message)) {
 		// todo: report somewhere to close socket
 		// don't call skynet_socket_close here (It will block mainloop)
 		free(sm);
 	}
 }
+
+// 调用socket_server_poll()函数得到消息向前传递消息
 
 int 
 skynet_socket_poll() {
