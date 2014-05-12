@@ -1,4 +1,4 @@
-Dev version
+v0.2.0 (2014-5-12)
 -----------
 
 * Rewrite malloc hook , use `pthread_getspecific` instead of `__thread` to get current service handle.
@@ -13,6 +13,7 @@ Dev version
 * When dropping message queue (at service exit) , dispatcher will post an error back to the source of each message.
 * Remove skynet.watch , monitor is not necessary for watching skynet.call . so simplemonitor.lua is move to examples.
 * Remove the limit of global queue size (64K actived service limit before).
+* Refactoring `skynet_command`.
 
 v0.1.1 (2014-4-28)
 ------------------
