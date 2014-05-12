@@ -12,11 +12,10 @@ skynet.register_protocol {
 		local w = service_map[address]
 		if w then
 			for watcher in pairs(w) do
-				skynet.send(watcher, "error", address)
+				skynet.redirect(watcher, address, "error", "")
 			end
 			service_map[address] = false
 		end
-		print(string.format("[:%x] exit", address))
 	end
 }
 

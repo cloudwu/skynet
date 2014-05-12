@@ -21,4 +21,8 @@ int skynet_context_total();
 
 void skynet_context_endless(uint32_t handle);	// for monitor
 
+void skynet_globalinit(void);
+void skynet_globalexit(void);
+void skynet_initthread(int m);
+
 #endif
