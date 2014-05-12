@@ -8,13 +8,13 @@
 
 #define PTYPE_TEXT 0
 #define PTYPE_RESPONSE 1
-#define PTYPE_MULTICAST_DEPRECATED 2
+#define PTYPE_MULTICAST 2
 #define PTYPE_CLIENT 3
 #define PTYPE_SYSTEM 4
 #define PTYPE_HARBOR 5
 #define PTYPE_SOCKET 6
 // read lualib/skynet.lua lualib/simplemonitor.lua
-#define PTYPE_RESERVED_ERROR 7	
+#define PTYPE_ERROR 7	
 // read lualib/skynet.lua lualib/mqueue.lua
 #define PTYPE_RESERVED_QUEUE 8
 #define PTYPE_RESERVED_DEBUG 9

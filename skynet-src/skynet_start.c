@@ -5,7 +5,6 @@
 #include "skynet_handle.h"
 #include "skynet_module.h"
 #include "skynet_timer.h"
-#include "skynet_harbor.h"
 #include "skynet_monitor.h"
 #include "skynet_socket.h"
 
@@ -50,6 +49,7 @@ wakeup(struct monitor *m, int busy) {
 static void *
 _socket(void *p) {
 	struct monitor * m = p;
+	skynet_initthread(THREAD_SOCKET);
 	for (;;) {
 		int r = skynet_socket_poll();
 		if (r==0)
@@ -81,6 +81,7 @@ _monitor(void *p) {
 	struct monitor * m = p;
 	int i;
 	int n = m->count;
+	skynet_initthread(THREAD_MONITOR);
 	for (;;) {
 		CHECK_ABORT
 		for (i=0;i<n;i++) {
@@ -98,6 +99,7 @@ _monitor(void *p) {
 static void *
 _timer(void *p) {
 	struct monitor * m = p;
+	skynet_initthread(THREAD_TIMER);
 	for (;;) {
 		skynet_updatetime();
 		CHECK_ABORT
@@ -117,6 +119,7 @@ _worker(void *p) {
 	int id = wp->id;
 	struct monitor *m = wp->m;
 	struct skynet_monitor *sm = m->m[id];
+	skynet_initthread(THREAD_WORKER);
 	for (;;) {
 		if (skynet_context_message_dispatch(sm)) {
 			CHECK_ABORT
@@ -177,12 +180,17 @@ _start(int thread) {
 	free_monitor(m);
 }
 
-static int
-_start_master(const char * master) {
-	struct skynet_context *ctx = skynet_context_new("master", master);
-	if (ctx == NULL)
-		return 1;
-	return 0;	
+static void
+bootstrap(const char * cmdline) {
+	int sz = strlen(cmdline);
+	char name[sz+1];
+	char args[sz+1];
+	sscanf(cmdline, "%s %s", name, args);
+	struct skynet_context *ctx = skynet_context_new(name, args);
+	if (ctx == NULL) {
+		skynet_error(NULL, "Bootstrap error : %s\n", cmdline);
+		exit(1);
+	}
 }
 
 void 
@@ -194,32 +202,8 @@ skynet_start(struct skynet_config * config) {
 	skynet_timer_init();
 	skynet_socket_init();
 
-	struct skynet_context *ctx;
-	ctx = skynet_context_new("logger", config->logger);
-	if (ctx == NULL) {
-		fprintf(stderr,"launch logger error");
-		exit(1);
-	}
-
-	if (config->standalone) {
-		if (_start_master(config->standalone)) {
-			fprintf(stderr, "Init fail : mater");
-			return;
-		}
-	}
-	// harbor must be init first
-	if (skynet_harbor_start(config->master , config->local)) {
-		fprintf(stderr, "Init fail : no master");
-		return;
-	}
-
-	ctx = skynet_context_new("snlua", "launcher");
-	if (ctx) {
-		skynet_command(ctx, "REG", ".launcher");
-		ctx = skynet_context_new("snlua", config->start);
-	}
+	bootstrap(config->bootstrap);
 
 	_start(config->thread);
 	skynet_socket_free();
 }
-
