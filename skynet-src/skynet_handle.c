@@ -194,7 +194,7 @@ _insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
 	int begin = 0;
 	int end = s->name_count - 1;
 	while (begin<=end) {
-		int mid = (begin+end)/2;
+		int mid = begin+((end-begin)/2);
 		struct handle_name *n = &s->name[mid];
 		int c = strcmp(n->name, name);
 		if (c==0) {
