@@ -815,6 +815,22 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 	return 1;
 }
 
+static inline void 
+clear_closed_event(struct socket_server *ss, struct socket_message * result, int type) {
+	if (type == SOCKET_CLOSE || type == SOCKET_ERROR) {
+		int id = result->id;
+		int i;
+		for (i=ss->event_index; i<ss->event_n; i++) {
+			struct event *e = &ss->ev[i];
+			struct socket *s = e->s;
+			if (s) {
+				if (s->type == SOCKET_TYPE_INVALID && s->id == id) {
+					e->s = NULL;
+				}
+			}
+		}
+	}
+}
 
 // return type
 int 
@@ -823,9 +839,10 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 		if (ss->checkctrl) {
 			if (has_cmd(ss)) {
 				int type = ctrl_cmd(ss, result);
-				if (type != -1)
+				if (type != -1) {
+					clear_closed_event(ss, result, type);
 					return type;
-				else
+				} else
 					continue;
 			} else {
 				ss->checkctrl = 0;
@@ -865,12 +882,14 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				int type = send_buffer(ss, s, result);
 				if (type == -1)
 					break;
+				clear_closed_event(ss, result, type);
 				return type;
 			}
 			if (e->read) {
 				int type = forward_message(ss, s, result);
 				if (type == -1)
 					break;
+				clear_closed_event(ss, result, type);
 				return type;
 			}
 			break;
