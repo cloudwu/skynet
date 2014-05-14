@@ -85,7 +85,7 @@ function MSG.data(fd, msg, sz)
 	if agent then
 		skynet.redirect(agent, c.client, "client", 0, msg, sz)
 	else
-		skynet.send(watchdog, "lua", "socket", "data", netpack.tostring(msg, sz))
+		skynet.send(watchdog, "lua", "socket", "data", fd, netpack.tostring(msg, sz))
 	end
 end
 
