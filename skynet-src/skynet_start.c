@@ -17,20 +17,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+// 监控
 struct monitor {
-	int count;
-	struct skynet_monitor ** m;
-	pthread_cond_t cond;
-	pthread_mutex_t mutex;
-	int sleep;
+	int count;					// 工作者线程数 skynet内部实际上市 count + 3 多了3个线程的
+	struct skynet_monitor ** m; // monitor 工作线程监控表
+	pthread_cond_t  cond;  		// 条件变量
+	pthread_mutex_t mutex; 		// 互斥锁        条件变量和互斥锁实现线程的同步
+	int sleep;					// 睡眠中的工作者线程数
 };
 
+// 用于线程参数 工作线程
 struct worker_parm {
 	struct monitor *m;
 	int id;
 };
 
-#define CHECK_ABORT if (skynet_context_total()==0) break;
+#define CHECK_ABORT if (skynet_context_total()==0) break; // 服务数为0
 
 static void
 create_thread(pthread_t *thread, void *(*start_routine) (void *), void *arg) {
@@ -40,9 +42,10 @@ create_thread(pthread_t *thread, void *(*start_routine) (void *), void *arg) {
 	}
 }
 
+// 全部线程都睡眠的情况下才唤醒一个工作线程(即只要有工作线程处于工作状态，则不需要唤醒)
 static void
 wakeup(struct monitor *m, int busy) {
-	if (m->sleep >= m->count - busy) {
+	if (m->sleep >= m->count - busy) { // 睡眠的线程
 		// signal sleep worker, "spurious wakeup" is harmless
 		pthread_cond_signal(&m->cond);
 	}
@@ -52,14 +55,15 @@ static void *
 _socket(void *p) {
 	struct monitor * m = p;
 	for (;;) {
-		int r = skynet_socket_poll(); // 事件循环
-		if (r==0)
+		int r = skynet_socket_poll();
+		if (r==0)		// SOCKET_EXIT
 			break;
 		if (r<0) {
 			CHECK_ABORT
 			continue;
 		}
-		wakeup(m,0);
+		// 有socket消息返回
+		wakeup(m,0);	// 全部线程都睡眠的情况下才唤醒一个工作线程(即只要有工作线程处于工作状态，则不需要唤醒)
 	}
 	return NULL;
 }
@@ -77,6 +81,7 @@ free_monitor(struct monitor *m) {
 	free(m);
 }
 
+// 用于监控是否有消息没有即时处理
 static void *
 _monitor(void *p) {
 	struct monitor * m = p;
@@ -96,22 +101,26 @@ _monitor(void *p) {
 	return NULL;
 }
 
+// 用于定时器
 static void *
 _timer(void *p) {
 	struct monitor * m = p;
 	for (;;) {
 		skynet_updatetime();
 		CHECK_ABORT
-		wakeup(m,m->count-1);
+		wakeup(m,m->count-1);	// 只要有一个睡眠线程就唤醒，让工作线程热起来
 		usleep(2500);
 	}
+
 	// wakeup socket thread
 	skynet_socket_exit();
+
 	// wakeup all worker thread
 	pthread_cond_broadcast(&m->cond);
 	return NULL;
 }
 
+// 工作线程
 static void *
 _worker(void *p) {
 	struct worker_parm *wp = p;
@@ -123,9 +132,11 @@ _worker(void *p) {
 			CHECK_ABORT
 			if (pthread_mutex_lock(&m->mutex) == 0) {
 				++ m->sleep;
+
+				// 假装的醒来时无害的 因为 skynet_ctx_msg_dispatch() 可以在任何时候被调用
 				// "spurious wakeup" is harmless,
 				// because skynet_context_message_dispatch() can be call at any time.
-				pthread_cond_wait(&m->cond, &m->mutex);
+				pthread_cond_wait(&m->cond, &m->mutex); // wait for wakeup
 				-- m->sleep;
 				if (pthread_mutex_unlock(&m->mutex)) {
 					fprintf(stderr, "unlock mutex error");
@@ -139,7 +150,7 @@ _worker(void *p) {
 
 static void
 _start(int thread) {
-	pthread_t pid[thread+3];
+	pthread_t pid[thread+3]; // 线程数+3 3个线程分别用于 _monitor _timer  _socket 监控 定时器 socket IO
 
 	struct monitor *m = malloc(sizeof(*m));
 	memset(m, 0, sizeof(*m));
@@ -151,6 +162,7 @@ _start(int thread) {
 	for (i=0;i<thread;i++) {
 		m->m[i] = skynet_monitor_new();
 	}
+
 	if (pthread_mutex_init(&m->mutex, NULL)) {
 		fprintf(stderr, "Init mutex error");
 		exit(1);
@@ -172,10 +184,10 @@ _start(int thread) {
 	}
 
 	for (i=0;i<thread+3;i++) {
-		pthread_join(pid[i], NULL); 
+		pthread_join(pid[i], NULL); // 等待所有线程退出
 	}
 
-	free_monitor(m);
+	free_monitor(m); // 释放监控
 }
 
 static int
@@ -186,6 +198,7 @@ _start_master(const char * master) {
 	return 0;	
 }
 
+// skynet 启动的时候 初始化
 void 
 skynet_start(struct skynet_config * config) {
 	skynet_group_init();
@@ -203,7 +216,7 @@ skynet_start(struct skynet_config * config) {
 		exit(1);
 	}
 
-	if (config->standalone) {
+	if (config->standalone) { // 是否是单机版
 		if (_start_master(config->standalone)) {
 			fprintf(stderr, "Init fail : mater");
 			return;
