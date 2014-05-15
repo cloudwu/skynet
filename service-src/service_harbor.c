@@ -47,6 +47,9 @@ struct remote_message_header {
 	uint32_t session;
 };
 
+// 12 is sizeof(struct remote_message_header)
+#define HEADER_COOKIE_LENGTH 12
+
 struct harbor {
 	struct skynet_context *ctx;
 	char * local_addr;
@@ -502,23 +505,23 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 	case PTYPE_HARBOR: {
 		// remote message in
 		const char * cookie = msg;
-		cookie += sz - 12;
+		cookie += sz - HEADER_COOKIE_LENGTH;
 		struct remote_message_header header;
 		_message_to_header((const uint32_t *)cookie, &header);
 		if (header.source == 0) {
 			if (header.destination < REMOTE_MAX) {
 				// 1 byte harbor id (0~255)
 				// update remote harbor address
-				char ip [sz - 11];
-				memcpy(ip, msg, sz-12);
-				ip[sz-11] = '\0';
+				char ip [sz - HEADER_COOKIE_LENGTH + 1];
+				memcpy(ip, msg, sz-HEADER_COOKIE_LENGTH);
+				ip[sz-HEADER_COOKIE_LENGTH] = '\0';
 				_update_remote_address(h, header.destination, ip);
 			} else {
 				// update global name
-				if (sz - 12 > GLOBALNAME_LENGTH) {
-					char name[sz-11];
-					memcpy(name, msg, sz-12);
-					name[sz-11] = '\0';
+				if (sz - HEADER_COOKIE_LENGTH > GLOBALNAME_LENGTH) {
+					char name[sz-HEADER_COOKIE_LENGTH+1];
+					memcpy(name, msg, sz-HEADER_COOKIE_LENGTH);
+					name[sz-HEADER_COOKIE_LENGTH] = '\0';
 					skynet_error(context, "Global name is too long %s", name);
 				}
 				_update_remote_name(h, msg, header.destination);
@@ -527,7 +530,7 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 			uint32_t destination = header.destination;
 			int type = (destination >> HANDLE_REMOTE_SHIFT) | PTYPE_TAG_DONTCOPY;
 			destination = (destination & HANDLE_MASK) | ((uint32_t)h->id << HANDLE_REMOTE_SHIFT);
-			skynet_send(context, header.source, destination, type, (int)header.session, (void *)msg, sz-12);
+			skynet_send(context, header.source, destination, type, (int)header.session, (void *)msg, sz-HEADER_COOKIE_LENGTH);
 			return 1;
 		}
 		return 0;
