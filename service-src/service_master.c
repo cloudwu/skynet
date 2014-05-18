@@ -316,7 +316,7 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 	return 0;
 }
 
-// master_init
+// master_init so
 int
 master_init(struct master *m, struct skynet_context *ctx, const char * args) {
 	char tmp[strlen(args) + 32];
