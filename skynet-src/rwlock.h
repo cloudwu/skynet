@@ -1,6 +1,7 @@
 #ifndef _RWLOCK_H_
 #define _RWLOCK_H_
 
+// test
 // ¶ÁÐ´ËøµÄ·­×ª
 struct rwlock {
 	int write;
