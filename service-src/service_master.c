@@ -9,27 +9,48 @@
 #include <assert.h>
 #include <stdint.h>
 
+// skynet的 master服务 master服务保存了key-value key就是skynet的handle value就handle对应的服务
+// matser用于skynet不同节点间的同步
+
+// 我设计了一台 master 中心服务器用来同步机器信息。把每个 skynet 进程上用于和其他机器通讯的部件称为 Harbor 。
+// 每个 skynet 进程有一个 harbor id 为 1 到 255 （保留 0 给系统内部用）。在每个 skynet 进程启动时，
+// 向 master 机器汇报自己的 harbor id 。一旦冲突，则禁止连入。
+
+// master 服务其实就是一个简单的内存 key-value 数据库。数字 key 对应的 value 正是 harbor 的通讯地址。
+// 另外，支持了拥有全局名字的服务，也依靠 master 机器同步。比如，你可以从某台 skynet 节点注册一个叫 DATABASE
+// 的服务节点，它只要将 DATABASE 和节点 id 的对应关系通知 master 机器，就可以依靠 master 机器同步给所有注册入网络的 skynet 节点。
+
+// master 做的事情很简单，其实就是回应名字的查询，以及在更新名字后，同步给网络中所有的机器。
+
+// skynet 节点，通过 master ，认识网络中所有其它 skynet 节点。它们相互一一建立单向通讯通道。
+// 也就是说，如果一共有 100 个 skynet 节点，在它们启动完毕后，会建立起 1 万条通讯通道。
+
+// http://blog.codingnow.com/2012/08/skynet_harbor_rpc.html
+
 #define HASH_SIZE 4096
 
+// hash key-value表
 struct name {
 	struct name * next;
-	char key[GLOBALNAME_LENGTH];
+	char key[GLOBALNAME_LENGTH]; // GLOBALNAME_LENGTH: 16
 	uint32_t hash;
 	uint32_t value;
 };
 
+// hash name map
 struct namemap {
 	struct name *node[HASH_SIZE];
 };
 
 struct master {
 	struct skynet_context *ctx;
-	int remote_fd[REMOTE_MAX];
+	int remote_fd[REMOTE_MAX]; // REMOTE_MAX: 256 默认为256个节点 也可以更改
 	bool connected[REMOTE_MAX];
-	char * remote_addr[REMOTE_MAX];
+	char * remote_addr[REMOTE_MAX]; // ip:port
 	struct namemap map;
 };
 
+// 注册skynet服务的标准接口
 struct master *
 master_create() {
 	struct master *m = malloc(sizeof(*m));
@@ -46,7 +67,9 @@ master_create() {
 void
 master_release(struct master * m) {
 	int i;
+
 	struct skynet_context *ctx = m->ctx;
+
 	for (i=0;i<REMOTE_MAX;i++) {
 		int fd = m->remote_fd[i];
 		if (fd >= 0) {
@@ -55,6 +78,7 @@ master_release(struct master * m) {
 		}
 		free(m->remote_addr[i]);
 	}
+
 	for (i=0;i<HASH_SIZE;i++) {
 		struct name * node = m->map.node[i];
 		while (node) {
@@ -114,6 +138,7 @@ _connect_to(struct master *m, int id) {
 		skynet_error(ctx, "Harbor %d : address invalid (%s)",id, ipaddress);
 		return;
 	}
+
 	int sz = portstr - ipaddress;
 	char tmp[sz + 1];
 	memcpy(tmp,ipaddress,sz);
@@ -123,6 +148,7 @@ _connect_to(struct master *m, int id) {
 	m->remote_fd[id] = skynet_socket_connect(ctx, tmp, port);
 }
 
+// 大小端字节序的转换
 static inline void
 to_bigendian(uint8_t *buffer, uint32_t n) {
 	buffer[0] = (n >> 24) & 0xff;
@@ -131,6 +157,7 @@ to_bigendian(uint8_t *buffer, uint32_t n) {
 	buffer[3] = n & 0xff;
 }
 
+// 发送消息
 static void
 _send_to(struct master *m, int id, const void * buf, int sz, uint32_t handle) {
 	uint8_t * buffer= (uint8_t *)malloc(4 + sz + 12);
@@ -142,6 +169,7 @@ _send_to(struct master *m, int id, const void * buf, int sz, uint32_t handle) {
 
 	sz += 4 + 12;
 
+	// skynet_socket_send
 	if (skynet_socket_send(m->ctx, m->remote_fd[id], buffer, sz)) {
 		skynet_error(m->ctx, "Harbor %d : send error", id);
 	}
@@ -158,6 +186,7 @@ _broadcast(struct master *m, const char *name, size_t sz, uint32_t handle) {
 	}
 }
 
+// 请求name
 static void
 _request_name(struct master *m, const char * buffer, size_t sz) {
 	char name[GLOBALNAME_LENGTH];
@@ -287,22 +316,33 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 	return 0;
 }
 
+// master_init
 int
 master_init(struct master *m, struct skynet_context *ctx, const char * args) {
 	char tmp[strlen(args) + 32];
 	sprintf(tmp,"gate L ! %s %d %d 0",args,PTYPE_HARBOR,REMOTE_MAX);
 	const char * gate_addr = skynet_command(ctx, "LAUNCH", tmp);
+	// launch 简单的文本控制协议 得到 gate服务的addr 每一个服务实际上都是由服务+gate组成
+
 	if (gate_addr == NULL) {
 		skynet_error(ctx, "Master : launch gate failed");
 		return 1;
 	}
+
+	// 得到 gate 的id
 	uint32_t gate = strtoul(gate_addr+1, NULL, 16);
 	if (gate == 0) {
 		skynet_error(ctx, "Master : launch gate invalid %s", gate_addr);
 		return 1;
 	}
+
+	// 得到自己的 addr REG命令
 	const char * self_addr = skynet_command(ctx, "REG", NULL);
 	int n = sprintf(tmp,"broker %s",self_addr);
+
+	// skynet_send() 将消息发送出去
+// skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination ,
+//													int type, int session, void * data, size_t sz)
 	skynet_send(ctx, 0, gate, PTYPE_TEXT, 0, tmp, n);
 	skynet_send(ctx, 0, gate, PTYPE_TEXT, 0, "start", 5);
 

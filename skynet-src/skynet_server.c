@@ -451,7 +451,7 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		return NULL;
 	}
 
-	// 处理 name
+	// 处理 name 得到自己的 addr REG命令
 	if (strcmp(cmd,"REG") == 0) {
 		if (param == NULL || param[0] == '\0') {
 			sprintf(context->result, ":%x", context->handle);
