@@ -88,7 +88,7 @@ function command.ERROR(address)
 		skynet.redirect(reply.address , 0, "response", reply.session, "")
 		instance[address] = nil
 	end
-
+	services[address] = nil
 	return NORET
 end
 
