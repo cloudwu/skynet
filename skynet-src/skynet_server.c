@@ -122,7 +122,7 @@ skynet_context_new(const char * name, const char *param) {
 
 	CHECKCALLING_BEGIN(ctx)
 
-	int r = skynet_module_instance_init(mod, inst, ctx, param);
+	int r = skynet_module_instance_init(mod, inst, ctx, param); // module init
 
 	CHECKCALLING_END(ctx)
 
@@ -453,14 +453,14 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 
 	// 处理 name 得到自己的 addr REG命令
 	if (strcmp(cmd,"REG") == 0) {
-		if (param == NULL || param[0] == '\0') {
-			sprintf(context->result, ":%x", context->handle);
+		if (param == NULL || param[0] == '\0') { // 参数为空返回自己的handle
+			sprintf(context->result, ":%x", context->handle); // 返回自己的 handle
 			return context->result;
 		}
-		else if (param[0] == '.') {
-			return skynet_handle_namehandle(context->handle, param + 1);
+		else if (param[0] == '.') { // 参数以 .xxx 开始的返回本地的服务
+			return skynet_handle_namehandle(context->handle, param + 1); // name与handle绑定 返回 handle
 		}
-		else {
+		else { // 参数是别的形式 说明是注册远程的handle
 			assert(context->handle!=0);
 			struct remote_name *rname = malloc(sizeof(*rname));
 			_copy_name(rname->name, param);
@@ -539,19 +539,19 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 		return NULL;
 	}
 
-	// launch
+	// launch 返回 gate_addr 每一个服务对应一个gate模块 用于通信等
 	if (strcmp(cmd,"LAUNCH") == 0) {
 		size_t sz = strlen(param);
 		char tmp[sz+1];
 		strcpy(tmp,param);
 		char * args = tmp;
 		char * mod = strsep(&args, " \t\r\n");
-		args = strsep(&args, "\r\n");
-		struct skynet_context * inst = skynet_context_new(mod,args);
+		args = strsep(&args, "\r\n"); // strsep() 分解字符串为一组字符串
+		struct skynet_context * inst = skynet_context_new(mod,args); // 新的skynet_ctx 内部会初始化这个服务module
 		if (inst == NULL) {
 			return NULL;
 		} else {
-			_id_to_hex(context->result, inst->handle);
+			_id_to_hex(context->result, inst->handle); // 将 handle 转行成16进制的形式
 			return context->result;
 		}
 	}

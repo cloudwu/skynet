@@ -9,8 +9,8 @@
 #define PTYPE_MULTICAST 2
 #define PTYPE_CLIENT 3
 #define PTYPE_SYSTEM 4
-#define PTYPE_HARBOR 5 // harbor
-#define PTYPE_SOCKET 6
+#define PTYPE_HARBOR 5 // harbor harbor type 即远程消息
+#define PTYPE_SOCKET 6 // 本地的socket消息
 // read lualib/skynet.lua lualib/simplemonitor.lua
 #define PTYPE_RESERVED_ERROR 7	
 // read lualib/skynet.lua lualib/mqueue.lua
