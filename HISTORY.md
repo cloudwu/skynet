@@ -1,3 +1,10 @@
+v0.2.1 (2014-5-19)
+-----------
+* Bugfix: check all the events already read after socket close
+* Bugfix: socket data in gate service 
+* Bugfix: boundary problem in harbor service
+* Bugfix: stdin handle is 0
+
 v0.2.0 (2014-5-12)
 -----------
 

@@ -151,7 +151,7 @@ function socket.bind(os_fd)
 end
 
 function socket.stdin()
-	return socket.bind(1)
+	return socket.bind(0)
 end
 
 function socket.start(id, func)
