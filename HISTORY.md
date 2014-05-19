@@ -1,4 +1,4 @@
-v0.2.1
+v0.2.1 (2014-5-19)
 -----------
 * Bugfix: check all the events already read after socket close
 * Bugfix: socket data in gate service 
