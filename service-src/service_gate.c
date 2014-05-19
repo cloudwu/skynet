@@ -12,6 +12,9 @@
 
 #define BACKLOG 32
 
+// 每个master服务    实际上是   master服务 + gate服务总和
+// 每个harbor服务　实际上是   harbor 服务+gate服务总和
+
 struct connection {
 	int id;	// skynet_socket id
 	uint32_t agent;

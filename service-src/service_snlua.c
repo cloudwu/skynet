@@ -12,6 +12,10 @@
 #include <stdio.h>
 
 // LUA_CACHELIB may defined in patched lua for shared proto
+// lua 服务生成器
+// lua服务的消息　先到 service_snlua，再分发到lua服务中
+// 每个lua服务其实　是一个service_snlua + 实际的lua服务　总和
+
 #ifdef LUA_CACHELIB
 
 #define codecache luaopen_cache

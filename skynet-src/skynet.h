@@ -4,15 +4,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define PTYPE_TEXT 0    // 文本协议
+#define PTYPE_TEXT 0    		// 文本协议
 #define PTYPE_RESPONSE 1
 #define PTYPE_MULTICAST 2
 #define PTYPE_CLIENT 3
-#define PTYPE_SYSTEM 4
-#define PTYPE_HARBOR 5 // harbor harbor type 即远程消息
-#define PTYPE_SOCKET 6 // 本地的socket消息
+#define PTYPE_SYSTEM 4 			// 协议控制命令
+#define PTYPE_HARBOR 5 			// harbor harbor type 即远程消息
+#define PTYPE_SOCKET 6 			// 本地的socket消息
+
 // read lualib/skynet.lua lualib/simplemonitor.lua
 #define PTYPE_RESERVED_ERROR 7	
+
 // read lualib/skynet.lua lualib/mqueue.lua
 #define PTYPE_RESERVED_QUEUE 8
 #define PTYPE_RESERVED_DEBUG 9

@@ -9,6 +9,7 @@ struct logger {
 	int close;
 };
 
+// skynet的日志log服务
 struct logger *
 logger_create(void) {
 	struct logger * inst = malloc(sizeof(*inst));
@@ -44,12 +45,13 @@ logger_init(struct logger * inst, struct skynet_context *ctx, const char * parm)
 			return 1;
 		}
 		inst->close = 1;
-	} else {
+	}
+	else {
 		inst->handle = stdout;
 	}
 	if (inst->handle) {
 		skynet_callback(ctx, inst, _logger);
-		skynet_command(ctx, "REG", ".logger");
+		skynet_command(ctx, "REG", ".logger"); // .xxx 都是本地服务
 		return 0;
 	}
 	return 1;

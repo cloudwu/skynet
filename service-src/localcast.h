@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+// 本地广播的结构
 struct localcast {
 	int n;
 	const uint32_t * group;

@@ -7,12 +7,14 @@
 
 #define MESSAGEPOOL 1023
 
+// msg node
 struct message {
 	char * buffer;
 	int size;
 	struct message * next;
 };
 
+// Êı¾İ»º³åÇøÁ´±í
 struct databuffer {
 	int header;
 	int offset;
@@ -21,11 +23,13 @@ struct databuffer {
 	struct message * tail;
 };
 
+// msg_pool_list Ğ¤Ï²³ØÁ´±í
 struct messagepool_list {
 	struct messagepool_list *next;
 	struct message pool[MESSAGEPOOL];
 };
 
+// ÏûÏ¢³Ø
 struct messagepool {
 	struct messagepool_list * pool;
 	struct message * freelist;
@@ -41,6 +45,7 @@ messagepool_free(struct messagepool *pool) {
 		p=p->next;
 		free(tmp);
 	}
+
 	pool->pool = NULL;
 	pool->freelist = NULL;
 }
@@ -51,9 +56,11 @@ _return_message(struct databuffer *db, struct messagepool *mp) {
 	if (m->next == NULL) {
 		assert(db->tail == m);
 		db->head = db->tail = NULL;
-	} else {
+	}
+	else {
 		db->head = m->next;
 	}
+
 	free(m->buffer);
 	m->buffer = NULL;
 	m->size = 0;
@@ -78,7 +85,8 @@ databuffer_read(struct databuffer *db, struct messagepool *mp, void * buffer, in
 			db->offset = 0;
 			_return_message(db, mp);
 			return;
-		} else {
+		}
+		else {
 			memcpy(buffer, current->buffer + db->offset, bsz);
 			_return_message(db, mp);
 			db->offset = 0;
@@ -94,7 +102,8 @@ databuffer_push(struct databuffer *db, struct messagepool *mp, void *data, int s
 	if (mp->freelist) {
 		m = mp->freelist;
 		mp->freelist = m->next;
-	} else {
+	}
+	else {
 		struct messagepool_list * mpl = malloc(sizeof(*mpl));
 		struct message * temp = mpl->pool;
 		int i;
@@ -109,6 +118,7 @@ databuffer_push(struct databuffer *db, struct messagepool *mp, void *data, int s
 		m = &temp[0];
 		mp->freelist = &temp[1];
 	}
+
 	m->buffer = data;
 	m->size = sz;
 	m->next = NULL;
@@ -116,7 +126,8 @@ databuffer_push(struct databuffer *db, struct messagepool *mp, void *data, int s
 	if (db->head == NULL) {
 		assert(db->tail == NULL);
 		db->head = db->tail = m;
-	} else {
+	}
+	else {
 		db->tail->next = m;
 		db->tail = m;
 	}

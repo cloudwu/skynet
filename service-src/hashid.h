@@ -10,12 +10,13 @@ struct hashid_node {
 	struct hashid_node *next;
 };
 
+// hash_id ½á¹¹
 struct hashid {
 	int hashmod;
 	int cap;
 	int count;
 	struct hashid_node *id;
-	struct hashid_node **hash;
+	struct hashid_node **hash; // hash_map
 };
 
 static void

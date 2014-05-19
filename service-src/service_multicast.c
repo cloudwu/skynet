@@ -16,17 +16,22 @@ multicast_release(struct skynet_multicast_group *g) {
 	skynet_multicast_deletegroup(g);
 }
 
+// 多播的主要处理函数
 static int
 _maincb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct skynet_multicast_group *g = ud;
+
+	// PTYPE_SYSTEM 协议控制命令
 	if (type == PTYPE_SYSTEM) {
 		char cmd = '\0';
 		uint32_t handle = 0;
-		sscanf(msg,"%c %x",&cmd,&handle);
+		sscanf(msg,"%c %x",&cmd,&handle); // 格式化参数
 		if (handle == 0) {
 			skynet_error(context, "Invalid handle %s",msg);
 			return 0;
 		}
+
+		// 简单的命令协议
 		switch (cmd) {
 		case 'E':
 			skynet_multicast_entergroup(g, handle);
@@ -42,7 +47,10 @@ _maincb(struct skynet_context * context, void * ud, int type, int session, uint3
 			break;
 		}
 		return 0;		
-	} else {
+	}
+
+	// 发送消息出去
+	else {
 		sz |= type << HANDLE_REMOTE_SHIFT;
 		struct skynet_multicast_message * mc = skynet_multicast_create(msg, sz, source);
 		skynet_multicast_castgroup(context, g, mc);
