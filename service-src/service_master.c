@@ -9,6 +9,12 @@
 #include <assert.h>
 #include <stdint.h>
 
+
+// Harbor 间通过单向的 tcp 连接管道传输数据，完成不同的 skynet 节点间的数据交换。
+// skynet 目前支持一个全局名字服务，可以把一个消息包发送到特定名字的服务上。这个服务不必存在于当前 skynet 节点中。这样，我们就需要一个机构能够同步这些全局名字。
+// 为此，我实现了一个叫做 master 的服务。它的作用就是广播同步所有的全局名字，以及加入进来的 skynet 节点的地址。本质上，这些地址也是一种名字。
+// 同样可以用 key-value 的形式储存。即，每个 skynet 节点号对应一个字符串的地址。
+
 // skynet的 master服务 master服务保存了key-value key就是skynet的handle value就handle对应的服务
 // matser用于skynet不同节点间的同步
 
