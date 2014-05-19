@@ -8,7 +8,7 @@ local CMD = {}
 local client_fd
 
 local function send_client(v)
-	socket.write(client_fd, netpack.pack(jsonpack.pack(0,v)))
+	socket.write(client_fd, netpack.pack(jsonpack.pack(0, {true, v})))
 end
 
 local function response_client(session,v)
