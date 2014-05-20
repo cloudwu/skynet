@@ -394,8 +394,9 @@ skynet_queryname(struct skynet_context * context, const char * name) {
 	case ':':
 		return strtoul(name+1,NULL,16);
 	case '.':
-		return skynet_handle_findname(name + 1);
+		return skynet_handle_findname(name + 1); // return handle
 	}
+
 	skynet_error(context, "Don't support query global name %s",name);
 	return 0;
 }

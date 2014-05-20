@@ -7,7 +7,7 @@
 #define PTYPE_TEXT 0    		// 文本协议
 #define PTYPE_RESPONSE 1
 #define PTYPE_MULTICAST 2
-#define PTYPE_CLIENT 3
+#define PTYPE_CLIENT 3          // 客户端消息
 #define PTYPE_SYSTEM 4 			// 协议控制命令
 #define PTYPE_HARBOR 5 			// harbor harbor type 即远程消息
 #define PTYPE_SOCKET 6 			// 本地的socket消息
