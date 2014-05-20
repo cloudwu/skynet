@@ -12,7 +12,7 @@ struct hashid_node {
 
 // hash_id 结构
 struct hashid {
-	int hashmod;
+	int hashmod;			   // 用于计算hash的mod
 	int cap;
 	int count;
 	struct hashid_node *id;
@@ -27,6 +27,7 @@ hashid_init(struct hashid *hi, int max) {
 	while (hashcap < max) {
 		hashcap *= 2;
 	}
+
 	hi->hashmod = hashcap - 1;
 	hi->cap = max;
 	hi->count = 0;
@@ -35,6 +36,7 @@ hashid_init(struct hashid *hi, int max) {
 		hi->id[i].id = -1;
 		hi->id[i].next = NULL;
 	}
+
 	hi->hash = malloc(hashcap * sizeof(struct hashid_node *));
 	memset(hi->hash, 0, hashcap * sizeof(struct hashid_node *));
 }
@@ -82,6 +84,7 @@ hashid_remove(struct hashid *hi, int id) {
 		c = c->next;
 	}
 	return -1;
+
 _clear:
 	c->id = -1;
 	c->next = NULL;
@@ -100,6 +103,7 @@ hashid_insert(struct hashid * hi, int id) {
 			break;
 		}
 	}
+
 	assert(c);
 	++hi->count;
 	c->id = id;

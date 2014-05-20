@@ -11,6 +11,8 @@ struct client {
 	int id;
 };
 
+// skynet-client 的简单实现
+
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	assert(sz <= 65535);
@@ -19,13 +21,16 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 		// todo: tell client the session is broken
 		return 0;
 	}
+
 	if (type == PTYPE_RESPONSE) {
 		// todo: response to client with session, session may be packed into package
-	} else {
+	}
+	else {
 		printf("client %d\n",type);
 		assert(type == PTYPE_TEXT);
 		// todo: support other protocol
 	}
+
 	// todo: design the protocol between client and agent
 	// tmp will be free by skynet_socket.
 	// see skynet_src/socket_server.c : send_socket()
@@ -33,7 +38,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	tmp[0] = (sz >> 8) & 0xff;
 	tmp[1] = sz & 0xff;
 	memcpy(tmp+2, msg, sz);
-	skynet_socket_send(context, c->id, tmp, sz+2);
+	skynet_socket_send(context, c->id, tmp, sz+2); // send msg
 
 	return 0;
 }
