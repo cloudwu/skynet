@@ -1,6 +1,5 @@
 #include "skynet.h"
 #include "lua-seri.h"
-#include "service_lua.h"
 
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
@@ -11,18 +10,36 @@
 #include <string.h>
 #include <assert.h>
 
+struct snlua {
+	lua_State * L;
+	struct skynet_context * ctx;
+	const char * preload;
+};
+
+static int 
+traceback (lua_State *L) {
+	const char *msg = lua_tostring(L, 1);
+	if (msg)
+		luaL_traceback(L, L, msg, 1);
+	else {
+		lua_pushliteral(L, "(no error message)");
+	}
+	return 1;
+}
+
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	lua_State *L = ud;
 	int trace = 1;
 	int r;
 	int top = lua_gettop(L);
-	if (top == 1) {
+	if (top == 0) {
+		lua_pushcfunction(L, traceback);
 		lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
 	} else {
 		assert(top == 2);
-		lua_pushvalue(L,2);
 	}
+	lua_pushvalue(L,2);
 
 	lua_pushinteger(L, type);
 	lua_pushlightuserdata(L, (void *)msg);
@@ -290,15 +307,14 @@ luaopen_skynet_c(lua_State *L) {
 		{ NULL, NULL },
 	};
 
-	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_lua");
-	struct snlua *lua = lua_touserdata(L,-1);
-	if (lua == NULL || lua->ctx == NULL) {
+	luaL_newlibtable(L, l);
+
+	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
+	struct skynet_context *ctx = lua_touserdata(L,-1);
+	if (ctx == NULL) {
 		return luaL_error(L, "Init skynet context first");
 	}
-	assert(lua->L == L);
 
-	luaL_newlibtable(L, l);
-	lua_pushlightuserdata(L, lua->ctx);
 	luaL_setfuncs(L,l,1);
 
 	return 1;

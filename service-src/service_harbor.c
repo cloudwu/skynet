@@ -47,6 +47,9 @@ struct remote_message_header {
 	uint32_t session;
 };
 
+// 12 is sizeof(struct remote_message_header)
+#define HEADER_COOKIE_LENGTH 12
+
 struct harbor {
 	struct skynet_context *ctx;
 	char * local_addr;
@@ -402,9 +405,8 @@ _remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int
 		_send_remote(context, fd, msg,sz,&cookie);
 	} else {
 		// throw an error return to source
-		if (session != 0) {
-			skynet_send(context, destination, source, PTYPE_RESERVED_ERROR, session, NULL, 0);
-		}
+		// report the destination is dead
+		skynet_send(context, destination, source, PTYPE_ERROR, 0 , NULL, 0);
 		skynet_error(context, "Drop message to harbor %d from %x to %x (session = %d, msgsz = %d)",harbor_id, source, destination,session,(int)sz);
 	}
 	return 0;
@@ -503,23 +505,23 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 	case PTYPE_HARBOR: {
 		// remote message in
 		const char * cookie = msg;
-		cookie += sz - 12;
+		cookie += sz - HEADER_COOKIE_LENGTH;
 		struct remote_message_header header;
 		_message_to_header((const uint32_t *)cookie, &header);
 		if (header.source == 0) {
 			if (header.destination < REMOTE_MAX) {
 				// 1 byte harbor id (0~255)
 				// update remote harbor address
-				char ip [sz - 11];
-				memcpy(ip, msg, sz-12);
-				ip[sz-11] = '\0';
+				char ip [sz - HEADER_COOKIE_LENGTH + 1];
+				memcpy(ip, msg, sz-HEADER_COOKIE_LENGTH);
+				ip[sz-HEADER_COOKIE_LENGTH] = '\0';
 				_update_remote_address(h, header.destination, ip);
 			} else {
 				// update global name
-				if (sz - 12 > GLOBALNAME_LENGTH) {
-					char name[sz-11];
-					memcpy(name, msg, sz-12);
-					name[sz-11] = '\0';
+				if (sz - HEADER_COOKIE_LENGTH > GLOBALNAME_LENGTH) {
+					char name[sz-HEADER_COOKIE_LENGTH+1];
+					memcpy(name, msg, sz-HEADER_COOKIE_LENGTH);
+					name[sz-HEADER_COOKIE_LENGTH] = '\0';
 					skynet_error(context, "Global name is too long %s", name);
 				}
 				_update_remote_name(h, msg, header.destination);
@@ -528,7 +530,7 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 			uint32_t destination = header.destination;
 			int type = (destination >> HANDLE_REMOTE_SHIFT) | PTYPE_TAG_DONTCOPY;
 			destination = (destination & HANDLE_MASK) | ((uint32_t)h->id << HANDLE_REMOTE_SHIFT);
-			skynet_send(context, header.source, destination, type, (int)header.session, (void *)msg, sz-12);
+			skynet_send(context, header.source, destination, type, (int)header.session, (void *)msg, sz-HEADER_COOKIE_LENGTH);
 			return 1;
 		}
 		return 0;
@@ -593,6 +595,8 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 		fprintf(stderr, "Harbor: Connect to master failed\n");
 		exit(1);
 	}
+	skynet_harbor_start(ctx);
+
 	h->local_addr = skynet_strdup(local_addr);
 
 	_launch_gate(ctx, local_addr);

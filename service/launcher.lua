@@ -2,8 +2,8 @@ local skynet = require "skynet"
 local string = string
 
 local services = {}
-
 local command = {}
+local instance = {} -- for confirm (function command.LAUNCH / command.ERROR / command.LAUNCHOK)
 
 local function handle_to_address(handle)
 	return tonumber("0x" .. string.sub(handle , 2))
@@ -19,18 +19,6 @@ function command.LIST()
 	return list
 end
 
-function command.RELOAD(handle)
-	handle = handle_to_address(handle)
-	local cmd = string.match(services[handle], "snlua (.+)")
-	print(services[handle],cmd)
-	if cmd then
-		skynet.send(handle,"debug","RELOAD",cmd)
-		return {cmd}
-	else
-		return {"Support only snlua"}
-	end
-end
-
 function command.STAT()
 	local list = {}
 	for k,v in pairs(services) do
@@ -40,7 +28,7 @@ function command.STAT()
 	return list
 end
 
-function command.INFO(handle)
+function command.INFO(_, _, handle)
 	handle = handle_to_address(handle)
 	if services[handle] == nil then
 		return
@@ -50,23 +38,7 @@ function command.INFO(handle)
 	end
 end
 
-function command.TIMING(handle)
-	handle = handle_to_address(handle)
-	if services[handle] == nil then
-		return
-	else
-		local r = skynet.call(handle,"debug","TIMING")
-		local result = {}
-		for k,v in pairs(r) do
-			v.name = services[k]
-			v.avg = v.ti/v.n
-			result[skynet.address(k)] = v
-		end
-		return result
-	end
-end
-
-function command.KILL(handle)
+function command.KILL(_, _, handle)
 	handle = handle_to_address(handle)
 	skynet.kill(handle)
 	local ret = { [skynet.address(handle)] = tostring(services[handle]) }
@@ -90,48 +62,71 @@ function command.GC()
 	return command.MEM()
 end
 
-function command.REMOVE(handle)
+function command.REMOVE(_,_, handle)
 	services[handle] = nil
 	-- don't return (skynet.ret) because the handle may exit
 	return NORET
 end
 
-local instance = {}
-
-skynet.dispatch("text" , function(session, address , cmd)
-	if cmd == "" then
-		-- init notice
-		local reply = instance[address]
-		if reply then
-			skynet.redirect(reply.address , 0, "response", reply.session, skynet.address(address))
-			instance[address] = nil
-		end
-	elseif cmd == "ERROR" then
-		-- see serivce-src/service_lua.c
-		-- init failed
-		local reply = instance[address]
-		if reply then
-			skynet.redirect(reply.address , 0, "response", reply.session, "")
-			instance[address] = nil
-		end
+function command.LAUNCH(address, session, service, ...)
+	local param = table.concat({...}, " ")
+	local inst = skynet.launch(service, param)
+	if inst then
+		services[inst] = service .. " " .. param
+		instance[inst] = { session = session, address = address }
 	else
-		-- launch request
-		local service, param = string.match(cmd,"([^ ]+) (.*)")
-		local inst = skynet.launch(service, param)
-		if inst then
-			services[inst] = cmd
-			instance[inst] = { session = session, address = address }
-		else
-			skynet.ret("")
-		end
+		skynet.ret("")	-- launch failed
 	end
-end)
+	return NORET
+end
+
+function command.ERROR(address)
+	-- see serivce-src/service_lua.c
+	-- init failed
+	local reply = instance[address]
+	if reply then
+		skynet.redirect(reply.address , 0, "response", reply.session, "")
+		instance[address] = nil
+	end
+	services[address] = nil
+	return NORET
+end
+
+function command.LAUNCHOK(address)
+	-- init notice
+	local reply = instance[address]
+	if reply then
+		skynet.redirect(reply.address , 0, "response", reply.session, skynet.address(address))
+		instance[address] = nil
+	end
+
+	return NORET
+end
+
+-- for historical reasons, launcher support text command (for C service)
+
+skynet.register_protocol {
+	name = "text",
+	id = skynet.PTYPE_TEXT,
+	unpack = skynet.tostring,
+	dispatch = function(session, address , cmd)
+		if cmd == "" then
+			command.LAUNCHOK(address)
+		elseif cmd == "ERROR" then
+			command.ERROR(address)
+		else
+			-- launch request
+			local service, param = string.match(cmd,"([^ ]+) (.*)")
+			command.LAUNCH(address, session, service, param)
+		end
+	end,
+}
 
 skynet.dispatch("lua", function(session, address, cmd , ...)
 	cmd = string.upper(cmd)
 	local f = command[cmd]
 	if f then
-		local ret = f(...)
+		local ret = f(address, session, ...)
 		if ret ~= NORET then
 			skynet.ret(skynet.pack(ret))
 		end

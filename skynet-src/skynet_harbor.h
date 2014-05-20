@@ -26,6 +26,6 @@ void skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int sessio
 void skynet_harbor_register(struct remote_name *rname);
 int skynet_harbor_message_isremote(uint32_t handle);
 void skynet_harbor_init(int harbor);
-int skynet_harbor_start(const char * master, const char *local);
+void skynet_harbor_start(void * ctx);
 
 #endif
