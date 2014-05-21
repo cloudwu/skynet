@@ -1,3 +1,7 @@
+Dev version
+-----------
+* Bugfix: update lua-bson (signed 32bit int bug)
+
 v0.2.1 (2014-5-19)
 -----------
 * Bugfix: check all the events already read after socket close
