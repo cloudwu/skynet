@@ -53,17 +53,23 @@ codecache(lua_State *L) {
 
 static void
 current_time(struct timespec *ti) {
+
 #if  !defined(__APPLE__)
+
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, ti);
+
 #else
+
 	struct task_thread_times_info aTaskInfo;
 	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
 	assert(KERN_SUCCESS == task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount));
 	ti->tv_sec = aTaskInfo.user_time.seconds;
 	ti->tv_nsec = aTaskInfo.user_time.microseconds * 1000;
+
 #endif
 }
 
+// 时间相减
 static double
 diff_time(struct timespec *ti) {
 	struct timespec end;
@@ -74,6 +80,7 @@ diff_time(struct timespec *ti) {
 		--diffsec;
 		diffnsec += NANOSEC;
 	}
+
 	return (double)diffsec + (double)diffnsec / NANOSEC;
 }
 
@@ -126,16 +133,18 @@ _try_load(lua_State *L, const char * path, int pathlen, const char * name) {
 	return 1;
 }
 
+// 加载lua 环境配置
 static int
 _load(lua_State *L, char ** filename) {
 	const char * name = strsep(filename, " \r\n");
-	const char * path = skynet_command(NULL, "GETENV", "luaservice");
+	const char * path = skynet_command(NULL, "GETENV", "luaservice"); // 得到lua的环境配置
 	while (path[0]) {
 		int pathlen;
 		char * pathend = strchr(path,';');
 		if (pathend) {
 			pathlen = pathend - path;
-		} else {
+		}
+		else {
 			pathlen = strlen(path);
 		}
 		int r = _try_load(L, path, pathlen, name);
@@ -149,6 +158,7 @@ _load(lua_State *L, char ** filename) {
 	return -1;
 }
 
+// lua栈回溯
 static int 
 traceback (lua_State *L) {
 	const char *msg = lua_tostring(L, 1);
@@ -160,6 +170,7 @@ traceback (lua_State *L) {
 	return 1;
 }
 
+// lua 的错误
 static void
 _report_error(lua_State *L, struct skynet_context *ctx, const char *filename, int err) {
 	switch (err) {
@@ -185,11 +196,12 @@ _report_launcher_error(struct skynet_context *ctx) {
 	skynet_sendname(ctx, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
 }
 
+// lua 状态机的初始化
 static int
 _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	lua_State *L = l->L;
 	l->ctx = ctx;
-	lua_gc(L, LUA_GCSTOP, 0);
+	lua_gc(L, LUA_GCSTOP, 0); // 调用lua的一系列初始化函数来初始化lua的状态机
 	luaL_openlibs(L);
 	lua_pushlightuserdata(L, l);
 	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_lua");
@@ -201,12 +213,12 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	char *parm = tmp;
 	strcpy(parm,args);
 
-	lua_pushcfunction(L, traceback);
+	lua_pushcfunction(L, traceback); // 设置了栈回溯函数
 	int traceback_index = lua_gettop(L);
 	assert(traceback_index == 1);
 
 	const char * filename = parm;
-	int r = _load(L, &parm);
+	int r = _load(L, &parm); // load
 	if (r != 0) {
 		if (r<0) {
 			skynet_error(ctx, "lua parser [%s] load error", filename);
@@ -224,6 +236,7 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 			++n;
 		}
 	}
+
 	r = lua_pcall(L,n,0,traceback_index);
 	if (r == LUA_OK) {
 		r = lua_gc(L, LUA_GCCOLLECT, 0);
@@ -231,6 +244,7 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 			return 0;
 		}
 	}
+
 	_report_error(L, ctx, filename, r);
 	_report_launcher_error(ctx);
 	return 1;
@@ -263,15 +277,17 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	const char * self = skynet_command(ctx, "REG", NULL);
 	uint32_t handle_id = strtoul(self+1, NULL, 16);
 	// it must be first message
+
 	skynet_send(ctx, 0, handle_id, PTYPE_TAG_DONTCOPY,0, tmp, sz+1);
 	return 0;
 }
 
+// lua服务生成器snlua的实现
 struct snlua *
 snlua_create(void) {
 	struct snlua * l = malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
-	l->L = luaL_newstate();
+	l->L = luaL_newstate(); // 创建一个新的lua状态机
 	l->init = _init;
 	return l;
 }
