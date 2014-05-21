@@ -40,6 +40,7 @@ struct buffer {
 	uint8_t buffer[DEFAULT_CAP];
 };
 
+// 小端字节序
 static inline uint32_t
 little_endian(uint32_t v) {
 	union {
@@ -134,14 +135,15 @@ write_length(struct buffer *b, int32_t v, int off) {
 	b->ptr[off++] = (uv >> 24)&0xff;
 }
 
-// 1 integer id
-// 2 integer flags
-// 3 string collection name
-// 4 integer skip
-// 5 integer return number
+// 1 integer  id
+// 2 integer  flags
+// 3 string   collection name
+// 4 integer  skip
+// 5 integer  return number
 // 6 document query
 // 7 document selector (optional)
-// return string package
+// ret        string package
+
 static int
 op_query(lua_State *L) {
 	int id = luaL_checkinteger(L,1);
@@ -520,15 +522,16 @@ reply_length(lua_State *L) {
 	return 1;
 }
 
+// lua mongo driver mgdb的驱动
 int
 luaopen_mongo_driver(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] ={
 		{ "query", op_query },
 		{ "reply", op_reply },
-		{ "kill", op_kill },
+		{ "kill",  op_kill },
 		{ "delete", op_delete },
-		{ "more", op_get_more },
+		{ "more",   op_get_more },
 		{ "update", op_update },
 		{ "insert", op_insert },
 		{ "length", reply_length },

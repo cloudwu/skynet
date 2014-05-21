@@ -27,6 +27,10 @@ init_winsock() {
 
 #endif
 
+// bson是一种类似于json的数据结构 具有 课遍历性 轻量性 高效性等特征
+// 比较高效的一种数据结构 但是空间利用率不是很高效
+// bson的一份实现 mgdb内部是使用了bson存储数据的
+
 #define DEFAULT_CAP 64
 #define MAX_NUMBER 1024
 
@@ -54,7 +58,7 @@ init_winsock() {
 #define BSON_TYPE_SHIFT 5
 
 static char bson_numstrs[MAX_NUMBER][4];
-static int bson_numstr_len[MAX_NUMBER];
+static int  bson_numstr_len[MAX_NUMBER];
 
 struct bson {
 	int size;
@@ -523,6 +527,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 		} else {
 			lua_pushlstring(L, key, klen);
 		}
+
 		switch (bt) {
 		case BSON_REAL:
 			lua_pushnumber(L, read_double(L, &t));
@@ -1099,6 +1104,7 @@ init_oid_header() {
  		}
 		h ^= i;
 	}
+
 	oid_header[0] = h & 0xff;
 	oid_header[1] = (h>>8) & 0xff;
 	oid_header[2] = (h>>16) & 0xff;

@@ -11,6 +11,7 @@ struct session_time {
 	double time;
 };
 
+// 定时器队列 ?
 struct tqueue {
 	int cap;
 	int n;

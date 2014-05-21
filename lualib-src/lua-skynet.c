@@ -100,7 +100,8 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	int top = lua_gettop(L);
 	if (top == 1) {
 		lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
-	} else {
+	}
+	else {
 		assert(top == 2);
 		lua_pushvalue(L,2);
 	}
@@ -513,6 +514,7 @@ _reload(lua_State *L) {
 	return 0;
 }
 
+// skynetµÄ½Ó¿Ú
 int
 luaopen_skynet_c(lua_State *L) {
 	luaL_checkversion(L);
