@@ -1,6 +1,7 @@
 Dev version
 -----------
 * Bugfix: update lua-bson (signed 32bit int bug)
+* cluster support
 
 v0.2.1 (2014-5-19)
 -----------

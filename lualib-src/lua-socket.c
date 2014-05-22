@@ -191,7 +191,7 @@ pop_lstring(lua_State *L, struct socket_buffer *sb, int sz, int skip) {
 /*
 	userdata send_buffer
 	table pool
-	integer sz
+	integer sz or string (big endian)
  */
 static int
 lpopbuffer(lua_State *L) {
@@ -200,7 +200,23 @@ lpopbuffer(lua_State *L) {
 		return luaL_error(L, "Need buffer object at param 1");
 	}
 	luaL_checktype(L,2,LUA_TTABLE);
-	int sz = luaL_checkinteger(L,3);
+	int type = lua_type(L,3);
+	int sz;
+	if (type == LUA_TNUMBER) {
+		sz = lua_tointeger(L,3);
+	} else {
+		size_t len;
+		const uint8_t * s = (const uint8_t *)luaL_checklstring(L, 3, &len);
+		if (len > 4 || len < 1) {
+			return luaL_error(L, "Invalid read %s", s);
+		}
+		int i;
+		sz = 0;
+		for (i=0;i<(int)len;i++) {
+			sz <<= 8;
+			sz |= s[i];
+		}
+	}
 	if (sb->size < sz || sz == 0) {
 		lua_pushnil(L);
 	} else {
