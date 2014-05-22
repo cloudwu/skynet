@@ -4,16 +4,23 @@ skynet.start(function()
 	assert(skynet.launch("logger", skynet.getenv "logger"))
 
 	local standalone = skynet.getenv "standalone"
-	local master_addr = skynet.getenv "master"
+	local harbor_id = tonumber(skynet.getenv "harbor")
+	if harbor_id == 0 then
+		assert(standalone ==  nil)
+		standalone = true
+		skynet.setenv("standalone", "true")
+		assert(skynet.launch("dummy"))
+	else
+		local master_addr = skynet.getenv "master"
 
-	if standalone then
-		assert(skynet.launch("master", master_addr))
+		if standalone then
+			assert(skynet.launch("master", master_addr))
+		end
+
+		local local_addr = skynet.getenv "address"
+
+		assert(skynet.launch("harbor",master_addr, local_addr, harbor_id))
 	end
-
-	local local_addr = skynet.getenv "address"
-	local harbor_id = skynet.getenv "harbor"
-
-	assert(skynet.launch("harbor",master_addr, local_addr, harbor_id))
 
 	local launcher = assert(skynet.launch("snlua","launcher"))
 	skynet.name(".launcher", launcher)

@@ -7,18 +7,20 @@
 #include <assert.h>
 
 static struct skynet_context * REMOTE = 0;
-static unsigned int HARBOR = 0;
+static unsigned int HARBOR = ~0;
 
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
 	int type = rmsg->sz >> HANDLE_REMOTE_SHIFT;
 	rmsg->sz &= HANDLE_MASK;
-	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR);
+	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR && REMOTE);
 	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg) , source, type , session);
 }
 
 void 
 skynet_harbor_register(struct remote_name *rname) {
+	if (REMOTE == NULL)
+		return;
 	int i;
 	int number = 1;
 	for (i=0;i<GLOBALNAME_LENGTH;i++) {
@@ -34,7 +36,7 @@ skynet_harbor_register(struct remote_name *rname) {
 
 int 
 skynet_harbor_message_isremote(uint32_t handle) {
-	assert(HARBOR != 0);
+	assert(HARBOR != ~0);
 	int h = (handle & ~HANDLE_MASK);
 	return h != HARBOR && h !=0;
 }

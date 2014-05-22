@@ -28,7 +28,7 @@ logger_release(struct logger * inst) {
 static int
 _logger(struct skynet_context * context, void *ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct logger * inst = ud;
-	fprintf(inst->handle, "[:%x] ",source);
+	fprintf(inst->handle, "[:%08x] ",source);
 	fwrite(msg, sz , 1, inst->handle);
 	fprintf(inst->handle, "\n");
 	fflush(inst->handle);
