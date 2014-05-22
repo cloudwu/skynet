@@ -34,7 +34,6 @@ struct global_queue {
 	struct message_queue ** queue;
 	// We use a separated flag array to ensure the mq is pushed.
 	// See the comments below.
-	bool * flag;
 	struct message_queue *list;
 };
 
@@ -49,7 +48,10 @@ static void
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
-	if (q->flag[GP(q->tail)]) {
+	uint32_t tail = GP(__sync_fetch_and_add(&q->tail,1));
+
+	// only one thread can set the slot (change q->queue[tail] from NULL to queue)
+	if (!__sync_bool_compare_and_swap(&q->queue[tail], NULL, queue)) {
 		// The queue may full seldom, save queue in list
 		assert(queue->next == NULL);
 		struct message_queue * last;
@@ -60,14 +62,6 @@ skynet_globalmq_push(struct message_queue * queue) {
 
 		return;
 	}
-
-	uint32_t tail = GP(__sync_fetch_and_add(&q->tail,1));
-	// The thread would suspend here, and the q->queue[tail] is last version ,
-	// but the queue tail is increased.
-	// So we set q->flag[tail] after changing q->queue[tail].
-	q->queue[tail] = queue;
-	__sync_synchronize();
-	q->flag[tail] = true;
 }
 
 struct message_queue * 
@@ -93,18 +87,14 @@ skynet_globalmq_pop() {
 		}
 	}
 
-	// Check the flag first, if the flag is false, the pushing may not complete.
-	if(!q->flag[head_ptr]) {
-		return NULL;
-	}
-
-	__sync_synchronize();
-
 	struct message_queue * mq = q->queue[head_ptr];
 	if (!__sync_bool_compare_and_swap(&q->head, head, head+1)) {
 		return NULL;
 	}
-	q->flag[head_ptr] = false;
+	// only one thread can get the slot (change q->queue[head_ptr] to NULL)
+	if (!__sync_bool_compare_and_swap(&q->queue[head_ptr], mq, NULL)) {
+		return NULL;
+	}
 
 	return mq;
 }
@@ -220,8 +210,7 @@ skynet_mq_init() {
 	struct global_queue *q = skynet_malloc(sizeof(*q));
 	memset(q,0,sizeof(*q));
 	q->queue = skynet_malloc(MAX_GLOBAL_MQ * sizeof(struct message_queue *));
-	q->flag = skynet_malloc(MAX_GLOBAL_MQ * sizeof(bool));
-	memset(q->flag, 0, sizeof(bool) * MAX_GLOBAL_MQ);
+	memset(q->queue, 0, sizeof(struct message_queue *) * MAX_GLOBAL_MQ);
 	Q=q;
 }
 
