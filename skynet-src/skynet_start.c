@@ -195,6 +195,12 @@ bootstrap(const char * cmdline) {
 
 void 
 skynet_start(struct skynet_config * config) {
+	if (config->daemon) {
+		if (daemon(1,0)) {
+			fprintf(stderr, "daemon error");
+			exit(1);
+		}
+	}
 	skynet_harbor_init(config->harbor);
 	skynet_handle_init(config->harbor);
 	skynet_mq_init();

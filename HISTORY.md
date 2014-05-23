@@ -1,7 +1,8 @@
 Dev version
 -----------
 * Bugfix: update lua-bson (signed 32bit int bug)
-* cluster support
+* Add cluster support
+* Add daemon mode
 
 v0.2.1 (2014-5-19)
 -----------
