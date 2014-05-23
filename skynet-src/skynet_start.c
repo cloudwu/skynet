@@ -7,6 +7,7 @@
 #include "skynet_timer.h"
 #include "skynet_monitor.h"
 #include "skynet_socket.h"
+#include "skynet_daemon.h"
 
 #include <pthread.h>
 #include <unistd.h>
@@ -196,8 +197,7 @@ bootstrap(const char * cmdline) {
 void 
 skynet_start(struct skynet_config * config) {
 	if (config->daemon) {
-		if (daemon(1,0)) {
-			fprintf(stderr, "daemon error");
+		if (daemon_init(config->daemon)) {
 			exit(1);
 		}
 	}
@@ -212,4 +212,7 @@ skynet_start(struct skynet_config * config) {
 
 	_start(config->thread);
 	skynet_socket_free();
+	if (config->daemon) {
+		daemon_exit(config->daemon);
+	}
 }

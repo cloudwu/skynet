@@ -24,6 +24,7 @@ optint(const char *key, int opt) {
 	return strtol(str, NULL, 10);
 }
 
+/*
 static int
 optboolean(const char *key, int opt) {
 	const char * str = skynet_getenv(key);
@@ -33,6 +34,7 @@ optboolean(const char *key, int opt) {
 	}
 	return strcmp(str,"true")==0;
 }
+*/
 
 static const char *
 optstring(const char *key,const char * opt) {
@@ -112,7 +114,7 @@ main(int argc, char *argv[]) {
 	config.module_path = optstring("cpath","./cservice/?.so");
 	config.harbor = optint("harbor", 1);
 	config.bootstrap = optstring("bootstrap","snlua bootstrap");
-	config.daemon = optboolean("daemon", 0);
+	config.daemon = optstring("daemon", NULL);
 
 	lua_close(L);
 
