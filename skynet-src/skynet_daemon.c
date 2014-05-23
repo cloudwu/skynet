@@ -60,19 +60,13 @@ write_pid(const char *pidfile) {
 	}
 	fflush(f);
 
-	if (flock(fd, LOCK_UN) == -1) {
-		fprintf(stderr, "Can't unlock pidfile %s.\n", pidfile);
-		close(fd);
-		return 0;
-	}
-	close(fd);
-
 	return pid;
 }
 
 int
 daemon_init(const char *pidfile) {
 	int pid = check_pid(pidfile);
+
 	if (pid) {
 		fprintf(stderr, "Skynet is already running, pid = %d.\n", pid);
 		return 1;
@@ -93,5 +87,5 @@ daemon_init(const char *pidfile) {
 
 int 
 daemon_exit(const char *pidfile) {
-	return unlink (pidfile);
+	return unlink(pidfile);
 }
