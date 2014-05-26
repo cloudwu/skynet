@@ -88,6 +88,10 @@ skynet_globalmq_pop() {
 	}
 
 	struct message_queue * mq = q->queue[head_ptr];
+	if (mq == NULL) {
+		// globalmq push not complete
+		return NULL;
+	}
 	if (!__sync_bool_compare_and_swap(&q->head, head, head+1)) {
 		return NULL;
 	}
