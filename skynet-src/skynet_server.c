@@ -139,7 +139,7 @@ skynet_context_new(const char * name, const char *param) {
 		if (ret) {
 			ctx->init = true;
 		}
-		skynet_mq_force_push(queue);
+		skynet_globalmq_push(queue);
 		if (ret) {
 			skynet_error(ret, "LAUNCH %s %s", name, param ? param : "");
 		}
@@ -258,7 +258,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm) {
 	}
 
 	assert(q == ctx->queue);
-	skynet_mq_pushglobal(q);
+	skynet_globalmq_push(q);
 	skynet_context_release(ctx);
 
 	skynet_monitor_trigger(sm, 0,0);
