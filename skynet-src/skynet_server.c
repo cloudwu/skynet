@@ -228,11 +228,13 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	CHECKCALLING_END(ctx)
 }
 
-int
-skynet_context_message_dispatch(struct skynet_monitor *sm) {
-	struct message_queue * q = skynet_globalmq_pop();
-	if (q==NULL)
-		return 1;
+struct message_queue * 
+skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q) {
+	if (q == NULL) {
+		q = skynet_globalmq_pop();
+		if (q==NULL)
+			return NULL;
+	}
 
 	uint32_t handle = skynet_mq_handle(q);
 
@@ -240,13 +242,13 @@ skynet_context_message_dispatch(struct skynet_monitor *sm) {
 	if (ctx == NULL) {
 		struct drop_t d = { handle };
 		skynet_mq_release(q, drop_message, &d);
-		return 0;
+		return skynet_globalmq_pop();
 	}
 
 	struct skynet_message msg;
 	if (skynet_mq_pop(q,&msg)) {
 		skynet_context_release(ctx);
-		return 0;
+		return skynet_globalmq_pop();
 	}
 
 	skynet_monitor_trigger(sm, msg.source , handle);
@@ -258,12 +260,18 @@ skynet_context_message_dispatch(struct skynet_monitor *sm) {
 	}
 
 	assert(q == ctx->queue);
-	skynet_globalmq_push(q);
+	struct message_queue *nq = skynet_globalmq_pop();
+	if (nq) {
+		// If global mq is not empty , push q back, and return next queue (nq)
+		// Else (global mq is empty or block, don't push q back, and return q again (for next dispatch)
+		skynet_globalmq_push(q);
+		q = nq;
+	} 
 	skynet_context_release(ctx);
 
 	skynet_monitor_trigger(sm, 0,0);
 
-	return 0;
+	return q;
 }
 
 static void

@@ -121,8 +121,10 @@ _worker(void *p) {
 	struct monitor *m = wp->m;
 	struct skynet_monitor *sm = m->m[id];
 	skynet_initthread(THREAD_WORKER);
+	struct message_queue * q = NULL;
 	for (;;) {
-		if (skynet_context_message_dispatch(sm)) {
+		q = skynet_context_message_dispatch(sm, q);
+		if (q == NULL) {
 			CHECK_ABORT
 			if (pthread_mutex_lock(&m->mutex) == 0) {
 				++ m->sleep;
