@@ -15,6 +15,7 @@
 
 #include "luaconf.h"
 
+// lua 相关的一些借口 很多是对lua接口的封装
 
 #define LUA_VERSION_MAJOR	"5"
 #define LUA_VERSION_MINOR	"2"
@@ -279,8 +280,8 @@ LUA_API int  (lua_status) (lua_State *L);
 ** garbage-collection function and options
 */
 
-#define LUA_GCSTOP		0
-#define LUA_GCRESTART		1
+#define LUA_GCSTOP		    0
+#define LUA_GCRESTART		1 // lua gc
 #define LUA_GCCOLLECT		2
 #define LUA_GCCOUNT		3
 #define LUA_GCCOUNTB		4
