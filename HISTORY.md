@@ -1,8 +1,12 @@
-Dev version
+v0.3.0 (2014-6-2)
 -----------
-* Bugfix: update lua-bson (signed 32bit int bug)
 * Add cluster support
+* Add single node mode
 * Add daemon mode
+* Bugfix: update lua-bson (signed 32bit int bug / check string length)
+* Optimize timer
+* Simplify message queue and optimize message dispatch
+* Use jemalloc release 3.6.0
 
 v0.2.1 (2014-5-19)
 -----------
