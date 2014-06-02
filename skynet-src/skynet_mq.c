@@ -44,7 +44,7 @@ static struct global_queue *Q = NULL;
 
 #define GP(p) ((p) % MAX_GLOBAL_MQ)
 
-static void 
+void 
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
@@ -219,21 +219,6 @@ skynet_mq_init() {
 }
 
 void 
-skynet_mq_force_push(struct message_queue * queue) {
-	assert(queue->in_global);
-	skynet_globalmq_push(queue);
-}
-
-void 
-skynet_mq_pushglobal(struct message_queue *queue) {
-	LOCK(queue)
-	assert(queue->in_global);
-	skynet_globalmq_push(queue);
-	queue->in_global = MQ_IN_GLOBAL;
-	UNLOCK(queue)
-}
-
-void 
 skynet_mq_mark_release(struct message_queue *q) {
 	LOCK(q)
 	assert(q->release == 0);
@@ -261,7 +246,7 @@ skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud) {
 		UNLOCK(q)
 		_drop_queue(q, drop_func, ud);
 	} else {
-		skynet_mq_force_push(q);
+		skynet_globalmq_push(q);
 		UNLOCK(q)
 	}
 }

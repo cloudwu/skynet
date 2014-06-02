@@ -7,6 +7,7 @@
 #include "skynet_timer.h"
 #include "skynet_monitor.h"
 #include "skynet_socket.h"
+#include "skynet_daemon.h"
 
 #include <pthread.h>
 #include <unistd.h>
@@ -120,8 +121,10 @@ _worker(void *p) {
 	struct monitor *m = wp->m;
 	struct skynet_monitor *sm = m->m[id];
 	skynet_initthread(THREAD_WORKER);
+	struct message_queue * q = NULL;
 	for (;;) {
-		if (skynet_context_message_dispatch(sm)) {
+		q = skynet_context_message_dispatch(sm, q);
+		if (q == NULL) {
 			CHECK_ABORT
 			if (pthread_mutex_lock(&m->mutex) == 0) {
 				++ m->sleep;
@@ -195,6 +198,11 @@ bootstrap(const char * cmdline) {
 
 void 
 skynet_start(struct skynet_config * config) {
+	if (config->daemon) {
+		if (daemon_init(config->daemon)) {
+			exit(1);
+		}
+	}
 	skynet_harbor_init(config->harbor);
 	skynet_handle_init(config->harbor);
 	skynet_mq_init();
@@ -206,4 +214,7 @@ skynet_start(struct skynet_config * config) {
 
 	_start(config->thread);
 	skynet_socket_free();
+	if (config->daemon) {
+		daemon_exit(config->daemon);
+	}
 }

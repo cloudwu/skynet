@@ -35,6 +35,7 @@ optboolean(const char *key, int opt) {
 	return strcmp(str,"true")==0;
 }
 */
+
 static const char *
 optstring(const char *key,const char * opt) {
 	const char * str = skynet_getenv(key);
@@ -109,21 +110,16 @@ main(int argc, char *argv[]) {
 	} 
 	_init_env(L);
 
-#ifdef LUA_CACHELIB
-  printf("Skynet lua code cache enable\n");
-#endif
-
 	config.thread =  optint("thread",8);
 	config.module_path = optstring("cpath","./cservice/?.so");
 	config.harbor = optint("harbor", 1);
 	config.bootstrap = optstring("bootstrap","snlua bootstrap");
+	config.daemon = optstring("daemon", NULL);
 
 	lua_close(L);
 
 	skynet_start(&config);
 	skynet_globalexit();
-
-	printf("skynet exit\n");
 
 	return 0;
 }

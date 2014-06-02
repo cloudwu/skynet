@@ -13,6 +13,7 @@ struct skynet_message {
 
 struct message_queue;
 
+void skynet_globalmq_push(struct message_queue * queue);
 struct message_queue * skynet_globalmq_pop(void);
 
 struct message_queue * skynet_mq_create(uint32_t handle);
@@ -29,9 +30,6 @@ void skynet_mq_push(struct message_queue *q, struct skynet_message *message);
 
 // return the length of message queue, for debug
 int skynet_mq_length(struct message_queue *q);
-
-void skynet_mq_force_push(struct message_queue *q);
-void skynet_mq_pushglobal(struct message_queue *q);
 
 void skynet_mq_init();
 
