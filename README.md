@@ -1,6 +1,6 @@
 ## Build
 
-Install autoconf first for jemalloc
+For linux, install autoconf first for jemalloc
 
 ```
 git clone git@github.com:cloudwu/skynet.git
@@ -14,6 +14,8 @@ Or you can :
 export PLAT=linux
 make
 ```
+
+For freeBSD , use gmake instead of make .
 
 ## Test
 
