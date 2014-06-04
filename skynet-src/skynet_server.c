@@ -52,6 +52,7 @@ struct skynet_context {
 
 struct skynet_node {
 	int total;
+	int init;
 	uint32_t monitor_exit;
 	pthread_key_t handle_key;
 };
@@ -75,8 +76,13 @@ context_dec() {
 
 uint32_t 
 skynet_current_handle(void) {
-	void * handle = pthread_getspecific(G_NODE.handle_key);
-	return (uint32_t)(uintptr_t)handle;
+	if (G_NODE.init) {
+		void * handle = pthread_getspecific(G_NODE.handle_key);
+		return (uint32_t)(uintptr_t)handle;
+	} else {
+		uintptr_t v = (uint32_t)(-THREAD_MAIN);
+		return v;
+	}
 }
 
 static void
@@ -650,6 +656,7 @@ void
 skynet_globalinit(void) {
 	G_NODE.total = 0;
 	G_NODE.monitor_exit = 0;
+	G_NODE.init = 1;
 	if (pthread_key_create(&G_NODE.handle_key, NULL)) {
 		fprintf(stderr, "pthread_key_create failed");
 		exit(1);
