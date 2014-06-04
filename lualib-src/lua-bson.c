@@ -532,8 +532,8 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 			break;
 		case BSON_STRING: {
 			int sz = read_int32(L, &t);
-			if (sz == 0) {
-				luaL_error(L, "Invalid bson string , length = 0");
+			if (sz <= 0) {
+				luaL_error(L, "Invalid bson string , length = %d", sz);
 			}
 			lua_pushlstring(L, read_bytes(L, &t, sz), sz-1);
 			break;
