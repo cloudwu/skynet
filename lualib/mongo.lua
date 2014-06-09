@@ -98,7 +98,7 @@ function mongo.client( conf )
 		host = obj.host,
 		port = obj.port,
 		response = dispatch_reply,
-		auth = mongo_auth(conf),
+		auth = mongo_auth(obj),
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect(true)	-- try connect only once

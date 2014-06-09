@@ -68,6 +68,13 @@ struct bson_reader {
 	int size;
 };
 
+static inline int32_t
+get_length(const uint8_t * data) {
+	const uint8_t * b = (const uint8_t *)data;
+	int32_t len = b[0] | b[1]<<8 | b[2]<<16 | b[3]<<24;
+	return len;
+}
+
 static inline void
 bson_destroy(struct bson *b) {
 	if (b->ptr != b->buffer) {
@@ -644,7 +651,7 @@ static int
 lmakeindex(lua_State *L) {
 	int32_t *bson = luaL_checkudata(L,1,"bson");
 	const uint8_t * start = (const uint8_t *)bson;
-	struct bson_reader br = { start+4, *bson - 5 };
+	struct bson_reader br = { start+4, get_length(start) - 5 };
 	lua_newtable(L);
 
 	for (;;) {
@@ -820,7 +827,9 @@ ldecode(lua_State *L) {
 	if (data == NULL) {
 		return 0;
 	}
-	struct bson_reader br = { (const uint8_t *)data , *data };
+	const uint8_t * b = (const uint8_t *)data;
+	int32_t len = get_length(b);
+	struct bson_reader br = { b , len };
 
 	unpack_dict(L, &br, false);
 
