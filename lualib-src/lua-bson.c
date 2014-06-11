@@ -1149,14 +1149,14 @@ lobjectid(lua_State *L) {
 		}
 	} else {
 		time_t ti = time(NULL);
-		oid[2] = ti & 0xff;
-		oid[3] = (ti>>8) & 0xff;
-		oid[4] = (ti>>16) & 0xff;
-		oid[5] = (ti>>24) & 0xff;
+		oid[2] = (ti>>24) & 0xff;
+		oid[3] = (ti>>16) & 0xff;
+		oid[4] = (ti>>8) & 0xff;
+		oid[5] = ti & 0xff;
 		memcpy(oid+6 , oid_header, 5);
-		oid[11] = oid_counter & 0xff; 
+		oid[11] = (oid_counter>>16) & 0xff; 
 		oid[12] = (oid_counter>>8) & 0xff; 
-		oid[13] = (oid_counter>>16) & 0xff; 
+		oid[13] = oid_counter & 0xff; 
 		++oid_counter;
 	}
 	lua_pushlstring( L, (const char *)oid, 14);
