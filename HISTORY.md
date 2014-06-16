@@ -1,4 +1,4 @@
-Dev version
+v0.3.1 (2014-6-16)
 -----------
 * Bugfix: lua mongo driver . Hold reply string before decode bson data.
 * More check in bson decoding.
