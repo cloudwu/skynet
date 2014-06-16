@@ -1,3 +1,9 @@
+v0.3.1 (2014-6-16)
+-----------
+* Bugfix: lua mongo driver . Hold reply string before decode bson data.
+* More check in bson decoding.
+* Use big-endian for encoding bson objectid.
+
 v0.3.0 (2014-6-2)
 -----------
 * Add cluster support
