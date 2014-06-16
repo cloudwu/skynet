@@ -42,7 +42,7 @@ end
 socket_message[1] = function(id, size, data)
 	local s = socket_pool[id]
 	if s == nil then
-		skynet.error("socket: drop package from " .. id)
+		print("socket: drop package from " .. id)
 		driver.drop(data, size)
 		return
 	end
@@ -100,11 +100,11 @@ end
 socket_message[5] = function(id)
 	local s = socket_pool[id]
 	if s == nil then
-		skynet.error("socket: error on unknown", id)
+		print("socket: error on unknown", id)
 		return
 	end
 	if s.connected then
-		skynet.error("socket: error on", id)
+		print("socket: error on", id)
 	end
 	s.connected = false
 
