@@ -502,7 +502,7 @@ end
 local function init_service(start)
 	local ok, err = xpcall(init_template, debug.traceback, start)
 	if not ok then
-		print("init service failed:", err)
+		skynet.error("init service failed: " .. tostring(err))
 		skynet.send(".launcher","lua", "ERROR")
 		skynet.exit()
 	else
