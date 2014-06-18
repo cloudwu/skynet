@@ -153,6 +153,8 @@ lunpackrequest(lua_State *L) {
 static int
 lpackresponse(lua_State *L) {
 	uint32_t session = luaL_checkunsigned(L,1);
+	// clusterd.lua:command.socket call lpackresponse,
+	// and the msg/sz is return by skynet.rawcall , so don't free(msg)
 	void * msg = lua_touserdata(L,2);
 	size_t sz = luaL_checkunsigned(L, 3);
 
@@ -160,8 +162,6 @@ lpackresponse(lua_State *L) {
 	fill_header(L, buf, sz+4, msg);
 	fill_uint32(buf+2, session);
 	memcpy(buf+6,msg,sz);
-
-	skynet_free(msg);
 
 	lua_pushlstring(L, (const char *)buf, sz+6);
 
