@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local socket = require "socket"
 local socketchannel = require "socketchannel"
+local int64 = require "int64"
 
 local table = table
 local string = string
@@ -94,31 +95,56 @@ function command:disconnect()
 	setmetatable(self, nil)
 end
 
-local function compose_message(msg)
-	if #msg == 1 then
-		return msg[1] .. "\r\n"
+-- msg could be any type of value
+local function pack_value(lines, v)
+	if v == nil then
+		return
 	end
-	local lines = { "*" .. #msg }
-	for _,v in ipairs(msg) do
-		local t = type(v)
-		if t == "number" then
-			v = tostring(v)
-		elseif t == "userdata" then
-			v = int64.tostring(int64.new(v),10)
-		end
-		table.insert(lines,"$"..#v)
-		table.insert(lines,v)
-	end
-	table.insert(lines,"")
 
-	local cmd =  table.concat(lines,"\r\n")
-	return cmd
+	local t = type(v)
+	if t == "number" then
+		v = tostring(v)
+	elseif t == "userdata" then
+		v = int64.tostring(int64.new(v),10)
+	end
+	table.insert(lines,"$"..#v)
+	table.insert(lines,v)
+end
+
+local function compose_message(cmd, msg)
+	local len = 1
+	local t = type(msg)
+
+	if t == "table" then
+		len = len + #msg
+	elseif t ~= nil then
+		len = len + 1
+	end
+
+	local lines = {"*" .. len}
+	pack_value(lines, cmd)
+
+	if t == "table" then
+		for _,v in ipairs(msg) do
+			pack_value(lines, v)
+		end
+	else
+		pack_value(lines, msg)
+	end
+	table.insert(lines, "")
+
+	local chunk =  table.concat(lines,"\r\n")
+	return chunk
 end
 
 setmetatable(command, { __index = function(t,k)
 	local cmd = string.upper(k)
-	local f = function (self, ...)
-		return self[1]:request(compose_message { cmd, ... }, read_response)
+	local f = function (self, v, ...)
+		if type(v) == "table" then
+			return self[1]:request(compose_message(cmd, v), read_response)
+		else
+			return self[1]:request(compose_message(cmd, {v, ...}), read_response)
+		end
 	end
 	t[k] = f
 	return f
@@ -131,12 +157,12 @@ end
 
 function command:exists(key)
 	local fd = self[1]
-	return fd:request(compose_message { "EXISTS", key }, read_boolean)
+	return fd:request(compose_message ("EXISTS", key), read_boolean)
 end
 
 function command:sismember(key, value)
 	local fd = self[1]
-	return fd:request(compose_message { "SISMEMBER", key, value }, read_boolean)
+	return fd:request(compose_message ("SISMEMBER", {key, value}), read_boolean)
 end
 
 --- watch mode
@@ -156,10 +182,10 @@ local function watch_login(obj, auth)
 			so:request("AUTH "..auth.."\r\n", read_response)
 		end
 		for k in pairs(obj.__psubscribe) do
-			so:request(compose_message { "PSUBSCRIBE", k })
+			so:request(compose_message ("PSUBSCRIBE", k))
 		end
 		for k in pairs(obj.__subscribe) do
-			so:request(compose_message { "SUBSCRIBE", k })
+			so:request(compose_message("SUBSCRIBE", k))
 		end
 	end
 end
@@ -192,7 +218,7 @@ local function watch_func( name )
 		local so = self.__sock
 		for i = 1, select("#", ...) do
 			local v = select(i, ...)
-			so:request(compose_message { NAME, v })
+			so:request(compose_message(NAME, v))
 		end
 	end
 end
