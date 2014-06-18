@@ -31,7 +31,7 @@ macosx : EXPORT :=
 macosx linux : SKYNET_LIBS += -ldl
 linux freebsd : SKYNET_LIBS += -lrt
 
-# Turn off jemalloc and malloc hook on macosx and freebsd
+# Turn off jemalloc and malloc hook on macosx
 
 macosx : MALLOC_STATICLIB :=
 macosx : SKYNET_DEFINES :=-DNOUSE_JEMALLOC
