@@ -257,15 +257,42 @@ _send_name(struct dummy *h, uint32_t source, const char name[GLOBALNAME_LENGTH],
 	}
 }
 
+static void
+dummy_command(struct dummy * h, const char * msg, size_t sz, int session, uint32_t source) {
+	switch(msg[0]) {
+	case 'R' : {
+		// register global name
+		const char * name = msg + 2;
+		int s = (int)sz;
+		s -= 2;
+		if (s <=0 || s>= GLOBALNAME_LENGTH) {
+			skynet_error(h->ctx, "Invalid global name %s", name);
+			return;
+		}
+		struct remote_name rn;
+		memset(&rn, 0, sizeof(rn));
+		memcpy(rn.name, name, s);
+		rn.handle = source;
+		_update_name(h, rn.name, rn.handle);
+		break;
+	}
+	case 'C' :
+	case 'M' :
+		skynet_error(h->ctx, "Don't support harbor monitor in cluster dummy mode");
+		skynet_send(h->ctx, 0, source, PTYPE_ERROR, session, NULL, 0);
+		break;
+	default:
+		skynet_error(h->ctx, "Unknown command %s", msg);
+		return;
+	}
+}
+
 static int
 _mainloop(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct dummy * h = ud;
 	switch (type) {
 	case PTYPE_SYSTEM: {
-		// register name message
-		const struct remote_message *rmsg = msg;
-		assert (sz == sizeof(rmsg->destination));
-		_update_name(h, rmsg->destination.name, rmsg->destination.handle);
+		dummy_command(h, msg, sz, session, source);
 		return 0;
 	}
 	default: {

@@ -190,12 +190,33 @@ function skynet.wait()
 	session_id_coroutine[session] = nil
 end
 
+local function globalname(name, handle)
+	local c = string.sub(name,1,1)
+	assert(c ~= ':')
+	if c == '.' then
+		return false
+	end
+
+	assert(#name <= 16)	-- GLOBALNAME_LENGTH is 16, defined in skynet_harbor.h
+	assert(tonumber(name) == nil)	-- global name can't be number
+
+	local harbor = require "skynet.harbor"
+
+	harbor.globalname(name, handle)
+
+	return true
+end
+
 function skynet.register(name)
-	c.command("REG", name)
+	if not globalname(name) then
+		c.command("REG", name)
+	end
 end
 
 function skynet.name(name, handle)
-	c.command("NAME", name .. " " .. skynet.address(handle))
+	if not globalname(name, handle) then
+		c.command("NAME", name .. " " .. skynet.address(handle))
+	end
 end
 
 local self_handle

@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+local harbor = require "skynet.harbor"
 
 skynet.start(function()
 	assert(skynet.launch("logger", skynet.getenv "logger"))
@@ -9,7 +10,8 @@ skynet.start(function()
 		assert(standalone ==  nil)
 		standalone = true
 		skynet.setenv("standalone", "true")
-		assert(skynet.launch("dummy"))
+		local dummy = assert(skynet.launch("dummy"))
+		harbor.init(dummy)
 	else
 		local master_addr = skynet.getenv "master"
 
@@ -19,7 +21,8 @@ skynet.start(function()
 
 		local local_addr = skynet.getenv "address"
 
-		assert(skynet.launch("harbor",master_addr, local_addr, harbor_id))
+		local h = assert(skynet.launch("harbor",master_addr, local_addr, harbor_id))
+		harbor.init(h)
 	end
 
 	local launcher = assert(skynet.launch("snlua","launcher"))

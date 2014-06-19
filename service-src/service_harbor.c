@@ -47,6 +47,17 @@ struct remote_message_header {
 	uint32_t session;
 };
 
+struct monitor_response {
+	uint32_t addr;
+	int session;
+};
+
+struct monitor_set {
+	int cap;
+	int n;
+	struct monitor_response * resp;
+};
+
 // 12 is sizeof(struct remote_message_header)
 #define HEADER_COOKIE_LENGTH 12
 
@@ -60,7 +71,60 @@ struct harbor {
 	int remote_fd[REMOTE_MAX];
 	bool connected[REMOTE_MAX];
 	char * remote_addr[REMOTE_MAX];
+	struct monitor_set * monitor[REMOTE_MAX];
 };
+
+static void
+monitor_free(struct harbor *h) {
+	int i;
+	for (i=0;i<REMOTE_MAX;i++) {
+		struct monitor_set * m = h->monitor[i];
+		if (m) {
+			skynet_free(m->resp);
+			skynet_free(m);
+			h->monitor[i] = NULL;
+		}
+	}
+}
+
+static void
+monitor_add(struct harbor *h, int id, uint32_t addr, int session) {
+	struct monitor_set * m = h->monitor[id];
+	if (m == NULL) {
+		m = skynet_malloc(sizeof(*m));
+		m->cap = 4;
+		m->n = 0;
+		m->resp = skynet_malloc(m->cap * sizeof(struct monitor_response));
+		h->monitor[id] = m;
+	}
+	if (m->n >= m->cap) {
+		assert(m->n == m->cap);
+		struct monitor_response * resp = skynet_malloc(m->cap * 2 * sizeof(struct monitor_response));
+		int i;
+		for (i=0;i<m->n;i++) {
+			resp[i] = m->resp[i];
+		}
+		m->cap *= 2;
+		skynet_free(m->resp);
+		m->resp = resp;
+	}
+	struct monitor_response * resp = &m->resp[m->n++];
+	resp->addr = addr;
+	resp->session = session;
+}
+
+static void
+monitor_clear(struct harbor *h, int id) {
+	struct monitor_set * m = h->monitor[id];
+	if (m) {
+		int i;
+		for (i=0;i<m->n;i++) {
+			struct monitor_response * resp = &m->resp[i];
+			skynet_send(h->ctx, 0, resp->addr, PTYPE_RESPONSE, resp->session, NULL, 0);
+		}
+		m->n = 0;
+	}
+}
 
 // hash table
 
@@ -211,6 +275,7 @@ harbor_create(void) {
 		h->remote_fd[i] = -1;
 		h->connected[i] = false;
 		h->remote_addr[i] = NULL;
+		h->monitor[i] = NULL;
 	}
 	h->map = _hash_new();
 	return h;
@@ -232,6 +297,7 @@ harbor_release(struct harbor *h) {
 		}
 	}
 	_hash_delete(h->map);
+	monitor_free(h);
 	skynet_free(h);
 }
 
@@ -314,6 +380,14 @@ _send_remote(struct skynet_context * ctx, int fd, const char * buffer, size_t sz
 }
 
 static void
+response_close(struct harbor *h, int id) {
+	if (h->connected[id]) {
+		monitor_clear(h, id);
+	}
+	h->connected[id] = false;
+}
+
+static void
 _update_remote_address(struct harbor *h, int harbor_id, const char * ipaddr) {
 	if (harbor_id == h->id) {
 		return;
@@ -326,7 +400,7 @@ _update_remote_address(struct harbor *h, int harbor_id, const char * ipaddr) {
 		h->remote_addr[harbor_id] = NULL;
 	}
 	h->remote_fd[harbor_id] = _connect_to(h, ipaddr, false);
-	h->connected[harbor_id] = false;
+	response_close(h, harbor_id);
 }
 
 static void
@@ -466,7 +540,7 @@ close_harbor(struct harbor *h, int fd) {
 	skynet_error(h->ctx, "Harbor %d closed",id);
 	skynet_socket_close(h->ctx, fd);
 	h->remote_fd[id] = -1;
-	h->connected[id] = false;
+	response_close(h,id);
 }
 
 static void
@@ -475,7 +549,61 @@ open_harbor(struct harbor *h, int fd) {
 	if (id == 0)
 		return;
 	assert(h->connected[id] == false);
+	monitor_clear(h, id);
 	h->connected[id] = true;
+}
+
+static void
+harbor_command(struct harbor * h, const char * msg, size_t sz, int session, uint32_t source) {
+	const char * name = msg + 2;
+	int s = (int)sz;
+	s -= 2;
+	switch(msg[0]) {
+	case 'R' : {
+		// register global name
+		if (s <=0 || s>= GLOBALNAME_LENGTH) {
+			skynet_error(h->ctx, "Invalid global name %s", name);
+			return;
+		}
+		struct remote_name rn;
+		memset(&rn, 0, sizeof(rn));
+		memcpy(rn.name, name, s);
+		rn.handle = source;
+		_remote_register_name(h, rn.name, rn.handle);
+		break;
+	}
+	case 'C' :
+	case 'M' : {
+		if (s <= 0) {
+			skynet_error(h->ctx, "Invalid harbor montior");
+			skynet_send(h->ctx, 0, source, PTYPE_ERROR, session, NULL, 0);
+			return;
+		}
+		int hid = strtol(name, NULL, 10);
+		if (hid <= 0 || hid >= REMOTE_MAX) {
+			skynet_error(h->ctx, "Invalid harbor montior id : %s", name);
+			skynet_send(h->ctx, 0, source, PTYPE_ERROR, session, NULL, 0);
+			return;
+		}
+		if (msg[0] == 'M') {
+			if (!h->connected[hid]) {
+				skynet_send(h->ctx, 0, source, PTYPE_RESPONSE, session, NULL, 0);
+				return;
+			}
+		} else {
+			assert(msg[0] == 'C');
+			if (h->connected[hid]) {
+				skynet_send(h->ctx, 0, source, PTYPE_RESPONSE, session, NULL, 0);
+				return;
+			}
+		}
+		monitor_add(h, hid, source, session);
+		break;
+	}
+	default:
+		skynet_error(h->ctx, "Unknown command %s", msg);
+		return;
+	}
 }
 
 static int
@@ -536,10 +664,7 @@ _mainloop(struct skynet_context * context, void * ud, int type, int session, uin
 		return 0;
 	}
 	case PTYPE_SYSTEM: {
-		// register name message
-		const struct remote_message *rmsg = msg;
-		assert (sz == sizeof(rmsg->destination));
-		_remote_register_name(h, rmsg->destination.name, rmsg->destination.handle);
+		harbor_command(h, msg,sz,session,source);
 		return 0;
 	}
 	default: {

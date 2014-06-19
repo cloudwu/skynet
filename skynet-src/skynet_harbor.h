@@ -23,7 +23,6 @@ struct remote_message {
 };
 
 void skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session);
-void skynet_harbor_register(struct remote_name *rname);
 int skynet_harbor_message_isremote(uint32_t handle);
 void skynet_harbor_init(int harbor);
 void skynet_harbor_start(void * ctx);

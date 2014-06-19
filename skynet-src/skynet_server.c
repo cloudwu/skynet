@@ -342,11 +342,7 @@ cmd_reg(struct skynet_context * context, const char * param) {
 	} else if (param[0] == '.') {
 		return skynet_handle_namehandle(context->handle, param + 1);
 	} else {
-		assert(context->handle!=0);
-		struct remote_name *rname = skynet_malloc(sizeof(*rname));
-		copy_name(rname->name, param);
-		rname->handle = context->handle;
-		skynet_harbor_register(rname);
+		skynet_error(context, "Can't register global name %s in C", param);
 		return NULL;
 	}
 }
@@ -377,10 +373,7 @@ cmd_name(struct skynet_context * context, const char * param) {
 	if (name[0] == '.') {
 		return skynet_handle_namehandle(handle_id, name + 1);
 	} else {
-		struct remote_name *rname = skynet_malloc(sizeof(*rname));
-		copy_name(rname->name, name);
-		rname->handle = handle_id;
-		skynet_harbor_register(rname);
+		skynet_error(context, "Can't set global name %s in C", name);
 	}
 	return NULL;
 }

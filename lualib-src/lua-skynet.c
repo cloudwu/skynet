@@ -221,7 +221,7 @@ _send(lua_State *L) {
 	}
 	if (session < 0) {
 		// send to invalid address
-		// todo: maybe throw error is better
+		// todo: maybe throw error whould be better
 		return 0;
 	}
 	lua_pushinteger(L,session);
