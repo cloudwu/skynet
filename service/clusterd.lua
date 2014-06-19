@@ -32,7 +32,12 @@ local node_channel = setmetatable({}, { __index = open_channel })
 
 function command.listen(source, addr, port)
 	local gate = skynet.newservice("gate")
-	skynet.call(gate, "lua", "open", { address = addr, port = port })
+	if port == nil then
+		local host, port = string.match(node_address[addr], "([^:]+):(.*)$")
+		skynet.call(gate, "lua", "open", { address = host, port = port })
+	else
+		skynet.call(gate, "lua", "open", { address = addr, port = port })
+	end
 	skynet.ret(skynet.pack(nil))
 end
 

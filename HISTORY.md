@@ -2,6 +2,7 @@ Dev version
 -----------
 * Optimize redis driver `compose_message`.
 * Add module skynet.harbor for monitor harbor connect/disconnect, see test/testharborlink.lua .
+* cluster.open support cluster name.
 
 v0.3.1 (2014-6-16)
 -----------
