@@ -134,12 +134,6 @@ skynet_socket_connect(struct skynet_context *ctx, const char *host, int port) {
 }
 
 int 
-skynet_socket_block_connect(struct skynet_context *ctx, const char *host, int port) {
-	uint32_t source = skynet_context_handle(ctx);
-	return socket_server_block_connect(SOCKET_SERVER, source, host, port);
-}
-
-int 
 skynet_socket_bind(struct skynet_context *ctx, int fd) {
 	uint32_t source = skynet_context_handle(ctx);
 	return socket_server_bind(SOCKET_SERVER, source, fd);

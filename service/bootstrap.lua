@@ -14,7 +14,7 @@ skynet.start(function()
 		local master_addr = skynet.getenv "master"
 
 		if standalone then
-			assert(skynet.launch("master", master_addr))
+			assert(skynet.launch("master", standalone))
 		end
 
 		local local_addr = skynet.getenv "address"

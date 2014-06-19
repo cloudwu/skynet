@@ -121,6 +121,7 @@ _connect_to(struct master *m, int id) {
 	int port = strtol(portstr+1,NULL,10);
 	skynet_error(ctx, "Master connect to harbor(%d) %s:%d", id, tmp, port);
 	m->remote_fd[id] = skynet_socket_connect(ctx, tmp, port);
+	m->connected[id] = true;
 }
 
 static inline void
@@ -217,7 +218,7 @@ socket_id(struct master *m, int id) {
 static void
 on_connected(struct master *m, int id) {
 	_broadcast(m, m->remote_addr[id], strlen(m->remote_addr[id]), id);
-	m->connected[id] = true;
+//	m->connected[id] = true;
 	int i;
 	for (i=1;i<REMOTE_MAX;i++) {
 		if (i == id)

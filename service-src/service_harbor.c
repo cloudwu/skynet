@@ -302,7 +302,7 @@ harbor_release(struct harbor *h) {
 }
 
 static int
-_connect_to(struct harbor *h, const char *ipaddress, bool blocking) {
+_connect_to(struct harbor *h, const char *ipaddress) {
 	char * port = strchr(ipaddress,':');
 	if (port==NULL) {
 		return -1;
@@ -316,11 +316,7 @@ _connect_to(struct harbor *h, const char *ipaddress, bool blocking) {
 
 	skynet_error(h->ctx, "Harbor(%d) connect to %s:%d", h->id, tmp, portid);
 
-	if (blocking) {
-		return skynet_socket_block_connect(h->ctx, tmp, portid);
-	} else {
-		return skynet_socket_connect(h->ctx, tmp, portid);
-	}
+	return skynet_socket_connect(h->ctx, tmp, portid);
 }
 
 static inline void
@@ -399,7 +395,7 @@ _update_remote_address(struct harbor *h, int harbor_id, const char * ipaddr) {
 		skynet_free(h->remote_addr[harbor_id]);
 		h->remote_addr[harbor_id] = NULL;
 	}
-	h->remote_fd[harbor_id] = _connect_to(h, ipaddr, false);
+	h->remote_fd[harbor_id] = _connect_to(h, ipaddr);
 	response_close(h, harbor_id);
 }
 
@@ -448,7 +444,9 @@ _request_master(struct harbor *h, const char name[GLOBALNAME_LENGTH], size_t i, 
 	to_bigendian(buffer, handle);
 	memcpy(buffer+4,name,i);
 
-	_send_package(h->ctx, h->master_fd, buffer, 4+i);
+	if (h->master_fd >= 0) {
+		_send_package(h->ctx, h->master_fd, buffer, 4+i);
+	}
 }
 
 /*
@@ -534,7 +532,14 @@ harbor_id(struct harbor *h, int fd) {
 
 static void
 close_harbor(struct harbor *h, int fd) {
+	if (fd == h->master_fd) {
+		skynet_socket_close(h->ctx, fd);
+		skynet_error(h->ctx, "Master disconnected");
+		h->master_fd = -1;
+		return;
+	}
 	int id = harbor_id(h,fd);
+
 	if (id == 0)
 		return;
 	skynet_error(h->ctx, "Harbor %d closed",id);
@@ -551,6 +556,7 @@ open_harbor(struct harbor *h, int fd) {
 	assert(h->connected[id] == false);
 	monitor_clear(h, id);
 	h->connected[id] = true;
+	skynet_error(h->ctx, "Harbor(%d) connected", id);
 }
 
 static void
@@ -715,7 +721,7 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 	sscanf(args,"%s %s %d",master_addr, local_addr, &harbor_id);
 	h->master_addr = skynet_strdup(master_addr);
 	h->id = harbor_id;
-	h->master_fd = _connect_to(h, master_addr, true);
+	h->master_fd = _connect_to(h, master_addr);
 	if (h->master_fd == -1) {
 		fprintf(stderr, "Harbor: Connect to master failed\n");
 		exit(1);
