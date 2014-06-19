@@ -234,6 +234,16 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	CHECKCALLING_END(ctx)
 }
 
+void 
+skynet_context_dispatchall(struct skynet_context * ctx) {
+	// for skynet_error
+	struct skynet_message msg;
+	struct message_queue *q = ctx->queue;
+	while (!skynet_mq_pop(q,&msg)) {
+		_dispatch_message(ctx, &msg);
+	}
+}
+
 struct message_queue * 
 skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q) {
 	if (q == NULL) {

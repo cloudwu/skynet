@@ -115,6 +115,7 @@ main(int argc, char *argv[]) {
 	config.harbor = optint("harbor", 1);
 	config.bootstrap = optstring("bootstrap","snlua bootstrap");
 	config.daemon = optstring("daemon", NULL);
+	config.logger = optstring("logger", NULL);
 
 	lua_close(L);
 

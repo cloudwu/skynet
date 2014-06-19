@@ -2,8 +2,6 @@ local skynet = require "skynet"
 local harbor = require "skynet.harbor"
 
 skynet.start(function()
-	assert(skynet.launch("logger", skynet.getenv "logger"))
-
 	local standalone = skynet.getenv "standalone"
 	local harbor_id = tonumber(skynet.getenv "harbor")
 	if harbor_id == 0 then
