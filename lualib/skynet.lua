@@ -288,6 +288,7 @@ skynet.redirect = function(dest,source,typename,...)
 end
 
 skynet.pack = assert(c.pack)
+skynet.packstring = assert(c.packstring)
 skynet.unpack = assert(c.unpack)
 skynet.tostring = assert(c.tostring)
 
@@ -339,8 +340,8 @@ function skynet.dispatch(typename, func)
 	p.dispatch = func
 end
 
-local function unknown_request(session, address, msg, sz)
-	print("Unknown request :" , c.tostring(msg,sz))
+local function unknown_request(session, address, msg, sz, prototype)
+	skynet.error(string.format("Unknown request (%s): %s", prototype, c.tostring(msg,sz)))
 	error(string.format("Unknown session : %d from %x", session, address))
 end
 
@@ -394,7 +395,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			session_coroutine_address[co] = source
 			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
 		else
-			unknown_request(session, source, msg, sz)
+			unknown_request(session, source, msg, sz, proto[prototype])
 		end
 	end
 end

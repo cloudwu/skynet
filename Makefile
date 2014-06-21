@@ -40,7 +40,7 @@ jemalloc : $(MALLOC_STATICLIB)
 
 # skynet
 
-CSERVICE = snlua logger gate master harbor dummy
+CSERVICE = snlua logger gate harbor
 LUA_CLIB = skynet socketdriver int64 bson mongo md5 netpack \
   cjson clientsocket memory profile multicast \
   cluster

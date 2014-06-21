@@ -3,6 +3,10 @@ Dev version
 * Optimize redis driver `compose_message`.
 * Add module skynet.harbor for monitor harbor connect/disconnect, see test/testharborlink.lua .
 * cluster.open support cluster name.
+* Add new api skynet.packstring , and skynet.unpack support lua string
+* socket.listen support put port into address. (address:port)
+* Redesign harbor/master/dummy, remove lots of C code and rewite in lua.
+* Remove block connect api, queue sending message during connecting now.
 
 v0.3.1 (2014-6-16)
 -----------

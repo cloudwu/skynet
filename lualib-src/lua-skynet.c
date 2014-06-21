@@ -289,6 +289,16 @@ _harbor(lua_State *L) {
 	return 2;
 }
 
+static int
+lpackstring(lua_State *L) {
+	_luaseri_pack(L);
+	char * str = (char *)lua_touserdata(L, -2);
+	int sz = lua_tointeger(L, -1);
+	lua_pushlstring(L, str, sz);
+	skynet_free(str);
+	return 1;
+}
+
 int
 luaopen_skynet_c(lua_State *L) {
 	luaL_checkversion(L);
@@ -303,6 +313,7 @@ luaopen_skynet_c(lua_State *L) {
 		{ "harbor", _harbor },
 		{ "pack", _luaseri_pack },
 		{ "unpack", _luaseri_unpack },
+		{ "packstring", lpackstring },
 		{ "callback", _callback },
 		{ NULL, NULL },
 	};

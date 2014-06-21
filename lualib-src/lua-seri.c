@@ -581,8 +581,16 @@ _luaseri_unpack(lua_State *L) {
 	if (lua_isnoneornil(L,1)) {
 		return 0;
 	}
-	void * buffer = lua_touserdata(L,1);
-	int len = luaL_checkinteger(L,2);
+	void * buffer;
+	int len;
+	if (lua_type(L,1) == LUA_TSTRING) {
+		size_t sz;
+		 buffer = (void *)lua_tolstring(L,1,&sz);
+		len = (int)sz;
+	} else {
+		buffer = lua_touserdata(L,1);
+		len = luaL_checkinteger(L,2);
+	}
 	if (len == 0) {
 		return 0;
 	}
