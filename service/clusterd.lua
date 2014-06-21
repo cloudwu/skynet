@@ -10,7 +10,7 @@ local node_session = {}
 local command = {}
 
 local function read_response(sock)
-	local sz = sock:read(2)
+	local sz = socket.header(sock:read(2))
 	local msg = sock:read(sz)
 	return cluster.unpackresponse(msg)	-- session, ok, data
 end
