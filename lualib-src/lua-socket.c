@@ -188,10 +188,29 @@ pop_lstring(lua_State *L, struct socket_buffer *sb, int sz, int skip) {
 	luaL_pushresult(&b);
 }
 
+static int
+lheader(lua_State *L) {
+	size_t len;
+	const uint8_t * s = (const uint8_t *)luaL_checklstring(L, 1, &len);
+	if (len > 4 || len < 1) {
+		return luaL_error(L, "Invalid read %s", s);
+	}
+	int i;
+	size_t sz = 0;
+	for (i=0;i<(int)len;i++) {
+		sz <<= 8;
+		sz |= s[i];
+	}
+
+	lua_pushunsigned(L, sz);
+
+	return 1;
+}
+
 /*
 	userdata send_buffer
 	table pool
-	integer sz or string (big endian)
+	integer sz 
  */
 static int
 lpopbuffer(lua_State *L) {
@@ -200,23 +219,7 @@ lpopbuffer(lua_State *L) {
 		return luaL_error(L, "Need buffer object at param 1");
 	}
 	luaL_checktype(L,2,LUA_TTABLE);
-	int type = lua_type(L,3);
-	int sz;
-	if (type == LUA_TNUMBER) {
-		sz = lua_tointeger(L,3);
-	} else {
-		size_t len;
-		const uint8_t * s = (const uint8_t *)luaL_checklstring(L, 3, &len);
-		if (len > 4 || len < 1) {
-			return luaL_error(L, "Invalid read %s", s);
-		}
-		int i;
-		sz = 0;
-		for (i=0;i<(int)len;i++) {
-			sz <<= 8;
-			sz |= s[i];
-		}
-	}
+	int sz = luaL_checkinteger(L,3);
 	if (sb->size < sz || sz == 0) {
 		lua_pushnil(L);
 	} else {
@@ -485,6 +488,7 @@ luaopen_socketdriver(lua_State *L) {
 		{ "clear", lclearbuffer },
 		{ "readline", lreadline },
 		{ "str2p", lstr2p },
+		{ "header", lheader },
 
 		{ "unpack", lunpack },
 		{ NULL, NULL },
