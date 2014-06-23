@@ -1,3 +1,9 @@
+v0.3.2 (2014-6-23)
+----------
+* Bugifx : mongo driver and lua-bson . (objectid encoding, and gc problem when mongdo driver reply bson object).
+* Bugfix : cluster (double free).
+* Add socket.header() to decode big-endian package header (and fix the bug in cluster).
+
 v0.3.1 (2014-6-16)
 -----------
 * Bugfix: lua mongo driver . Hold reply string before decode bson data.
