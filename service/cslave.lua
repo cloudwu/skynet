@@ -36,7 +36,7 @@ end
 local function connect_slave(slave_id, address)
 	local ok, err = pcall(function()
 		if slaves[slave_id] == nil then
-			local fd = socket.open(address)
+			local fd = assert(socket.open(address), "Can't connect to "..address)
 			skynet.error(string.format("Connect to harbor %d (fd=%d), %s", slave_id, fd, address))
 			slaves[slave_id] = fd
 			monitor_clear(slave_id)
