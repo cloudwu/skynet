@@ -47,8 +47,10 @@ local function report_slave(fd, slave_id, slave_addr)
 	local message = pack_package("C", slave_id, slave_addr)
 	local n = 0
 	for k,v in pairs(slave_node) do
-		socket.write(v.fd, message)
-		n = n + 1
+		if v.fd ~= 0 then
+			socket.write(v.fd, message)
+			n = n + 1
+		end
 	end
 	socket.write(fd, pack_package("W", n))
 end
