@@ -132,7 +132,7 @@ local function monitor_harbor(master_fd)
 		if t == "Q" then
 			-- query name
 			if globalname[arg] then
-				skynet.redirect(harbor_service, globalname[arg], "harbor", "N " .. arg)
+				skynet.redirect(harbor_service, globalname[arg], "harbor", 0, "N " .. arg)
 			else
 				socket.write(master_fd, pack_package("Q", arg))
 			end
