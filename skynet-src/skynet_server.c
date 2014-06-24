@@ -569,9 +569,6 @@ int
 skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
 	if ((sz & HANDLE_MASK) != sz) {
 		skynet_error(context, "The message to %x is too large (sz = %lu)", destination, sz);
-		if (session != 0) {
-			skynet_send(context, destination, source, PTYPE_ERROR, session, NULL, 0);
-		}
 		skynet_free(data);
 		return -1;
 	}

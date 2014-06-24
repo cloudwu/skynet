@@ -149,7 +149,7 @@ _sendname(lua_State *L, struct skynet_context * context, const char * dest) {
 		luaL_error(L, "skynet.send invalid param %s", lua_typename(L,lua_type(L,4)));
 	}
 	if (session < 0) {
-		luaL_error(L, "skynet.send session (%d) < 0", session);
+		return 0;
 	}
 	lua_pushinteger(L,session);
 	return 1;
