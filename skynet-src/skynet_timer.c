@@ -26,6 +26,8 @@ typedef void (*timer_execute_func)(void *ud,void *arg);
 #define TIME_NEAR_MASK (TIME_NEAR-1)
 #define TIME_LEVEL_MASK (TIME_LEVEL-1)
 
+#define CENTISECOND_MASK 0x1ffffff
+
 struct timer_event {
 	uint32_t handle;
 	int session;
@@ -218,28 +220,41 @@ skynet_timeout(uint32_t handle, int time, int session) {
 	return session;
 }
 
-static uint32_t
-_gettime(void) {
-	uint32_t t;
+// centisecond: 1/100 second
+static void
+_systime(uint32_t *sec, uint32_t *cs) {
 #if !defined(__APPLE__)
 	struct timespec ti;
-	clock_gettime(CLOCK_MONOTONIC, &ti);
-	t = (uint32_t)(ti.tv_sec & 0xffffff) * 100;
-	t += ti.tv_nsec / 10000000;
+	clock_gettime(CLOCK_REALTIME, &ti);
+	*sec = (uint32_t)ti.tv_sec;
+	*cs = (uint32_t)(ti.tv_nsec / 10000000);
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	t = (uint32_t)(tv.tv_sec & 0xffffff) * 100;
-	t += tv.tv_usec / 10000;
+	*sec = tv.tv_sec;
+	*cs = tv.tv_usec / 10000;
 #endif
-	return t;
+}
+
+static uint32_t
+_gettime() {
+	uint32_t sec, cs;
+	_systime(&sec, &cs);
+	// if sec < TI->starttime, need to update TI->starttime?
+	// if(sec < TI->starttime) {
+	//	 skynet_error(NULL, "time diff error, change from %u -> %u", TI->starttime, sec);
+	//	 TI->starttime = sec;
+	//	 TI->current = cs;
+	// }
+	uint32_t diff = (sec - TI->starttime) & CENTISECOND_MASK;
+	return diff * 100 + cs;
 }
 
 void
 skynet_updatetime(void) {
 	uint32_t ct = _gettime();
 	if (ct != TI->current) {
-		int diff = ct>=TI->current?ct-TI->current:(0xffffff+1)*100-TI->current+ct;
+		uint32_t diff = ct>=TI->current?ct-TI->current:(uint32_t)(CENTISECOND_MASK+1)*100-TI->current+ct;
 		TI->current = ct;
 		int i;
 		for (i=0;i<diff;i++) {
@@ -261,18 +276,6 @@ skynet_gettime(void) {
 void 
 skynet_timer_init(void) {
 	TI = timer_create_timer();
-	TI->current = _gettime();
-
-#if !defined(__APPLE__)
-	struct timespec ti;
-	clock_gettime(CLOCK_REALTIME, &ti);
-	uint32_t sec = (uint32_t)ti.tv_sec;
-#else
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	uint32_t sec = (uint32_t)tv.tv_sec;
-#endif
-	uint32_t mono = _gettime() / 100;
-
-	TI->starttime = sec - mono;
+	_systime(&TI->starttime, &TI->current);
 }
+
