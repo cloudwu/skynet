@@ -427,13 +427,13 @@ push_socket_data(struct harbor *h, const struct skynet_socket_message * message)
 		}
 		case STATUS_HEADER: {
 			// big endian 4 bytes length, the first one must be 0.
-			int need = 4 - s->length;
+			int need = 4 - s->read;
 			if (size < need) {
-				s->length += size;
-				memcpy(s->size + s->length, buffer, size);
+				memcpy(s->size + s->read, buffer, size);
+				s->read += size;
 				return;
 			} else {
-				memcpy(s->size + s->length, buffer, need);
+				memcpy(s->size + s->read, buffer, need);
 				buffer += need;
 				size -= need;
 
