@@ -425,36 +425,40 @@ push_socket_data(struct harbor *h, const struct skynet_socket_message * message)
 			}
 			// go though
 		}
-		case STATUS_HEADER:
-			if (size < 4) {
-				s->length = size;
-				memcpy(s->size, buffer, size);
+		case STATUS_HEADER: {
+			// big endian 4 bytes length, the first one must be 0.
+			int need = 4 - s->length;
+			if (size < need) {
+				s->length += size;
+				memcpy(s->size + s->length, buffer, size);
 				return;
 			} else {
-				// big endian 4 bytes length
-				if (buffer[0] != 0) {
+				memcpy(s->size + s->length, buffer, need);
+				buffer += need;
+				size -= need;
+
+				if (s->size[0] != 0) {
 					skynet_error(h->ctx, "Message is too long from harbor %d", id);
 					close_harbor(h,id);
 					return;
 				}
-				s->length = buffer[1] << 16 | buffer[2] << 8 | buffer[3];
+				s->length = s->size[1] << 16 | s->size[2] << 8 | s->size[3];
 				s->read = 0;
 				s->recv_buffer = skynet_malloc(s->length);
 				s->status = STATUS_CONTENT;
-				buffer += 4;
-				size -= 4;
 				if (size == 0) {
 					return;
 				}
 			}
-			// go though
-		case STATUS_CONTENT:
-			if (size < s->length - s->read) {
+		}
+		// go though
+		case STATUS_CONTENT: {
+			int need = s->length - s->read;
+			if (size < need) {
 				memcpy(s->recv_buffer + s->read, buffer, size);
 				s->read += size;
 				return;
 			}
-			int need = s->length - s->read;
 			memcpy(s->recv_buffer + s->read, buffer, need);
 			forward_local_messsage(h, s->recv_buffer, s->length);
 			s->length = 0;
@@ -466,6 +470,7 @@ push_socket_data(struct harbor *h, const struct skynet_socket_message * message)
 			if (size == 0)
 				return;
 			break;
+		}
 		default:
 			return;
 		}
