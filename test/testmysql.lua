@@ -69,7 +69,15 @@ skynet.start(function()
 	res = db:query("select * from cats order by id asc")
 	print ( dump( res ) )
 	
-	
+	-- multiresultset test
+	res = db:query("select * from cats order by id asc ; select * from cats")
+	print ( dump( res ) )
+
+	print ( mysql.quote_sql_str([[\mysql escape %string test'test"]]) )
+
+	-- bad sql statement
+	res = pcall(  db.query, db, "select * from notexisttable" )
+	print( dump(res) )
 	skynet.exit()
 end)
 
