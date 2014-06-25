@@ -52,7 +52,8 @@ skynet.start(function()
 		port=3306,
 		database="skynet",
 		user="root",
-		password="1"
+		password="1",
+		max_packet_size = 1024 * 1024
 	}
 	if not db then
 		print("failed to connect")
