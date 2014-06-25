@@ -26,8 +26,6 @@ typedef void (*timer_execute_func)(void *ud,void *arg);
 #define TIME_NEAR_MASK (TIME_NEAR-1)
 #define TIME_LEVEL_MASK (TIME_LEVEL-1)
 
-#define CENTISECOND_MASK 0x1ffffff
-
 struct timer_event {
 	uint32_t handle;
 	int session;
@@ -50,6 +48,8 @@ struct timer {
 	int time;
 	uint32_t current;
 	uint32_t starttime;
+	uint64_t current_point;
+	uint64_t origin_point;
 };
 
 static struct timer * TI = NULL;
@@ -236,26 +236,34 @@ _systime(uint32_t *sec, uint32_t *cs) {
 #endif
 }
 
-static uint32_t
+static uint64_t
 _gettime() {
-	uint32_t sec, cs;
-	_systime(&sec, &cs);
-	// if sec < TI->starttime, need to update TI->starttime?
-	// if(sec < TI->starttime) {
-	//	 skynet_error(NULL, "time diff error, change from %u -> %u", TI->starttime, sec);
-	//	 TI->starttime = sec;
-	//	 TI->current = cs;
-	// }
-	uint32_t diff = (sec - TI->starttime) & CENTISECOND_MASK;
-	return diff * 100 + cs;
+	uint64_t t;
+#if !defined(__APPLE__)
+	struct timespec ti;
+	clock_gettime(CLOCK_MONOTONIC, &ti);
+	t = ti.tv_sec * 100;
+	t += (uint32_t)(ti.tv_nsec / 10000000);
+#else
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	t = ti.tv_sec * 100;
+	t += (uint32_t)(tv.tv_usec / 10000);
+#endif
+	return t;
 }
 
 void
 skynet_updatetime(void) {
-	uint32_t ct = _gettime();
-	if (ct != TI->current) {
-		uint32_t diff = ct>=TI->current?ct-TI->current:(uint32_t)(CENTISECOND_MASK+1)*100-TI->current+ct;
-		TI->current = ct;
+	uint64_t cp = _gettime();
+	if(cp < TI->current_point) {
+		skynet_error(NULL, "time diff error: change from %lld to %lld", cp, TI->current_point);
+	} else if (cp != TI->current_point) {
+		uint32_t diff = (uint32_t)(cp - TI->current_point);
+		TI->current_point = cp;
+
+        // when cs > 0xffffffff(about 49710), time rewind
+		TI->current += diff;
 		int i;
 		for (i=0;i<diff;i++) {
 			timer_update(TI);
@@ -277,5 +285,8 @@ void
 skynet_timer_init(void) {
 	TI = timer_create_timer();
 	_systime(&TI->starttime, &TI->current);
+	uint64_t point = _gettime();
+	TI->current_point = point;
+	TI->origin_point = point;
 }
 
