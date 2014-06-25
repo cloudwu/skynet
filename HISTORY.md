@@ -7,6 +7,7 @@ Dev version
 * socket.listen support put port into address. (address:port)
 * Redesign harbor/master/dummy, remove lots of C code and rewite in lua.
 * Remove block connect api, queue sending message during connecting now.
+* Add skynet.time()
 
 v0.3.2 (2014-6-23)
 ----------

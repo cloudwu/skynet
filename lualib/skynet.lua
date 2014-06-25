@@ -247,6 +247,10 @@ function skynet.starttime()
 	return tonumber(c.command("STARTTIME"))
 end
 
+function skynet.time()
+	return skynet.starttime() + skynet.now()/100
+end
+
 function skynet.exit()
 	skynet.send(".launcher","lua","REMOVE",skynet.self())
 	c.command("EXIT")
