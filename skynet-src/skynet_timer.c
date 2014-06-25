@@ -48,6 +48,8 @@ struct timer {
 	int time;
 	uint32_t current;
 	uint32_t starttime;
+	uint64_t current_point;
+	uint64_t origin_point;
 };
 
 static struct timer * TI = NULL;
@@ -218,29 +220,50 @@ skynet_timeout(uint32_t handle, int time, int session) {
 	return session;
 }
 
-static uint32_t
-_gettime(void) {
-	uint32_t t;
+// centisecond: 1/100 second
+static void
+_systime(uint32_t *sec, uint32_t *cs) {
 #if !defined(__APPLE__)
 	struct timespec ti;
-	clock_gettime(CLOCK_MONOTONIC, &ti);
-	t = (uint32_t)(ti.tv_sec & 0xffffff) * 100;
-	t += ti.tv_nsec / 10000000;
+	clock_gettime(CLOCK_REALTIME, &ti);
+	*sec = (uint32_t)ti.tv_sec;
+	*cs = (uint32_t)(ti.tv_nsec / 10000000);
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	t = (uint32_t)(tv.tv_sec & 0xffffff) * 100;
-	t += tv.tv_usec / 10000;
+	*sec = tv.tv_sec;
+	*cs = tv.tv_usec / 10000;
+#endif
+}
+
+static uint64_t
+_gettime() {
+	uint64_t t;
+#if !defined(__APPLE__)
+	struct timespec ti;
+	clock_gettime(CLOCK_MONOTONIC, &ti);
+	t = ti.tv_sec * 100;
+	t += (uint32_t)(ti.tv_nsec / 10000000);
+#else
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	t = ti.tv_sec * 100;
+	t += (uint32_t)(tv.tv_usec / 10000);
 #endif
 	return t;
 }
 
 void
 skynet_updatetime(void) {
-	uint32_t ct = _gettime();
-	if (ct != TI->current) {
-		int diff = ct>=TI->current?ct-TI->current:(0xffffff+1)*100-TI->current+ct;
-		TI->current = ct;
+	uint64_t cp = _gettime();
+	if(cp < TI->current_point) {
+		skynet_error(NULL, "time diff error: change from %lld to %lld", cp, TI->current_point);
+	} else if (cp != TI->current_point) {
+		uint32_t diff = (uint32_t)(cp - TI->current_point);
+		TI->current_point = cp;
+
+        // when cs > 0xffffffff(about 49710), time rewind
+		TI->current += diff;
 		int i;
 		for (i=0;i<diff;i++) {
 			timer_update(TI);
@@ -261,18 +284,9 @@ skynet_gettime(void) {
 void 
 skynet_timer_init(void) {
 	TI = timer_create_timer();
-	TI->current = _gettime();
-
-#if !defined(__APPLE__)
-	struct timespec ti;
-	clock_gettime(CLOCK_REALTIME, &ti);
-	uint32_t sec = (uint32_t)ti.tv_sec;
-#else
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	uint32_t sec = (uint32_t)tv.tv_sec;
-#endif
-	uint32_t mono = _gettime() / 100;
-
-	TI->starttime = sec - mono;
+	_systime(&TI->starttime, &TI->current);
+	uint64_t point = _gettime();
+	TI->current_point = point;
+	TI->origin_point = point;
 }
+
