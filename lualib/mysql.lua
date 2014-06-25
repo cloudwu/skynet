@@ -605,46 +605,7 @@ local function _mysql_login(self,user,password,database)
         return sockchannel:request(authpacket,_recv_auth_resp(self))
     end
 end
-function _M.connect( opts)
 
-    local self = setmetatable( {}, mt)
-
-    local max_packet_size = opts.max_packet_size
-    if not max_packet_size then
-        max_packet_size = 1024 * 1024 -- default 1 MB
-    end
-    self._max_packet_size = max_packet_size
-    self.compact = opts.compact_arrays
-
-
-    local database = opts.database or ""
-    local user = opts.user or ""
-    local password = opts.password or ""
-
-	local channel = socketchannel.channel {
-        host = opts.host,
-        port = opts.port or 3306,
-        auth = _mysql_login(self,user,password,database ),
-    }
-    -- try connect first only once
-    channel:connect(true)
-    self.sockchannel = channel
-
-
-    return self
-end
-
-
-
-function _M.close(self)
-    self.sockchannel:close()
-    setmetatable(self, nil)
-end
-
-
-function _M.server_ver(self)
-    return self._server_ver
-end
 
 local function _compose_query(self, query)
  
@@ -665,14 +626,15 @@ local function read_result(self, sock)
     local packet, typ, err = _recv_packet(self, sock)
     if not packet then
         --print("read result", err)
-        error( err )
+        return nil, err
+        --error( err )
     end
 
     if typ == "ERR" then
         local errno, msg, sqlstate = _parse_err_packet(packet)
         --print("read result ", msg, errno, sqlstate)
-        --return nil, msg, errno, sqlstate
-        error( string.format("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
+        return nil, msg, errno, sqlstate
+        --error( string.format("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
     end
 
     if typ == 'OK' then
@@ -687,7 +649,8 @@ local function read_result(self, sock)
 
     if typ ~= 'DATA' then
         --print("read result", "packet type " ,typ , " not supported")
-        error( "packet type " .. typ .. " not supported" )
+        return nil, "packet type " .. typ .. " not supported"
+        --error( "packet type " .. typ .. " not supported" )
     end
 
     -- typ == 'DATA'
@@ -702,8 +665,8 @@ local function read_result(self, sock)
     for i = 1, field_count do
         local col, err, errno, sqlstate = _recv_field_packet(self, sock)
         if not col then
-            --return nil, err, errno, sqlstate
-            error( string.format("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
+            return nil, err, errno, sqlstate
+            --error( string.format("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
         end
 
         cols[i] = col
@@ -711,11 +674,13 @@ local function read_result(self, sock)
 
     local packet, typ, err = _recv_packet(self, sock)
     if not packet then
-        error( err)
+        --error( err)
+        return nil, err
     end
 
     if typ ~= 'EOF' then
-        error ( "unexpected packet type " .. typ .. " while eof packet is ".. "expected" )
+        --error ( "unexpected packet type " .. typ .. " while eof packet is ".. "expected" )
+        return nil, "unexpected packet type " .. typ .. " while eof packet is ".. "expected" 
     end
 
     -- typ == 'EOF'
@@ -729,7 +694,8 @@ local function read_result(self, sock)
 
         packet, typ, err = _recv_packet(self, sock)
         if not packet then
-            error (err)
+            --error (err)
+            return nil, err
         end
 
         if typ == 'EOF' then
@@ -761,15 +727,25 @@ end
 local function _query_resp(self)
      return function(sock)
         --return true ,read_result(self,sock)
-        local res, more = read_result(self,sock)
-        if more ~= "again" then
+        --local res, more = read_result(self,sock)
+        local res, err, errno, sqlstate = read_result(self,sock)
+        if not res then
+            local badresult ={}
+            badresult.badresult = true
+            badresult.err = err
+            badresult.errno = errno
+            badresult.sqlstate = sqlstate
+            return true , badresult
+        end
+        if err ~= "again" then
             return true, res
         end
         local mulitresultset = {res}
         mulitresultset.mulitresultset = true
         local i =2
-        while more =="again" do
-            res, more = read_result(self,sock)
+        while err =="again" do
+            --res, more = read_result(self,sock)
+            res, err, errno, sqlstate = read_result(self,sock)
             if not res then
                 return true, mulitresultset
             end
@@ -779,6 +755,44 @@ local function _query_resp(self)
         return true, mulitresultset
     end
 end
+
+function _M.connect( opts)
+
+    local self = setmetatable( {}, mt)
+
+    local max_packet_size = opts.max_packet_size
+    if not max_packet_size then
+        max_packet_size = 1024 * 1024 -- default 1 MB
+    end
+    self._max_packet_size = max_packet_size
+    self.compact = opts.compact_arrays
+
+
+    local database = opts.database or ""
+    local user = opts.user or ""
+    local password = opts.password or ""
+
+    local channel = socketchannel.channel {
+        host = opts.host,
+        port = opts.port or 3306,
+        auth = _mysql_login(self,user,password,database ),
+    }
+    -- try connect first only once
+    channel:connect(true)
+    self.sockchannel = channel
+
+
+    return self
+end
+
+
+
+function _M.disconnect(self)
+    self.sockchannel:close()
+    setmetatable(self, nil)
+end
+
+
 function _M.query(self, query)
     local querypacket = _compose_query(self, query)
     local sockchannel = self.sockchannel
@@ -788,14 +802,18 @@ function _M.query(self, query)
     return  sockchannel:request( querypacket, self.query_resp )
 end
 
-
-function _M.set_compact_arrays(self, value)
-    self.compact = value
+function _M.server_ver(self)
+    return self._server_ver
 end
 
 
 function _M.quote_sql_str( str)
     return mysqlaux.quote_sql_str(str)
 end
+
+function _M.set_compact_arrays(self, value)
+    self.compact = value
+end
+
 
 return _M

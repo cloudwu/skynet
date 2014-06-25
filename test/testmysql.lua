@@ -78,12 +78,13 @@ skynet.start(function()
 	print ( mysql.quote_sql_str([[\mysql escape %string test'test"]]) )
 
 	-- bad sql statement
-	local ok, res = pcall(  db.query, db, "select * from notexisttable" )
-	print( "ok= ",ok, dump(res) )
+	local res =  db:query("select * from notexisttable" )
+	print(  dump(res) )
 
 	res = db:query("select * from cats order by id asc")
 	print ( dump( res ) )
 
+	db:disconnect()
 	skynet.exit()
 end)
 
