@@ -1,12 +1,56 @@
 local skynet = require "skynet"
 local mysql = require "mysql"
 
+local function dump(obj)
+    local getIndent, quoteStr, wrapKey, wrapVal, dumpObj
+    getIndent = function(level)
+        return string.rep("\t", level)
+    end
+    quoteStr = function(str)
+        return '"' .. string.gsub(str, '"', '\\"') .. '"'
+    end
+    wrapKey = function(val)
+        if type(val) == "number" then
+            return "[" .. val .. "]"
+        elseif type(val) == "string" then
+            return "[" .. quoteStr(val) .. "]"
+        else
+            return "[" .. tostring(val) .. "]"
+        end
+    end
+    wrapVal = function(val, level)
+        if type(val) == "table" then
+            return dumpObj(val, level)
+        elseif type(val) == "number" then
+            return val
+        elseif type(val) == "string" then
+            return quoteStr(val)
+        else
+            return tostring(val)
+        end
+    end
+    dumpObj = function(obj, level)
+        if type(obj) ~= "table" then
+            return wrapVal(obj)
+        end
+        level = level + 1
+        local tokens = {}
+        tokens[#tokens + 1] = "{"
+        for k, v in pairs(obj) do
+            tokens[#tokens + 1] = getIndent(level) .. wrapKey(k) .. " = " .. wrapVal(v, level) .. ","
+        end
+        tokens[#tokens + 1] = getIndent(level - 1) .. "}"
+        return table.concat(tokens, "\n")
+    end
+    return dumpObj(obj, 0)
+end
+
 skynet.start(function()
 
 	local db=mysql.connect{	
-		host="192.168.1.218",
+		host="127.0.0.1",
 		port=3306,
-		database="Battle_Data",
+		database="skynet",
 		user="root",
 		password="1"
 	}
@@ -15,17 +59,16 @@ skynet.start(function()
 	end
 	print("testmysql success to connect to mysql server")
 
-	--local res=db:query("select * from test1;select * from test1")
-	local res=db:query("select * from G_BuildData_0 limit 10")
-	print(res)
-	for k,v in pairs(res) do
-		print("k=",k,"v=",v)
-		if type(v)=="table" then
-			for kk, vv in pairs(v) do
-				print("kk=",kk,"vv=",v)
-			end
-		end
-	end
+	local res = db:query("drop table if exists cats")
+	res = db:query("create table cats " 
+		               .."(id serial primary key, ".. "name varchar(5))")
+	print( dump( res ) )
+	res = db:query("insert into cats (name) "
+                             .. "values (\'Bob\'),(\'\'),(null)")
+	print ( dump( res ) )
+	res = db:query("select * from cats order by id asc")
+	print ( dump( res ) )
+	
 	
 	skynet.exit()
 end)
