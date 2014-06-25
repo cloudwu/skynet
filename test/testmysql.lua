@@ -63,9 +63,11 @@ skynet.start(function()
 	res = db:query("create table cats " 
 		               .."(id serial primary key, ".. "name varchar(5))")
 	print( dump( res ) )
+
 	res = db:query("insert into cats (name) "
                              .. "values (\'Bob\'),(\'\'),(null)")
 	print ( dump( res ) )
+
 	res = db:query("select * from cats order by id asc")
 	print ( dump( res ) )
 	
@@ -76,8 +78,12 @@ skynet.start(function()
 	print ( mysql.quote_sql_str([[\mysql escape %string test'test"]]) )
 
 	-- bad sql statement
-	res = pcall(  db.query, db, "select * from notexisttable" )
+	local ok, res = pcall(  db.query, db, "select * from notexisttable" )
 	print( dump(res) )
+
+	res = db:query("select * from cats order by id asc")
+	print ( dump( res ) )
+	
 	skynet.exit()
 end)
 
