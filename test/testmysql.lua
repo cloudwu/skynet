@@ -45,6 +45,24 @@ local function dump(obj)
     return dumpObj(obj, 0)
 end
 
+local function test2( db)
+    local i=1
+    while true do
+        local    res = db:query("select * from cats order by id asc")
+        print ( "test2 i=" ,i,"\n",dump( res ) )
+        skynet.sleep(1000)
+        i=i+1
+    end
+end
+local function test3( db)
+    local i=1
+    while true do
+        local    res = db:query("select * from cats order by id asc")
+        print ( "test3 i=" ,i,"\n",dump( res ) )
+        skynet.sleep(1000)
+        i=i+1
+    end
+end
 skynet.start(function()
 
 	local db=mysql.connect{	
@@ -71,7 +89,10 @@ skynet.start(function()
 
 	res = db:query("select * from cats order by id asc")
 	print ( dump( res ) )
-	
+
+    -- test in another coroutine
+	skynet.fork( test2, db)
+    skynet.fork( test3, db)
 	-- multiresultset test
 	res = db:query("select * from cats order by id asc ; select * from cats")
 	print ( dump( res ) )
@@ -82,10 +103,15 @@ skynet.start(function()
 	local res =  db:query("select * from notexisttable" )
 	print(  dump(res) )
 
-	res = db:query("select * from cats order by id asc")
-	print ( dump( res ) )
+    local i=1
+    while true do
+        local    res = db:query("select * from cats order by id asc")
+        print ( "test1 i=" ,i,"\n",dump( res ) )
+        skynet.sleep(1000)
+        i=i+1
+    end
 
-	db:disconnect()
-	skynet.exit()
+	--db:disconnect()
+	--skynet.exit()
 end)
 

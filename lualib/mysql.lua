@@ -481,12 +481,14 @@ local function _recv_auth_resp(self)
         if not packet then
             --print("recv auth resp : failed to receive the result packet")
             error ("failed to receive the result packet"..err)
+            --return nil,err
         end
         
         --print("receive auth response packet type: ",typ)
         if typ == 'ERR' then
             local errno, msg, sqlstate = _parse_err_packet(packet)
             error( string.format("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
+            --return nil, errno,msg, sqlstate
         end
 
         if typ == 'EOF' then
