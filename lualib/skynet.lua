@@ -248,7 +248,7 @@ function skynet.starttime()
 end
 
 function skynet.time()
-	return skynet.starttime() + skynet.now()/100
+	return skynet.now()/100 + skynet.starttime()	-- get now first would be better
 end
 
 function skynet.exit()
