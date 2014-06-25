@@ -132,9 +132,12 @@ local function dispatch_by_order(self)
 			else
 				close_channel_socket(self)
 				local errmsg
-				if result ~= socket_error then
+				if result_ok ~= socket_error then
 					errmsg = result_ok
 				end
+				self.__result[co] = socket_error
+				self.__result_data[co] = errmsg
+				skynet.wakeup(co)				
 				wakeup_all(self, errmsg)
 			end
 		end

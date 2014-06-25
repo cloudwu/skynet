@@ -79,11 +79,11 @@ skynet.start(function()
 
 	-- bad sql statement
 	local ok, res = pcall(  db.query, db, "select * from notexisttable" )
-	print( dump(res) )
+	print( "ok= ",ok, dump(res) )
 
 	res = db:query("select * from cats order by id asc")
 	print ( dump( res ) )
-	
+
 	skynet.exit()
 end)
 
