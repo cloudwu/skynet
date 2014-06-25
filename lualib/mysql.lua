@@ -157,14 +157,11 @@ local function _compute_token(password, scramble)
         return ""
     end
     --_dump(scramble)
-    --print("password=",password)
-    --print("password:", password, "scramble: ", _dumphex(scramble) )
+
     local stage1 = sha1(password)
     --print("stage1:", _dumphex(stage1) )
     local stage2 = sha1(stage1)
-    --print("stage2:", _dumphex(stage2) )
     local stage3 = sha1(scramble .. stage2)
-    --print("stage3:", _dumphex(stage3) )
     local n = #stage1
     local bytes = new_tab(n, 0)
     for i = 1, n do
@@ -187,13 +184,9 @@ local function _send_packet(self, req, size)
 
     self.packet_no = self.packet_no + 1
 
-    --print("packet no: ", self.packet_no)
 
     local packet = _set_byte3(size) .. strchar(self.packet_no) .. req
 
-    --print("sending packet...")
-
-    --return sock:send(packet)
     return socket.write(self.sock,packet)
 end
 
@@ -205,12 +198,10 @@ local function _recv_packet(self,sock)
     if not data then
         return nil, nil, "failed to receive packet header: " 
     end
-	--print("_recv_packet data type:" ,type(data) )
-    --print("packet header: ", _dump(data))
+
 
     local len, pos = _get_byte3(data, 1)
 
-    --print("recv_packet packet length: ", len)
 
     if len == 0 then
         return nil, nil, "empty packet"
@@ -222,24 +213,16 @@ local function _recv_packet(self,sock)
 
     local num = strbyte(data, pos)
 
-    --print("recv packet: packet no: ", num)
-
     self.packet_no = num
-
-    --data, err = sock:receive(len)
 
     data = sock:read(len)
     
- 
     if not data then
         return nil, nil, "failed to read packet content: " 
     end
 
-    --print("packet content: ", _dump(data))
-    --print("packet content (ascii): ", data)
 
     local field_count = strbyte(data, 1)
-	--print("field count:",field_count)
     local typ
     if field_count == 0x00 then
         typ = "OK"
@@ -251,15 +234,12 @@ local function _recv_packet(self,sock)
         typ = "DATA"
     end
 	
-    --print("recv packet: typ= ", typ)
     return data, typ
 end
 
 
 local function _from_length_coded_bin(data, pos)
     local first = strbyte(data, pos)
-
-    --print("LCB: first: ", first)
 
     if not first then
         return nil, pos
@@ -309,26 +289,18 @@ local function _parse_ok_packet(packet)
 
     res.affected_rows, pos = _from_length_coded_bin(packet, 2)
 
-    --print("affected rows: ", res.affected_rows, ", pos:", pos)
-
     res.insert_id, pos = _from_length_coded_bin(packet, pos)
-
-    --print("insert id: ", res.insert_id, ", pos:", pos)
 
     res.server_status, pos = _get_byte2(packet, pos)
 
-    --print("server status: ", res.server_status, ", pos:", pos)
-
     res.warning_count, pos = _get_byte2(packet, pos)
 
-    --print("warning count: ", res.warning_count, ", pos: ", pos)
 
     local message = sub(packet, pos)
     if message and message ~= "" then
         res.message = message
     end
 
-    --print("message: ", res.message, ", pos:", pos)
 
     return res
 end
@@ -376,7 +348,6 @@ local function _parse_field_packet(data)
     local pos
     catalog, pos = _from_length_coded_str(data, 1)
 
-    --print("catalog: ", col.catalog, ", pos:", pos)
 
     db, pos = _from_length_coded_str(data, pos)
     table, pos = _from_length_coded_str(data, pos)
@@ -427,8 +398,6 @@ local function _parse_row_data_packet(data, cols, compact)
         local typ = col.type
         local name = col.name
 
-        --print("row field value: ", value, ", type: ", typ)
-
         if value ~= null then
             local conv = converters[typ]
             if conv then
@@ -476,7 +445,6 @@ end
 
 local function _recv_auth_resp(self)
      return function(sock)
-        --print("recv auth resp")
         local packet, typ, err = _recv_packet(self,sock)
         if not packet then
             --print("recv auth resp : failed to receive the result packet")
@@ -484,7 +452,6 @@ local function _recv_auth_resp(self)
             --return nil,err
         end
         
-        --print("receive auth response packet type: ",typ)
         if typ == 'ERR' then
             local errno, msg, sqlstate = _parse_err_packet(packet)
             error( string.format("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
@@ -519,24 +486,17 @@ local function _mysql_login(self,user,password,database)
 
         self.protocol_ver = strbyte(packet)
 
-        --print("protocol version: ", self.protocol_ver)
-
         local server_ver, pos = _from_cstring(packet, 2)
         if not server_ver then
             error "bad handshake initialization packet: bad server version"
         end
         
-        --print("server version: ", server_ver)
-
         self._server_ver = server_ver
 
         
         local thread_id, pos = _get_byte4(packet, pos)
 
-        --print("thread id: ", thread_id)
-
         local scramble1 = sub(packet, pos, pos + 8 - 1)
-        --print("scramble1:",_dump(scramble1), "pos:",pos)
         if not scramble1 then
             error "1st part of scramble not found"
         end
@@ -546,16 +506,10 @@ local function _mysql_login(self,user,password,database)
         -- two lower bytes
         self._server_capabilities, pos = _get_byte2(packet, pos)
 
-        --print("server capabilities: ", self._server_capabilities)
-
         self._server_lang = strbyte(packet, pos)
         pos = pos + 1
 
-        --print("server lang: ", self._server_lang)
-
         self._server_status, pos = _get_byte2(packet, pos)
-
-        --print("server status: ", self._server_status)
 
         local more_capabilities
         more_capabilities, pos = _get_byte2(packet, pos)
@@ -563,13 +517,8 @@ local function _mysql_login(self,user,password,database)
         self._server_capabilities = bor(self._server_capabilities,
                                         lshift(more_capabilities, 16))
 
-        --print("server capabilities: ", self._server_capabilities)
-
         
-        -- local len = strbyte(packet, pos)
         local len = 21 - 8 - 1
-
-        --print("scramble len: ", len)
 
         pos = pos + 1 + 10
 
@@ -580,13 +529,9 @@ local function _mysql_login(self,user,password,database)
         
 
         local scramble = scramble1..scramble_part2
-        --print("scramble:",_dump(scramble) )
         local token = _compute_token(password, scramble)
 
-        -- local client_flags = self._server_capabilities
         local client_flags = 260047;
-
-        --print("token: ", _dump(token))
 
         local req = _set_byte4(client_flags)
                     .. _set_byte4(self._max_packet_size)
@@ -599,11 +544,7 @@ local function _mysql_login(self,user,password,database)
         local packet_len = 4 + 4 + 1 + 23 + #user + 1
             + #token + 1 + #database + 1
 
-         --print("packet content length: ", packet_len)
-         --print("packet content: ", _dump(concat(req, "")))
-
         local authpacket=_compose_packet(self,req,packet_len)
-        --print("mysql login authpacket len=",#authpacket)
         return sockchannel:request(authpacket,_recv_auth_resp(self))
     end
 end
@@ -617,24 +558,20 @@ local function _compose_query(self, query)
     local packet_len = 1 + #query
 
     local querypacket = _compose_packet(self, cmd_packet, packet_len)
-    --print("compose query packet, len= ", #querypacket)
     return querypacket
 end
 
 
 
 local function read_result(self, sock)
-    --print("read_result")
     local packet, typ, err = _recv_packet(self, sock)
     if not packet then
-        --print("read result", err)
         return nil, err
         --error( err )
     end
 
     if typ == "ERR" then
         local errno, msg, sqlstate = _parse_err_packet(packet)
-        --print("read result ", msg, errno, sqlstate)
         return nil, msg, errno, sqlstate
         --error( string.format("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
     end
@@ -642,26 +579,19 @@ local function read_result(self, sock)
     if typ == 'OK' then
         local res = _parse_ok_packet(packet)
         if res and band(res.server_status, SERVER_MORE_RESULTS_EXISTS) ~= 0 then
-            --print("read result ", res, "again")
             return res, "again"
         end
-        --print("parse ok packet res=",res)
         return res
     end
 
     if typ ~= 'DATA' then
-        --print("read result", "packet type " ,typ , " not supported")
         return nil, "packet type " .. typ .. " not supported"
         --error( "packet type " .. typ .. " not supported" )
     end
 
     -- typ == 'DATA'
 
-    --print("read the result set header packet")
-
     local field_count, extra = _parse_result_set_header_packet(packet)
-
-    --print("field count: ", field_count)
 
     local cols = new_tab(field_count, 0)
     for i = 1, field_count do
@@ -692,8 +622,6 @@ local function read_result(self, sock)
     local rows = new_tab( 4, 0)
     local i = 0
     while true do
-        --print("reading a row")
-
         packet, typ, err = _recv_packet(self, sock)
         if not packet then
             --error (err)
@@ -702,8 +630,6 @@ local function read_result(self, sock)
 
         if typ == 'EOF' then
             local warning_count, status_flags = _parse_eof_packet(packet)
-
-            --print("status flags: ", status_flags)
 
             if band(status_flags, SERVER_MORE_RESULTS_EXISTS) ~= 0 then
                 return rows, "again"
@@ -728,8 +654,6 @@ end
 
 local function _query_resp(self)
      return function(sock)
-        --return true ,read_result(self,sock)
-        --local res, more = read_result(self,sock)
         local res, err, errno, sqlstate = read_result(self,sock)
         if not res then
             local badresult ={}
@@ -746,7 +670,6 @@ local function _query_resp(self)
         mulitresultset.mulitresultset = true
         local i =2
         while err =="again" do
-            --res, more = read_result(self,sock)
             res, err, errno, sqlstate = read_result(self,sock)
             if not res then
                 return true, mulitresultset

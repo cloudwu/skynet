@@ -49,7 +49,10 @@ local function test2( db)
     local i=1
     while true do
         local    res = db:query("select * from cats order by id asc")
-        print ( "test2 i=" ,i,"\n",dump( res ) )
+        print ( "test2 loop times=" ,i,"\n","query result=",dump( res ) )
+        res = db:query("select * from cats order by id asc")
+        print ( "test2 loop times=" ,i,"\n","query result=",dump( res ) )
+
         skynet.sleep(1000)
         i=i+1
     end
@@ -58,7 +61,9 @@ local function test3( db)
     local i=1
     while true do
         local    res = db:query("select * from cats order by id asc")
-        print ( "test3 i=" ,i,"\n",dump( res ) )
+        print ( "test3 loop times=" ,i,"\n","query result=",dump( res ) )
+        res = db:query("select * from cats order by id asc")
+        print ( "test3 loop times=" ,i,"\n","query result=",dump( res ) )        
         skynet.sleep(1000)
         i=i+1
     end
@@ -95,18 +100,23 @@ skynet.start(function()
     skynet.fork( test3, db)
 	-- multiresultset test
 	res = db:query("select * from cats order by id asc ; select * from cats")
-	print ( dump( res ) )
+	print ("multiresultset test result=", dump( res ) )
 
-	print ( mysql.quote_sql_str([[\mysql escape %string test'test"]]) )
+	print ("escape string test result=", mysql.quote_sql_str([[\mysql escape %string test'test"]]) )
 
 	-- bad sql statement
 	local res =  db:query("select * from notexisttable" )
-	print(  dump(res) )
+	print( "bad query test result=" ,dump(res) )
 
     local i=1
     while true do
         local    res = db:query("select * from cats order by id asc")
-        print ( "test1 i=" ,i,"\n",dump( res ) )
+        print ( "test1 loop times=" ,i,"\n","query result=",dump( res ) )
+      
+        res = db:query("select * from cats order by id asc")
+        print ( "test1 loop times=" ,i,"\n","query result=",dump( res ) )
+
+
         skynet.sleep(1000)
         i=i+1
     end
