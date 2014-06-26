@@ -13,7 +13,5 @@ skynet.start(function()
 		maxclient = max_client,
 	})
 
-	print(skynet.time())
-
 	skynet.exit()
 end)

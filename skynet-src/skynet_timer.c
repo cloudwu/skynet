@@ -254,7 +254,7 @@ gettime() {
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	t = (uint64_t)ti.tv_sec * 100;
+	t = (uint64_t)tv.tv_sec * 100;
 	t += tv.tv_usec / 10000;
 #endif
 	return t;
