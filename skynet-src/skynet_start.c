@@ -127,11 +127,11 @@ _worker(void *p) {
 		if (q == NULL) {
 			CHECK_ABORT
 			if (pthread_mutex_lock(&m->mutex) == 0) {
-				++ m->sleep;
+				__sync_fetch_and_add(&m->sleep, 1);
 				// "spurious wakeup" is harmless,
 				// because skynet_context_message_dispatch() can be call at any time.
 				pthread_cond_wait(&m->cond, &m->mutex);
-				-- m->sleep;
+				__sync_fetch_and_sub(&m->sleep, 1);
 				if (pthread_mutex_unlock(&m->mutex)) {
 					fprintf(stderr, "unlock mutex error");
 					exit(1);
