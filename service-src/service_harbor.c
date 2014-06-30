@@ -262,7 +262,8 @@ harbor_release(struct harbor *h) {
 		struct slave *s = &h->s[i];
 		if (s->fd && s->status != STATUS_DOWN) {
 			close_harbor(h,i);
-			report_harbor_down(h,i);
+			// don't call report_harbor_down.
+			// never call skynet_send during module exit, because of dead lock
 		}
 	}
 	hash_delete(h->map);
