@@ -18,6 +18,7 @@ void skynet_context_send(struct skynet_context * context, void * msg, size_t sz,
 int skynet_context_newsession(struct skynet_context *);
 struct message_queue * skynet_context_message_dispatch(struct skynet_monitor *, struct message_queue *);	// return next queue
 int skynet_context_total();
+void skynet_context_dispatchall(struct skynet_context * context);	// for skynet_error output before exit
 
 void skynet_context_endless(uint32_t handle);	// for monitor
 

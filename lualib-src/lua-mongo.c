@@ -260,6 +260,13 @@ op_reply(lua_State *L) {
 			lua_pushnil(L);
 			lua_rawseti(L, 2, i);
 		}
+	} else {
+		if (sz >= 4) {
+			sz -= get_length((document)doc);
+		}
+	}
+	if (sz != 0) {
+		return luaL_error(L, "Invalid result bson document");
 	}
 	lua_pushboolean(L,1);
 	lua_pushinteger(L, id);

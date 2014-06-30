@@ -40,7 +40,7 @@ jemalloc : $(MALLOC_STATICLIB)
 
 # skynet
 
-CSERVICE = snlua logger gate master harbor dummy
+CSERVICE = snlua logger gate harbor
 LUA_CLIB = skynet socketdriver int64 bson mongo md5 netpack \
   cjson clientsocket memory profile multicast \
   cluster
@@ -66,7 +66,7 @@ $(CSERVICE_PATH) :
 
 define CSERVICE_TEMP
   $$(CSERVICE_PATH)/$(1).so : service-src/service_$(1).c | $$(CSERVICE_PATH)
-	$(CC) $$(CFLAGS) $$(SHARED) $$< -o $$@ -Iskynet-src
+	$$(CC) $$(CFLAGS) $$(SHARED) $$< -o $$@ -Iskynet-src
 endef
 
 $(foreach v, $(CSERVICE), $(eval $(call CSERVICE_TEMP,$(v))))

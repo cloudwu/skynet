@@ -266,12 +266,19 @@ end
 
 socket.write = assert(driver.send)
 socket.lwrite = assert(driver.lsend)
+socket.header = assert(driver.header)
 
 function socket.invalid(id)
 	return socket_pool[id] == nil
 end
 
-socket.listen = assert(driver.listen)
+function socket.listen(host, port, backlog)
+	if port == nil then
+		host, port = string.match(host, "([^:]+):(.+)$")
+		port = tonumber(port)
+	end
+	return driver.listen(host, port, backlog)
+end
 
 function socket.lock(id)
 	local s = socket_pool[id]

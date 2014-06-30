@@ -98,7 +98,7 @@ function mongo.client( conf )
 		host = obj.host,
 		port = obj.port,
 		response = dispatch_reply,
-		auth = mongo_auth(conf),
+		auth = mongo_auth(obj),
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect(true)	-- try connect only once
@@ -167,7 +167,9 @@ function mongo_db:runCommand(cmd,cmd_v,...)
 		bson_cmd = bson_encode_order(cmd,cmd_v,...)
 	end
 	local pack = driver.query(request_id, 0, self.__cmd, 0, 1, bson_cmd)
-	local doc = sock:request(pack, request_id).document
+	-- we must hold req (req.data), because req.document is a lightuserdata, it's a pointer to the string (req.data)
+	local req = sock:request(pack, request_id)
+	local doc = req.document
 	return bson_decode(doc)
 end
 
@@ -224,7 +226,9 @@ function mongo_collection:findOne(query, selector)
 	local request_id = conn:genId()
 	local sock = conn.__sock
 	local pack = driver.query(request_id, 0, self.full_name, 0, 1, query and bson_encode(query) or empty_bson, selector and bson_encode(selector))
-	local doc = sock:request(pack, request_id).document
+	-- we must hold req (req.data), because req.document is a lightuserdata, it's a pointer to the string (req.data)
+	local req = sock:request(pack, request_id)
+	local doc = req.document
 	return bson_decode(doc)
 end
 

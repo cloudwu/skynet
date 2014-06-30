@@ -10,7 +10,7 @@ local node_session = {}
 local command = {}
 
 local function read_response(sock)
-	local sz = sock:read(2)
+	local sz = socket.header(sock:read(2))
 	local msg = sock:read(sz)
 	return cluster.unpackresponse(msg)	-- session, ok, data
 end
@@ -32,6 +32,9 @@ local node_channel = setmetatable({}, { __index = open_channel })
 
 function command.listen(source, addr, port)
 	local gate = skynet.newservice("gate")
+	if port == nil then
+		addr, port = string.match(node_address[addr], "([^:]+):(.*)$")
+	end
 	skynet.call(gate, "lua", "open", { address = addr, port = port })
 	skynet.ret(skynet.pack(nil))
 end
