@@ -7,6 +7,7 @@ struct skynet_config {
 	const char * daemon;
 	const char * module_path;
 	const char * bootstrap;
+	const char * logger;
 };
 
 #define THREAD_WORKER 0

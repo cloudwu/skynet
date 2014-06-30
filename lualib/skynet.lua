@@ -190,12 +190,33 @@ function skynet.wait()
 	session_id_coroutine[session] = nil
 end
 
+local function globalname(name, handle)
+	local c = string.sub(name,1,1)
+	assert(c ~= ':')
+	if c == '.' then
+		return false
+	end
+
+	assert(#name <= 16)	-- GLOBALNAME_LENGTH is 16, defined in skynet_harbor.h
+	assert(tonumber(name) == nil)	-- global name can't be number
+
+	local harbor = require "skynet.harbor"
+
+	harbor.globalname(name, handle)
+
+	return true
+end
+
 function skynet.register(name)
-	c.command("REG", name)
+	if not globalname(name) then
+		c.command("REG", name)
+	end
 end
 
 function skynet.name(name, handle)
-	c.command("NAME", name .. " " .. skynet.address(handle))
+	if not globalname(name, handle) then
+		c.command("NAME", name .. " " .. skynet.address(handle))
+	end
 end
 
 local self_handle
@@ -224,6 +245,10 @@ end
 
 function skynet.starttime()
 	return tonumber(c.command("STARTTIME"))
+end
+
+function skynet.time()
+	return skynet.now()/100 + skynet.starttime()	-- get now first would be better
 end
 
 function skynet.exit()
@@ -267,6 +292,7 @@ skynet.redirect = function(dest,source,typename,...)
 end
 
 skynet.pack = assert(c.pack)
+skynet.packstring = assert(c.packstring)
 skynet.unpack = assert(c.unpack)
 skynet.tostring = assert(c.tostring)
 
@@ -318,8 +344,8 @@ function skynet.dispatch(typename, func)
 	p.dispatch = func
 end
 
-local function unknown_request(session, address, msg, sz)
-	print("Unknown request :" , c.tostring(msg,sz))
+local function unknown_request(session, address, msg, sz, prototype)
+	skynet.error(string.format("Unknown request (%s): %s", prototype, c.tostring(msg,sz)))
 	error(string.format("Unknown session : %d from %x", session, address))
 end
 
@@ -373,7 +399,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			session_coroutine_address[co] = source
 			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
 		else
-			unknown_request(session, source, msg, sz)
+			unknown_request(session, source, msg, sz, proto[prototype])
 		end
 	end
 end
@@ -502,7 +528,7 @@ end
 local function init_service(start)
 	local ok, err = xpcall(init_template, debug.traceback, start)
 	if not ok then
-		print("init service failed:", err)
+		skynet.error("init service failed: " .. tostring(err))
 		skynet.send(".launcher","lua", "ERROR")
 		skynet.exit()
 	else

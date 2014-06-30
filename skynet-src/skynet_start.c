@@ -184,7 +184,7 @@ _start(int thread) {
 }
 
 static void
-bootstrap(const char * cmdline) {
+bootstrap(struct skynet_context * logger, const char * cmdline) {
 	int sz = strlen(cmdline);
 	char name[sz+1];
 	char args[sz+1];
@@ -192,6 +192,7 @@ bootstrap(const char * cmdline) {
 	struct skynet_context *ctx = skynet_context_new(name, args);
 	if (ctx == NULL) {
 		skynet_error(NULL, "Bootstrap error : %s\n", cmdline);
+		skynet_context_dispatchall(logger);
 		exit(1);
 	}
 }
@@ -210,7 +211,13 @@ skynet_start(struct skynet_config * config) {
 	skynet_timer_init();
 	skynet_socket_init();
 
-	bootstrap(config->bootstrap);
+	struct skynet_context *ctx = skynet_context_new("logger", config->logger);
+	if (ctx == NULL) {
+		fprintf(stderr, "Can't launch logger service\n");
+		exit(1);
+	}
+
+	bootstrap(ctx, config->bootstrap);
 
 	_start(config->thread);
 	skynet_socket_free();

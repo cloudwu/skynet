@@ -1,8 +1,8 @@
 local skynet = require "skynet"
 
 skynet.start(function()
-	skynet.dispatch("text", function(session, address, text)
-		print("[GLOBALLOG]", skynet.address(address),text)
+	skynet.dispatch("lua", function(session, address, ...)
+		print("[GLOBALLOG]", skynet.address(address), ...)
 	end)
 	skynet.register "LOG"
 end)
