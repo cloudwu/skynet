@@ -14,7 +14,7 @@ end)
 else
 
 	skynet.start(function()
-		local test = skynet.newservice("testdeadcall", "test")	-- launch self in test mode
+		local test = skynet.newservice(SERVICE_NAME, "test")	-- launch self in test mode
 
 		print(pcall(function()
 			skynet.send(test,"lua", "hello world")

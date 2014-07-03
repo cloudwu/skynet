@@ -253,6 +253,13 @@ end
 
 function skynet.exit()
 	skynet.send(".launcher","lua","REMOVE",skynet.self())
+	for co, session in pairs(session_coroutine_id) do
+		local address = session_coroutine_address[co]
+		local self = skynet.self()
+		if session~=0 and address then
+			skynet.redirect(self, address, "error", session, "")
+		end
+	end
 	c.command("EXIT")
 end
 

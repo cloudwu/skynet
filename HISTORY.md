@@ -1,3 +1,8 @@
+Dev version
+-----------
+* add SERVICE_NAME in loader
+* throw error back when skynet.error
+
 v0.4.0 (2014-6-30)
 -----------
 * Optimize redis driver `compose_message`.
