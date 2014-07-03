@@ -569,6 +569,7 @@ function skynet.monitor(service, query)
 	end
 	assert(monitor, "Monitor launch failed")
 	c.command("MONITOR", string.format(":%08x", monitor))
+	return monitor
 end
 
 function skynet.mqlen()
