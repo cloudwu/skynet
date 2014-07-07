@@ -27,7 +27,7 @@ end
 
 function dbgcmd.TASK()
 	local task = {}
-	skynet.task(function(info) table.insert(task, info) end)
+	skynet.task(task)
 	skynet.ret(skynet.pack(task))
 end
 

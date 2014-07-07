@@ -583,11 +583,11 @@ function skynet.mqlen()
 	return tonumber(c.command "MQLEN")
 end
 
-function skynet.task(f)
+function skynet.task(ret)
 	local t = 0
-	for _,co in pairs(session_id_coroutine) do
-		if f then
-			f(debug.traceback(co))
+	for session,co in pairs(session_id_coroutine) do
+		if ret then
+			ret[session] = debug.traceback(co)
 		end
 		t = t + 1
 	end
