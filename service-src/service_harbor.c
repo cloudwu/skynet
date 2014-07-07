@@ -510,6 +510,9 @@ remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int 
 			skynet_send(context, destination, source, PTYPE_ERROR, 0 , NULL, 0);
 			skynet_error(context, "Drop message to harbor %d from %x to %x (session = %d, msgsz = %d)",harbor_id, source, destination,session,(int)sz);
 		} else {
+			if (s->queue == NULL) {
+				s->queue = new_queue();
+			}
 			struct remote_message_header header;
 			header.source = source;
 			header.destination = type << HANDLE_REMOTE_SHIFT;
