@@ -583,6 +583,17 @@ function skynet.mqlen()
 	return tonumber(c.command "MQLEN")
 end
 
+function skynet.task(f)
+	local t = 0
+	for _,co in pairs(session_id_coroutine) do
+		if f then
+			f(debug.traceback(co))
+		end
+		t = t + 1
+	end
+	return t
+end
+
 -- Inject internal debug framework
 local debug = require "skynet.debug"
 debug(skynet)

@@ -38,6 +38,16 @@ function command.INFO(_, _, handle)
 	end
 end
 
+function command.TASK(_, _, handle)
+	handle = handle_to_address(handle)
+	if services[handle] == nil then
+		return
+	else
+		local result = skynet.call(handle,"debug","TASK")
+		return result
+	end
+end
+
 function command.KILL(_, _, handle)
 	handle = handle_to_address(handle)
 	skynet.kill(handle)
