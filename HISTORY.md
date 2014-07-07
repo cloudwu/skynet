@@ -1,7 +1,9 @@
-Dev version
+v0.4.1 (2014-7-7)
 -----------
-* add SERVICE_NAME in loader
-* throw error back when skynet.error
+* Add SERVICE_NAME in loader
+* Throw error back when skynet.error
+* Add skynet.task
+* Bugfix for last version (harbor service bugs)
 
 v0.4.0 (2014-6-30)
 -----------
