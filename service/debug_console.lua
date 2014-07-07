@@ -113,6 +113,7 @@ function COMMAND.help()
 		snax = "lanuch a new snax service",
 		clearcache = "clear lua code cache",
 		service = "List unique service",
+		task = "task address : show service task detail",
 	}
 end
 

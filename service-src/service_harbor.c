@@ -262,7 +262,8 @@ harbor_release(struct harbor *h) {
 		struct slave *s = &h->s[i];
 		if (s->fd && s->status != STATUS_DOWN) {
 			close_harbor(h,i);
-			report_harbor_down(h,i);
+			// don't call report_harbor_down.
+			// never call skynet_send during module exit, because of dead lock
 		}
 	}
 	hash_delete(h->map);
@@ -509,6 +510,9 @@ remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int 
 			skynet_send(context, destination, source, PTYPE_ERROR, 0 , NULL, 0);
 			skynet_error(context, "Drop message to harbor %d from %x to %x (session = %d, msgsz = %d)",harbor_id, source, destination,session,(int)sz);
 		} else {
+			if (s->queue == NULL) {
+				s->queue = new_queue();
+			}
 			struct remote_message_header header;
 			header.source = source;
 			header.destination = type << HANDLE_REMOTE_SHIFT;

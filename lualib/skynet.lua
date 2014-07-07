@@ -253,6 +253,13 @@ end
 
 function skynet.exit()
 	skynet.send(".launcher","lua","REMOVE",skynet.self())
+	for co, session in pairs(session_coroutine_id) do
+		local address = session_coroutine_address[co]
+		local self = skynet.self()
+		if session~=0 and address then
+			skynet.redirect(self, address, "error", session, "")
+		end
+	end
 	c.command("EXIT")
 end
 
@@ -569,10 +576,22 @@ function skynet.monitor(service, query)
 	end
 	assert(monitor, "Monitor launch failed")
 	c.command("MONITOR", string.format(":%08x", monitor))
+	return monitor
 end
 
 function skynet.mqlen()
 	return tonumber(c.command "MQLEN")
+end
+
+function skynet.task(ret)
+	local t = 0
+	for session,co in pairs(session_id_coroutine) do
+		if ret then
+			ret[session] = debug.traceback(co)
+		end
+		t = t + 1
+	end
+	return t
 end
 
 -- Inject internal debug framework

@@ -21,7 +21,14 @@ end
 function dbgcmd.STAT()
 	local stat = {}
 	stat.mqlen = skynet.mqlen()
+	stat.task = skynet.task()
 	skynet.ret(skynet.pack(stat))
+end
+
+function dbgcmd.TASK()
+	local task = {}
+	skynet.task(task)
+	skynet.ret(skynet.pack(task))
 end
 
 function dbgcmd.INFO()

@@ -1,3 +1,10 @@
+v0.4.1 (2014-7-7)
+-----------
+* Add SERVICE_NAME in loader
+* Throw error back when skynet.error
+* Add skynet.task
+* Bugfix for last version (harbor service bugs)
+
 v0.4.0 (2014-6-30)
 -----------
 * Optimize redis driver `compose_message`.

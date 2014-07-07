@@ -3,11 +3,13 @@ for word in string.gmatch(..., "%S+") do
 	table.insert(args, word)
 end
 
+SERVICE_NAME = args[1]
+
 local main, pattern
 
 local err = {}
 for pat in string.gmatch(LUA_SERVICE, "([^;]+);*") do
-	local filename = string.gsub(pat, "?", args[1])
+	local filename = string.gsub(pat, "?", SERVICE_NAME)
 	local f, msg = loadfile(filename)
 	if not f then
 		table.insert(err, msg)
