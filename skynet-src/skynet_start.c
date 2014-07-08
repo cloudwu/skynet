@@ -27,6 +27,7 @@ struct monitor {
 struct worker_parm {
 	struct monitor *m;
 	int id;
+	int weight;
 };
 
 #define CHECK_ABORT if (skynet_context_total()==0) break;
@@ -118,12 +119,13 @@ static void *
 _worker(void *p) {
 	struct worker_parm *wp = p;
 	int id = wp->id;
+	int weight = wp->weight;
 	struct monitor *m = wp->m;
 	struct skynet_monitor *sm = m->m[id];
 	skynet_initthread(THREAD_WORKER);
 	struct message_queue * q = NULL;
 	for (;;) {
-		q = skynet_context_message_dispatch(sm, q);
+		q = skynet_context_message_dispatch(sm, q, weight);
 		if (q == NULL) {
 			CHECK_ABORT
 			if (pthread_mutex_lock(&m->mutex) == 0) {
@@ -169,10 +171,20 @@ _start(int thread) {
 	create_thread(&pid[1], _timer, m);
 	create_thread(&pid[2], _socket, m);
 
+	static int weight[] = { 
+		-1, -1, -1, -1, 0, 0, 0, 0,
+		1, 1, 1, 1, 1, 1, 1, 1, 
+		2, 2, 2, 2, 2, 2, 2, 2, 
+		3, 3, 3, 3, 3, 3, 3, 3, };
 	struct worker_parm wp[thread];
 	for (i=0;i<thread;i++) {
 		wp[i].m = m;
 		wp[i].id = i;
+		if (i < sizeof(weight)/sizeof(weight[0])) {
+			wp[i].weight= weight[i];
+		} else {
+			wp[i].weight = 0;
+		}
 		create_thread(&pid[i+3], _worker, &wp[i]);
 	}
 
