@@ -315,7 +315,9 @@ forward_local_messsage(struct harbor *h, void *msg, int sz) {
 	int type = (destination >> HANDLE_REMOTE_SHIFT) | PTYPE_TAG_DONTCOPY;
 	destination = (destination & HANDLE_MASK) | ((uint32_t)h->id << HANDLE_REMOTE_SHIFT);
 
-	skynet_send(h->ctx, header.source, destination, type, (int)header.session, (void *)msg, sz-HEADER_COOKIE_LENGTH);
+	if (skynet_send(h->ctx, header.source, destination, type, (int)header.session, (void *)msg, sz-HEADER_COOKIE_LENGTH) < 0) {
+		skynet_error(h->ctx, "Unknown destination :%x from :%x", destination, header.source);
+	}
 }
 
 static void
@@ -515,7 +517,7 @@ remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int 
 			}
 			struct remote_message_header header;
 			header.source = source;
-			header.destination = type << HANDLE_REMOTE_SHIFT;
+			header.destination = (type << HANDLE_REMOTE_SHIFT) | (destination & HANDLE_MASK);
 			header.session = (uint32_t)session;
 			push_queue(s->queue, (void *)msg, sz, &header);
 			return 1;
