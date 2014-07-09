@@ -317,6 +317,10 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		if ( sock < 0 ) {
 			continue;
 		}
+
+        const char enable=1;
+        setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable));
+
 		socket_keepalive(sock);
 		sp_nonblocking(sock);
 		status = connect( sock, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
@@ -994,6 +998,10 @@ do_listen(const char * host, int port, int backlog) {
 		addr=inet_addr(host);
 	}
 	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    const char enable=1;
+    setsockopt(listen_fd, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable));
+
 	if (listen_fd < 0) {
 		return -1;
 	}
