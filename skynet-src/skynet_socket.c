@@ -103,6 +103,10 @@ skynet_socket_poll() {
 
 int
 skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz) {
+	if (id < 0) {
+		skynet_free(buffer);
+		return -1;
+	}
 	int64_t wsz = socket_server_send(SOCKET_SERVER, id, buffer, sz);
 	if (wsz < 0) {
 		skynet_free(buffer);
