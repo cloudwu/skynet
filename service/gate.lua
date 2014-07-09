@@ -8,6 +8,7 @@ local watchdog
 local maxclient
 local client_number = 0
 local CMD = setmetatable({}, { __gc = function() netpack.clear(queue) end })
+local nodelay = false
 
 local connection = {}	-- fd -> connection : { fd , client, agent , ip, mode }
 local forwarding = {}	-- agent -> connection
@@ -20,6 +21,13 @@ function CMD.open( source , conf )
 	watchdog = conf.watchdog or source
 	socket = socketdriver.listen(address, port)
 	socketdriver.start(socket)
+end
+
+function CMD.nodelay(source, v)
+	if v ~= false then
+		v = true
+	end
+	nodelay = v
 end
 
 function CMD.close()
@@ -106,6 +114,9 @@ function MSG.open(fd, msg)
 	}
 	connection[fd] = c
 	client_number = client_number + 1
+	if nodelay then
+		socketdriver.nodelay(fd)
+	end
 	skynet.send(watchdog, "lua", "socket", "open", fd, msg)
 end
 

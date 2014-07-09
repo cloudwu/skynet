@@ -34,6 +34,7 @@ end
 
 function CMD.start(conf)
 	skynet.call(gate, "lua", "open" , conf)
+	skynet.call(gate, "lua", "nodelay", true)
 end
 
 skynet.start(function()

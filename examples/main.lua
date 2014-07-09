@@ -12,6 +12,7 @@ skynet.start(function()
 		port = 8888,
 		maxclient = max_client,
 	})
+	print("Watchdog listen on ", 8888)
 
 	skynet.exit()
 end)

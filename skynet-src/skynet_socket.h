@@ -28,5 +28,6 @@ int skynet_socket_connect(struct skynet_context *ctx, const char *host, int port
 int skynet_socket_bind(struct skynet_context *ctx, int fd);
 void skynet_socket_close(struct skynet_context *ctx, int id);
 void skynet_socket_start(struct skynet_context *ctx, int id);
+void skynet_socket_nodelay(struct skynet_context *ctx, int id);
 
 #endif
