@@ -135,6 +135,9 @@ local function dispatch_by_order(self)
 				if result ~= socket_error then
 					errmsg = result_ok
 				end
+				self.__result[co] = socket_error
+				self.__result_data[co] = errmsg
+				skynet.wakeup(co)
 				wakeup_all(self, errmsg)
 			end
 		end

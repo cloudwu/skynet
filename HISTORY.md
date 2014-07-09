@@ -4,6 +4,7 @@ Dev version
 * Add optional TCP_NODELAY support
 * Add worker thread weight
 * Add skynet.queue
+* Bugfix: socketchannel
 
 v0.4.1 (2014-7-7)
 -----------
