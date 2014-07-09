@@ -1,3 +1,9 @@
+Dev version
+-----------
+* Bugfix : invalid negative socket id 
+* Add optional TCP_NODELAY support
+* Add worker thread weight
+
 v0.4.1 (2014-7-7)
 -----------
 * Add SERVICE_NAME in loader

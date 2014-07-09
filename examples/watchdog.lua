@@ -33,8 +33,8 @@ function SOCKET.data(fd, msg)
 end
 
 function CMD.start(conf)
-	skynet.call(gate, "lua", "open" , conf)
 	skynet.call(gate, "lua", "nodelay", true)
+	skynet.call(gate, "lua", "open" , conf)
 end
 
 skynet.start(function()
