@@ -150,3 +150,8 @@ skynet_socket_start(struct skynet_context *ctx, int id) {
 	uint32_t source = skynet_context_handle(ctx);
 	socket_server_start(SOCKET_SERVER, source, id);
 }
+
+void
+skynet_socket_nodelay(struct skynet_context *ctx, int id) {
+	socket_server_nodelay(SOCKET_SERVER, id);
+}

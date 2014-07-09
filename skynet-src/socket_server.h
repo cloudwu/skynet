@@ -36,4 +36,6 @@ int socket_server_listen(struct socket_server *, uintptr_t opaque, const char * 
 int socket_server_connect(struct socket_server *, uintptr_t opaque, const char * addr, int port);
 int socket_server_bind(struct socket_server *, uintptr_t opaque, int fd);
 
+void socket_server_nodelay(struct socket_server *, int id);
+
 #endif

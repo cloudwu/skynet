@@ -476,6 +476,14 @@ lstart(lua_State *L) {
 	return 0;
 }
 
+static int
+lnodelay(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	skynet_socket_nodelay(ctx,id);
+	return 0;
+}
+
 int
 luaopen_socketdriver(lua_State *L) {
 	luaL_checkversion(L);
@@ -502,6 +510,7 @@ luaopen_socketdriver(lua_State *L) {
 		{ "lsend", lsendlow },
 		{ "bind", lbind },
 		{ "start", lstart },
+		{ "nodelay", lnodelay },
 		{ NULL, NULL },
 	};
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
