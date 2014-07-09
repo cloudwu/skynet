@@ -1,3 +1,5 @@
+-- This is a deprecated module, use skynet.queue instead.
+
 local skynet = require "skynet"
 local c = require "skynet.c"
 
