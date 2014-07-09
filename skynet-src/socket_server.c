@@ -942,6 +942,8 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 // return -1 when error
 int64_t 
 socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz) {
+	if (id < 0)
+		return -1;
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		return -1;
@@ -958,6 +960,8 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 
 void 
 socket_server_send_lowpriority(struct socket_server *ss, int id, const void * buffer, int sz) {
+	if (id < 0)
+		return;
 	struct socket * s = &ss->slot[id % MAX_SOCKET];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		return;
