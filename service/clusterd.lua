@@ -57,7 +57,6 @@ function command.req(source, node, addr, msg, sz)
 	local session = node_session[node]
 	-- msg is a local pointer, cluster.packrequest will free it
 	request, node_session[node] = cluster.packrequest(addr, session , msg, sz)
-	local ok, result = pcall(c.request, c, request, session)
 	skynet.ret(c:request(request, session))
 end
 
