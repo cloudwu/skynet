@@ -5,6 +5,9 @@ Dev version
 * Add worker thread weight
 * Add skynet.queue
 * Bugfix: socketchannel
+* cluster can throw error
+* Add readline and writeline to clientsocket lib
+* Add cluster.reload to reload config file
 
 v0.4.1 (2014-7-7)
 -----------
