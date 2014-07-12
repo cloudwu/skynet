@@ -39,7 +39,7 @@ end
 
 while true do
 	dispatch()
-	local cmd = socket.readline()
+	local cmd = socket.readstdin()
 	if cmd then
 		local args = {}
 		string.gsub(cmd, '[^ ]+', function(v) table.insert(args, v) end )

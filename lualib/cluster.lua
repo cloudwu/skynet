@@ -16,6 +16,10 @@ function cluster.open(port)
 	end
 end
 
+function cluster.reload()
+	skynet.call(clusterd, "lua", "reload")
+end
+
 skynet.init(function()
 	clusterd = skynet.uniqueservice("clusterd")
 end)

@@ -325,6 +325,9 @@ end
 
 function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
+	if watching_service[addr] == false then
+		error("Service is dead")
+	end
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
 	return yield_call(addr, session)
 end
