@@ -21,6 +21,9 @@ if mode == "agent" then
 	id = tonumber(id)
 
 	skynet.start(function()
+		-- A small limit, if socket buffer overflow, close the client
+		socket.limit(64)
+
 		skynet.fork(function()
 			echo(id)
 			skynet.exit()
@@ -30,7 +33,7 @@ else
 	local function accept(id)
 		socket.start(id)
 		socket.write(id, "Hello Skynet\n")
-		skynet.newservice("testsocket", "agent", id)
+		skynet.newservice(SERVICE_NAME, "agent", id)
 		-- notice: Some data on this connection(id) may lost before new service start.
 		-- So, be careful when you want to use start / abandon / start .
 		socket.abandon(id)
