@@ -176,7 +176,7 @@ skynet.start(function()
 		end
 	end)
 	local handle = skynet.localname ".service"
-	if  handle ~= 0 then
+	if  handle then
 		skynet.error(".service is already register by ", skynet.address(handle))
 		skynet.exit()
 	else
