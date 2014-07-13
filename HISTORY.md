@@ -8,6 +8,7 @@ Dev version
 * cluster can throw error
 * Add readline and writeline to clientsocket lib
 * Add cluster.reload to reload config file
+* Add datacenter.wait
 
 v0.4.1 (2014-7-7)
 -----------
