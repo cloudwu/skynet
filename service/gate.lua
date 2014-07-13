@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local gateserver = require "gateserver"
+local gateserver = require "gamefw.gateserver"
 local netpack = require "netpack"
 
 local watchdog

@@ -1,4 +1,4 @@
-local login = require "loginserver"
+local login = require "gamefw.loginserver"
 local json = require "cjson"
 local crypt = require "crypt"
 local skynet = require "skynet"
