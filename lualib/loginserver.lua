@@ -112,8 +112,9 @@ local function launch_master(conf)
 end
 
 local function login (conf)
+	local name = conf.name or "login_master"
 	skynet.start(function()
-		local loginmaster = datacenter.get "login_master"
+		local loginmaster = datacenter.get(name)
 		if loginmaster then
 			local auth_handler = assert(conf.auth_handler)
 			launch_master = nil

@@ -5,6 +5,7 @@ local crypt = require "crypt"
 local server = {
 	host = "127.0.0.1",
 	port = 8001,
+	name = "login_master",
 }
 
 function server.auth_handler(token)
