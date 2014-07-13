@@ -257,7 +257,7 @@ function skynet.exit()
 		local address = session_coroutine_address[co]
 		local self = skynet.self()
 		if session~=0 and address then
-			skynet.redirect(self, address, "error", session, "")
+			skynet.redirect(address, self, "error", session, "")
 		end
 	end
 	c.command("EXIT")
