@@ -14,7 +14,6 @@ package.cpath = "luaclib/?.so"
 ]]
 
 local socket = require "clientsocket"
-local cjson = require "cjson"
 local crypt = require "crypt"
 
 local last
@@ -61,7 +60,14 @@ local token = {
 	pass = "password",
 }
 
-local etoken = crypt.desencode(secret, cjson.encode(token))
+local function encode_token(token)
+	return string.format("%s@%s:%s",
+		crypt.base64encode(token.user),
+		crypt.base64encode(token.server),
+		crypt.base64encode(token.pass))
+end
+
+local etoken = crypt.desencode(secret, encode_token(token))
 local b = crypt.base64encode(etoken)
 socket.writeline(fd, crypt.base64encode(etoken))
 

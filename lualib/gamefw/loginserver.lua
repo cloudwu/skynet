@@ -2,18 +2,21 @@ local skynet = require "skynet"
 local socket = require "socket"
 local crypt = require "crypt"
 
-local function launch_slave(auth_handler)
-	local cmd = {}
+local function write(fd, text)
+	assert(socket.write(fd, text), "socket error")
+end
 
+local function launch_slave(auth_handler)
 	-- set socket buffer limit (8K)
 	-- If the attacker send large package, close the socket
 	socket.limit(8192)
 
-	function cmd.auth(fd, addr)
+	local function auth(fd, addr)
+		fd = assert(tonumber(fd))
 		skynet.error(string.format("connect from %s (fd = %d)", addr, fd))
 		socket.start(fd)
 		local challenge = crypt.randomkey()
-		socket.write(fd, crypt.base64encode(challenge).."\n")
+		write(fd, crypt.base64encode(challenge).."\n")
 
 		local handshake = assert(socket.readline(fd), "socket closed")
 		local clientkey = crypt.base64decode(handshake)
@@ -21,7 +24,7 @@ local function launch_slave(auth_handler)
 			error "Invalid client key"
 		end
 		local serverkey = crypt.randomkey()
-		socket.write(fd, crypt.base64encode(crypt.dhexchange(serverkey)).."\n")
+		write(fd, crypt.base64encode(crypt.dhexchange(serverkey)).."\n")
 
 		local secret = crypt.dhsecret(clientkey, serverkey)
 
@@ -29,7 +32,7 @@ local function launch_slave(auth_handler)
 		local hmac = crypt.hmac64(challenge, secret)
 
 		if hmac ~= crypt.base64decode(response) then
-			socket.write(fd, "400 Bad Request\n")
+			write(fd, "400 Bad Request\n")
 			error "challenge failed"
 		end
 
@@ -43,26 +46,27 @@ local function launch_slave(auth_handler)
 		return ok, server, uid, secret
 	end
 
-	skynet.dispatch("lua", function(_,_,command,...)
-		local f = assert(cmd[command])
-		skynet.ret(skynet.pack(f(...)))
+	skynet.dispatch("lua", function(_,_,...)
+		skynet.ret(skynet.pack(auth(...)))
 	end)
 end
 
 local function accept(conf, s, fd, addr)
-	local ok, server, uid, secret = skynet.call(s, "lua", "auth", fd, addr)
+	-- call slave auth
+	local ok, server, uid, secret = skynet.call(s, "lua",  fd, addr)
+	socket.start(fd)
+
 	if not ok then
-		socket.write(fd, "401 Unauthorized\n")
+		write(fd, "401 Unauthorized\n")
 		error(server)
 	end
 
-	socket.start(fd)
-
 	local ok, err = pcall(conf.login_handler, server, uid, secret)
 	if ok then
-		socket.write(fd,  "200 OK\n")
+		err = err or ""
+		write(fd,  "200 "..crypt.base64encode(err).."\n")
 	else
-		socket.write(fd,  "406 Not Acceptable\n")
+		write(fd,  "406 Not Acceptable\n")
 		error(err)
 	end
 end
@@ -80,7 +84,7 @@ local function launch_master(conf)
 			table.insert(slave, source)
 			skynet.ret(skynet.pack(nil))
 		else
-			skynet.ret(skynet.pack(conf.command_handler(command, source, ...)))
+			skynet.ret(skynet.pack(conf.command_handler(command, ...)))
 		end
 	end)
 
@@ -104,7 +108,7 @@ local function launch_master(conf)
 	end)
 end
 
-local function login (conf)
+local function login(conf)
 	local name = "." .. (conf.name or "login")
 	skynet.start(function()
 		local loginmaster = skynet.localname(name)

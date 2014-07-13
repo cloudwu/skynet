@@ -140,7 +140,7 @@ handler.error = handler.close
 function handler.open(source, conf)
 	login_master = assert(conf.loginserver)
 	local servername = assert(conf.servername)
-	skynet.call(login_master, "lua", "register_gate", servername)
+	skynet.call(login_master, "lua", "register_gate", servername, skynet.self())
 end
 
 
@@ -162,7 +162,7 @@ end
 function CMD.logout(source)
 	local c = agent[source]
 	if c then
-		skynet.call(login_master, "lua", "logout", c.server, c.uid)
+		skynet.call(login_master, "lua", "logout", c.uid)
 		if c.fd then
 			gateserver.closeclient(c.fd)
 		end

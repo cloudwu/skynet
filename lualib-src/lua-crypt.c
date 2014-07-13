@@ -729,7 +729,7 @@ lb64encode(lua_State *L) {
 	}
 	int i,j;
 	j=0;
-	for (i=0;i<sz-2;i+=3) {
+	for (i=0;i<(int)sz-2;i+=3) {
 		uint32_t v = text[i] << 16 | text[i+1] << 8 | text[i+2];
 		buffer[j] = encoding[v >> 18];
 		buffer[j+1] = encoding[(v >> 12) & 0x3f];
