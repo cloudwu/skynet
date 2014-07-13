@@ -15,7 +15,6 @@ local handler = {}
 
 function handler.open(source, conf)
 	watchdog = conf.watchdog or source
-	maxclient = conf.maxclient or 1024
 end
 
 function handler.message(fd, msg, sz)

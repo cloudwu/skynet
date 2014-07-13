@@ -1,7 +1,6 @@
 local skynet = require "skynet"
 local socket = require "socket"
 local crypt = require "crypt"
-local datacenter = require "datacenter"
 
 local function launch_slave(auth_handler)
 	local cmd = {}
@@ -75,32 +74,26 @@ local function launch_master(conf)
 	local port = assert(tonumber(conf.port))
 	local slave = {}
 	local balance = 1
-	local cmd = {}
 
-	function cmd.logout(server, uid)
-		conf.logout_handler(server, uid)
-	end
-
-	if conf.init then
-		conf.init()
-		conf.init = nil
-	end
+	skynet.dispatch("lua", function(_,source,command, ...)
+		if command == "register_slave" then
+			table.insert(slave, source)
+			skynet.ret(skynet.pack(nil))
+		else
+			skynet.ret(skynet.pack(conf.command_handler(command, source, ...)))
+		end
+	end)
 
 	for i=1,instance do
-		slave[i] = skynet.newservice(SERVICE_NAME)
+		skynet.newservice(SERVICE_NAME)
 	end
-
-	skynet.dispatch("lua", function(_,_,command, ...)
-		local f = assert(cmd[command])
-		skynet.ret(skynet.pack(f(...)))
-	end)
 
 	local id = socket.listen(host, port)
 	skynet.error(string.format("login server listen at : %s %d", host, port))
 	socket.start(id , function(fd, addr)
 		local s = slave[balance]
 		balance = balance + 1
-		if balance > instance then
+		if balance > #slave then
 			balance = 1
 		end
 		local ok, err = pcall(accept, conf, s, fd, addr)
@@ -112,10 +105,11 @@ local function launch_master(conf)
 end
 
 local function login (conf)
-	local name = conf.name or "login_master"
+	local name = "." .. (conf.name or "login")
 	skynet.start(function()
-		local loginmaster = datacenter.get(name)
+		local loginmaster = skynet.localname(name)
 		if loginmaster then
+			skynet.call(loginmaster, "lua", "register_slave")
 			local auth_handler = assert(conf.auth_handler)
 			launch_master = nil
 			conf = nil
@@ -124,8 +118,8 @@ local function login (conf)
 			launch_slave = nil
 			conf.auth_handler = nil
 			assert(conf.login_handler)
-			assert(conf.logout_handler)
-			datacenter.set("login_master", skynet.self())
+			assert(conf.command_handler)
+			skynet.register(name)
 			launch_master(conf)
 		end
 	end)
