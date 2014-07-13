@@ -368,8 +368,10 @@ static const char *
 cmd_query(struct skynet_context * context, const char * param) {
 	if (param[0] == '.') {
 		uint32_t handle = skynet_handle_findname(param+1);
-		sprintf(context->result, ":%x", handle);
-		return context->result;
+		if (handle) {
+			sprintf(context->result, ":%x", handle);
+			return context->result;
+		}
 	}
 	return NULL;
 }

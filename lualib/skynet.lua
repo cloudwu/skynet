@@ -229,7 +229,10 @@ function skynet.self()
 end
 
 function skynet.localname(name)
-	return string_to_handle(c.command("QUERY", name))
+	local addr = c.command("QUERY", name)
+	if addr then
+		return string_to_handle(addr)
+	end
 end
 
 function skynet.launch(...)
