@@ -15,11 +15,11 @@ local server_mt = {}
 server_mt.__index = server_mt
 
 function server_mt:kick(uid)
-	skynet.call(self.address, "lua", "kick", self.name, uid)
+	return skynet.call(self.address, "lua", "kick", self.name, uid)
 end
 
 function server_mt:login(uid, secret)
-	skynet.call(self.address, "lua", "login", self.name, uid, secret)
+	return skynet.call(self.address, "lua", "login", self.name, uid, secret)
 end
 
 function server.auth_handler(token)
@@ -40,8 +40,9 @@ function server.login_handler(server, uid, secret)
 	end
 	assert(user_online[uid] == nil, "kick failed")
 	local gameserver = assert(server_list[server], "Unknown server")
-	gameserver:login(uid, secret)
+	local subid = gameserver:login(uid, secret)
 	user_online[uid] = gameserver
+	return tostring(subid)
 end
 
 local CMD = {}

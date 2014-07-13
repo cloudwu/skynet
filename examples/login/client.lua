@@ -71,9 +71,12 @@ local etoken = crypt.desencode(secret, encode_token(token))
 local b = crypt.base64encode(etoken)
 socket.writeline(fd, crypt.base64encode(etoken))
 
-print(readline())
-
+local result = readline()
+local code = tonumber(string.sub(result, 1, 3))
+assert(code == 200)
 socket.close(fd)
+
+local subid = crypt.base64decode(string.sub(result, 5))
 
 ----- connect to game server
 
@@ -105,7 +108,7 @@ end
 
 local index = 0
 local request = 0
-local handshake = string.format("%s@%s:%d:%d", crypt.base64encode(token.user), crypt.base64encode(token.server) , index, request)
+local handshake = string.format("%s#%s@%s:%d:%d", crypt.base64encode(token.user), crypt.base64encode(subid),crypt.base64encode(token.server) , index, request)
 local hmac = crypt.hmac64(crypt.hashkey(handshake), secret)
 
 socket.send(fd, handshake .. ":" .. crypt.base64encode(hmac))
