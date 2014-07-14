@@ -245,7 +245,7 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 }
 
 struct message_queue * 
-skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q) {
+skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
 	if (q == NULL) {
 		q = skynet_globalmq_pop();
 		if (q==NULL)
@@ -261,18 +261,27 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		return skynet_globalmq_pop();
 	}
 
+	int i,n=1;
 	struct skynet_message msg;
-	if (skynet_mq_pop(q,&msg)) {
-		skynet_context_release(ctx);
-		return skynet_globalmq_pop();
-	}
 
-	skynet_monitor_trigger(sm, msg.source , handle);
+	for (i=0;i<n;i++) {
+		if (skynet_mq_pop(q,&msg)) {
+			skynet_context_release(ctx);
+			return skynet_globalmq_pop();
+		} else if (i==0 && weight >= 0) {
+			n = skynet_mq_length(q);
+			n >>= weight;
+		}
 
-	if (ctx->cb == NULL) {
-		skynet_free(msg.data);
-	} else {
-		_dispatch_message(ctx, &msg);
+		skynet_monitor_trigger(sm, msg.source , handle);
+
+		if (ctx->cb == NULL) {
+			skynet_free(msg.data);
+		} else {
+			_dispatch_message(ctx, &msg);
+		}
+
+		skynet_monitor_trigger(sm, 0,0);
 	}
 
 	assert(q == ctx->queue);
@@ -284,8 +293,6 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		q = nq;
 	} 
 	skynet_context_release(ctx);
-
-	skynet_monitor_trigger(sm, 0,0);
 
 	return q;
 }
@@ -361,8 +368,10 @@ static const char *
 cmd_query(struct skynet_context * context, const char * param) {
 	if (param[0] == '.') {
 		uint32_t handle = skynet_handle_findname(param+1);
-		sprintf(context->result, ":%x", handle);
-		return context->result;
+		if (handle) {
+			sprintf(context->result, ":%x", handle);
+			return context->result;
+		}
 	}
 	return NULL;
 }

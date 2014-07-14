@@ -15,7 +15,7 @@
 		uint32_t next_session
  */
 
-#define TEMP_LENGTH 0x10002
+#define TEMP_LENGTH 0x10007
 
 static void
 fill_uint32(uint8_t * buf, uint32_t n) {
@@ -146,6 +146,7 @@ lunpackrequest(lua_State *L) {
 
 /*
 	int session
+	boolean ok
 	lightuserdata msg
 	int sz
 	return string response
@@ -155,15 +156,27 @@ lpackresponse(lua_State *L) {
 	uint32_t session = luaL_checkunsigned(L,1);
 	// clusterd.lua:command.socket call lpackresponse,
 	// and the msg/sz is return by skynet.rawcall , so don't free(msg)
-	void * msg = lua_touserdata(L,2);
-	size_t sz = luaL_checkunsigned(L, 3);
+	int ok = lua_toboolean(L,2);
+	void * msg;
+	size_t sz;
+	
+	if (lua_type(L,3) == LUA_TSTRING) {
+		msg = (void *)lua_tolstring(L, 3, &sz);
+		if (sz > 0x1000) {
+			sz = 0x1000;
+		}
+	} else {
+		msg = lua_touserdata(L,3);
+		sz = luaL_checkunsigned(L, 4);
+	}
 
 	uint8_t buf[TEMP_LENGTH];
-	fill_header(L, buf, sz+4, msg);
+	fill_header(L, buf, sz+5, msg);
 	fill_uint32(buf+2, session);
-	memcpy(buf+6,msg,sz);
+	buf[6] = ok;
+	memcpy(buf+7,msg,sz);
 
-	lua_pushlstring(L, (const char *)buf, sz+6);
+	lua_pushlstring(L, (const char *)buf, sz+7);
 
 	return 1;
 }
@@ -178,13 +191,13 @@ static int
 lunpackresponse(lua_State *L) {
 	size_t sz;
 	const char * buf = luaL_checklstring(L, 1, &sz);
-	if (sz < 4) {
+	if (sz < 5) {
 		return 0;
 	}
 	uint32_t session = unpack_uint32((const uint8_t *)buf);
 	lua_pushunsigned(L, session);
-	lua_pushboolean(L, 1);
-	lua_pushlstring(L, buf+4, sz-4);
+	lua_pushboolean(L, buf[4]);
+	lua_pushlstring(L, buf+5, sz-5);
 
 	return 3;
 }

@@ -5,7 +5,14 @@ local cluster = require "cluster.c"
 
 local config_name = skynet.getenv "cluster"
 local node_address = {}
-assert(loadfile(config_name, "t", node_address))()
+
+local function loadconfig()
+	local f = assert(io.open(config_name))
+	local source = f:read "*a"
+	f:close()
+	assert(load(source, "@"..config_name, "t", node_address))()
+end
+
 local node_session = {}
 local command = {}
 
@@ -30,6 +37,11 @@ end
 
 local node_channel = setmetatable({}, { __index = open_channel })
 
+function command.reload()
+	loadconfig()
+	skynet.ret(skynet.pack(nil))
+end
+
 function command.listen(source, addr, port)
 	local gate = skynet.newservice("gate")
 	if port == nil then
@@ -53,8 +65,13 @@ local request_fd = {}
 function command.socket(source, subcmd, fd, msg)
 	if subcmd == "data" then
 		local addr, session, msg = cluster.unpackrequest(msg)
-		local msg, sz = skynet.rawcall(addr, "lua", msg)
-		local response = cluster.packresponse(session, msg, sz)
+		local ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg)
+		local response
+		if ok then
+			response = cluster.packresponse(session, true, msg, sz)
+		else
+			response = cluster.packresponse(session, false, msg)
+		end
 		socket.write(fd, response)
 	elseif subcmd == "open" then
 		skynet.error(string.format("socket accept from %s", msg))
@@ -65,7 +82,8 @@ function command.socket(source, subcmd, fd, msg)
 end
 
 skynet.start(function()
-	skynet.dispatch("lua", function(_, source, cmd, ...)
+	loadconfig()
+	skynet.dispatch("lua", function(session , source, cmd, ...)
 		local f = assert(command[cmd])
 		f(source, ...)
 	end)

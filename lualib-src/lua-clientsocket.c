@@ -125,14 +125,19 @@ _block:
 		boolean (true: data, false: block, nil: close)
 		string last
  */
+
+struct socket_buffer {
+	void * buffer;
+	int sz;
+};
+
 static int
-lrecv(lua_State *L) {
+recv_socket(lua_State *L, char *tmp, struct socket_buffer *result) {
 	int fd = luaL_checkinteger(L,1);
 	size_t sz = 0;
 	const char * last = lua_tolstring(L,2,&sz);
 	luaL_checktype(L, 3, LUA_TTABLE);
 
-	char tmp[CACHE_SIZE];
 	char * buffer;
 	int r = recv(fd, tmp, CACHE_SIZE, 0);
 	if (r == 0) {
@@ -163,9 +168,63 @@ lrecv(lua_State *L) {
 		lua_pushnil(L);
 		lua_rawseti(L, 3, i);
 	}
-
-	return unpack(L, (uint8_t *)buffer, r+sz, 0);
+	result->buffer = buffer;
+	result->sz = r + sz;
+	return -1;
 }
+
+static int
+lrecv(lua_State *L) {
+	struct socket_buffer sb;
+	char tmp[CACHE_SIZE];
+	int ret = recv_socket(L, tmp, &sb);
+	if (ret < 0) {
+		return unpack(L, sb.buffer, sb.sz, 0);
+	} else {
+		return ret;
+	}
+}
+
+static int
+unpack_line(lua_State *L, uint8_t *buffer, int sz, int n) {
+	if (sz == 0) 
+		goto _block;
+	if (buffer[0] == '\n') {
+		return unpack_line(L, buffer+1, sz-1, n);
+	}
+	int i;
+	for (i=1;i<sz;i++) {
+		if (buffer[i] == '\n') {
+			++n;
+			lua_pushlstring(L, (const char *)buffer, i);
+			lua_rawseti(L, 3, n);
+			buffer += i + 1;
+			sz -= i + 1;
+			return unpack_line(L, buffer, sz, n);
+		}
+	}
+_block:
+	lua_pushboolean(L, n==0 ? 0:1);
+	if (sz == 0) {
+		lua_pushnil(L);
+	} else {
+		lua_pushlstring(L, (const char *)buffer, sz);
+	}
+	return 2;
+}
+
+static int
+lreadline(lua_State *L) {
+	struct socket_buffer sb;
+	char tmp[CACHE_SIZE];
+	int ret = recv_socket(L, tmp, &sb);
+	if (ret < 0) {
+		return unpack_line(L, sb.buffer, sb.sz, 0);
+	} else {
+		return ret;
+	}
+}
+
 
 static int
 lusleep(lua_State *L) {
@@ -219,7 +278,7 @@ readline_stdin(void * arg) {
 }
 
 static int
-lreadline(lua_State *L) {
+lreadstdin(lua_State *L) {
 	struct queue *q = lua_touserdata(L, lua_upvalueindex(1));
 	LOCK(q);
 	if (q->head == q->tail) {
@@ -236,6 +295,18 @@ lreadline(lua_State *L) {
 	return 1;
 }
 
+static int
+lwriteline(lua_State *L) {
+	size_t sz = 0;
+	int fd = luaL_checkinteger(L,1);
+	const char * msg = luaL_checklstring(L, 2, &sz);
+	block_send(L, fd, msg, sz);
+	char nl[1] = { '\n' };
+	block_send(L, fd, nl, 1);
+	
+	return 0;
+}
+
 int
 luaopen_clientsocket(lua_State *L) {
 	luaL_checkversion(L);
@@ -245,14 +316,16 @@ luaopen_clientsocket(lua_State *L) {
 		{ "send", lsend },
 		{ "close", lclose },
 		{ "usleep", lusleep },
+		{ "readline", lreadline },
+		{ "writeline", lwriteline },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L, l);
 
 	struct queue * q = lua_newuserdata(L, sizeof(*q));
 	memset(q, 0, sizeof(*q));
-	lua_pushcclosure(L, lreadline, 1);
-	lua_setfield(L, -2, "readline");
+	lua_pushcclosure(L, lreadstdin, 1);
+	lua_setfield(L, -2, "readstdin");
 
 	pthread_t pid ;
 	pthread_create(&pid, NULL, readline_stdin, q);

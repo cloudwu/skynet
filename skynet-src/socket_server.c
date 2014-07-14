@@ -5,6 +5,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -33,6 +34,8 @@
 
 #define PRIORITY_HIGH 0
 #define PRIORITY_LOW 1
+
+#define HASH_ID(id) (((unsigned)id) % MAX_SOCKET)
 
 struct write_buffer {
 	struct write_buffer * next;
@@ -107,6 +110,12 @@ struct request_start {
 	uintptr_t opaque;
 };
 
+struct request_setopt {
+	int id;
+	int what;
+	int value;
+};
+
 struct request_package {
 	uint8_t header[8];	// 6 bytes dummy
 	union {
@@ -117,6 +126,7 @@ struct request_package {
 		struct request_listen listen;
 		struct request_bind bind;
 		struct request_start start;
+		struct request_setopt setopt;
 	} u;
 	uint8_t dummy[256];
 };
@@ -144,7 +154,7 @@ reserve_id(struct socket_server *ss) {
 		if (id < 0) {
 			id = __sync_and_and_fetch(&(ss->alloc_id), 0x7fffffff);
 		}
-		struct socket *s = &ss->slot[id % MAX_SOCKET];
+		struct socket *s = &ss->slot[HASH_ID(id)];
 		if (s->type == SOCKET_TYPE_INVALID) {
 			if (__sync_bool_compare_and_swap(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
 				s->id = id;
@@ -267,7 +277,7 @@ check_wb_list(struct wb_list *s) {
 
 static struct socket *
 new_fd(struct socket_server *ss, int id, int fd, uintptr_t opaque, bool add) {
-	struct socket * s = &ss->slot[id % MAX_SOCKET];
+	struct socket * s = &ss->slot[HASH_ID(id)];
 	assert(s->type == SOCKET_TYPE_RESERVE);
 
 	if (add) {
@@ -357,7 +367,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 	return -1;
 _failed:
 	freeaddrinfo( ai_list );
-	ss->slot[id % MAX_SOCKET].type = SOCKET_TYPE_INVALID;
+	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
 	return SOCKET_ERROR;
 }
 
@@ -502,7 +512,7 @@ send_buffer_empty(struct socket *s) {
 static int
 send_socket(struct socket_server *ss, struct request_send * request, struct socket_message *result, int priority) {
 	int id = request->id;
-	struct socket * s = &ss->slot[id % MAX_SOCKET];
+	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->type == SOCKET_TYPE_INVALID || s->id != id 
 		|| s->type == SOCKET_TYPE_HALFCLOSE
 		|| s->type == SOCKET_TYPE_PACCEPT) {
@@ -556,7 +566,7 @@ _failed:
 	result->id = id;
 	result->ud = 0;
 	result->data = NULL;
-	ss->slot[id % MAX_SOCKET].type = SOCKET_TYPE_INVALID;
+	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
 
 	return SOCKET_ERROR;
 }
@@ -564,7 +574,7 @@ _failed:
 static int
 close_socket(struct socket_server *ss, struct request_close *request, struct socket_message *result) {
 	int id = request->id;
-	struct socket * s = &ss->slot[id % MAX_SOCKET];
+	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->type == SOCKET_TYPE_INVALID || s->id != id) {
 		result->id = id;
 		result->opaque = request->opaque;
@@ -612,7 +622,7 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	result->opaque = request->opaque;
 	result->ud = 0;
 	result->data = NULL;
-	struct socket *s = &ss->slot[id % MAX_SOCKET];
+	struct socket *s = &ss->slot[HASH_ID(id)];
 	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
 		return SOCKET_ERROR;
 	}
@@ -631,6 +641,17 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 		return SOCKET_OPEN;
 	}
 	return -1;
+}
+
+static void
+setopt_socket(struct socket_server *ss, struct request_setopt *request) {
+	int id = request->id;
+	struct socket *s = &ss->slot[HASH_ID(id)];
+	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
+		return;
+	}
+	int v = request->value;
+	setsockopt(s->fd, IPPROTO_TCP, request->what, &v, sizeof(v));
 }
 
 static void
@@ -696,6 +717,9 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 		return send_socket(ss, (struct request_send *)buffer, result, PRIORITY_HIGH);
 	case 'P':
 		return send_socket(ss, (struct request_send *)buffer, result, PRIORITY_LOW);
+	case 'T':
+		setopt_socket(ss, (struct request_setopt *)buffer);
+		return -1;
 	default:
 		fprintf(stderr, "socket-server: Unknown ctrl %c.\n",type);
 		return -1;
@@ -942,7 +966,7 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 // return -1 when error
 int64_t 
 socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz) {
-	struct socket * s = &ss->slot[id % MAX_SOCKET];
+	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		return -1;
 	}
@@ -958,7 +982,7 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 
 void 
 socket_server_send_lowpriority(struct socket_server *ss, int id, const void * buffer, int sz) {
-	struct socket * s = &ss->slot[id % MAX_SOCKET];
+	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		return;
 	}
@@ -1053,4 +1077,11 @@ socket_server_start(struct socket_server *ss, uintptr_t opaque, int id) {
 	send_request(ss, &request, 'S', sizeof(request.u.start));
 }
 
-
+void
+socket_server_nodelay(struct socket_server *ss, int id) {
+	struct request_package request;
+	request.u.setopt.id = id;
+	request.u.setopt.what = TCP_NODELAY;
+	request.u.setopt.value = 1;
+	send_request(ss, &request, 'T', sizeof(request.u.setopt));
+}

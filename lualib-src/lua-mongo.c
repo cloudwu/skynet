@@ -506,7 +506,7 @@ op_insert(lua_State *L) {
 		int i;
 		for (i=1;i<=s;i++) {
 			lua_rawgeti(L,3,i);
-			document doc = lua_touserdata(L,3);
+			document doc = lua_touserdata(L,-1);
 			luaL_addlstring(&b, (const char *)doc, get_length(doc));
 			lua_pop(L,1);
 		}

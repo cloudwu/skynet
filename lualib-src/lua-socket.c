@@ -14,6 +14,7 @@
 #define BACKLOG 32
 // 2 ** 12 == 4096
 #define LARGE_PAGE_NODE 12
+#define BUFFER_LIMIT (256 * 1024)
 
 struct buffer_node {
 	char * msg;
@@ -22,6 +23,7 @@ struct buffer_node {
 };
 
 struct socket_buffer {
+	int limit;
 	int size;
 	int offset;
 	struct buffer_node *head;
@@ -64,6 +66,7 @@ lnewpool(lua_State *L, int sz) {
 static int
 lnewbuffer(lua_State *L) {
 	struct socket_buffer * sb = lua_newuserdata(L, sizeof(*sb));	
+	sb->limit = luaL_optint(L,1,BUFFER_LIMIT);
 	sb->size = 0;
 	sb->offset = 0;
 	sb->head = NULL;
@@ -126,6 +129,9 @@ lpushbuffer(lua_State *L) {
 	sb->size += sz;
 
 	lua_pushinteger(L, sb->size);
+	if (sb->limit > 0 && sb->size > sb->limit) {
+		return luaL_error(L, "buffer overflow (limit = %d, size = %d)", sb->limit, sb->size);
+	}
 
 	return 1;
 }
@@ -476,6 +482,14 @@ lstart(lua_State *L) {
 	return 0;
 }
 
+static int
+lnodelay(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	skynet_socket_nodelay(ctx,id);
+	return 0;
+}
+
 int
 luaopen_socketdriver(lua_State *L) {
 	luaL_checkversion(L);
@@ -502,6 +516,7 @@ luaopen_socketdriver(lua_State *L) {
 		{ "lsend", lsendlow },
 		{ "bind", lbind },
 		{ "start", lstart },
+		{ "nodelay", lnodelay },
 		{ NULL, NULL },
 	};
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");

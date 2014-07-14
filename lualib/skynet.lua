@@ -22,7 +22,7 @@ local skynet = {
 	PTYPE_HARBOR = 5,
 	PTYPE_SOCKET = 6,
 	PTYPE_ERROR = 7,
-	PTYPE_QUEUE = 8,
+	PTYPE_QUEUE = 8,	-- use in deprecated mqueue, use skynet.queue instead
 	PTYPE_DEBUG = 9,
 	PTYPE_LUA = 10,
 	PTYPE_SNAX = 11,
@@ -229,7 +229,10 @@ function skynet.self()
 end
 
 function skynet.localname(name)
-	return string_to_handle(c.command("QUERY", name))
+	local addr = c.command("QUERY", name)
+	if addr then
+		return string_to_handle(addr)
+	end
 end
 
 function skynet.launch(...)
@@ -257,7 +260,7 @@ function skynet.exit()
 		local address = session_coroutine_address[co]
 		local self = skynet.self()
 		if session~=0 and address then
-			skynet.redirect(self, address, "error", session, "")
+			skynet.redirect(address, self, "error", session, "")
 		end
 	end
 	c.command("EXIT")
@@ -325,6 +328,9 @@ end
 
 function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
+	if watching_service[addr] == false then
+		error("Service is dead")
+	end
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
 	return yield_call(addr, session)
 end

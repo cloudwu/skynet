@@ -1,3 +1,15 @@
+v0.4.2 (2014-7-14)
+-----------
+* Bugfix : invalid negative socket id 
+* Add optional TCP_NODELAY support
+* Add worker thread weight
+* Add skynet.queue
+* Bugfix: socketchannel
+* cluster can throw error
+* Add readline and writeline to clientsocket lib
+* Add cluster.reload to reload config file
+* Add datacenter.wait
+
 v0.4.1 (2014-7-7)
 -----------
 * Add SERVICE_NAME in loader
