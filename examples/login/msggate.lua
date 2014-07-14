@@ -32,7 +32,7 @@ function handler.connect(fd, addr)
 end
 
 local function auth(fd, msg, sz)
---	base64(base64(uid)@base64(server)#base64(subid):index:request:base64(hmac)
+--	base64(uid)@base64(server)#base64(subid):index:request:base64(hmac)
 	local message = netpack.tostring(msg, sz)
 	local username, index, request , hmac = string.match(message, "([^:]*):([^:]*):([^:]*):([^:]*)")
 	local content = users[username]
