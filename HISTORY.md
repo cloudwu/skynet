@@ -1,4 +1,4 @@
-Dev version
+v0.4.2 (2014-7-14)
 -----------
 * Bugfix : invalid negative socket id 
 * Add optional TCP_NODELAY support
