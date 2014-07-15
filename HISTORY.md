@@ -1,3 +1,8 @@
+Dev version
+-----------
+* skynet.exit will quit service immediately.
+* Add snax.gateserver, snax.loginserver, snax.msgserver
+
 v0.4.2 (2014-7-14)
 -----------
 * Bugfix : invalid negative socket id 

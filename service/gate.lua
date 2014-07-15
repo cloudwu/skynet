@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local gateserver = require "gamefw.gateserver"
+local gateserver = require "snax.gateserver"
 local netpack = require "netpack"
 
 local watchdog
@@ -53,7 +53,7 @@ local function close_fd(fd)
 	end
 end
 
-function handler.close(fd)
+function handler.disconnect(fd)
 	close_fd(fd)
 	skynet.send(watchdog, "lua", "socket", "close", fd)
 end
@@ -89,15 +89,6 @@ function CMD.accept(source, fd)
 end
 
 function CMD.kick(source, fd)
-	local c
-	if fd then
-		c = connection[fd]
-	else
-		c = forwarding[source]
-	end
-
-	assert(c)
-
 	gateserver.closeclient(fd)
 end
 

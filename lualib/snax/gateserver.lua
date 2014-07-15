@@ -40,7 +40,7 @@ function gateserver.start(handler)
 		socket = socketdriver.listen(address, port)
 		socketdriver.start(socket)
 		if handler.open then
-			handler.open(source, conf)
+			return handler.open(source, conf)
 		end
 	end
 
@@ -88,8 +88,8 @@ function gateserver.start(handler)
 	end
 
 	function MSG.close(fd)
-		if handler.close then
-			handler.close(fd)
+		if handler.disconnect then
+			handler.disconnect(fd)
 		end
 		close_fd(fd)
 	end

@@ -1,18 +1,5 @@
 package.cpath = "luaclib/?.so"
 
---[[ Status code
-
-200 OK
-
-400 Bad Request	(通常是登陆协议错误)
-401 Unauthorized (通常是登陆服务器或游戏服务器验证错误)
-403 Forbidden	(通常是连接游戏服务器的 index 已经过期)
-404 Not Found   (通常是游戏服务器未获得登陆服务器的通知)
-406 Not Acceptable (通常是登陆服务器转发游戏服务器拒绝登陆)
-412 Precondition Failed	(通常是遗漏了和游戏服务器前次通讯的请求)
-
-]]
-
 local socket = require "clientsocket"
 local crypt = require "crypt"
 
@@ -72,16 +59,38 @@ local b = crypt.base64encode(etoken)
 socket.writeline(fd, crypt.base64encode(etoken))
 
 local result = readline()
+print(result)
 local code = tonumber(string.sub(result, 1, 3))
 assert(code == 200)
 socket.close(fd)
 
 local subid = crypt.base64decode(string.sub(result, 5))
 
+print("login ok, subid=", subid)
+
 ----- connect to game server
 
+local session = 0
+
+local function send_request(v)
+	session = session + 1
+	local s =  string.char(bit32.extract(session,24,8), bit32.extract(session,16,8), bit32.extract(session,8,8), bit32.extract(session,0,8))
+	socket.send(fd , v..s)
+	return session, v
+end
+
+local function recv_response(v)
+	local content = v:sub(1,-6)
+	local ok = v:sub(-5,-5):byte()
+	local session = 0
+	for i=-4,-1 do
+		local c = v:byte(i)
+		session = session + bit32.lshift(c,(-1-i) * 8)
+	end
+	return ok ~=0 , session, content
+end
+
 local input = {}
-local fd = assert(socket.connect("127.0.0.1", 8888))
 
 local function readpackage()
 	local line = table.remove(input, 1)
@@ -106,20 +115,32 @@ local function readpackage()
 	end
 end
 
-local index = 0
-local request = 0
-local handshake = string.format("%s#%s@%s:%d:%d", crypt.base64encode(token.user), crypt.base64encode(subid),crypt.base64encode(token.server) , index, request)
-local hmac = crypt.hmac64(crypt.hashkey(handshake), secret)
+local index = 1
 
-socket.send(fd, handshake .. ":" .. crypt.base64encode(hmac))
+local function echo(text)
+	print("connect")
+	local fd = assert(socket.connect("127.0.0.1", 8888))
+	input = {}
 
-print(readpackage())
+	local handshake = string.format("%s@%s#%s:%d", crypt.base64encode(token.user), crypt.base64encode(token.server),crypt.base64encode(subid) , index)
+	local hmac = crypt.hmac64(crypt.hashkey(handshake), secret)
 
-socket.send(fd , "echo")
-print(readpackage())
+	socket.send(fd, handshake .. ":" .. crypt.base64encode(hmac))
 
+	print(readpackage())
+	print("===>",send_request(text))
+	print("===>",send_request(text .. " again"))
+	print("<===",recv_response(readpackage()))
+	print("<===",recv_response(readpackage()))
 
+	print("disconnect")
+	socket.close(fd)
+end
 
+echo "hello"
 
+index = index + 1
+
+echo "world"
 
 

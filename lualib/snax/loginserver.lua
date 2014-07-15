@@ -1,6 +1,35 @@
 local skynet = require "skynet"
 local socket = require "socket"
 local crypt = require "crypt"
+local table = table
+local string = string
+local assert = assert
+
+--[[
+
+Protocol:
+
+	line (\n) based text protocol
+
+	1. Server->Client : base64(8bytes random challenge)
+	2. Client->Server : base64(8bytes handshake client key)
+	3. Server: Gen a 8bytes handshake server key
+	4. Server->Client : base64(DH-Exchange(server key))
+	5. Server/Client secret := DH-Secret(client key/server key)
+	6. Client->Server : base64(HMAC(challenge, secret))
+	7. Client->Server : DES(secret, base64(token))
+	8. Server : call auth_handler(token) -> server, uid (A user defined method)
+	9. Server : call login_handler(server, uid, secret) (A user defined method)
+
+Error Code:
+	400 Bad Request . challenge failed
+	401 Unauthorized . unauthorized by auth_handler
+	403 Forbidden . login_handler failed
+	406 Not Acceptable . already in login (disallow multi login)
+
+Success:
+	200 base64(subid)
+]]
 
 local function write(fd, text)
 	assert(socket.write(fd, text), "socket error")
@@ -51,6 +80,8 @@ local function launch_slave(auth_handler)
 	end)
 end
 
+local user_login = {}
+
 local function accept(conf, s, fd, addr)
 	-- call slave auth
 	local ok, server, uid, secret = skynet.call(s, "lua",  fd, addr)
@@ -61,12 +92,24 @@ local function accept(conf, s, fd, addr)
 		error(server)
 	end
 
+	if not conf.multilogin then
+		if user_login[uid] then
+			write(fd, "406 Not Acceptable\n")
+			error(string.format("User %s is already login", uid))
+		end
+
+		user_login[uid] = true
+	end
+
 	local ok, err = pcall(conf.login_handler, server, uid, secret)
+	-- unlock login
+	user_login[uid] = nil
+
 	if ok then
 		err = err or ""
 		write(fd,  "200 "..crypt.base64encode(err).."\n")
 	else
-		write(fd,  "406 Not Acceptable\n")
+		write(fd,  "403 Forbidden\n")
 		error(err)
 	end
 end
@@ -92,8 +135,8 @@ local function launch_master(conf)
 		skynet.newservice(SERVICE_NAME)
 	end
 
-	local id = socket.listen(host, port)
 	skynet.error(string.format("login server listen at : %s %d", host, port))
+	local id = socket.listen(host, port)
 	socket.start(id , function(fd, addr)
 		local s = slave[balance]
 		balance = balance + 1

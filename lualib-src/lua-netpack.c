@@ -457,9 +457,9 @@ lpack_padding(lua_State *L) {
 	size_t content_sz;
 	uint8_t *buffer;
 	const char * ptr = tolstring(L, &content_sz, 2);
-	size_t header_sz = 0;
-	const char * header = luaL_checklstring(L,1,&header_sz);
-	size_t len = header_sz + content_sz;
+	size_t cookie_sz = 0;
+	const char * cookie = luaL_checklstring(L,1,&cookie_sz);
+	size_t len = cookie_sz + content_sz;
 
 	if (len > 0x10000) {
 		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
@@ -472,8 +472,8 @@ lpack_padding(lua_State *L) {
 	}
 
 	write_size(buffer, len);
-	memcpy(buffer+2, header, header_sz);
-	memcpy(buffer+2+header_sz, ptr, content_sz);
+	memcpy(buffer+2, ptr, content_sz);
+	memcpy(buffer+2+content_sz, cookie, cookie_sz);
 	lua_pushlstring(L, (const char *)buffer, len+2);
 
 	return 1;
@@ -486,8 +486,19 @@ ltostring(lua_State *L) {
 	if (ptr == NULL) {
 		lua_pushliteral(L, "");
 	} else {
-		lua_pushlstring(L, (const char *)ptr, size);
-		skynet_free(ptr);
+		if (lua_isnumber(L, 3)) {
+			int offset = lua_tointeger(L, 3);
+			if (offset < 0) {
+				return luaL_error(L, "Invalid offset %d", offset);
+			}
+			if (offset > size) {
+				offset = size;
+			}
+			lua_pushlstring(L, (const char *)ptr + offset, size-offset);
+		} else {
+			lua_pushlstring(L, (const char *)ptr, size);
+			skynet_free(ptr);
+		}
 	}
 	return 1;
 }
