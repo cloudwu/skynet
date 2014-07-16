@@ -175,11 +175,11 @@ local function connect_once(self)
 	end
 
 	self.__authcoroutine = false
-	return true
+	return self.__sock ~= nil
 end
 
 local function try_connect(self , once)
-	local t = 100
+	local t = 0
 	while not self.__closed do
 		if connect_once(self) then
 			if not once then
@@ -288,6 +288,16 @@ end
 function channel:close()
 	if not self.__closed then
 		self.__closed = true
+		close_channel_socket(self)
+	end
+end
+
+function channel:changehost(host, port)
+	self.__host = host
+	if port then
+		self.__port = port
+	end
+	if not self.__closed then
 		close_channel_socket(self)
 	end
 end

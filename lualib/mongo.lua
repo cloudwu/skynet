@@ -84,6 +84,7 @@ local function mongo_auth(mongoc)
 	end
 	return function()
 		assert(mongoc:auth(user, pass))
+		-- todo : If mongoc want to connect to replica set, runCommand ismater here, and call mongoc.__sock:changehost
 	end
 end
 
