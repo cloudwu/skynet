@@ -155,11 +155,18 @@ end
 
 local function connect_backup(self)
 	if self.__backup then
-		for _, host in ipairs(self.__backup) do
-			skynet.error("socket: connect to backup host", host, self.__port)
-			local fd = socket.open(host, self.__port)
+		for _, addr in ipairs(self.__backup) do
+			local host, port
+			if type(host) == "table" then
+				host, port = addr.host, addr.port
+			else
+				host = addr
+			end
+			skynet.error("socket: connect to backup host", host, port)
+			local fd = socket.open(host, port)
 			if fd then
 				self.__host = host
+				self.__port = port
 				return fd
 			end
 		end
