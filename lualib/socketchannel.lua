@@ -161,6 +161,9 @@ local function connect_backup(self)
 				host, port = addr.host, addr.port
 			else
 				host = addr
+				if not addr:find(":", 1, true) then
+					port = self.__port
+				end
 			end
 			skynet.error("socket: connect to backup host", host, port)
 			local fd = socket.open(host, port)
