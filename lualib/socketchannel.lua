@@ -157,7 +157,7 @@ local function connect_backup(self)
 	if self.__backup then
 		for _, addr in ipairs(self.__backup) do
 			local host, port
-			if type(host) == "table" then
+			if type(addr) == "table" then
 				host, port = addr.host, addr.port
 			else
 				host = addr
