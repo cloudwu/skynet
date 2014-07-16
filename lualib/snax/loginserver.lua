@@ -19,7 +19,8 @@ Protocol:
 	6. Client->Server : base64(HMAC(challenge, secret))
 	7. Client->Server : DES(secret, base64(token))
 	8. Server : call auth_handler(token) -> server, uid (A user defined method)
-	9. Server : call login_handler(server, uid, secret) (A user defined method)
+	9. Server : call login_handler(server, uid, secret) ->subid (A user defined method)
+	10. Server->Client : 200 base64(subid)
 
 Error Code:
 	400 Bad Request . challenge failed
