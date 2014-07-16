@@ -65,14 +65,6 @@ end
 
 local CMD = {}
 
-local function unforward(c)
-	if c.agent then
-		forwarding[c.agent] = nil
-		c.agent = nil
-		c.client = nil
-	end
-end
-
 function CMD.forward(source, fd, client, address)
 	local c = assert(connection[fd])
 	unforward(c)
