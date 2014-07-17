@@ -177,6 +177,9 @@ local function connect_backup(self)
 end
 
 local function connect_once(self)
+	if self.__closed then
+		return false
+	end
 	assert(not self.__sock and not self.__authcoroutine)
 	local fd = socket.open(self.__host, self.__port)
 	if not fd then
@@ -185,29 +188,29 @@ local function connect_once(self)
 			return false
 		end
 	end
-	while not self.__closed do
+
+	self.__sock = setmetatable( {fd} , channel_socket_meta )
+	skynet.fork(dispatch_function(self), self)
+
+	if self.__auth then
 		self.__authcoroutine = coroutine.running()
-		self.__sock = setmetatable( {fd} , channel_socket_meta )
-		skynet.fork(dispatch_function(self), self)
-
-		if self.__auth then
-			local ok , message = pcall(self.__auth, self)
-			if not ok then
-				close_channel_socket(self)
-				if message ~= socket_error then
-					skynet.error("socket: auth failed", message)
-				end
+		local ok , message = pcall(self.__auth, self)
+		if not ok then
+			close_channel_socket(self)
+			if message ~= socket_error then
+				skynet.error("socket: auth failed", message)
 			end
-			self.__authcoroutine = false
-			return ok
 		end
-
 		self.__authcoroutine = false
 		if self.__sock then
-			return true
+			return ok
+		else
+			-- auth may change host, so connect again
+			return connect_once(self)
 		end
-		-- auth may change host, so connect again
 	end
+
+	return true
 end
 
 local function try_connect(self , once)
