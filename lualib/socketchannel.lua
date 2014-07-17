@@ -201,9 +201,7 @@ local function connect_once(self)
 			end
 		end
 		self.__authcoroutine = false
-		if self.__sock then
-			return ok
-		elseif ok then
+		if ok and not self.__sock then
 			-- auth may change host, so connect again
 			return connect_once(self)
 		end
