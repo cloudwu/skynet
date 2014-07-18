@@ -212,18 +212,21 @@ function server.start(conf)
 
 	local request_handler = assert(conf.request_handler)
 
-	-- u.response is a struct { message, version, index }
+	-- u.response is a struct { return_fd , response, version, index }
 	local function retire_response(u)
 		if u.index >= expired_number * 2 then
 			local max = 0
 			local response = u.response
 			for k,p in pairs(response) do
-				if p[3] < expired_number then
-					response[k] = nil
-				else
-					p[3] = p[3] - expired_number
-					if p[3] > max then
-						max = p[3]
+				if p[1] == nil then
+					-- request complete, check expired
+					if p[4] < expired_number then
+						response[k] = nil
+					else
+						p[4] = p[4] - expired_number
+						if p[4] > max then
+							max = p[4]
+						end
 					end
 				end
 			end
@@ -238,14 +241,23 @@ function server.start(conf)
 		local p = u.response[session]
 		if p then
 			-- session can be reuse in the same connection
-			if p[2] == u.version then
+			if p[3] == u.version then
+				local last = u.response[session]
 				u.response[session] = nil
 				p = nil
+				if last[2] == nil then
+					local error_msg = string.format("Conflict session %s", crypt.hexencode(session))
+					skynet.error(error_msg)
+					error(error_msg)
+				end
 			end
 		end
 
 		if p == nil then
+			p = { fd }
+			u.response[session] = p
 			local ok, result = pcall(conf.request_handler, u.username, msg, msg_sz)
+			result = result or ""
 			-- NOTICE: YIELD here, socket may close.
 			if not ok then
 				skynet.error(result)
@@ -254,21 +266,28 @@ function server.start(conf)
 				result = result .. '\1' .. session
 			end
 
-			p = { netpack.pack_string(result), u.version, u.index }
-			if u.response[session] then
-				skynet.error(string.format("Conflict session %s", crypt.hexencode(session)))
-			end
-			 u.response[session] = p
+			p[2] = netpack.pack_string(result)
+			p[3] = u.version
+			p[4] = u.index
 		else
 			netpack.tostring(msg, sz) -- request before, so free msg
-			-- resend response, and update index p[3].
-			p[3] = u.index
+			-- update version/index, change return fd.
+			-- resend response.
+			p[1] = fd
+			p[3] = u.version
+			p[4] = u.index
+			if p[2] == nil then
+				-- already request, but response is not ready
+				return
+			end
 		end
 		u.index = u.index + 1
-		-- check connect again
+		-- the return fd is p[1] (fd may change by multi request) check connect
+		fd = p[1]
 		if connection[fd] then
-			socketdriver.send(fd, p[1])
+			socketdriver.send(fd, p[2])
 		end
+		p[1] = nil
 		retire_response(u)
 	end
 

@@ -70,13 +70,10 @@ print("login ok, subid=", subid)
 
 ----- connect to game server
 
-local session = 0
-
-local function send_request(v)
-	session = session + 1
+local function send_request(v, session)
 	local s =  string.char(bit32.extract(session,24,8), bit32.extract(session,16,8), bit32.extract(session,8,8), bit32.extract(session,0,8))
 	socket.send(fd , v..s)
-	return session, v
+	return v, session
 end
 
 local function recv_response(v)
@@ -87,7 +84,7 @@ local function recv_response(v)
 		local c = v:byte(i)
 		session = session + bit32.lshift(c,(-1-i) * 8)
 	end
-	return ok ~=0 , session, content
+	return ok ~=0 , content, session
 end
 
 local input = {}
@@ -115,32 +112,44 @@ local function readpackage()
 	end
 end
 
+local text = "echo"
 local index = 1
 
-local function echo(text)
-	print("connect")
-	local fd = assert(socket.connect("127.0.0.1", 8888))
-	input = {}
+print("connect")
+local fd = assert(socket.connect("127.0.0.1", 8888))
+input = {}
 
-	local handshake = string.format("%s@%s#%s:%d", crypt.base64encode(token.user), crypt.base64encode(token.server),crypt.base64encode(subid) , index)
-	local hmac = crypt.hmac64(crypt.hashkey(handshake), secret)
+local handshake = string.format("%s@%s#%s:%d", crypt.base64encode(token.user), crypt.base64encode(token.server),crypt.base64encode(subid) , index)
+local hmac = crypt.hmac64(crypt.hashkey(handshake), secret)
 
-	socket.send(fd, handshake .. ":" .. crypt.base64encode(hmac))
+socket.send(fd, handshake .. ":" .. crypt.base64encode(hmac))
 
-	print(readpackage())
-	print("===>",send_request(text))
-	print("===>",send_request(text .. " again"))
-	print("<===",recv_response(readpackage()))
-	print("<===",recv_response(readpackage()))
+print(readpackage())
+print("===>",send_request(text,0))
+-- don't recv response
+-- print("<===",recv_response(readpackage()))
 
-	print("disconnect")
-	socket.close(fd)
-end
-
-echo "hello"
+print("disconnect")
+socket.close(fd)
 
 index = index + 1
 
-echo "world"
+print("connect again")
+local fd = assert(socket.connect("127.0.0.1", 8888))
+input = {}
 
+local handshake = string.format("%s@%s#%s:%d", crypt.base64encode(token.user), crypt.base64encode(token.server),crypt.base64encode(subid) , index)
+local hmac = crypt.hmac64(crypt.hashkey(handshake), secret)
+
+socket.send(fd, handshake .. ":" .. crypt.base64encode(hmac))
+
+print(readpackage())
+print("===>",send_request("fake",0))	-- request again (use last session 0, so the request message is fake)
+print("===>",send_request("again",1))	-- request again (use new session)
+print("<===",recv_response(readpackage()))
+print("<===",recv_response(readpackage()))
+
+
+print("disconnect")
+socket.close(fd)
 
