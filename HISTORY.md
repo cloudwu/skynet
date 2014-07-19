@@ -2,6 +2,7 @@ Dev version
 -----------
 * skynet.exit will quit service immediately.
 * Add snax.gateserver, snax.loginserver, snax.msgserver
+* Simplify clientsocket lib
 
 v0.4.2 (2014-7-14)
 -----------

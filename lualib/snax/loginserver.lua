@@ -32,8 +32,18 @@ Success:
 	200 base64(subid)
 ]]
 
+local socket_error = {}
+local function assert_socket(v, fd)
+	if v then
+		return v
+	else
+		skynet.error(string.format("auth failed: socket (fd = %d) closed", fd))
+		error(socket_error)
+	end
+end
+
 local function write(fd, text)
-	assert(socket.write(fd, text), "socket error")
+	assert_socket(socket.write(fd, text), fd)
 end
 
 local function launch_slave(auth_handler)
@@ -48,7 +58,7 @@ local function launch_slave(auth_handler)
 		local challenge = crypt.randomkey()
 		write(fd, crypt.base64encode(challenge).."\n")
 
-		local handshake = assert(socket.readline(fd), "socket closed")
+		local handshake = assert_socket(socket.readline(fd), fd)
 		local clientkey = crypt.base64decode(handshake)
 		if #clientkey ~= 8 then
 			error "Invalid client key"
@@ -58,7 +68,7 @@ local function launch_slave(auth_handler)
 
 		local secret = crypt.dhsecret(clientkey, serverkey)
 
-		local response = assert(socket.readline(fd), "socket closed")
+		local response = assert_socket(socket.readline(fd), fd)
 		local hmac = crypt.hmac64(challenge, secret)
 
 		if hmac ~= crypt.base64decode(response) then
@@ -66,7 +76,7 @@ local function launch_slave(auth_handler)
 			error "challenge failed"
 		end
 
-		local etoken = assert(socket.readline(fd), "socket closed")
+		local etoken = assert_socket(socket.readline(fd),fd)
 
 		local token = crypt.desdecode(secret, crypt.base64decode(etoken))
 
@@ -76,8 +86,16 @@ local function launch_slave(auth_handler)
 		return ok, server, uid, secret
 	end
 
+	local function ret_pack(ok, err, ...)
+		if ok then
+			skynet.ret(skynet.pack(err, ...))
+		elseif err ~= socket_error then
+			error(err)
+		end
+	end
+
 	skynet.dispatch("lua", function(_,_,...)
-		skynet.ret(skynet.pack(auth(...)))
+		ret_pack(pcall(auth, ...))
 	end)
 end
 
@@ -146,7 +164,9 @@ local function launch_master(conf)
 		end
 		local ok, err = pcall(accept, conf, s, fd, addr)
 		if not ok then
-			skynet.error(string.format("invalid client (fd = %d) error = %s", fd, err))
+			if err ~= socket_error then
+				skynet.error(string.format("invalid client (fd = %d) error = %s", fd, err))
+			end
 		end
 		socket.close(fd)
 	end)
