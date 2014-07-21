@@ -3,6 +3,7 @@ Dev version
 * skynet.exit will quit service immediately.
 * Add snax.gateserver, snax.loginserver, snax.msgserver
 * Simplify clientsocket lib
+* mongo driver support replica set
 
 v0.4.2 (2014-7-14)
 -----------
