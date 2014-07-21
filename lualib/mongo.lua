@@ -75,23 +75,51 @@ local function dispatch_reply(so)
 	return reply_id, succ, result
 end
 
+local function __parse_addr(addr)
+    local host, port = string.match(addr, "([^:]+):(.+)")
+    return host, tonumber(port)
+end
+
 local function mongo_auth(mongoc)
 	local user = rawget(mongoc, "username")
 	local pass = rawget(mongoc, "password")
 
-	if user == nil or pass == nil then
-		return
-	end
 	return function()
-		assert(mongoc:auth(user, pass))
-		-- todo : If mongoc want to connect to replica set, runCommand ismater here, and call mongoc.__sock:changehost
+        if user ~= nil and pass ~= nil then
+            assert(mongoc:auth(user, pass))
+        end
+        local rs_data = mongoc:runCommand("ismaster")
+        if rs_data.ok == 1 then
+            if rs_data.hosts then
+                local backup = {}
+                for _, v in ipairs(rs_data.hosts) do
+                    local host, port = __parse_addr(v)
+                    table.insert(backup, {host = host, port = port})
+                end
+                mongoc.__sock:changebackup(backup)
+            end
+            if rs_data.ismaster then
+                return
+            else
+                local host, port = __parse_addr(rs_data.primary)
+                mongoc.host = host
+                mongoc.port = port
+                mongoc.__sock:changehost(host, port)
+            end
+        end
 	end
 end
 
 function mongo.client( conf )
+    local first = conf
+    local backup = nil
+    if conf.rs then
+        first = conf.rs[1]
+        backup = conf.rs
+    end
 	local obj = {
-		host = conf.host,
-		port = conf.port or 27017,
+		host = first.host,
+		port = first.port or 27017,
 	}
 
 	obj.__id = 0
@@ -100,6 +128,7 @@ function mongo.client( conf )
 		port = obj.port,
 		response = dispatch_reply,
 		auth = mongo_auth(obj),
+        backup = backup,
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect(true)	-- try connect only once
