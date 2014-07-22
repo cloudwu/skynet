@@ -2,6 +2,7 @@ local skynet = require "skynet"
 local socket = require "socket"
 local httpd = require "http.httpd"
 local sockethelper = require "http.sockethelper"
+local urllib = require "http.url"
 
 local mode = ...
 
@@ -15,7 +16,20 @@ skynet.start(function()
 			if code ~= 200 then
 				httpd.write_response(sockethelper.writefunc(id), code)
 			else
-				httpd.write_response(sockethelper.writefunc(id), code , "Hello world")
+				local tmp = {}
+				if header.host then
+					table.insert(tmp, string.format("host: %s", header.host))
+				end
+				local path, query = urllib.parse(url)
+				table.insert(tmp, string.format("path: %s", path))
+				if query then
+					local q = urllib.parse_query(query)
+					for k, v in pairs(q) do
+						table.insert(tmp, string.format("query: %s= %s", k,v))
+					end
+				end
+
+				httpd.write_response(sockethelper.writefunc(id), code , table.concat(tmp,"\n"))
 			end
 		else
 			if url == sockethelper.socket_error then
