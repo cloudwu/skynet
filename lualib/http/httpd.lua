@@ -52,8 +52,6 @@ local function recvheader(readline, header)
 		return header
 	end
 
-	header = header or {}
-
 	local name, value
 	repeat
 		if line:byte(1) == 9 then	-- tab, append last line
@@ -117,18 +115,15 @@ local function readall(readline, readbytes)
 	if httpver < 1.0 or httpver > 1.1 then
 		return 505	-- HTTP Version not supported
 	end
-	local header = recvheader(readline)
-	local length, mode
-	if header then
-		length = header["content-length"]
-		if length then
-			length = tonumber(length)
-		end
-		mode = header["transfer-encoding"]
-		if mode then
-			if mode ~= "identity" or mode ~= "chunked" then
-				return 501	-- Not Implemented
-			end
+	local header = recvheader(readline, {})
+	local length = header["content-length"]
+	if length then
+		length = tonumber(length)
+	end
+	local mode = header["transfer-encoding"]
+	if mode then
+		if mode ~= "identity" or mode ~= "chunked" then
+			return 501	-- Not Implemented
 		end
 	end
 
@@ -157,7 +152,7 @@ function httpd.read_request(readfunc)
 end
 
 function httpd.write_response(writefunc, statuscode, bodyfunc, header)
-	local statusline = string.format("HTTP/1.1 %03d %s\r\n", statuscode, http_status_msg[statuscode])
+	local statusline = string.format("HTTP/1.1 %03d %s\r\n", statuscode, http_status_msg[statuscode] or "")
 	writefunc(statusline)
 	if header then
 		for k,v in pairs(header) do
