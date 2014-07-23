@@ -45,33 +45,37 @@ local http_status_msg = {
 	[505] = "HTTP Version not supported",
 }
 
-local function recvheader(readbytes, limit, lines, last)
-	local idx = 1
-	local len = 0
-	local header = last
-	while true do
-		header = header .. readbytes()
-		if #header + len > limit then
-			return
-		end
+local function recvheader(readbytes, limit, lines, header)
+	local result
+	local e = header:find("\r\n\r\n", 1, true)
+	if e then
+		result = header:sub(e+4)
+	else
 		while true do
-			local f,e = header:find("\r\n",1, true)
-			if f then
-				if f == 1 then
-					for i = idx, #lines do
-						lines[i] = nil
-					end
-					return header:sub(3)
-				end
-				lines[idx] = header:sub(1, f-1)
-				idx = idx + 1
-				len = len + f-1
-				header = header:sub(e+1)
-			else
+			local bytes = readbytes()
+			header = header .. bytes
+			if #header > limit then
+				return
+			end
+			e = header:find("\r\n\r\n", -#bytes-3, true)
+			if e then
+				result = header:sub(e+4)
 				break
 			end
 		end
 	end
+	local idx = 1
+	for v in header:gmatch("(.-)\r\n") do
+		if v == "" then
+			break
+		end
+		lines[idx] = v
+		idx = idx + 1
+	end
+	for i = idx, #lines do
+		lines[i] = nil
+	end
+	return result
 end
 
 local function parseheader(lines, from, header)
