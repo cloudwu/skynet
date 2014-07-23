@@ -7,9 +7,9 @@ local function echo(id)
 	socket.start(id)
 
 	while true do
-		local str = socket.readline(id,"\n")
+		local str = socket.read(id)
 		if str then
-			socket.write(id, str .. "\n")
+			socket.write(id, str)
 		else
 			socket.close(id)
 			return
@@ -21,9 +21,6 @@ if mode == "agent" then
 	id = tonumber(id)
 
 	skynet.start(function()
-		-- A small limit, if socket buffer overflow, close the client
-		socket.limit(64)
-
 		skynet.fork(function()
 			echo(id)
 			skynet.exit()

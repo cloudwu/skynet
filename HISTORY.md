@@ -5,6 +5,7 @@ Dev version
 * Simplify clientsocket lib
 * mongo driver support replica set
 * config file support read from ENV
+* add simple httpd (see examples/simpleweb.lua)
 
 v0.4.2 (2014-7-14)
 -----------

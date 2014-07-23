@@ -47,14 +47,15 @@ local function write(fd, text)
 end
 
 local function launch_slave(auth_handler)
-	-- set socket buffer limit (8K)
-	-- If the attacker send large package, close the socket
-	socket.limit(8192)
-
 	local function auth(fd, addr)
 		fd = assert(tonumber(fd))
 		skynet.error(string.format("connect from %s (fd = %d)", addr, fd))
 		socket.start(fd)
+
+		-- set socket buffer limit (8K)
+		-- If the attacker send large package, close the socket
+		socket.limit(fd, 8192)
+
 		local challenge = crypt.randomkey()
 		write(fd, crypt.base64encode(challenge).."\n")
 
