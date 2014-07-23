@@ -227,8 +227,8 @@ local function readall(readbytes, bodylimit)
 	return 200, url, method, header, body
 end
 
-function httpd.read_request(readbytes, bodylimit)
-	local ok, code, url, method, header, body = pcall(readall, readbytes, bodylimit)
+function httpd.read_request(...)
+	local ok, code, url, method, header, body = pcall(readall, ...)
 	if ok then
 		return code, url, method, header, body
 	else
@@ -236,7 +236,7 @@ function httpd.read_request(readbytes, bodylimit)
 	end
 end
 
-function httpd.write_response(writefunc, statuscode, bodyfunc, header)
+local function writeall(writefunc, statuscode, bodyfunc, header)
 	local statusline = string.format("HTTP/1.1 %03d %s\r\n", statuscode, http_status_msg[statuscode] or "")
 	writefunc(statusline)
 	if header then
@@ -265,6 +265,10 @@ function httpd.write_response(writefunc, statuscode, bodyfunc, header)
 		assert(t == "nil")
 		writefunc("\r\n")
 	end
+end
+
+function httpd.write_response(...)
+	return pcall(writeall, ...)
 end
 
 return httpd

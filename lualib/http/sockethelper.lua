@@ -4,7 +4,7 @@ local readbytes = socket.read
 local writebytes = socket.write
 
 local sockethelper = {}
-local socket_error = {}
+local socket_error = setmetatable({} , { __tostring = function() return "[Socket Error]" end })
 
 sockethelper.socket_error = socket_error
 

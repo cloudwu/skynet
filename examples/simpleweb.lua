@@ -8,6 +8,14 @@ local mode = ...
 
 if mode == "agent" then
 
+local function response(id, ...)
+	local ok, err = httpd.write_response(sockethelper.writefunc(id), ...)
+	if not ok then
+		-- if err == sockethelper.socket_error , that means socket closed.
+		skynet.error(string.format("fd = %d, %s", id, err))
+	end
+end
+
 skynet.start(function()
 	skynet.dispatch("lua", function (_,_,id)
 		socket.start(id)
@@ -15,7 +23,7 @@ skynet.start(function()
 		local code, url, method, header, body = httpd.read_request(sockethelper.readfunc(id), 8192)
 		if code then
 			if code ~= 200 then
-				httpd.write_response(sockethelper.writefunc(id), code)
+				response(id, code)
 			else
 				local tmp = {}
 				if header.host then
@@ -29,8 +37,7 @@ skynet.start(function()
 						table.insert(tmp, string.format("query: %s= %s", k,v))
 					end
 				end
-
-				httpd.write_response(sockethelper.writefunc(id), code , table.concat(tmp,"\n"))
+				response(id, code, table.concat(tmp,"\n"))
 			end
 		else
 			if url == sockethelper.socket_error then
