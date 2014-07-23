@@ -23,7 +23,6 @@ struct buffer_node {
 };
 
 struct socket_buffer {
-	int limit;
 	int size;
 	int offset;
 	struct buffer_node *head;
@@ -66,7 +65,6 @@ lnewpool(lua_State *L, int sz) {
 static int
 lnewbuffer(lua_State *L) {
 	struct socket_buffer * sb = lua_newuserdata(L, sizeof(*sb));	
-	sb->limit = luaL_optint(L,1,BUFFER_LIMIT);
 	sb->size = 0;
 	sb->offset = 0;
 	sb->head = NULL;
@@ -129,9 +127,6 @@ lpushbuffer(lua_State *L) {
 	sb->size += sz;
 
 	lua_pushinteger(L, sb->size);
-	if (sb->limit > 0 && sb->size > sb->limit) {
-		return luaL_error(L, "buffer overflow (limit = %d, size = %d)", sb->limit, sb->size);
-	}
 
 	return 1;
 }

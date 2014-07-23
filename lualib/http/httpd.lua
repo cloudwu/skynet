@@ -1,7 +1,6 @@
 local table = table
 
 local httpd = {}
-local READLIMIT = 8192	-- limit bytes per read
 
 local http_status_msg = {
 	[100] = "Continue",
@@ -46,76 +45,150 @@ local http_status_msg = {
 	[505] = "HTTP Version not supported",
 }
 
-local function recvheader(readline, header)
-	local line = readline()
-	if line == "" then
-		return header
+local function recvheader(readbytes, limit, lines, last)
+	local idx = 1
+	local len = 0
+	local header = last
+	while true do
+		header = header .. readbytes()
+		if #header + len > limit then
+			return
+		end
+		while true do
+			local f,e = header:find("\r\n",1, true)
+			if f then
+				if f == 1 then
+					for i = idx, #lines do
+						lines[i] = nil
+					end
+					return header:sub(3)
+				end
+				lines[idx] = header:sub(1, f-1)
+				idx = idx + 1
+				len = len + f-1
+				header = header:sub(e+1)
+			else
+				break
+			end
+		end
 	end
+end
 
+local function parseheader(lines, from, header)
 	local name, value
-	repeat
+	for i=from,#lines do
+		local line = lines[i]
 		if line:byte(1) == 9 then	-- tab, append last line
+			if name == nil then
+				return
+			end
 			header[name] = header[name] .. line:sub(2)
 		else
 			name, value = line:match "^(.-):%s*(.*)"
-			assert(name and value)
+			if name == nil or value == nil then
+				return
+			end
 			name = name:lower()
 			if header[name] then
 				header[name] = header[name] .. ", " .. value
 			else
 				header[name] = value
 			end
-			line = readline()
 		end
-	until line == ""
-
+	end
 	return header
 end
 
-local function recvbody(readbytes, length)
-	if length < READLIMIT then
-		return readbytes(length)
-	end
-	local tmp = {}
+local function chunksize(readbytes, body)
 	while true do
-		if length <= READLIMIT then
-			table.insert(tmp, readbytes(length))
+		if #body > 128 then
+			return
+		end
+		body = body .. readbytes()
+		local f,e = body:find("\r\n",1,true)
+		if f then
+			return tonumber(body:sub(1,f-1),16), body:sub(e+1)
+		end
+	end
+end
+
+local function readcrln(readbytes, body)
+	if #body > 2 then
+		if body:sub(1,2) ~= "\r\n" then
+			return
+		end
+		return body:sub(3)
+	else
+		body = body .. readbytes(2-#body)
+		if body ~= "\r\n" then
+			return
+		end
+		return ""
+	end
+end
+
+local tmpline = {}
+
+local function recvchunkedbody(readbytes, bodylimit, header, body)
+	local result = ""
+	local size = 0
+
+	while true do
+		local sz
+		sz , body = chunksize(readbytes, body)
+		if not sz then
+			return
+		end
+		if sz == 0 then
 			break
 		end
-		table.insert(tmp, readbytes(READLIMIT))
-		length = length - READLIMIT
+		size = size + sz
+		if bodylimit and size > bodylimit then
+			return
+		end
+		if #body >= sz then
+			result = result .. body:sub(1,sz)
+			body = body:sub(sz+1)
+		else
+			result = result .. body .. readbytes(sz - #body)
+			body = ""
+		end
+		body = readcrln(readbytes, body)
+		if not body then
+			return
+		end
 	end
-	return table.concat(tmp)
+
+	body = readcrln(readbytes, body)
+	if not body then
+		return
+	end
+	body = recvheader(readbytes, 8192, tmpline, body)
+	if not body then
+		return
+	end
+
+	header = parseheader(tmpline,1,header)
+
+	return result, header
 end
 
-local function recvchunkedbody(readline, readbytes, header)
-	local size = assert(tonumber(readline(),16))
-	local body = recvbody(readbytes,size)
-	assert(readbytes(2) == "\r\n")
-	size = assert(tonumber(readline(),16))
-	if size > 0 then
-		local bodys = { body }
-		repeat
-			table.insert(bodys, recvbody(readbytes,size))
-			assert(readbytes(2) == "\r\n")
-			size = assert(tonumber(readline(),16))
-		until size <= 0
-		body = table.concat(bodys)
+local function readall(readbytes, bodylimit)
+	local body = recvheader(readbytes, 8192, tmpline, "")
+	if not body then
+		return 413	-- Request Entity Too Large
 	end
-	assert(readbytes(2) == "\r\n")
-	header = recvheader(readline, header)
-	return body, header
-end
-
-local function readall(readline, readbytes)
-	local request = readline()
+	local request = assert(tmpline[1])
 	local method, url, httpver = request:match "^(%a+)%s+(.-)%s+HTTP/([%d%.]+)$"
 	assert(method and url and httpver)
 	httpver = assert(tonumber(httpver))
 	if httpver < 1.0 or httpver > 1.1 then
 		return 505	-- HTTP Version not supported
 	end
-	local header = recvheader(readline, {})
+	local header = parseheader(tmpline,2,{})
+	if not header then
+		return 400	-- Bad request
+	end
 	local length = header["content-length"]
 	if length then
 		length = tonumber(length)
@@ -127,23 +200,31 @@ local function readall(readline, readbytes)
 		end
 	end
 
-	local body
 	if mode == "chunked" then
-		body, header = recvchunkedbody(readline, readbytes, header)
+		body, header = recvchunkedbody(readbytes, bodylimit, header, body)
+		if not body then
+			return 413
+		end
 	else
 		-- identity mode
 		if length then
-			body = readbody(readbytes, length)
+			if length > bodylimit then
+				return 413
+			end
+			if #body >= length then
+				body = body:sub(1,length)
+			else
+				local padding = readbytes(length - #body)
+				body = body .. padding
+			end
 		end
 	end
 
 	return 200, url, method, header, body
 end
 
-function httpd.read_request(readfunc)
-	local readline = assert(readfunc.readline)
-	local readbytes = assert(readfunc.readbytes)
-	local ok, code, url, method, header, body = pcall(readall, readline, readbytes)
+function httpd.read_request(readbytes, bodylimit)
+	local ok, code, url, method, header, body = pcall(readall, readbytes, bodylimit)
 	if ok then
 		return code, url, method, header, body
 	else
