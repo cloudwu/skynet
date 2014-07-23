@@ -11,6 +11,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include <signal.h>
+#include <assert.h>
 
 static int
 optint(const char *key, int opt) {
@@ -51,7 +52,6 @@ optstring(const char *key,const char * opt) {
 
 static void
 _init_env(lua_State *L) {
-	lua_pushglobaltable(L);
 	lua_pushnil(L);  /* first key */
 	while (lua_next(L, -2) != 0) {
 		int keyt = lua_type(L, -2);
@@ -83,6 +83,19 @@ int sigign() {
 	return 0;
 }
 
+static const char * load_config = "\
+	local config_name = ...\
+	local f = assert(io.open(config_name))\
+	local code = assert(f:read \'*a\')\
+	local function getenv(name) return assert(os.getenv(name), name) end\
+	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
+	print(code)\
+	f:close()\
+	local result = {}\
+	assert(load(code,\'=(load)\',\'t\',result))()\
+	return result\
+";
+
 int
 main(int argc, char *argv[]) {
 	const char * config_file = "config";
@@ -98,11 +111,12 @@ main(int argc, char *argv[]) {
 
 	struct lua_State *L = lua_newstate(skynet_lalloc, NULL);
 	luaL_openlibs(L);	// link lua lib
-	lua_close(L);
 
-	L = luaL_newstate();
-
-	int err = luaL_dofile(L, config_file);
+	int err = luaL_loadstring(L, load_config);
+	assert(err == LUA_OK);
+	lua_pushstring(L, config_file);
+	
+	err = lua_pcall(L, 1, 1, 0);
 	if (err) {
 		fprintf(stderr,"%s\n",lua_tostring(L,-1));
 		lua_close(L);

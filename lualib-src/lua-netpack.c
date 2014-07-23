@@ -393,13 +393,13 @@ lpop(lua_State *L) {
  */
 
 static const char *
-tolstring(lua_State *L, size_t *sz) {
+tolstring(lua_State *L, size_t *sz, int index) {
 	const char * ptr;
-	if (lua_isuserdata(L,1)) {
-		ptr = (const char *)lua_touserdata(L,1);
-		*sz = (size_t)luaL_checkinteger(L, 2);
+	if (lua_isuserdata(L,index)) {
+		ptr = (const char *)lua_touserdata(L,index);
+		*sz = (size_t)luaL_checkinteger(L, index+1);
 	} else {
-		ptr = luaL_checklstring(L, 1, sz);
+		ptr = luaL_checklstring(L, index, sz);
 	}
 	return ptr;
 }
@@ -413,7 +413,7 @@ write_size(uint8_t * buffer, int len) {
 static int
 lpack(lua_State *L) {
 	size_t len;
-	const char * ptr = tolstring(L, &len);
+	const char * ptr = tolstring(L, &len, 1);
 	if (len > 0x10000) {
 		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
 	}
@@ -433,7 +433,7 @@ lpack_string(lua_State *L) {
 	uint8_t tmp[SMALLSTRING+2];
 	size_t len;
 	uint8_t *buffer;
-	const char * ptr = tolstring(L, &len);
+	const char * ptr = tolstring(L, &len, 1);
 	if (len > 0x10000) {
 		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
 	}
@@ -452,14 +452,53 @@ lpack_string(lua_State *L) {
 }
 
 static int
+lpack_padding(lua_State *L) {
+	uint8_t tmp[SMALLSTRING+2];
+	size_t content_sz;
+	uint8_t *buffer;
+	const char * ptr = tolstring(L, &content_sz, 2);
+	size_t cookie_sz = 0;
+	const char * cookie = luaL_checklstring(L,1,&cookie_sz);
+	size_t len = cookie_sz + content_sz;
+
+	if (len > 0x10000) {
+		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
+	}
+
+	if (len <= SMALLSTRING) {
+		buffer = tmp;
+	} else {
+		buffer = lua_newuserdata(L, len + 2);
+	}
+
+	write_size(buffer, len);
+	memcpy(buffer+2, ptr, content_sz);
+	memcpy(buffer+2+content_sz, cookie, cookie_sz);
+	lua_pushlstring(L, (const char *)buffer, len+2);
+
+	return 1;
+}
+
+static int
 ltostring(lua_State *L) {
 	void * ptr = lua_touserdata(L, 1);
 	int size = luaL_checkinteger(L, 2);
 	if (ptr == NULL) {
 		lua_pushliteral(L, "");
 	} else {
-		lua_pushlstring(L, (const char *)ptr, size);
-		skynet_free(ptr);
+		if (lua_isnumber(L, 3)) {
+			int offset = lua_tointeger(L, 3);
+			if (offset < 0) {
+				return luaL_error(L, "Invalid offset %d", offset);
+			}
+			if (offset > size) {
+				offset = size;
+			}
+			lua_pushlstring(L, (const char *)ptr + offset, size-offset);
+		} else {
+			lua_pushlstring(L, (const char *)ptr, size);
+			skynet_free(ptr);
+		}
 	}
 	return 1;
 }
@@ -471,6 +510,7 @@ luaopen_netpack(lua_State *L) {
 		{ "pop", lpop },
 		{ "pack", lpack },
 		{ "pack_string", lpack_string },
+		{ "pack_padding", lpack_padding },
 		{ "clear", lclear },
 		{ "tostring", ltostring },
 		{ NULL, NULL },

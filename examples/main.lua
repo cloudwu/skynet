@@ -11,6 +11,7 @@ skynet.start(function()
 	skynet.call(watchdog, "lua", "start", {
 		port = 8888,
 		maxclient = max_client,
+		nodelay = true,
 	})
 	print("Watchdog listen on ", 8888)
 

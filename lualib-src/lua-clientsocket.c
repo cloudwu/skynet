@@ -75,45 +75,10 @@ lsend(lua_State *L) {
 	size_t sz = 0;
 	int fd = luaL_checkinteger(L,1);
 	const char * msg = luaL_checklstring(L, 2, &sz);
-	uint8_t tmp[sz + 2];
-	if (sz >= 0x10000) {
-		return luaL_error(L, "package too long %d (16bit limited)", (int)sz);
-	}
-	tmp[0] = (sz >> 8) & 0xff;
-	tmp[1] = sz & 0xff;
-	memcpy(tmp+2, msg, sz);
 
-	block_send(L, fd, (const char *)tmp, (int)sz+2);
+	block_send(L, fd, msg, (int)sz);
 
 	return 0;
-}
-
-
-static int
-unpack(lua_State *L, uint8_t *buffer, int sz, int n) {
-	int size = 0;
-	if (sz >= 2) {
-		size = buffer[0] << 8 | buffer[1];
-		if (size > sz - 2) {
-			goto _block;
-		}
-	} else {
-		goto _block;
-	}
-	++n;
-	lua_pushlstring(L, (const char *)buffer+2, size);
-	lua_rawseti(L, 3, n);
-	buffer += size + 2;
-	sz -= size + 2;
-	return unpack(L, buffer, sz, n);
-_block:
-	lua_pushboolean(L, n==0 ? 0:1);
-	if (sz == 0) {
-		lua_pushnil(L);
-	} else {
-		lua_pushlstring(L, (const char *)buffer, sz);
-	}
-	return 2;
 }
 
 /*
@@ -132,99 +97,25 @@ struct socket_buffer {
 };
 
 static int
-recv_socket(lua_State *L, char *tmp, struct socket_buffer *result) {
+lrecv(lua_State *L) {
 	int fd = luaL_checkinteger(L,1);
-	size_t sz = 0;
-	const char * last = lua_tolstring(L,2,&sz);
-	luaL_checktype(L, 3, LUA_TTABLE);
 
-	char * buffer;
-	int r = recv(fd, tmp, CACHE_SIZE, 0);
+	char buffer[CACHE_SIZE];
+	int r = recv(fd, buffer, CACHE_SIZE, 0);
 	if (r == 0) {
+		lua_pushliteral(L, "");
 		// close
-		return 0;
+		return 1;
 	}
 	if (r < 0) {
 		if (errno == EAGAIN || errno == EINTR) {
-			lua_pushboolean(L, 0);
-			lua_pushvalue(L, 2);
-			return 2;
+			return 0;
 		}
 		luaL_error(L, "socket error: %s", strerror(errno));
 	}
-	if (sz + r <= CACHE_SIZE) {
-		buffer = tmp;
-		memmove(buffer + sz, buffer, r);
-		memcpy(buffer, last, sz);
-	} else {
-		buffer = lua_newuserdata(L, r + sz);
-		memcpy(buffer, last, sz);
-		memcpy(buffer + sz, tmp, r);
-	}
-
-	int i;
-	int n = lua_rawlen(L, 3);
-	for (i=1;i<=n;i++) {
-		lua_pushnil(L);
-		lua_rawseti(L, 3, i);
-	}
-	result->buffer = buffer;
-	result->sz = r + sz;
-	return -1;
+	lua_pushlstring(L, buffer, r);
+	return 1;
 }
-
-static int
-lrecv(lua_State *L) {
-	struct socket_buffer sb;
-	char tmp[CACHE_SIZE];
-	int ret = recv_socket(L, tmp, &sb);
-	if (ret < 0) {
-		return unpack(L, sb.buffer, sb.sz, 0);
-	} else {
-		return ret;
-	}
-}
-
-static int
-unpack_line(lua_State *L, uint8_t *buffer, int sz, int n) {
-	if (sz == 0) 
-		goto _block;
-	if (buffer[0] == '\n') {
-		return unpack_line(L, buffer+1, sz-1, n);
-	}
-	int i;
-	for (i=1;i<sz;i++) {
-		if (buffer[i] == '\n') {
-			++n;
-			lua_pushlstring(L, (const char *)buffer, i);
-			lua_rawseti(L, 3, n);
-			buffer += i + 1;
-			sz -= i + 1;
-			return unpack_line(L, buffer, sz, n);
-		}
-	}
-_block:
-	lua_pushboolean(L, n==0 ? 0:1);
-	if (sz == 0) {
-		lua_pushnil(L);
-	} else {
-		lua_pushlstring(L, (const char *)buffer, sz);
-	}
-	return 2;
-}
-
-static int
-lreadline(lua_State *L) {
-	struct socket_buffer sb;
-	char tmp[CACHE_SIZE];
-	int ret = recv_socket(L, tmp, &sb);
-	if (ret < 0) {
-		return unpack_line(L, sb.buffer, sb.sz, 0);
-	} else {
-		return ret;
-	}
-}
-
 
 static int
 lusleep(lua_State *L) {
@@ -295,18 +186,6 @@ lreadstdin(lua_State *L) {
 	return 1;
 }
 
-static int
-lwriteline(lua_State *L) {
-	size_t sz = 0;
-	int fd = luaL_checkinteger(L,1);
-	const char * msg = luaL_checklstring(L, 2, &sz);
-	block_send(L, fd, msg, sz);
-	char nl[1] = { '\n' };
-	block_send(L, fd, nl, 1);
-	
-	return 0;
-}
-
 int
 luaopen_clientsocket(lua_State *L) {
 	luaL_checkversion(L);
@@ -316,8 +195,6 @@ luaopen_clientsocket(lua_State *L) {
 		{ "send", lsend },
 		{ "close", lclose },
 		{ "usleep", lusleep },
-		{ "readline", lreadline },
-		{ "writeline", lwriteline },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L, l);

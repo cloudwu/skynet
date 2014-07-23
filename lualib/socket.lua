@@ -2,7 +2,6 @@ local driver = require "socketdriver"
 local skynet = require "skynet"
 local assert = assert
 
-local buffer_limit = -1
 local socket = {}	-- api
 local buffer_pool = {}	-- store all message buffer object
 local socket_pool = setmetatable( -- store all socket object
@@ -48,13 +47,7 @@ socket_message[1] = function(id, size, data)
 		return
 	end
 
-	local ok , sz = pcall(driver.push, s.buffer, buffer_pool, data, size)
-	if not ok then
-		skynet.error("socket: error on ", id , sz)
-		driver.clear(s.buffer,buffer_pool)
-		driver.close(id)
-		return
-	end
+	local sz = driver.push(s.buffer, buffer_pool, data, size)
 	local rr = s.read_required
 	local rrt = type(rr)
 	if rrt == "number" then
@@ -63,11 +56,19 @@ socket_message[1] = function(id, size, data)
 			s.read_required = nil
 			wakeup(s)
 		end
-	elseif rrt == "string" then
-		-- read line
-		if driver.readline(s.buffer,nil,rr) then
-			s.read_required = nil
-			wakeup(s)
+	else
+		if s.buffer_limit and sz > s.buffer_limit then
+			skynet.error(string.format("socket buffer overlow: fd=%d size=%d", id , sz))
+			driver.clear(s.buffer,buffer_pool)
+			driver.close(id)
+			return
+		end
+		if rrt == "string" then
+			-- read line
+			if driver.readline(s.buffer,nil,rr) then
+				s.read_required = nil
+				wakeup(s)
+			end
 		end
 	end
 end
@@ -130,7 +131,7 @@ skynet.register_protocol {
 local function connect(id, func)
 	local newbuffer
 	if func == nil then
-		newbuffer = driver.buffer(buffer_limit)
+		newbuffer = driver.buffer()
 	end
 	local s = {
 		id = id,
@@ -206,6 +207,27 @@ end
 function socket.read(id, sz)
 	local s = socket_pool[id]
 	assert(s)
+	if sz == nil then
+		-- read some bytes
+		local ret = driver.readall(s.buffer, buffer_pool)
+		if ret ~= "" then
+			return ret
+		end
+
+		if not s.connected then
+			return false, ret
+		end
+		assert(not s.read_required)
+		s.read_required = 0
+		suspend(s)
+		ret = driver.readall(s.buffer, buffer_pool)
+		if ret ~= "" then
+			return ret
+		else
+			return false, ret
+		end
+	end
+
 	local ret = driver.pop(s.buffer, buffer_pool, sz)
 	if ret then
 		return ret
@@ -325,8 +347,9 @@ function socket.abandon(id)
 	socket_pool[id] = nil
 end
 
-function socket.limit(limit)
-	buffer_limit = limit
+function socket.limit(id, limit)
+	local s = assert(socket_pool[id])
+	s.buffer_limit = limit
 end
 
 return socket

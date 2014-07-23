@@ -127,7 +127,7 @@ function suspend(co, result, command, param, size)
 	if not result then
 		local session = session_coroutine_id[co]
 		local addr = session_coroutine_address[co]
-		if session and session ~= 0  then
+		if session then
 			c.send(addr, skynet.PTYPE_ERROR, session, "")
 		end
 		session_coroutine_id[co] = nil
@@ -151,6 +151,9 @@ function suspend(co, result, command, param, size)
 		-- coroutine exit
 		session_coroutine_id[co] = nil
 		session_coroutine_address[co] = nil
+	elseif command == "QUIT" then
+		-- service exit
+		return
 	else
 		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
 	end
@@ -264,6 +267,8 @@ function skynet.exit()
 		end
 	end
 	c.command("EXIT")
+	-- quit service
+	coroutine_yield "QUIT"
 end
 
 function skynet.kill(name)
