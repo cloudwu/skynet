@@ -11,7 +11,8 @@ if mode == "agent" then
 skynet.start(function()
 	skynet.dispatch("lua", function (_,_,id)
 		socket.start(id)
-		local code, url, method, header, body = httpd.read_request(sockethelper.readfunc(id))
+		-- limit request body size to 8192 (you can pass nil to unlimit)
+		local code, url, method, header, body = httpd.read_request(sockethelper.readfunc(id), 8192)
 		if code then
 			if code ~= 200 then
 				httpd.write_response(sockethelper.writefunc(id), code)
