@@ -647,11 +647,6 @@ skynet_context_handle(struct skynet_context *ctx) {
 }
 
 void 
-skynet_context_init(struct skynet_context *ctx, uint32_t handle) {
-	ctx->handle = handle;
-}
-
-void 
 skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb) {
 	context->cb = cb;
 	context->cb_ud = ud;

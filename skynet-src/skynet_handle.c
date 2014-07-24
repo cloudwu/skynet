@@ -49,7 +49,6 @@ skynet_handle_register(struct skynet_context *ctx) {
 				rwlock_wunlock(&s->lock);
 
 				handle |= s->harbor;
-				skynet_context_init(ctx, handle);
 				return handle;
 			}
 		}
