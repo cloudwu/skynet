@@ -3,6 +3,8 @@ local socket = require "socket"
 local httpd = require "http.httpd"
 local sockethelper = require "http.sockethelper"
 local urllib = require "http.url"
+local table = table
+local string = string
 
 local mode = ...
 

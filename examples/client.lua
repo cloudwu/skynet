@@ -8,10 +8,9 @@ local fd = assert(socket.connect("127.0.0.1", 8888))
 
 local function send_package(fd, pack)
 	local size = #pack
-	local package = string.format("%c%c%s",
-		bit32.extract(size,8,8),
-		bit32.extract(size,0,8),
-		pack)
+	local package = string.char(bit32.extract(size,8,8)) ..
+		string.char(bit32.extract(size,0,8))..
+		pack
 
 	socket.send(fd, package)
 end

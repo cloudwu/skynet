@@ -93,15 +93,13 @@ print("login ok, subid=", subid)
 
 local function send_request(v, session)
 	local size = #v + 4
-	local package = string.format("%c%c%s%c%c%c%c",
-		bit32.extract(size,8,8),
-		bit32.extract(size,0,8),
-		v,
-		bit32.extract(session,24,8),
-		bit32.extract(session,16,8),
-		bit32.extract(session,8,8),
-		bit32.extract(session,0,8)
-		)
+	local package = string.char(bit32.extract(size,8,8))..
+		string.char(bit32.extract(size,0,8))..
+		v..
+		string.char(bit32.extract(session,24,8))..
+		string.char(bit32.extract(session,16,8))..
+		string.char(bit32.extract(session,8,8))..
+		string.char(bit32.extract(session,0,8))
 
 	socket.send(fd, package)
 	return v, session
@@ -135,10 +133,9 @@ local readpackage = unpack_f(unpack_package)
 
 local function send_package(fd, pack)
 	local size = #pack
-	local package = string.format("%c%c%s",
-		bit32.extract(size,8,8),
-		bit32.extract(size,0,8),
-		pack)
+	local package = string.char(bit32.extract(size,8,8))..
+		string.char(bit32.extract(size,0,8))..
+		pack
 
 	socket.send(fd, package)
 end
