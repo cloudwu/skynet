@@ -16,7 +16,7 @@ static inline void
 rwlock_rlock(struct rwlock *lock) {
 	for (;;) {
 		while(lock->write) {
-			__sync_synchronize();
+			pthread_yield();
 		}
 		__sync_add_and_fetch(&lock->read,1);
 		if (lock->write) {
@@ -29,7 +29,9 @@ rwlock_rlock(struct rwlock *lock) {
 
 static inline void
 rwlock_wlock(struct rwlock *lock) {
-	while (__sync_lock_test_and_set(&lock->write,1)) {}
+	while (__sync_lock_test_and_set(&lock->write,1)) {
+		pthread_yield();
+	}
 	while(lock->read) {
 		__sync_synchronize();
 	}
