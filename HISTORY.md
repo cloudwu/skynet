@@ -1,4 +1,4 @@
-Dev version
+v0.5.0 (2014-7-28)
 -----------
 * skynet.exit will quit service immediately.
 * Add snax.gateserver, snax.loginserver, snax.msgserver
