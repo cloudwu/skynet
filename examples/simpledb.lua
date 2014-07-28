@@ -16,7 +16,11 @@ end
 skynet.start(function()
 	skynet.dispatch("lua", function(session, address, cmd, ...)
 		local f = command[string.upper(cmd)]
-		skynet.ret(skynet.pack(f(...)))
+		if f then
+			skynet.ret(skynet.pack(f(...)))
+		else
+			error(string.format("Unknown command %s", tostring(cmd)))
+		end
 	end)
 	skynet.register "SIMPLEDB"
 end)

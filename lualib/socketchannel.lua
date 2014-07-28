@@ -26,6 +26,7 @@ function socket_channel.channel(desc)
 	local c = {
 		__host = assert(desc.host),
 		__port = assert(desc.port),
+		__backup = desc.backup,
 		__auth = desc.auth,
 		__response = desc.response,	-- It's for session mode
 		__request = {},	-- request seq { response func or session }	-- It's for order mode
@@ -152,34 +153,66 @@ local function dispatch_function(self)
 	end
 end
 
+local function connect_backup(self)
+	if self.__backup then
+		for _, addr in ipairs(self.__backup) do
+			local host, port
+			if type(addr) == "table" then
+				host, port = addr.host, addr.port
+			else
+				host = addr
+				port = self.__port
+			end
+			skynet.error("socket: connect to backup host", host, port)
+			local fd = socket.open(host, port)
+			if fd then
+				self.__host = host
+				self.__port = port
+				return fd
+			end
+		end
+	end
+end
+
 local function connect_once(self)
+	if self.__closed then
+		return false
+	end
 	assert(not self.__sock and not self.__authcoroutine)
 	local fd = socket.open(self.__host, self.__port)
 	if not fd then
-		return false
+		fd = connect_backup(self)
+		if not fd then
+			return false
+		end
 	end
-	self.__authcoroutine = coroutine.running()
+
 	self.__sock = setmetatable( {fd} , channel_socket_meta )
 	skynet.fork(dispatch_function(self), self)
 
 	if self.__auth then
+		self.__authcoroutine = coroutine.running()
 		local ok , message = pcall(self.__auth, self)
 		if not ok then
 			close_channel_socket(self)
 			if message ~= socket_error then
+				self.__authcoroutine = false
 				skynet.error("socket: auth failed", message)
 			end
 		end
 		self.__authcoroutine = false
+		if ok and not self.__sock then
+			-- auth may change host, so connect again
+			return connect_once(self)
+		end
 		return ok
 	end
 
-	self.__authcoroutine = false
 	return true
 end
 
 local function try_connect(self , once)
-	local t = 100
+	local t = 0
 	while not self.__closed do
 		if connect_once(self) then
 			if not once then
@@ -290,6 +323,20 @@ function channel:close()
 		self.__closed = true
 		close_channel_socket(self)
 	end
+end
+
+function channel:changehost(host, port)
+	self.__host = host
+	if port then
+		self.__port = port
+	end
+	if not self.__closed then
+		close_channel_socket(self)
+	end
+end
+
+function channel:changebackup(backup)
+	self.__backup = backup
 end
 
 channel_meta.__gc = channel.close
