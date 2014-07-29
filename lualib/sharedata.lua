@@ -18,7 +18,6 @@ local function monitor(name, obj, cobj)
 		end
 		sd.update(obj, newobj)
 	end
-	print("name exit")
 end
 
 function sharedata.query(name)

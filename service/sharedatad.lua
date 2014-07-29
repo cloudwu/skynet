@@ -23,7 +23,6 @@ local function collectobj()
 			if v == true then
 				if sharedata.host.getref(obj) <= 0  then
 					objmap[obj] = nil
-					print("collect", obj)
 					sharedata.host.delete(obj)
 				end
 			end
