@@ -10,11 +10,11 @@ skynet.start(function()
 	sharedata.new("foobar", { a=1, b= { "hello",  "world" } })
 
 	skynet.fork(function()
-		skynet.sleep(200)	-- sleep 3s
-		skynet.error("update foobar")
+		skynet.sleep(200)	-- sleep 2s
+		skynet.error("update foobar a = 2")
 		sharedata.update("foobar", { a =2 })
-		skynet.sleep(200)	-- sleep 3s
-		skynet.error("update foobar")
+		skynet.sleep(200)	-- sleep 2s
+		skynet.error("update foobar a = 3")
 		sharedata.update("foobar", { a = 3, b = { "change" } })
 		skynet.sleep(100)
 		skynet.error("delete foobar")
@@ -39,7 +39,7 @@ skynet.start(function()
 
 	for i = 1, 5 do
 		skynet.sleep(100)
-		skynet.error(i)
+		skynet.error("second " ..i)
 		for k,v in pairs(obj) do
 			skynet.error(string.format("%s = %s", k , tostring(v)))
 		end
