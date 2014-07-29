@@ -132,6 +132,8 @@ skynet_context_new(const char * name, const char *param) {
 
 	ctx->init = false;
 	ctx->endless = false;
+	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
+	ctx->handle = 0;	
 	ctx->handle = skynet_handle_register(ctx);
 	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
 	// init function maybe use ctx->handle, so it must init at last
@@ -644,11 +646,6 @@ skynet_sendname(struct skynet_context * context, const char * addr , int type, i
 uint32_t 
 skynet_context_handle(struct skynet_context *ctx) {
 	return ctx->handle;
-}
-
-void 
-skynet_context_init(struct skynet_context *ctx, uint32_t handle) {
-	ctx->handle = handle;
 }
 
 void 

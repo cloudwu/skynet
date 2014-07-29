@@ -49,7 +49,6 @@ skynet_handle_register(struct skynet_context *ctx) {
 				rwlock_wunlock(&s->lock);
 
 				handle |= s->harbor;
-				skynet_context_init(ctx, handle);
 				return handle;
 			}
 		}
@@ -67,8 +66,9 @@ skynet_handle_register(struct skynet_context *ctx) {
 	}
 }
 
-void
+int
 skynet_handle_retire(uint32_t handle) {
+	int ret = 0;
 	struct handle_storage *s = H;
 
 	rwlock_wlock(&s->lock);
@@ -79,6 +79,7 @@ skynet_handle_retire(uint32_t handle) {
 	if (ctx != NULL && skynet_context_handle(ctx) == handle) {
 		skynet_context_release(ctx);
 		s->slot[hash] = NULL;
+		ret = 1;
 		int i;
 		int j=0, n=s->name_count;
 		for (i=0; i<n; ++i) {
@@ -94,6 +95,8 @@ skynet_handle_retire(uint32_t handle) {
 	}
 
 	rwlock_wunlock(&s->lock);
+
+	return ret;
 }
 
 void 
@@ -105,10 +108,14 @@ skynet_handle_retireall() {
 		for (i=0;i<s->slot_size;i++) {
 			rwlock_rlock(&s->lock);
 			struct skynet_context * ctx = s->slot[i];
+			uint32_t handle = 0;
+			if (ctx)
+				handle = skynet_context_handle(ctx);
 			rwlock_runlock(&s->lock);
-			if (ctx != NULL) {
-				++n;
-				skynet_handle_retire(skynet_context_handle(ctx));
+			if (handle != 0) {
+				if (skynet_handle_retire(handle)) {
+					++n;
+				}
 			}
 		}
 		if (n==0)
