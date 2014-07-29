@@ -56,6 +56,11 @@ function CMD.delete(name)
 	assert(objmap[v.obj])
 	objmap[v.obj] = true
 	sharedata.host.decref(v.obj)
+	for _,v in ipairs(v.watch) do
+		local session = v[1]
+		local address = v[2]
+		skynet.redirect(address, 0, "response", session, skynet.pack(nil))
+	end
 end
 
 function CMD.query(name)
@@ -78,7 +83,9 @@ function CMD.update(name, t)
 	if v then
 		watch = v.watch
 		oldcobj = v.obj
-		CMD.delete(name)
+		objmap[oldcobj] = true
+		sharedata.host.decref(oldcobj)
+		pool[name] = nil
 	end
 	CMD.new(name, t)
 	local newobj = pool[name].obj

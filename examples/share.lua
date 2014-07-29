@@ -10,9 +10,15 @@ skynet.start(function()
 	sharedata.new("foobar", { a=1, b= { "hello",  "world" } })
 
 	skynet.fork(function()
-		skynet.sleep(300)	-- sleep 3s
+		skynet.sleep(200)	-- sleep 3s
 		skynet.error("update foobar")
 		sharedata.update("foobar", { a =2 })
+		skynet.sleep(200)	-- sleep 3s
+		skynet.error("update foobar")
+		sharedata.update("foobar", { a = 3, b = { "change" } })
+		skynet.sleep(100)
+		skynet.error("delete foobar")
+		sharedata.delete "foobar"
 	end)
 end)
 
@@ -47,6 +53,11 @@ skynet.start(function()
 		skynet.error(err)
 	end
 
+	-- obj. b is not the same with local b
+	for k,v in ipairs(obj.b) do
+		skynet.error(string.format("b[%d] = %s", k , tostring(v)))
+	end
+
 	collectgarbage()
 	skynet.error("sleep")
 	skynet.sleep(100)
@@ -54,8 +65,6 @@ skynet.start(function()
 	collectgarbage()
 	skynet.error("sleep")
 	skynet.sleep(100)
-
-	sharedata.delete "foobar"
 
 	skynet.exit()
 end)

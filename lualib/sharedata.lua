@@ -10,8 +10,15 @@ end)
 local sharedata = {}
 
 local function monitor(name, obj, cobj)
-	local newobj = skynet.call(service, "lua", "monitor", name, cobj)
-	sd.update(obj, newobj)
+	local newobj = cobj
+	while true do
+		newobj = skynet.call(service, "lua", "monitor", name, newobj)
+		if newobj == nil then
+			return
+		end
+		sd.update(obj, newobj)
+	end
+	print("name exit")
 end
 
 function sharedata.query(name)
