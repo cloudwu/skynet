@@ -178,6 +178,23 @@ function suspend(co, result, command, param, size)
 		end
 		local f = param
 		local function response(ok, ...)
+			if ok == "TEST" then
+				if dead_service[co_address] then
+					release_watching(co_address)
+					f = false
+					return false
+				else
+					return true
+				end
+			end
+			if not f then
+				if f == false then
+					f = nil
+					return false
+				end
+				error "Can't response more than once"
+			end
+
 			local ret
 			if not dead_service[co_address] then
 				if ok then
