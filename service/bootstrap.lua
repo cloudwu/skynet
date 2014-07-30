@@ -13,31 +13,31 @@ skynet.start(function()
 		standalone = true
 		skynet.setenv("standalone", "true")
 
-		local slave = skynet.newservice "cdummy"
-		if slave == nil then
+		local ok, slave = pcall(skynet.newservice, "cdummy")
+		if not ok then
 			skynet.abort()
 		end
 		skynet.name(".slave", slave)
 
 	else
 		if standalone then
-			if not skynet.newservice "cmaster" then
+			if not pcall(skynet.newservice,"cmaster") then
 				skynet.abort()
 			end
 		end
 
-		local slave = skynet.newservice "cslave"
-		if slave == nil then
+		local ok, slave = pcall(skynet.newservice, "cslave")
+		if not ok then
 			skynet.abort()
 		end
 		skynet.name(".slave", slave)
 	end
 
 	if standalone then
-		local datacenter = assert(skynet.newservice "datacenterd")
+		local datacenter = skynet.newservice "datacenterd"
 		skynet.name("DATACENTER", datacenter)
 	end
-	assert(skynet.newservice "service_mgr")
-	assert(skynet.newservice(skynet.getenv "start" or "main"))
+	skynet.newservice "service_mgr"
+	pcall(skynet.newservice,skynet.getenv "start" or "main")
 	skynet.exit()
 end)

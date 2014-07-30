@@ -55,10 +55,8 @@ function CMD.delete(name)
 	assert(objmap[v.obj])
 	objmap[v.obj] = true
 	sharedata.host.decref(v.obj)
-	for _,v in ipairs(v.watch) do
-		local session = v[1]
-		local address = v[2]
-		skynet.redirect(address, 0, "response", session, skynet.pack(nil))
+	for _,response in ipairs(v.watch) do
+		response(true)
 	end
 end
 
@@ -90,21 +88,19 @@ function CMD.update(name, t)
 	local newobj = pool[name].obj
 	if watch then
 		sharedata.host.markdirty(oldcobj)
-		for _,v in ipairs(watch) do
-			local session = v[1]
-			local address = v[2]
-			skynet.redirect(address, 0, "response", session, skynet.pack(newobj))
+		for _,response in ipairs(watch) do
+			response(true, newobj)
 		end
 	end
 end
 
-function CMD.monitor(session, address, name, obj)
+function CMD.monitor(name, obj)
 	local v = assert(pool[name])
 	if obj ~= v.obj then
 		return v.obj
 	end
 
-	table.insert(v.watch, { session, address })
+	table.insert(v.watch, skynet.response())
 
 	return NORET
 end
@@ -113,12 +109,7 @@ skynet.start(function()
 	skynet.fork(collectobj)
 	skynet.dispatch("lua", function (session, source ,cmd, ...)
 		local f = assert(CMD[cmd])
-		local r
-		if cmd == "monitor" then
-			r = f(session, source, ...)
-		else
-			r = f(...)
-		end
+		local r = f(...)
 		if r ~= NORET then
 			skynet.ret(skynet.pack(r))
 		end

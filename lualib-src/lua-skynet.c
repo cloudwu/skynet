@@ -299,6 +299,26 @@ lpackstring(lua_State *L) {
 	return 1;
 }
 
+static int
+ltrash(lua_State *L) {
+	int t = lua_type(L,1);
+	switch (t) {
+	case LUA_TSTRING: {
+		break;
+	}
+	case LUA_TLIGHTUSERDATA: {
+		void * msg = lua_touserdata(L,1);
+		luaL_checkinteger(L,2);
+		skynet_free(msg);
+		break;
+	}
+	default:
+		luaL_error(L, "skynet.trash invalid param %s", lua_typename(L,t));
+	}
+
+	return 0;
+}
+
 int
 luaopen_skynet_c(lua_State *L) {
 	luaL_checkversion(L);
@@ -314,6 +334,7 @@ luaopen_skynet_c(lua_State *L) {
 		{ "pack", _luaseri_pack },
 		{ "unpack", _luaseri_unpack },
 		{ "packstring", lpackstring },
+		{ "trash" , ltrash },
 		{ "callback", _callback },
 		{ NULL, NULL },
 	};

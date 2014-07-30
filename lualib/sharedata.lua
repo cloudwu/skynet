@@ -14,7 +14,7 @@ local function monitor(name, obj, cobj)
 	while true do
 		newobj = skynet.call(service, "lua", "monitor", name, newobj)
 		if newobj == nil then
-			return
+			break
 		end
 		sd.update(obj, newobj)
 	end
