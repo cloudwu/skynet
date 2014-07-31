@@ -246,6 +246,7 @@ lclearbuffer(lua_State *L) {
 	while(sb->head) {
 		return_free_node(L,2,sb);
 	}
+	sb->size = 0;
 	return 0;
 }
 
@@ -264,6 +265,7 @@ lreadall(lua_State *L) {
 		return_free_node(L,2,sb);
 	}
 	luaL_pushresult(&b);
+	sb->size = 0;
 	return 1;
 }
 
