@@ -50,8 +50,10 @@ function command.DEL(source, c)
 	channel[c] = nil
 	channel_n[c] = nil
 	channel_remote[c] = nil
-	for node in pairs(remote) do
-		skynet.send(node_address[node], "lua", "DELR", c)
+	if remote then
+		for node in pairs(remote) do
+			skynet.send(node_address[node], "lua", "DELR", c)
+		end
 	end
 	return NORET
 end
