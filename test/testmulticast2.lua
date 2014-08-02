@@ -4,9 +4,13 @@ local mc = require "multicast"
 
 skynet.start(function()
 	print("remote start")
-	skynet.monitor("simplemonitor", true)
 	local console = skynet.newservice("console")
 	local channel = dc.get "MCCHANNEL"
+	if channel then
+		print("remote channel", channel)
+	else
+		print("create local channel")
+	end
 	for i=1,10 do
 		local sub = skynet.newservice("testmulticast", "sub")
 		skynet.call(sub, "lua", "init", channel)
