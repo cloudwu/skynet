@@ -34,8 +34,6 @@ Each lua file only load once and cache it in memory during skynet start . so if 
 
 You can also use the offical lua version , edit the makefile by yourself .
 
-## Blog (in Chinese)
+## How To (in Chinese)
 
-* http://blog.codingnow.com/2012/09/the_design_of_skynet.html
-* http://blog.codingnow.com/2012/08/skynet.html
-* http://blog.codingnow.com/eo/skynet/
+* Read Wiki https://github.com/cloudwu/skynet/wiki
