@@ -16,6 +16,7 @@ struct handle_name {
 	uint32_t handle;
 };
 
+// todo handle 是指一个服务? 用来做什么? 为何存储这么复杂?
 struct handle_storage {
 	struct rwlock lock;
 

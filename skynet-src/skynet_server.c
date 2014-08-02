@@ -50,11 +50,12 @@ struct skynet_context {
 	CHECKCALLING_DECL
 };
 
+// skynet 节点
 struct skynet_node {
-	int total;
+	int total; //todo 表示此节点有多少个 skynet_context?
 	int init;
 	uint32_t monitor_exit;
-	pthread_key_t handle_key;
+	pthread_key_t handle_key; //todo 线程的句柄
 };
 
 static struct skynet_node G_NODE;
@@ -267,16 +268,17 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 	struct skynet_message msg;
 
 	for (i=0;i<n;i++) {
-		if (skynet_mq_pop(q,&msg)) {
+		if (skynet_mq_pop(q,&msg)) { // skynet_mq_pop() 返回1表示失败, 返回0表示成功
 			skynet_context_release(ctx);
-			return skynet_globalmq_pop();
+			return skynet_globalmq_pop(); // 获取消息失败, 重新从[全局队列]中获取
 		} else if (i==0 && weight >= 0) {
-			n = skynet_mq_length(q);
+			n = skynet_mq_length(q); // todo 根据权重处理消息, 处理消息队列中的一半，甚至更少?
 			n >>= weight;
 		}
 
 		skynet_monitor_trigger(sm, msg.source , handle);
 
+		// todo ctx->cb 表示什么?
 		if (ctx->cb == NULL) {
 			skynet_free(msg.data);
 		} else {
@@ -686,6 +688,7 @@ skynet_globalexit(void) {
 void
 skynet_initthread(int m) {
 	uintptr_t v = (uint32_t)(-m);
-	pthread_setspecific(G_NODE.handle_key, (void *)v);
+	pthread_setspecific(G_NODE.handle_key, (void *)v); // pthread_getpecific和pthread_setspecific实现同一个线程中不同函数间共享数据
+														// todo v主要用来标识什么?
 }
 

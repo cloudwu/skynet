@@ -26,7 +26,10 @@ skynet_harbor_message_isremote(uint32_t handle) {
 
 void
 skynet_harbor_init(int harbor) {
-	HARBOR = (unsigned int)harbor << HANDLE_REMOTE_SHIFT;
+	// 高8位为 remote id, 详见下面定义
+	// #define HANDLE_MASK 0xffffff
+	// #define HANDLE_REMOTE_SHIFT 24
+	HARBOR = (unsigned int)harbor << HANDLE_REMOTE_SHIFT; 
 }
 
 void

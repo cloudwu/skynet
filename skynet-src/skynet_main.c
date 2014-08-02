@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <assert.h>
 
+// 详见 optstring() 注释
 static int
 optint(const char *key, int opt) {
 	const char * str = skynet_getenv(key);
@@ -37,6 +38,9 @@ optboolean(const char *key, int opt) {
 }
 */
 
+// 根据key设置环境变量, 
+// 如果环境变量不存在, 则设置为 opt 的值
+// 如果环境变量已经存在, 则返回对应的值
 static const char *
 optstring(const char *key,const char * opt) {
 	const char * str = skynet_getenv(key);
@@ -102,17 +106,17 @@ main(int argc, char *argv[]) {
 	if (argc > 1) {
 		config_file = argv[1];
 	}
-	skynet_globalinit();
-	skynet_env_init();
+	skynet_globalinit(); // 详见skynet_server.c, 初始化 G_NODE
+	skynet_env_init(); // 详见skynet_env.c, 初始化 E, E为全部变量, // todo 作用未知
 
-	sigign();
+	sigign(); // 忽略SIGPIPE, 详细google SIGPIPE
 
 	struct skynet_config config;
 
-	struct lua_State *L = lua_newstate(skynet_lalloc, NULL);
-	luaL_openlibs(L);	// link lua lib
+	struct lua_State *L = lua_newstate(skynet_lalloc, NULL); // 创建的一个新的独立的状态机, 使用自定义的内存分配操作skynet_lalloc
+	luaL_openlibs(L);	// link lua lib // 加载 lua 通用扩展库
 
-	int err = luaL_loadstring(L, load_config);
+	int err = luaL_loadstring(L, load_config); // luaL_loadstring ,将所有代码读入lua(详见 load_config 定义),并且检查代码是否有语法错误, for 下面的 lua_pcall
 	assert(err == LUA_OK);
 	lua_pushstring(L, config_file);
 	
@@ -131,7 +135,7 @@ main(int argc, char *argv[]) {
 	config.daemon = optstring("daemon", NULL);
 	config.logger = optstring("logger", NULL);
 
-	lua_close(L);
+	lua_close(L); // todo 为什么在这里可以 lua_close()? 不需要等到 return 0; 前才 lua_close()?
 
 	skynet_start(&config);
 	skynet_globalexit();
