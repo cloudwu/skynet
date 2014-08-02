@@ -7,10 +7,7 @@ local function console_main_loop()
 	while true do
 		local cmdline = socket.readline(stdin, "\n")
 		if cmdline ~= "" then
-			local handle = skynet.newservice(cmdline)
-			if handle == nil then
-				print("Launch error:",cmdline)
-			end
+			pcall(skynet.newservice,cmdline)
 		end
 	end
 	socket.unlock(stdin)

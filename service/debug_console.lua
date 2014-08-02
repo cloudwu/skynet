@@ -122,8 +122,8 @@ function COMMAND.clearcache()
 end
 
 function COMMAND.start(...)
-	local addr = skynet.newservice(...)
-	if addr then
+	local ok, addr = pcall(skynet.newservice, ...)
+	if ok then
 		return { [skynet.address(addr)] = ... }
 	else
 		return "Failed"
@@ -131,8 +131,8 @@ function COMMAND.start(...)
 end
 
 function COMMAND.snax(...)
-	local s = snax.newservice(...)
-	if s then
+	local ok, s = pcall(snax.newservice, ...)
+	if ok then
 		local addr = s.handle
 		return { [skynet.address(addr)] = ... }
 	else

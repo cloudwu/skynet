@@ -1,3 +1,10 @@
+Dev version
+-----------
+* add sharedata
+* bugfix: service exit before init would not report back
+* add skynet.response and check multicall skynet.ret
+* skynet.newservice throw error when lanuch faild
+
 v0.5.0 (2014-7-28)
 -----------
 * skynet.exit will quit service immediately.

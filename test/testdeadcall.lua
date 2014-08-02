@@ -11,6 +11,15 @@ skynet.start(function()
 	end)
 end)
 
+elseif mode == "dead" then
+
+skynet.start(function()
+	skynet.dispatch("lua", function (...)
+		skynet.sleep(100)
+		print("return", skynet.ret "")
+	end)
+end)
+
 else
 
 	skynet.start(function()
@@ -20,6 +29,9 @@ else
 			skynet.call(test,"lua", "dead call")
 		end))
 
-		skynet.exit()
+		local dead = skynet.newservice(SERVICE_NAME, "dead")	-- launch self in dead mode
+
+		skynet.timeout(0, skynet.exit)	-- exit after a while, so the call never return
+		skynet.call(dead, "lua", "whould not return")
 	end)
 end

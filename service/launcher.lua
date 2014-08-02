@@ -28,7 +28,7 @@ function command.STAT()
 	return list
 end
 
-function command.INFO(_, _, handle)
+function command.INFO(_, handle)
 	handle = handle_to_address(handle)
 	if services[handle] == nil then
 		return
@@ -38,7 +38,7 @@ function command.INFO(_, _, handle)
 	end
 end
 
-function command.TASK(_, _, handle)
+function command.TASK(_, handle)
 	handle = handle_to_address(handle)
 	if services[handle] == nil then
 		return
@@ -48,7 +48,7 @@ function command.TASK(_, _, handle)
 	end
 end
 
-function command.KILL(_, _, handle)
+function command.KILL(_, handle)
 	handle = handle_to_address(handle)
 	skynet.kill(handle)
 	local ret = { [skynet.address(handle)] = tostring(services[handle]) }
@@ -72,18 +72,29 @@ function command.GC()
 	return command.MEM()
 end
 
-function command.REMOVE(_,_, handle)
+function command.REMOVE(_, handle)
 	services[handle] = nil
+	local response = instance[handle]
+	if response then
+		-- instance is dead
+		response(false)
+		instance[handle] = nil
+	end
+
 	-- don't return (skynet.ret) because the handle may exit
 	return NORET
 end
 
-function command.LAUNCH(address, session, service, ...)
+local function return_string(str)
+	return str
+end
+
+function command.LAUNCH(_, service, ...)
 	local param = table.concat({...}, " ")
 	local inst = skynet.launch(service, param)
 	if inst then
 		services[inst] = service .. " " .. param
-		instance[inst] = { session = session, address = address }
+		instance[inst] = skynet.response(return_string)
 	else
 		skynet.ret("")	-- launch failed
 	end
@@ -93,9 +104,9 @@ end
 function command.ERROR(address)
 	-- see serivce-src/service_lua.c
 	-- init failed
-	local reply = instance[address]
-	if reply then
-		skynet.redirect(reply.address , 0, "response", reply.session, "")
+	local response = instance[address]
+	if response then
+		response(false)
 		instance[address] = nil
 	end
 	services[address] = nil
@@ -104,9 +115,9 @@ end
 
 function command.LAUNCHOK(address)
 	-- init notice
-	local reply = instance[address]
-	if reply then
-		skynet.redirect(reply.address , 0, "response", reply.session, skynet.address(address))
+	local response = instance[address]
+	if response then
+		response(true, skynet.address(address))
 		instance[address] = nil
 	end
 
@@ -127,7 +138,7 @@ skynet.register_protocol {
 		else
 			-- launch request
 			local service, param = string.match(cmd,"([^ ]+) (.*)")
-			command.LAUNCH(address, session, service, param)
+			command.LAUNCH(_, service, param)
 		end
 	end,
 }
@@ -136,7 +147,7 @@ skynet.dispatch("lua", function(session, address, cmd , ...)
 	cmd = string.upper(cmd)
 	local f = command[cmd]
 	if f then
-		local ret = f(address, session, ...)
+		local ret = f(address, ...)
 		if ret ~= NORET then
 			skynet.ret(skynet.pack(ret))
 		end
