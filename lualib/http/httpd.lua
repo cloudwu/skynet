@@ -64,16 +64,11 @@ local function recvheader(readbytes, limit, lines, header)
 			end
 		end
 	end
-	local idx = 1
 	for v in header:gmatch("(.-)\r\n") do
 		if v == "" then
 			break
 		end
-		lines[idx] = v
-		idx = idx + 1
-	end
-	for i = idx, #lines do
-		lines[i] = nil
+		table.insert(lines, v)
 	end
 	return result
 end
@@ -131,8 +126,6 @@ local function readcrln(readbytes, body)
 	end
 end
 
-local tmpline = {}
-
 local function recvchunkedbody(readbytes, bodylimit, header, body)
 	local result = ""
 	local size = 0
@@ -167,6 +160,7 @@ local function recvchunkedbody(readbytes, bodylimit, header, body)
 	if not body then
 		return
 	end
+	local tmpline = {}
 	body = recvheader(readbytes, 8192, tmpline, body)
 	if not body then
 		return
@@ -178,6 +172,7 @@ local function recvchunkedbody(readbytes, bodylimit, header, body)
 end
 
 local function readall(readbytes, bodylimit)
+	local tmpline = {}
 	local body = recvheader(readbytes, 8192, tmpline, "")
 	if not body then
 		return 413	-- Request Entity Too Large
