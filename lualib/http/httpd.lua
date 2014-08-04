@@ -46,6 +46,11 @@ local http_status_msg = {
 }
 
 local function recvheader(readbytes, limit, lines, header)
+	if #header >= 2 then
+		if header:find "^\r\n" then
+			return header:sub(3)
+		end
+	end
 	local result
 	local e = header:find("\r\n\r\n", 1, true)
 	if e then
@@ -61,6 +66,9 @@ local function recvheader(readbytes, limit, lines, header)
 			if e then
 				result = header:sub(e+4)
 				break
+			end
+			if header:find "^\r\n" then
+				return header:sub(3)
 			end
 		end
 	end
@@ -156,10 +164,6 @@ local function recvchunkedbody(readbytes, bodylimit, header, body)
 		end
 	end
 
-	body = readcrln(readbytes, body)
-	if not body then
-		return
-	end
 	local tmpline = {}
 	body = recvheader(readbytes, 8192, tmpline, body)
 	if not body then
@@ -194,7 +198,7 @@ local function readall(readbytes, bodylimit)
 	end
 	local mode = header["transfer-encoding"]
 	if mode then
-		if mode ~= "identity" or mode ~= "chunked" then
+		if mode ~= "identity" and mode ~= "chunked" then
 			return 501	-- Not Implemented
 		end
 	end
