@@ -2,7 +2,7 @@ local skynet = require "skynet"
 local httpc = require "http.httpc"
 
 skynet.start(function()
-	print("GET www.baidu.com")
+	print("GET baidu.com")
 	local header = {}
 	local status, body = httpc.get("baidu.com", "/", header)
 	print("[header] =====>")
