@@ -247,7 +247,7 @@ gettime() {
 #else
 #define CLOCK_TIMER CLOCK_MONOTONIC
 #endif
-    t = (uint64_t)(CFTimeInterval / 100);
+    t = (uint64_t)CFTimeInterval * 100;
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
