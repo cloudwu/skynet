@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #if defined(__APPLE__)
 #include <sys/time.h>
@@ -33,7 +34,7 @@ struct timer_event {
 
 struct timer_node {
 	struct timer_node *next;
-	int expire;
+	uint32_t expire;
 };
 
 struct link_list {
@@ -43,9 +44,9 @@ struct link_list {
 
 struct timer {
 	struct link_list near[TIME_NEAR];
-	struct link_list t[4][TIME_LEVEL-1];
+	struct link_list t[4][TIME_LEVEL];
 	int lock;
-	int time;
+	uint32_t time;
 	uint32_t current;
 	uint32_t starttime;
 	uint64_t current_point;
@@ -72,21 +73,22 @@ link(struct link_list *list,struct timer_node *node) {
 
 static void
 add_node(struct timer *T,struct timer_node *node) {
-	int time=node->expire;
-	int current_time=T->time;
+	uint32_t time=node->expire;
+	uint32_t current_time=T->time;
 	
 	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {
 		link(&T->near[time&TIME_NEAR_MASK],node);
 	} else {
 		int i;
-		int mask=TIME_NEAR << TIME_LEVEL_SHIFT;
+		uint32_t mask=TIME_NEAR << TIME_LEVEL_SHIFT;
 		for (i=0;i<3;i++) {
 			if ((time|(mask-1))==(current_time|(mask-1))) {
 				break;
 			}
 			mask <<= TIME_LEVEL_SHIFT;
 		}
-		link(&T->t[i][((time>>(TIME_NEAR_SHIFT + i*TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK)-1],node);	
+
+		link(&T->t[i][((time>>(TIME_NEAR_SHIFT + i*TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK)],node);	
 	}
 }
 
@@ -104,28 +106,37 @@ timer_add(struct timer *T,void *arg,size_t sz,int time) {
 }
 
 static void
+move_list(struct timer *T, int level, int idx) {
+	struct timer_node *current = link_clear(&T->t[level][idx]);
+	while (current) {
+		struct timer_node *temp=current->next;
+		add_node(T,current);
+		current=temp;
+	}
+}
+
+static void
 timer_shift(struct timer *T) {
 	LOCK(T);
 	int mask = TIME_NEAR;
-	int time = (++T->time) >> TIME_NEAR_SHIFT;
-	int i=0;
-	
-	while ((T->time & (mask-1))==0) {
-		int idx=time & TIME_LEVEL_MASK;
-		if (idx!=0) {
-			--idx;
-			struct timer_node *current = link_clear(&T->t[i][idx]);
-			while (current) {
-				struct timer_node *temp=current->next;
-				add_node(T,current);
-				current=temp;
+	uint32_t ct = ++T->time;
+	if (ct == 0) {
+		move_list(T, 3, 0);
+	} else {
+		uint32_t time = ct >> TIME_NEAR_SHIFT;
+		int i=0;
+
+		while ((ct & (mask-1))==0) {
+			int idx=time & TIME_LEVEL_MASK;
+			if (idx!=0) {
+				move_list(T, i, idx);
+				break;				
 			}
-			break;				
+			mask <<= TIME_LEVEL_SHIFT;
+			time >>= TIME_LEVEL_SHIFT;
+			++i;
 		}
-		mask <<= TIME_LEVEL_SHIFT;
-		time >>= TIME_LEVEL_SHIFT;
-		++i;
-	}	
+	}
 	UNLOCK(T);
 }
 
@@ -187,7 +198,7 @@ timer_create_timer() {
 	}
 
 	for (i=0;i<4;i++) {
-		for (j=0;j<TIME_LEVEL-1;j++) {
+		for (j=0;j<TIME_LEVEL;j++) {
 			link_clear(&r->t[i][j]);
 		}
 	}
@@ -265,6 +276,7 @@ skynet_updatetime(void) {
 	uint64_t cp = gettime();
 	if(cp < TI->current_point) {
 		skynet_error(NULL, "time diff error: change from %lld to %lld", cp, TI->current_point);
+		TI->current_point = cp;
 	} else if (cp != TI->current_point) {
 		uint32_t diff = (uint32_t)(cp - TI->current_point);
 		TI->current_point = cp;
