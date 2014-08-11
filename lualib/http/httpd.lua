@@ -1,3 +1,5 @@
+local internal = require "http.internal"
+
 local table = table
 
 local httpd = {}
@@ -45,139 +47,9 @@ local http_status_msg = {
 	[505] = "HTTP Version not supported",
 }
 
-local function recvheader(readbytes, limit, lines, header)
-	if #header >= 2 then
-		if header:find "^\r\n" then
-			return header:sub(3)
-		end
-	end
-	local result
-	local e = header:find("\r\n\r\n", 1, true)
-	if e then
-		result = header:sub(e+4)
-	else
-		while true do
-			local bytes = readbytes()
-			header = header .. bytes
-			if #header > limit then
-				return
-			end
-			e = header:find("\r\n\r\n", -#bytes-3, true)
-			if e then
-				result = header:sub(e+4)
-				break
-			end
-			if header:find "^\r\n" then
-				return header:sub(3)
-			end
-		end
-	end
-	for v in header:gmatch("(.-)\r\n") do
-		if v == "" then
-			break
-		end
-		table.insert(lines, v)
-	end
-	return result
-end
-
-local function parseheader(lines, from, header)
-	local name, value
-	for i=from,#lines do
-		local line = lines[i]
-		if line:byte(1) == 9 then	-- tab, append last line
-			if name == nil then
-				return
-			end
-			header[name] = header[name] .. line:sub(2)
-		else
-			name, value = line:match "^(.-):%s*(.*)"
-			if name == nil or value == nil then
-				return
-			end
-			name = name:lower()
-			if header[name] then
-				header[name] = header[name] .. ", " .. value
-			else
-				header[name] = value
-			end
-		end
-	end
-	return header
-end
-
-local function chunksize(readbytes, body)
-	while true do
-		if #body > 128 then
-			return
-		end
-		body = body .. readbytes()
-		local f,e = body:find("\r\n",1,true)
-		if f then
-			return tonumber(body:sub(1,f-1),16), body:sub(e+1)
-		end
-	end
-end
-
-local function readcrln(readbytes, body)
-	if #body > 2 then
-		if body:sub(1,2) ~= "\r\n" then
-			return
-		end
-		return body:sub(3)
-	else
-		body = body .. readbytes(2-#body)
-		if body ~= "\r\n" then
-			return
-		end
-		return ""
-	end
-end
-
-local function recvchunkedbody(readbytes, bodylimit, header, body)
-	local result = ""
-	local size = 0
-
-	while true do
-		local sz
-		sz , body = chunksize(readbytes, body)
-		if not sz then
-			return
-		end
-		if sz == 0 then
-			break
-		end
-		size = size + sz
-		if bodylimit and size > bodylimit then
-			return
-		end
-		if #body >= sz then
-			result = result .. body:sub(1,sz)
-			body = body:sub(sz+1)
-		else
-			result = result .. body .. readbytes(sz - #body)
-			body = ""
-		end
-		body = readcrln(readbytes, body)
-		if not body then
-			return
-		end
-	end
-
-	local tmpline = {}
-	body = recvheader(readbytes, 8192, tmpline, body)
-	if not body then
-		return
-	end
-
-	header = parseheader(tmpline,1,header)
-
-	return result, header
-end
-
 local function readall(readbytes, bodylimit)
 	local tmpline = {}
-	local body = recvheader(readbytes, 8192, tmpline, "")
+	local body = internal.recvheader(readbytes, tmpline, "")
 	if not body then
 		return 413	-- Request Entity Too Large
 	end
@@ -188,7 +60,7 @@ local function readall(readbytes, bodylimit)
 	if httpver < 1.0 or httpver > 1.1 then
 		return 505	-- HTTP Version not supported
 	end
-	local header = parseheader(tmpline,2,{})
+	local header = internal.parseheader(tmpline,2,{})
 	if not header then
 		return 400	-- Bad request
 	end
@@ -204,7 +76,7 @@ local function readall(readbytes, bodylimit)
 	end
 
 	if mode == "chunked" then
-		body, header = recvchunkedbody(readbytes, bodylimit, header, body)
+		body, header = internal.recvchunkedbody(readbytes, bodylimit, header, body)
 		if not body then
 			return 413
 		end
