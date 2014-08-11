@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local c = require "skynet.c"
+local c = require "skynet.core"
 local snax_interface = require "snax.interface"
 local profile = require "profile"
 local snax = require "snax"
