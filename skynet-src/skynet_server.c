@@ -614,8 +614,10 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 }
 
 int
-skynet_sendname(struct skynet_context * context, const char * addr , int type, int session, void * data, size_t sz) {
-	uint32_t source = context->handle;
+skynet_sendname(struct skynet_context * context, uint32_t source, const char * addr , int type, int session, void * data, size_t sz) {
+	if (source == 0) {
+		source = context->handle;
+	}
 	uint32_t des = 0;
 	if (addr[0] == ':') {
 		des = strtoul(addr+1, NULL, 16);

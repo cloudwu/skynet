@@ -39,6 +39,11 @@ skynet.start(function()
 						table.insert(tmp, string.format("query: %s= %s", k,v))
 					end
 				end
+				table.insert(tmp, "-----header----")
+				for k,v in pairs(header) do
+					table.insert(tmp, string.format("%s = %s",k,v))
+				end
+				table.insert(tmp, "-----body----\n" .. body)
 				response(id, code, table.concat(tmp,"\n"))
 			end
 		else

@@ -28,4 +28,16 @@ function sockethelper.writefunc(fd)
 	end
 end
 
+function sockethelper.connect(host, port)
+	local fd = socket.open(host, port)
+	if fd then
+		return fd
+	end
+	error(socket_error)
+end
+
+function sockethelper.close(fd)
+	socket.close(fd)
+end
+
 return sockethelper

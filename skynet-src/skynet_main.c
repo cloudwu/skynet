@@ -89,7 +89,6 @@ static const char * load_config = "\
 	local code = assert(f:read \'*a\')\
 	local function getenv(name) return assert(os.getenv(name), name) end\
 	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
-	print(code)\
 	f:close()\
 	local result = {}\
 	assert(load(code,\'=(load)\',\'t\',result))()\
