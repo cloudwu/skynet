@@ -17,7 +17,7 @@ skynet.start(function()
 		if not ok then
 			skynet.abort()
 		end
-		skynet.name(".slave", slave)
+		skynet.name(".cslave", slave)
 
 	else
 		if standalone then
@@ -30,7 +30,7 @@ skynet.start(function()
 		if not ok then
 			skynet.abort()
 		end
-		skynet.name(".slave", slave)
+		skynet.name(".cslave", slave)
 	end
 
 	if standalone then
