@@ -24,19 +24,6 @@ function cluster.proxy(node, name)
 	return skynet.call(clusterd, "lua", "proxy", node, name)
 end
 
-local namecache = {}
-
-function cluster.ncall(name, ...)
-	local s = namecache[name]
-	if not s then
-		local node , lname = name:match "(.-)(%..+)"
-		assert(node and lname)
-		s = cluster.proxy(node, lname)
-		namecache[name] = assert(s)
-	end
-	return skynet.call(s, "lua", ...)
-end
-
 skynet.init(function()
 	clusterd = skynet.uniqueservice("clusterd")
 end)
