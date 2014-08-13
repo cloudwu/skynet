@@ -39,6 +39,10 @@ function dbgcmd.INFO()
 	end
 end
 
+function dbgcmd.EXIT()
+	skynet.exit()
+end
+
 local function _debug_dispatch(session, address, cmd, ...)
 	local f = dbgcmd[cmd]
 	assert(f, cmd)

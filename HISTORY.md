@@ -7,8 +7,10 @@ Dev version
 * Don't check imported function in snax.hotfix
 * snax service add change SERVICE_PATH and add it to package.path
 * skynet.redirect support string address
+* bugfix: skynet.harbor.link may block
 * add skynet.harbor.queryname to query globalname
 * add cluster.proxy 
+* add DEBUG command exit (send a message to lua service by DEBUG)
 
 v0.5.2 (2014-8-11)
 -----------

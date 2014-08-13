@@ -56,6 +56,11 @@ function command.KILL(_, handle)
 	return ret
 end
 
+function command.EXIT(_, handle)
+	handle = handle_to_address(handle)
+	skynet.send(handle, "debug", "EXIT")
+end
+
 function command.MEM()
 	local list = {}
 	for k,v in pairs(services) do
