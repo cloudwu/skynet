@@ -86,7 +86,19 @@ function dbgcmd.RUN(source, filename)
 		local unique = {}
 		getupvaluetable(u, dispatch_func, unique)
 		getupvaluetable(u, skynet.register_protocol, unique)
-		local env = setmetatable( { print = print , _U = u }, { __index = _ENV })
+		local p = {}
+		local proto = u.proto
+		if proto then
+			for k,v in pairs(proto) do
+				local name, dispatch = v.name, v.dispatch
+				if name and dispatch then
+					local pp = {}
+					p[name] = pp
+					getupvaluetable(pp, dispatch, unique)
+				end
+			end
+		end
+		local env = setmetatable( { print = print , _U = u, _P = p}, { __index = _ENV })
 		local func, err = load(source, filename, "bt", env)
 		if not func then
 			skynet.ret(skynet.pack(err))
