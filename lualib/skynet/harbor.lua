@@ -7,6 +7,10 @@ function harbor.globalname(name, handle)
 	skynet.send(".cslave", "lua", "REGISTER", name, handle)
 end
 
+function harbor.queryname(name)
+	return skynet.call(".cslave", "lua", "QUERYNAME", name)
+end
+
 function harbor.link(id)
 	skynet.call(".cslave", "lua", "LINK", id)
 end
