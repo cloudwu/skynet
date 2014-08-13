@@ -36,7 +36,11 @@ function harbor.REGISTER(name, handle)
 	skynet.redirect(harbor_service, handle, "harbor", 0, "N " .. name)
 end
 
-function harbor.QUERYNAME(fd, name)
+function harbor.QUERYNAME(name)
+	if name:byte() == 46 then	-- "." , local name
+		skynet.ret(skynet.pack(skynet.localname(name)))
+		return
+	end
 	local result = globalname[name]
 	if result then
 		skynet.ret(skynet.pack(result))

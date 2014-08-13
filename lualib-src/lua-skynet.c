@@ -74,9 +74,16 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 }
 
 static int
+forward_cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
+	_cb(context, ud, type, session, source, msg, sz);
+	// don't delete msg in forward mode.
+	return 1;
+}
+
+static int
 _callback(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-
+	int forward = lua_toboolean(L, 2);
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);
 	lua_rawsetp(L, LUA_REGISTRYINDEX, _cb);
@@ -84,7 +91,11 @@ _callback(lua_State *L) {
 	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
 	lua_State *gL = lua_tothread(L,-1);
 
-	skynet_callback(context, gL, _cb);
+	if (forward) {
+		skynet_callback(context, gL, forward_cb);
+	} else {
+		skynet_callback(context, gL, _cb);
+	}
 
 	return 0;
 }

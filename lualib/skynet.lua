@@ -99,6 +99,7 @@ local coroutine_yield = coroutine.yield
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
 	if co == nil then
+		local print = print
 		co = coroutine.create(function(...)
 			f(...)
 			while true do
@@ -548,7 +549,7 @@ end
 
 function skynet.address(addr)
 	if type(addr) == "number" then
-		return string.format(":%x",addr)
+		return string.format(":%08x",addr)
 	else
 		return tostring(addr)
 	end
@@ -643,6 +644,21 @@ function skynet.filter(f ,start_func)
 	c.callback(function(...)
 		dispatch_message(f(...))
 	end)
+	skynet.timeout(0, function()
+		init_service(start_func)
+	end)
+end
+
+function skynet.forward_type(map, start_func)
+	c.callback(function(ptype, msg, sz, ...)
+		local prototype = map[ptype]
+		if prototype then
+			dispatch_message(prototype, msg, sz, ...)
+		else
+			dispatch_message(ptype, msg, sz, ...)
+			c.trash(msg, sz)
+		end
+	end, true)
 	skynet.timeout(0, function()
 		init_service(start_func)
 	end)

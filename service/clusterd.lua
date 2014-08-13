@@ -60,6 +60,16 @@ function command.req(source, node, addr, msg, sz)
 	skynet.ret(c:request(request, session))
 end
 
+local proxy = {}
+
+function command.proxy(source, node, name)
+	local fullname = node .. "." .. name
+	if proxy[fullname] == nil then
+		proxy[fullname] = skynet.newservice("clusterproxy", node, name)
+	end
+	skynet.ret(skynet.pack(proxy[fullname]))
+end
+
 local request_fd = {}
 
 function command.socket(source, subcmd, fd, msg)

@@ -232,7 +232,7 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	size_t sz = msg->sz & HANDLE_MASK;
 	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
 		skynet_free(msg->data);
-	}
+	} 
 	CHECKCALLING_END(ctx)
 }
 

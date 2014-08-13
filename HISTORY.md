@@ -7,6 +7,8 @@ Dev version
 * Don't check imported function in snax.hotfix
 * snax service add change SERVICE_PATH and add it to package.path
 * skynet.redirect support string address
+* add skynet.harbor.queryname to query globalname
+* add cluster.proxy and cluster.ncall
 
 v0.5.2 (2014-8-11)
 -----------
