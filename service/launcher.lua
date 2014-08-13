@@ -28,37 +28,12 @@ function command.STAT()
 	return list
 end
 
-function command.INFO(_, handle)
-	handle = handle_to_address(handle)
-	if services[handle] == nil then
-		return
-	else
-		local result = skynet.call(handle,"debug","INFO")
-		return result
-	end
-end
-
-function command.TASK(_, handle)
-	handle = handle_to_address(handle)
-	if services[handle] == nil then
-		return
-	else
-		local result = skynet.call(handle,"debug","TASK")
-		return result
-	end
-end
-
 function command.KILL(_, handle)
 	handle = handle_to_address(handle)
 	skynet.kill(handle)
 	local ret = { [skynet.address(handle)] = tostring(services[handle]) }
 	services[handle] = nil
 	return ret
-end
-
-function command.EXIT(_, handle)
-	handle = handle_to_address(handle)
-	skynet.send(handle, "debug", "EXIT")
 end
 
 function command.MEM()

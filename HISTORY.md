@@ -11,6 +11,7 @@ Dev version
 * add skynet.harbor.queryname to query globalname
 * add cluster.proxy 
 * add DEBUG command exit (send a message to lua service by DEBUG)
+* add DEBUG command run (debug_console command inject)
 
 v0.5.2 (2014-8-11)
 -----------

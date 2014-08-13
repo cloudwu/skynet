@@ -36,6 +36,7 @@ local function dump_list(print, list)
 	for _,v in ipairs(index) do
 		dump_line(print, v, list[v])
 	end
+	print("OK")
 end
 
 local function split_cmdline(cmdline)
@@ -92,6 +93,9 @@ skynet.start(function()
 	socket.start(listen_socket , function(id, addr)
 		local function print(...)
 			local t = { ... }
+			for k,v in ipairs(t) do
+				t[k] = tostring(v)
+			end
 			socket.write(id, table.concat(t,"\t"))
 			socket.write(id, "\n")
 		end
@@ -115,6 +119,7 @@ function COMMAND.help()
 		clearcache = "clear lua code cache",
 		service = "List unique service",
 		task = "task address : show service task detail",
+		inject = "inject address luascript.lua",
 	}
 end
 
@@ -143,4 +148,36 @@ end
 
 function COMMAND.service()
 	return skynet.call("SERVICE", "lua", "LIST")
+end
+
+local function adjust_address(address)
+	if address:sub(1,1) ~= ":" then
+		address = bit32.replace( tonumber("0x" .. address), skynet.harbor(skynet.self()), 24, 8)
+	end
+	return address
+end
+
+function COMMAND.exit(address)
+	skynet.send(adjust_address(address), "debug", "EXIT")
+end
+
+function COMMAND.inject(address, filename)
+	address = adjust_address(address)
+	local f = io.open(filename, "rb")
+	if not f then
+		return "Can't open " .. filename
+	end
+	local source = f:read "*a"
+	f:close()
+	return skynet.call(address, "debug", "RUN", source, filename)
+end
+
+function COMMAND.task(address)
+	address = adjust_address(address)
+	return skynet.call(address,"debug","TASK")
+end
+
+function COMMAND.info(address)
+	address = adjust_address(address)
+	return skynet.call(address,"debug","INFO")
 end

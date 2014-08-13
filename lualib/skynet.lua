@@ -701,6 +701,6 @@ end
 
 -- Inject internal debug framework
 local debug = require "skynet.debug"
-debug(skynet)
+debug(skynet, dispatch_message)
 
 return skynet
