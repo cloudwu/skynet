@@ -1,7 +1,7 @@
 local skynet = require "skynet"
 local sc = require "socketchannel"
 local socket = require "socket"
-local cluster = require "cluster.c"
+local cluster = require "cluster.core"
 
 local config_name = skynet.getenv "cluster"
 local node_address = {}
@@ -58,6 +58,16 @@ function command.req(source, node, addr, msg, sz)
 	-- msg is a local pointer, cluster.packrequest will free it
 	request, node_session[node] = cluster.packrequest(addr, session , msg, sz)
 	skynet.ret(c:request(request, session))
+end
+
+local proxy = {}
+
+function command.proxy(source, node, name)
+	local fullname = node .. "." .. name
+	if proxy[fullname] == nil then
+		proxy[fullname] = skynet.newservice("clusterproxy", node, name)
+	end
+	skynet.ret(skynet.pack(proxy[fullname]))
 end
 
 local request_fd = {}

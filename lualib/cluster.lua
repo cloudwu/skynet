@@ -4,7 +4,7 @@ local clusterd
 local cluster = {}
 
 function cluster.call(node, address, ...)
-	-- skynet.pack(...) will free by cluster.c.packrequest
+	-- skynet.pack(...) will free by cluster.core.packrequest
 	return skynet.call(clusterd, "lua", "req", node, address, skynet.pack(...))
 end
 
@@ -18,6 +18,10 @@ end
 
 function cluster.reload()
 	skynet.call(clusterd, "lua", "reload")
+end
+
+function cluster.proxy(node, name)
+	return skynet.call(clusterd, "lua", "proxy", node, name)
 end
 
 skynet.init(function()

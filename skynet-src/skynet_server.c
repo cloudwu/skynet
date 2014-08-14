@@ -132,6 +132,8 @@ skynet_context_new(const char * name, const char *param) {
 
 	ctx->init = false;
 	ctx->endless = false;
+	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
+	ctx->handle = 0;	
 	ctx->handle = skynet_handle_register(ctx);
 	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
 	// init function maybe use ctx->handle, so it must init at last
@@ -230,7 +232,7 @@ _dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	size_t sz = msg->sz & HANDLE_MASK;
 	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
 		skynet_free(msg->data);
-	}
+	} 
 	CHECKCALLING_END(ctx)
 }
 
@@ -612,8 +614,10 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 }
 
 int
-skynet_sendname(struct skynet_context * context, const char * addr , int type, int session, void * data, size_t sz) {
-	uint32_t source = context->handle;
+skynet_sendname(struct skynet_context * context, uint32_t source, const char * addr , int type, int session, void * data, size_t sz) {
+	if (source == 0) {
+		source = context->handle;
+	}
 	uint32_t des = 0;
 	if (addr[0] == ':') {
 		des = strtoul(addr+1, NULL, 16);
@@ -644,11 +648,6 @@ skynet_sendname(struct skynet_context * context, const char * addr , int type, i
 uint32_t 
 skynet_context_handle(struct skynet_context *ctx) {
 	return ctx->handle;
-}
-
-void 
-skynet_context_init(struct skynet_context *ctx, uint32_t handle) {
-	ctx->handle = handle;
 }
 
 void 
