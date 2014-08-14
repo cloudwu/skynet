@@ -296,7 +296,7 @@ local function wait_for_response(self, response)
 end
 
 function channel:request(request, response)
-	assert(block_connect(self))
+	assert(block_connect(self, true))	-- connect once
 
 	if not socket.write(self.__sock[1], request) then
 		close_channel_socket(self)
