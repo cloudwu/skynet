@@ -12,6 +12,7 @@ Dev version
 * add cluster.proxy 
 * add DEBUG command exit (send a message to lua service by DEBUG)
 * add DEBUG command run (debug_console command inject)
+* bugfix : socketchannel connect once
 
 v0.5.2 (2014-8-11)
 -----------

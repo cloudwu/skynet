@@ -51,13 +51,24 @@ function command.listen(source, addr, port)
 	skynet.ret(skynet.pack(nil))
 end
 
-function command.req(source, node, addr, msg, sz)
+local function send_request(source, node, addr, msg, sz)
 	local request
 	local c = node_channel[node]
 	local session = node_session[node]
 	-- msg is a local pointer, cluster.packrequest will free it
 	request, node_session[node] = cluster.packrequest(addr, session , msg, sz)
-	skynet.ret(c:request(request, session))
+
+	return c:request(request, session)
+end
+
+function command.req(...)
+	local ok, msg, sz = pcall(send_request, ...)
+	if ok then
+		skynet.ret(msg, sz)
+	else
+		skynet.error(msg)
+		skynet.response()(false)
+	end
 end
 
 local proxy = {}
