@@ -13,6 +13,7 @@ Dev version
 * add DEBUG command exit (send a message to lua service by DEBUG)
 * add DEBUG command run (debug_console command inject)
 * bugfix : socketchannel connect once
+* bugfix : mongo driver
 
 v0.5.2 (2014-8-11)
 -----------
