@@ -13,6 +13,7 @@
 
 #if defined(__APPLE__)
 #include <sys/time.h>
+#include <CoreFoundation/CFData.h>
 #endif
 
 typedef void (*timer_execute_func)(void *ud,void *arg);
@@ -257,11 +258,14 @@ gettime() {
 #else
 #define CLOCK_TIMER CLOCK_MONOTONIC
 #endif
-
-	struct timespec ti;
+    // bug fix for elapsed time from machine start
+    /* 
+    struct timespec ti;
 	clock_gettime(CLOCK_TIMER, &ti);
 	t = (uint64_t)ti.tv_sec * 100;
 	t += ti.tv_nsec / 10000000;
+    */
+    t = (uint64_t)CFTimeInterval * 100;
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
