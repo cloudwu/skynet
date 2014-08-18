@@ -1,4 +1,4 @@
-Dev version
+v0.6.0 (2014-8-18)
 -----------
 * add sharedata
 * bugfix: service exit before init would not report back
