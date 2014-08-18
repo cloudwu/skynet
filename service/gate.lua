@@ -31,7 +31,7 @@ end
 function handler.connect(fd, addr)
 	local c = {
 		fd = fd,
-		ip = msg,
+		ip = addr,
 	}
 	connection[fd] = c
 	skynet.send(watchdog, "lua", "socket", "open", fd, addr)
