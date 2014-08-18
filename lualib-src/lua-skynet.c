@@ -126,6 +126,15 @@ _genid(lua_State *L) {
 	return 1;
 }
 
+static const char *
+get_dest_string(lua_State *L, int index) {
+	const char * dest_string = lua_tostring(L, index);
+	if (dest_string == NULL) {
+		luaL_error(L, "dest address type (%s) must be a string or number.", lua_typename(L, lua_type(L,index)));
+	}
+	return dest_string;
+}
+
 /*
 	unsigned address
 	 string address
@@ -141,7 +150,7 @@ _send(lua_State *L) {
 	uint32_t dest = lua_tounsigned(L, 1);
 	const char * dest_string = NULL;
 	if (dest == 0) {
-		dest_string = lua_tostring(L, 1);
+		dest_string = get_dest_string(L, 1);
 	}
 
 	int type = luaL_checkinteger(L, 2);
@@ -195,7 +204,7 @@ _redirect(lua_State *L) {
 	uint32_t dest = lua_tounsigned(L,1);
 	const char * dest_string = NULL;
 	if (dest == 0) {
-		dest_string = lua_tostring(L,1);
+		dest_string = get_dest_string(L, 1);
 	}
 	uint32_t source = luaL_checkunsigned(L,2);
 	int type = luaL_checkinteger(L,3);
