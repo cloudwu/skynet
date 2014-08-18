@@ -1,10 +1,17 @@
 local skynet = require "skynet"
-local c = require "skynet.c"
+local c = require "skynet.core"
 local snax_interface = require "snax.interface"
 local profile = require "profile"
 local snax = require "snax"
 
-local func = snax_interface(tostring(...), _ENV)
+local snax_name = tostring(...)
+local func, pattern = snax_interface(snax_name, _ENV)
+local snax_path = pattern:sub(1,pattern:find("?", 1, true)-1) .. snax_name ..  "/"
+package.path = snax_path .. "?.lua;" .. package.path
+
+SERVICE_NAME = snax_name
+SERVICE_PATH = snax_path
+
 local mode
 local thread_id
 local message_queue = {}

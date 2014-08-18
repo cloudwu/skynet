@@ -1,3 +1,20 @@
+Dev version
+-----------
+* add sharedata
+* bugfix: service exit before init would not report back
+* add skynet.response and check multicall skynet.ret
+* skynet.newservice throw error when lanuch faild
+* Don't check imported function in snax.hotfix
+* snax service add change SERVICE_PATH and add it to package.path
+* skynet.redirect support string address
+* bugfix: skynet.harbor.link may block
+* add skynet.harbor.queryname to query globalname
+* add cluster.proxy 
+* add DEBUG command exit (send a message to lua service by DEBUG)
+* add DEBUG command run (debug_console command inject)
+* bugfix : socketchannel connect once
+* bugfix : mongo driver
+
 v0.5.2 (2014-8-11)
 -----------
 * Bugfix : httpd request

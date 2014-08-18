@@ -8,7 +8,7 @@
 struct skynet_context;
 
 uint32_t skynet_handle_register(struct skynet_context *);
-void skynet_handle_retire(uint32_t handle);
+int skynet_handle_retire(uint32_t handle);
 struct skynet_context * skynet_handle_grab(uint32_t handle);
 void skynet_handle_retireall();
 

@@ -507,8 +507,8 @@ op_insert(lua_State *L) {
 		for (i=1;i<=s;i++) {
 			lua_rawgeti(L,3,i);
 			document doc = lua_touserdata(L,-1);
+			lua_pop(L,1);	// must call lua_pop before luaL_addlstring, because addlstring may change stack top
 			luaL_addlstring(&b, (const char *)doc, get_length(doc));
-			lua_pop(L,1);
 		}
 	}
 

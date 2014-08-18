@@ -45,10 +45,8 @@ local function wakeup(db, key1, key2, value, ...)
 		db[key1] = nil
 		if value then
 			-- throw error because can't wake up a branch
-			for _,v in ipairs(q) do
-				local session = v[1]
-				local source = v[2]
-				skynet.redirect(source, 0, "error", session, "")
+			for _,response in ipairs(q) do
+				response(false)
 			end
 		else
 			return q
@@ -66,15 +64,13 @@ function command.UPDATE(...)
 	end
 	local q = wakeup(wait_queue, ...)
 	if q then
-		for _, v in ipairs(q) do
-			local session = v[1]
-			local source = v[2]
-			skynet.redirect(source, 0, "response", session, skynet.pack(value))
+		for _, response in ipairs(q) do
+			response(true,value)
 		end
 	end
 end
 
-local function waitfor(session, source, db, key1, key2, ...)
+local function waitfor(db, key1, key2, ...)
 	if key2 == nil then
 		-- push queue
 		local q = db[key1]
@@ -84,7 +80,7 @@ local function waitfor(session, source, db, key1, key2, ...)
 		else
 			assert(q[mode] == "queue")
 		end
-		table.insert(q, { session, source })
+		table.insert(q, skynet.response())
 	else
 		local q = db[key1]
 		if q == nil then
@@ -93,18 +89,18 @@ local function waitfor(session, source, db, key1, key2, ...)
 		else
 			assert(q[mode] == "branch")
 		end
-		return waitfor(session, source, q, key2, ...)
+		return waitfor(q, key2, ...)
 	end
 end
 
 skynet.start(function()
-	skynet.dispatch("lua", function (session, source, cmd, ...)
+	skynet.dispatch("lua", function (_, _, cmd, ...)
 		if cmd == "WAIT" then
 			local ret = command.QUERY(...)
 			if ret then
 				skynet.ret(skynet.pack(ret))
 			else
-				waitfor(session, source, wait_queue, ...)
+				waitfor(wait_queue, ...)
 			end
 		else
 			local f = assert(command[cmd])

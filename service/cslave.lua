@@ -1,9 +1,11 @@
 local skynet = require "skynet"
 local socket = require "socket"
+local table = table
 
 local slaves = {}
 local connect_queue = {}
 local globalname = {}
+local queryname = {}
 local harbor = {}
 local harbor_service
 local monitor = {}
@@ -28,7 +30,7 @@ local function monitor_clear(id)
 	if v then
 		monitor[id] = nil
 		for _, v in ipairs(v) do
-			skynet.redirect(v.address, 0, "response", v.session, "")
+			v(true)
 		end
 	end
 end
@@ -60,6 +62,17 @@ local function ready()
 	end
 end
 
+local function response_name(name)
+	local address = globalname[name]
+	if queryname[name] then
+		local tmp = queryname[name]
+		queryname[name] = nil
+		for _,resp in ipairs(tmp) do
+			resp(true, address)
+		end
+	end
+end
+
 local function monitor_master(master_fd)
 	while true do
 		local ok, t, id_name, address = pcall(read_package,master_fd)
@@ -72,6 +85,7 @@ local function monitor_master(master_fd)
 				end
 			elseif t == 'N' then
 				globalname[id_name] = address
+				response_name(id_name)
 				if connect_queue == nil then
 					skynet.redirect(harbor_service, address, "harbor", 0, "N " .. id_name)
 				end
@@ -79,6 +93,7 @@ local function monitor_master(master_fd)
 				local fd = slaves[id_name]
 				slaves[id_name] = false
 				if fd then
+					monitor_clear(id_name)
 					socket.close(fd)
 				end
 			end
@@ -129,14 +144,14 @@ local function monitor_harbor(master_fd)
 	return function(session, source, command)
 		local t = string.sub(command, 1, 1)
 		local arg = string.sub(command, 3)
-		if t == "Q" then
+		if t == 'Q' then
 			-- query name
 			if globalname[arg] then
 				skynet.redirect(harbor_service, globalname[arg], "harbor", 0, "N " .. arg)
 			else
 				socket.write(master_fd, pack_package("Q", arg))
 			end
-		elseif t == "D" then
+		elseif t == 'D' then
 			-- harbor down
 			local id = tonumber(arg)
 			if slaves[id] then
@@ -149,32 +164,52 @@ local function monitor_harbor(master_fd)
 	end
 end
 
-function harbor.REGISTER(_,_, fd, name, handle)
+function harbor.REGISTER(fd, name, handle)
 	assert(globalname[name] == nil)
 	globalname[name] = handle
+	response_name(name)
 	socket.write(fd, pack_package("R", name, handle))
 	skynet.redirect(harbor_service, handle, "harbor", 0, "N " .. name)
 end
 
-function harbor.LINK(session, source, fd, id)
+function harbor.LINK(fd, id)
 	if slaves[id] then
 		if monitor[id] == nil then
 			monitor[id] = {}
 		end
-		table.insert(monitor[id], { address = source, session = session })
+		table.insert(monitor[id], skynet.response())
 	else
 		skynet.ret()
 	end
 end
 
-function harbor.CONNECT(session, source, fd, id)
+function harbor.CONNECT(fd, id)
 	if not slaves[id] then
 		if monitor[id] == nil then
 			monitor[id] = {}
 		end
-		table.insert(monitor[id], { address = source, session = session })
+		table.insert(monitor[id], skynet.response())
 	else
 		skynet.ret()
+	end
+end
+
+function harbor.QUERYNAME(fd, name)
+	if name:byte() == 46 then	-- "." , local name
+		skynet.ret(skynet.pack(skynet.localname(name)))
+		return
+	end
+	local result = globalname[name]
+	if result then
+		skynet.ret(skynet.pack(result))
+		return
+	end
+	local queue = queryname[name]
+	if queue == nil then
+		queue = { skynet.response() }
+		queryname[name] = queue
+	else
+		table.insert(queue, skynet.response())
 	end
 end
 
@@ -184,11 +219,11 @@ skynet.start(function()
 	local slave_address = assert(skynet.getenv "address")
 	local slave_fd = socket.listen(slave_address)
 	skynet.error("slave connect to master " .. tostring(master_addr))
-	local master_fd = socket.open(master_addr)
+	local master_fd = assert(socket.open(master_addr), "Can't connect to master")
 
-	skynet.dispatch("lua", function (session,source,command,...)
+	skynet.dispatch("lua", function (_,_,command,...)
 		local f = assert(harbor[command])
-		f(session, source, master_fd, ...)
+		f(master_fd, ...)
 	end)
 	skynet.dispatch("text", monitor_harbor(master_fd))
 

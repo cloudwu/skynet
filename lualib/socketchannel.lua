@@ -218,9 +218,9 @@ local function try_connect(self , once)
 			if not once then
 				skynet.error("socket: connect to", self.__host, self.__port)
 			end
-			return
+			return true
 		elseif once then
-			error(string.format("Connect to %s:%d failed", self.__host, self.__port))
+			return false
 		end
 		if t > 1000 then
 			skynet.error("socket: try to reconnect", self.__host, self.__port)
@@ -233,7 +233,7 @@ local function try_connect(self , once)
 	end
 end
 
-local function block_connect(self, once)
+local function check_connection(self)
 	if self.__sock then
 		local authco = self.__authcoroutine
 		if not authco then
@@ -247,26 +247,36 @@ local function block_connect(self, once)
 	if self.__closed then
 		return false
 	end
+end
+
+local function block_connect(self, once)
+	local r = check_connection(self)
+	if r ~= nil then
+		return r
+	end
 
 	if #self.__connecting > 0 then
 		-- connecting in other coroutine
 		local co = coroutine.running()
 		table.insert(self.__connecting, co)
 		skynet.wait()
-		-- check connection again
-		return block_connect(self, once)
-	end
-	self.__connecting[1] = true
-	try_connect(self, once)
-	self.__connecting[1] = nil
-	for i=2, #self.__connecting do
-		local co = self.__connecting[i]
-		self.__connecting[i] = nil
-		skynet.wakeup(co)
+	else
+		self.__connecting[1] = true
+		try_connect(self, once)
+		self.__connecting[1] = nil
+		for i=2, #self.__connecting do
+			local co = self.__connecting[i]
+			self.__connecting[i] = nil
+			skynet.wakeup(co)
+		end
 	end
 
-	-- check again
-	return block_connect(self, once)
+	r = check_connection(self)
+	if r == nil then
+		error(string.format("Connect to %s:%d failed", self.__host, self.__port))
+	else
+		return r
+	end
 end
 
 function channel:connect(once)
@@ -296,7 +306,7 @@ local function wait_for_response(self, response)
 end
 
 function channel:request(request, response)
-	assert(block_connect(self))
+	assert(block_connect(self, true))	-- connect once
 
 	if not socket.write(self.__sock[1], request) then
 		close_channel_socket(self)
