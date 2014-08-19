@@ -36,17 +36,17 @@ struct remote_message_header {
 	uint32_t session;
 };
 
-struct msg {
+struct harbor_msg {
 	struct remote_message_header header;
 	void * buffer;
 	size_t size;
 };
 
-struct msg_queue {
+struct harbor_msg_queue {
 	int size;
 	int head;
 	int tail;
-	struct msg * data;
+	struct harbor_msg * data;
 };
 
 struct keyvalue {
@@ -54,7 +54,7 @@ struct keyvalue {
 	char key[GLOBALNAME_LENGTH];
 	uint32_t hash;
 	uint32_t value;
-	struct msg_queue * queue;
+	struct harbor_msg_queue * queue;
 };
 
 struct hashmap {
@@ -69,7 +69,7 @@ struct hashmap {
 
 struct slave {
 	int fd;
-	struct msg_queue *queue;
+	struct harbor_msg_queue *queue;
 	int status;
 	int length;
 	int read;
@@ -88,11 +88,11 @@ struct harbor {
 // hash table
 
 static void
-push_queue_msg(struct msg_queue * queue, struct msg * m) {
+push_queue_msg(struct harbor_msg_queue * queue, struct harbor_msg * m) {
 	// If there is only 1 free slot which is reserved to distinguish full/empty
 	// of circular buffer, expand it.
 	if (((queue->tail + 1) % queue->size) == queue->head) {
-		struct msg * new_buffer = skynet_malloc(queue->size * 2 * sizeof(struct msg));
+		struct harbor_msg * new_buffer = skynet_malloc(queue->size * 2 * sizeof(struct harbor_msg));
 		int i;
 		for (i=0;i<queue->size-1;i++) {
 			new_buffer[i] = queue->data[(i+queue->head) % queue->size];
@@ -103,46 +103,46 @@ push_queue_msg(struct msg_queue * queue, struct msg * m) {
 		queue->tail = queue->size - 1;
 		queue->size *= 2;
 	}
-	struct msg * slot = &queue->data[queue->tail];
+	struct harbor_msg * slot = &queue->data[queue->tail];
 	*slot = *m;
 	queue->tail = (queue->tail + 1) % queue->size;
 }
 
 static void
-push_queue(struct msg_queue * queue, void * buffer, size_t sz, struct remote_message_header * header) {
-	struct msg m;
+push_queue(struct harbor_msg_queue * queue, void * buffer, size_t sz, struct remote_message_header * header) {
+	struct harbor_msg m;
 	m.header = *header;
 	m.buffer = buffer;
 	m.size = sz;
 	push_queue_msg(queue, &m);
 }
 
-static struct msg *
-pop_queue(struct msg_queue * queue) {
+static struct harbor_msg *
+pop_queue(struct harbor_msg_queue * queue) {
 	if (queue->head == queue->tail) {
 		return NULL;
 	}
-	struct msg * slot = &queue->data[queue->head];
+	struct harbor_msg * slot = &queue->data[queue->head];
 	queue->head = (queue->head + 1) % queue->size;
 	return slot;
 }
 
-static struct msg_queue *
+static struct harbor_msg_queue *
 new_queue() {
-	struct msg_queue * queue = skynet_malloc(sizeof(*queue));
+	struct harbor_msg_queue * queue = skynet_malloc(sizeof(*queue));
 	queue->size = DEFAULT_QUEUE_SIZE;
 	queue->head = 0;
 	queue->tail = 0;
-	queue->data = skynet_malloc(DEFAULT_QUEUE_SIZE * sizeof(struct msg));
+	queue->data = skynet_malloc(DEFAULT_QUEUE_SIZE * sizeof(struct harbor_msg));
 
 	return queue;
 }
 
 static void
-release_queue(struct msg_queue *queue) {
+release_queue(struct harbor_msg_queue *queue) {
 	if (queue == NULL)
 		return;
-	struct msg * m;
+	struct harbor_msg * m;
 	while ((m=pop_queue(queue)) != NULL) {
 		skynet_free(m->buffer);
 	}
@@ -334,7 +334,7 @@ send_remote(struct skynet_context * ctx, int fd, const char * buffer, size_t sz,
 
 static void
 dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
-	struct msg_queue * queue = node->queue;
+	struct harbor_msg_queue * queue = node->queue;
 	uint32_t handle = node->value;
 	int harbor_id = handle >> HANDLE_REMOTE_SHIFT;
 	assert(harbor_id != 0);
@@ -352,7 +352,7 @@ dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
 				s->queue = node->queue;
 				node->queue = NULL;
 			} else {
-				struct msg * m;
+				struct harbor_msg * m;
 				while ((m = pop_queue(queue))!=NULL) {
 					push_queue_msg(s->queue, m);
 				}
@@ -360,7 +360,7 @@ dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
 		}
 		return;
 	}
-	struct msg * m;
+	struct harbor_msg * m;
 	while ((m = pop_queue(queue)) != NULL) {
 		m->header.destination |= (handle & HANDLE_MASK);
 		send_remote(context, fd, m->buffer, m->size, &m->header);
@@ -373,11 +373,11 @@ dispatch_queue(struct harbor *h, int id) {
 	int fd = s->fd;
 	assert(fd != 0);
 
-	struct msg_queue *queue = s->queue;
+	struct harbor_msg_queue *queue = s->queue;
 	if (queue == NULL)
 		return;
 
-	struct msg * m;
+	struct harbor_msg * m;
 	while ((m = pop_queue(queue)) != NULL) {
 		send_remote(h->ctx, fd, m->buffer, m->size, &m->header);
 	}
