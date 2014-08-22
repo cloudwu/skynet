@@ -9,6 +9,7 @@
 #include "skynet_env.h"
 #include "skynet_monitor.h"
 #include "skynet_imp.h"
+#include "skynet_log.h"
 
 #include <pthread.h>
 
@@ -37,13 +38,14 @@
 struct skynet_context {
 	void * instance;
 	struct skynet_module * mod;
-	uint32_t handle;
-	int ref;
-	char result[32];
 	void * cb_ud;
 	skynet_cb cb;
-	int session_id;
 	struct message_queue *queue;
+	FILE * logfile;
+	char result[32];
+	uint32_t handle;
+	int session_id;
+	int ref;
 	bool init;
 	bool endless;
 
@@ -129,6 +131,7 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
 	ctx->session_id = 0;
+	ctx->logfile = NULL;
 
 	ctx->init = false;
 	ctx->endless = false;
@@ -177,6 +180,9 @@ skynet_context_grab(struct skynet_context *ctx) {
 
 static void 
 delete_context(struct skynet_context *ctx) {
+	if (ctx->logfile) {
+		fclose(ctx->logfile);
+	}
 	skynet_module_instance_release(ctx->mod, ctx->instance);
 	skynet_mq_mark_release(ctx->queue);
 	skynet_free(ctx);
@@ -224,12 +230,15 @@ skynet_isremote(struct skynet_context * ctx, uint32_t handle, int * harbor) {
 }
 
 static void
-_dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
+dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
 	CHECKCALLING_BEGIN(ctx)
 	pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx->handle));
 	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
 	size_t sz = msg->sz & HANDLE_MASK;
+	if (ctx->logfile) {
+		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
+	}
 	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
 		skynet_free(msg->data);
 	} 
@@ -242,7 +251,7 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 	struct skynet_message msg;
 	struct message_queue *q = ctx->queue;
 	while (!skynet_mq_pop(q,&msg)) {
-		_dispatch_message(ctx, &msg);
+		dispatch_message(ctx, &msg);
 	}
 }
 
@@ -280,7 +289,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		if (ctx->cb == NULL) {
 			skynet_free(msg.data);
 		} else {
-			_dispatch_message(ctx, &msg);
+			dispatch_message(ctx, &msg);
 		}
 
 		skynet_monitor_trigger(sm, 0,0);
@@ -412,17 +421,23 @@ cmd_exit(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
-static const char *
-cmd_kill(struct skynet_context * context, const char * param) {
+static uint32_t
+tohandle(struct skynet_context * context, const char * param) {
 	uint32_t handle = 0;
 	if (param[0] == ':') {
 		handle = strtoul(param+1, NULL, 16);
 	} else if (param[0] == '.') {
 		handle = skynet_handle_findname(param+1);
 	} else {
-		skynet_error(context, "Can't kill %s",param);
-		// todo : kill global service
+		skynet_error(context, "Can't convert %s to handle",param);
 	}
+
+	return handle;
+}
+
+static const char *
+cmd_kill(struct skynet_context * context, const char * param) {
+	uint32_t handle = tohandle(context, param);
 	if (handle) {
 		handle_exit(context, handle);
 	}
@@ -503,14 +518,7 @@ cmd_monitor(struct skynet_context * context, const char * param) {
 		}
 		return NULL;
 	} else {
-		if (param[0] == ':') {
-			handle = strtoul(param+1, NULL, 16);
-		} else if (param[0] == '.') {
-			handle = skynet_handle_findname(param+1);
-		} else {
-			skynet_error(context, "Can't monitor %s",param);
-			// todo : monitor global service
-		}
+		handle = tohandle(context, param);
 	}
 	G_NODE.monitor_exit = handle;
 	return NULL;
@@ -521,6 +529,48 @@ cmd_mqlen(struct skynet_context * context, const char * param) {
 	int len = skynet_mq_length(context->queue);
 	sprintf(context->result, "%d", len);
 	return context->result;
+}
+
+static const char *
+cmd_logon(struct skynet_context * context, const char * param) {
+	uint32_t handle = tohandle(context, param);
+	if (handle == 0)
+		return NULL;
+	struct skynet_context * ctx = skynet_handle_grab(handle);
+	if (ctx == NULL)
+		return NULL;
+	FILE *f = NULL;
+	FILE * lastf = ctx->logfile;
+	if (lastf == NULL) {
+		f = skynet_log_open(context, handle);
+		if (f) {
+			if (!__sync_bool_compare_and_swap(&ctx->logfile, NULL, f)) {
+				// logfile opens in other thread, close this one.
+				fclose(f);
+			}
+		}
+	}
+	skynet_context_release(ctx);
+	return NULL;
+}
+
+static const char *
+cmd_logoff(struct skynet_context * context, const char * param) {
+	uint32_t handle = tohandle(context, param);
+	if (handle == 0)
+		return NULL;
+	struct skynet_context * ctx = skynet_handle_grab(handle);
+	if (ctx == NULL)
+		return NULL;
+	FILE * f = ctx->logfile;
+	if (f) {
+		// logfile may close in other thread
+		if (__sync_bool_compare_and_swap(&ctx->logfile, f, NULL)) {
+			skynet_log_close(context, f, handle);
+		}
+	}
+	skynet_context_release(ctx);
+	return NULL;
 }
 
 static struct command_func cmd_funcs[] = {
@@ -539,6 +589,8 @@ static struct command_func cmd_funcs[] = {
 	{ "ABORT", cmd_abort },
 	{ "MONITOR", cmd_monitor },
 	{ "MQLEN", cmd_mqlen },
+	{ "LOGON", cmd_logon },
+	{ "LOGOFF", cmd_logoff },
 	{ NULL, NULL },
 };
 

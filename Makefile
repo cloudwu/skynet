@@ -48,7 +48,7 @@ LUA_CLIB = skynet socketdriver int64 bson mongo md5 netpack \
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
   skynet_server.c skynet_start.c skynet_timer.c skynet_error.c \
   skynet_harbor.c skynet_env.c skynet_monitor.c skynet_socket.c socket_server.c \
-  malloc_hook.c skynet_daemon.c
+  malloc_hook.c skynet_daemon.c skynet_log.c
 
 all : \
   $(SKYNET_BUILD_PATH)/skynet \
