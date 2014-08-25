@@ -1,3 +1,9 @@
+v0.6.1 (2014-8-25)
+-----------
+* bugfix: datacenter.wakeup
+* change struct msg name to avoid conflict in mac
+* improve seri library
+
 v0.6.0 (2014-8-18)
 -----------
 * add sharedata
