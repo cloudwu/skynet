@@ -144,7 +144,8 @@ function suspend(co, result, command, param, size)
 	if not result then
 		local session = session_coroutine_id[co]
 		local addr = session_coroutine_address[co]
-		if session then
+		if session ~= 0 then
+			-- only call response error
 			c.send(addr, skynet.PTYPE_ERROR, session, "")
 		end
 		session_coroutine_id[co] = nil
