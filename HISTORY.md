@@ -1,3 +1,7 @@
+v0.6.2 (2014-9-1)
+-----------
+* bugfix: only skynet.call response PTYPE_ERROR
+
 v0.6.1 (2014-8-25)
 -----------
 * bugfix: datacenter.wakeup
