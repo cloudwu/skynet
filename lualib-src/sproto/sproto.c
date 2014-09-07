@@ -329,10 +329,13 @@ import_protocol(struct sproto *s, struct protocol *p, const uint8_t * stream) {
 	p->p[SPROTO_REQUEST] = NULL;
 	p->p[SPROTO_RESPONSE] = NULL;
 	int i;
-	for (i=0;i<fn;i++) {
+	int tag = 0;
+	for (i=0;i<fn;i++,tag++) {
 		int value = toword(stream + SIZEOF_FIELD * i);
-		if (value & 1)
-			return NULL;
+		if (value & 1) {
+			tag += (value-1)/2;
+			continue;
+		}
 		value = value/2 - 1;
 		switch (i) {
 		case 0:	// name
@@ -362,7 +365,7 @@ import_protocol(struct sproto *s, struct protocol *p, const uint8_t * stream) {
 		}
 	}
 
-	if (p->name == NULL || p->tag<0 || p->p[SPROTO_REQUEST] == NULL) {
+	if (p->name == NULL || p->tag<0) {
 		return NULL;
 	}
 

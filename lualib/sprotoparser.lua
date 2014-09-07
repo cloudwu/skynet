@@ -271,30 +271,35 @@ local function packtype(name, t, alltypes)
 end
 
 local function packproto(name, p, alltypes)
-	if p.request == nil then
-		error(string.format("Protocol %s need request", name))
+--	if p.request == nil then
+--		error(string.format("Protocol %s need request", name))
+--	end
+	if p.request then
+		local request = alltypes[p.request]
+		if request == nil then
+			error(string.format("Protocol %s request type %s not found", name, p.request))
+		end
 	end
-	local request = alltypes[p.request]
-	if request == nil then
-		error(string.format("Protocol %s request type %s not found", name, p.request))
-	end
-	local tmp
-	if p.response then
-		tmp = {
-			"\4\0",	-- 4 fields
-			"\0\0",	-- name (id=0, ref=0)
-			packvalue(p.tag),	-- tag (tag=1)
-			packvalue(alltypes[p.request]),	-- request typename (tag=2)
-			packvalue(alltypes[p.response]),  -- response typename (tag=3)
-		}
+	local tmp = {
+		"\4\0",	-- 4 fields
+		"\0\0",	-- name (id=0, ref=0)
+		packvalue(p.tag),	-- tag (tag=1)
+	}
+	if p.request == nil and p.response == nil then
+		tmp[1] = "\2\0"
 	else
-		tmp = {
-			"\3\0",	-- 3 fields
-			"\0\0",	-- name (id=0, ref=0)
-			packvalue(p.tag),	-- tag (tag=1)
-			packvalue(alltypes[p.request]),	-- request typename (tag=2)
-		}
+		if p.request then
+			table.insert(tmp, packvalue(alltypes[p.request])) -- request typename (tag=2)
+		else
+			table.insert(tmp, "\1\0")
+		end
+		if p.response then
+			table.insert(tmp, packvalue(alltypes[p.response])) -- request typename (tag=3)
+		else
+			tmp[1] = "\3\0"
+		end
 	end
+
 	table.insert(tmp, packbytes(name))
 
 	return packbytes(table.concat(tmp))

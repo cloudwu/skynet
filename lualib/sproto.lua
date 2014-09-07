@@ -126,11 +126,19 @@ function rpc:dispatch(...)
 	if header.type then
 		-- request
 		local proto = queryproto(self.__proto, header.type)
-		local result = core.decode(proto.request, content)
-		if header_tmp.session then
-			return "REQUEST", proto.name, result, gen_response(self, proto.response, header_tmp.session)
+		if proto.request then
+			local result = core.decode(proto.request, content)
+			if header_tmp.session then
+				return "REQUEST", proto.name, result, gen_response(self, proto.response, header_tmp.session)
+			else
+				return "REQUEST", proto.name, result
+			end
 		else
-			return "REQUEST", proto.name, result
+			if header_tmp.session then
+				return "REQUEST", proto.name, nil, gen_response(self, proto.response, header_tmp.session)
+			else
+				return "REQUEST", proto.name
+			end
 		end
 	else
 		-- response

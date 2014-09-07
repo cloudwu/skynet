@@ -7,7 +7,6 @@ local proto = sprotoparser.parse [[
 }
 
 handshake 1 {
-	request {}
 	response {
 		msg 0  : string
 	}
