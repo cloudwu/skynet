@@ -1,8 +1,12 @@
 package.cpath = "luaclib/?.so"
+package.path = "lualib/?.lua;examples/?.lua"
 
 local socket = require "clientsocket"
-local cjson = require "cjson"
 local bit32 = require "bit32"
+local proto = require "proto"
+local sproto = require "sproto"
+
+local rpc = sproto.new(proto):rpc "package"
 
 local fd = assert(socket.connect("127.0.0.1", 8888))
 
@@ -46,33 +50,38 @@ end
 
 local session = 0
 
-local function send_request(v)
+local function send_request(name, args)
 	session = session + 1
-	local str = string.format("%d+%s",session, cjson.encode(v))
+	local str = rpc:request(name, args, session)
 	send_package(fd, str)
 	print("Request:", session)
 end
 
 local last = ""
 
-while true do
+local function dispatch_package()
 	while true do
 		local v
 		v, last = recv_package(last)
 		if not v then
 			break
 		end
-		local session,t,str = string.match(v, "(%d+)(.)(.*)")
-		assert(t == '-' or t == '+')
-		session = tonumber(session)
-		local result = cjson.decode(str)
-		print("Response:",session, result[1], result[2])
+
+		local t, session, response = rpc:dispatch(v)
+		assert(t == "RESPONSE" , "This example only support request , so here must be RESPONSE")
+		print("response session", session)
+		for k,v in pairs(response) do
+			print(k,v)
+		end
 	end
+end
+
+send_request("handshake")
+while true do
+	dispatch_package()
 	local cmd = socket.readstdin()
 	if cmd then
-		local args = {}
-		string.gsub(cmd, '[^ ]+', function(v) table.insert(args, v) end )
-		send_request(args)
+		send_request("get", { what = cmd })
 	else
 		socket.usleep(100)
 	end
