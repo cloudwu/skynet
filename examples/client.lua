@@ -6,7 +6,8 @@ local bit32 = require "bit32"
 local proto = require "proto"
 local sproto = require "sproto"
 
-local rpc = sproto.new(proto):rpc "package"
+local host = sproto.new(proto.s2c):host "package"
+local request = host:attach(sproto.new(proto.c2s))
 
 local fd = assert(socket.connect("127.0.0.1", 8888))
 
@@ -52,12 +53,39 @@ local session = 0
 
 local function send_request(name, args)
 	session = session + 1
-	local str = rpc:request(name, args, session)
+	local str = request(name, args, session)
 	send_package(fd, str)
 	print("Request:", session)
 end
 
 local last = ""
+
+local function print_request(name, args)
+	print("REQUEST", name)
+	if args then
+		for k,v in pairs(args) do
+			print(k,v)
+		end
+	end
+end
+
+local function print_response(session, args)
+	print("RESPONSE", session)
+	if args then
+		for k,v in pairs(args) do
+			print(k,v)
+		end
+	end
+end
+
+local function print_package(t, ...)
+	if t == "REQUEST" then
+		print_request(...)
+	else
+		assert(t == "RESPONSE")
+		print_response(...)
+	end
+end
 
 local function dispatch_package()
 	while true do
@@ -67,16 +95,12 @@ local function dispatch_package()
 			break
 		end
 
-		local t, session, response = rpc:dispatch(v)
-		assert(t == "RESPONSE" , "This example only support request , so here must be RESPONSE")
-		print("response session", session)
-		for k,v in pairs(response) do
-			print(k,v)
-		end
+		print_package(host:dispatch(v))
 	end
 end
 
 send_request("handshake")
+send_request("set", { what = "hello", value = "world" })
 while true do
 	dispatch_package()
 	local cmd = socket.readstdin()

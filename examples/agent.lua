@@ -4,7 +4,8 @@ local socket = require "socket"
 local sproto = require "sproto"
 local bit32 = require "bit32"
 
-local rpc
+local host
+local send_request
 
 local CMD = {}
 local REQUEST = {}
@@ -19,11 +20,10 @@ end
 function REQUEST:set()
 	print("set", self.what, self.value)
 	local r = skynet.call("SIMPLEDB", "lua", "set", self.what, self.value)
-	return { ok = true }
 end
 
 function REQUEST:handshake()
-	return { msg = "Welcome to skynet" }
+	return { msg = "Welcome to skynet, I will send heartbeat every 5 sec." }
 end
 
 local function request(name, args, response)
@@ -47,7 +47,7 @@ skynet.register_protocol {
 	name = "client",
 	id = skynet.PTYPE_CLIENT,
 	unpack = function (msg, sz)
-		return rpc:dispatch(msg, sz)
+		return host:dispatch(msg, sz)
 	end,
 	dispatch = function (_, _, type, ...)
 		if type == "REQUEST" then
@@ -67,7 +67,15 @@ skynet.register_protocol {
 }
 
 function CMD.start(gate, fd, proto)
-	rpc = sproto.new(proto):rpc "package"
+	host = sproto.new(proto.c2s):host "package"
+	send_request = host:attach(sproto.new(proto.s2c))
+	skynet.fork(function()
+		while true do
+			send_package(send_request "heartbeat")
+			skynet.sleep(500)
+		end
+	end)
+
 	client_fd = fd
 	skynet.call(gate, "lua", "forward", fd)
 end
