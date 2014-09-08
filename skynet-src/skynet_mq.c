@@ -76,17 +76,6 @@ skynet_globalmq_pop() {
 
 	uint32_t head_ptr = GP(head);
 
-	struct message_queue * list = q->list;
-	if (list) {
-		// If q->list is not empty, try to load it back to the queue
-		struct message_queue *newhead = list->next;
-		if (__sync_bool_compare_and_swap(&q->list, list, newhead)) {
-			// try load list only once, if success , push it back to the queue.
-			list->next = NULL;
-			skynet_globalmq_push(list);
-		}
-	}
-
 	struct message_queue * mq = q->queue[head_ptr];
 	if (mq == NULL) {
 		// globalmq push not complete
@@ -98,6 +87,17 @@ skynet_globalmq_pop() {
 	// only one thread can get the slot (change q->queue[head_ptr] to NULL)
 	if (!__sync_bool_compare_and_swap(&q->queue[head_ptr], mq, NULL)) {
 		return NULL;
+	}
+
+    struct message_queue * list = q->list;
+	if (list) {
+		// If q->list is not empty, try to load it back to the queue
+		struct message_queue *newhead = list->next;
+		if (__sync_bool_compare_and_swap(&q->list, list, newhead)) {
+			// try load list only once, if success , push it back to the queue.
+			list->next = NULL;
+			skynet_globalmq_push(list);
+		}
 	}
 
 	return mq;
