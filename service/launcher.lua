@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+local core = require "skynet.core"
 local string = string
 
 local services = {}
@@ -65,18 +66,29 @@ function command.REMOVE(_, handle)
 	return NORET
 end
 
-local function return_string(str)
-	return str
+local function launch_service(service, ...)
+	local param = table.concat({...}, " ")
+	local inst = skynet.launch(service, param)
+	local response = skynet.response()
+	if inst then
+		services[inst] = service .. " " .. param
+		instance[inst] = response
+	else
+		response(false)
+		return
+	end
+	return inst
 end
 
 function command.LAUNCH(_, service, ...)
-	local param = table.concat({...}, " ")
-	local inst = skynet.launch(service, param)
+	launch_service(service, ...)
+	return NORET
+end
+
+function command.LOGLAUNCH(_, service, ...)
+	local inst = launch_service(service, ...)
 	if inst then
-		services[inst] = service .. " " .. param
-		instance[inst] = skynet.response(return_string)
-	else
-		skynet.ret("")	-- launch failed
+		core.command("LOGON", skynet.address(inst))
 	end
 	return NORET
 end
@@ -97,7 +109,7 @@ function command.LAUNCHOK(address)
 	-- init notice
 	local response = instance[address]
 	if response then
-		response(true, skynet.address(address))
+		response(true, address)
 		instance[address] = nil
 	end
 
@@ -116,9 +128,7 @@ skynet.register_protocol {
 		elseif cmd == "ERROR" then
 			command.ERROR(address)
 		else
-			-- launch request
-			local service, param = string.match(cmd,"([^ ]+) (.*)")
-			command.LAUNCH(_, service, param)
+			error ("Invalid text command " .. cmd)
 		end
 	end,
 }

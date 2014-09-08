@@ -1,0 +1,90 @@
+HISTORY for LPeg 0.12
+
+* Changes from version 0.11 to 0.12
+  ---------------------------------
+  + no "unsigned short" limit for pattern sizes
+  + mathtime captures considered nullable
+  + some bugs fixed
+
+* Changes from version 0.10 to 0.11
+  -------------------------------  
+  + complete reimplementation of the code generator
+  + new syntax for table captures
+  + new functions in module 're'
+  + other small improvements
+
+* Changes from version 0.9 to 0.10
+  -------------------------------  
+  + backtrack stack has configurable size
+  + better error messages
+  + Notation for non-terminals in 're' back to A instead o <A>
+  + experimental look-behind pattern
+  + support for external extensions
+  + works with Lua 5.2
+  + consumes less C stack
+
+  - "and" predicates do not keep captures
+
+* Changes from version 0.8 to 0.9
+  -------------------------------  
+  + The accumulator capture was replaced by a fold capture;
+    programs that used the old 'lpeg.Ca' will need small changes.
+  + Some support for character classes from old C locales.
+  + A new named-group capture.
+
+* Changes from version 0.7 to 0.8
+  -------------------------------  
+  + New "match-time" capture.
+  + New "argument capture" that allows passing arguments into the pattern.
+  + Better documentation for 're'.
+  + Several small improvements for 're'.
+  + The 're' module has an incompatibility with previous versions: 
+    now, any use of a non-terminal must be enclosed in angle brackets 
+    (like <B>).
+
+* Changes from version 0.6 to 0.7
+  -------------------------------  
+  + Several improvements in module 're':
+    - better documentation;
+    - support for most captures (all but accumulator);
+    - limited repetitions p{n,m}.
+  + Small improvements in efficiency.
+  + Several small bugs corrected (special thanks to Hans Hagen 
+    and Taco Hoekwater).
+
+* Changes from version 0.5 to 0.6
+  -------------------------------  
+  + Support for non-numeric indices in grammars.
+  + Some bug fixes (thanks to the luatex team).
+  + Some new optimizations; (thanks to Mike Pall).
+  + A new page layout (thanks to Andre Carregal).
+  + Minimal documentation for module 're'.
+
+* Changes from version 0.4 to 0.5
+  -------------------------------  
+  + Several optimizations.
+  + lpeg.P now accepts booleans.
+  + Some new examples.
+  + A proper license.
+  + Several small improvements.
+
+* Changes from version 0.3 to 0.4
+  -------------------------------  
+  + Static check for loops in repetitions and grammars.
+  + Removed label option in captures.
+  + The implementation of captures uses less memory.
+
+* Changes from version 0.2 to 0.3
+  -------------------------------  
+  + User-defined patterns in Lua.
+  + Several new captures.
+
+* Changes from version 0.1 to 0.2
+  -------------------------------  
+  + Several small corrections.
+  + Handles embedded zeros like any other character.
+  + Capture "name" can be any Lua value.
+  + Unlimited number of captures.
+  + Match gets an optional initial position.
+
+(end of HISTORY)

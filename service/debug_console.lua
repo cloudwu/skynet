@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local codecache = require "skynet.codecache"
+local core = require "skynet.core"
 local socket = require "socket"
 local snax = require "snax"
 
@@ -120,6 +121,9 @@ function COMMAND.help()
 		service = "List unique service",
 		task = "task address : show service task detail",
 		inject = "inject address luascript.lua",
+		logon = "logon address",
+		logoff = "logoff address",
+		log = "launch a new lua service with log",
 	}
 end
 
@@ -129,6 +133,15 @@ end
 
 function COMMAND.start(...)
 	local ok, addr = pcall(skynet.newservice, ...)
+	if ok then
+		return { [skynet.address(addr)] = ... }
+	else
+		return "Failed"
+	end
+end
+
+function COMMAND.log(...)
+	local ok, addr = pcall(skynet.call, ".launcher", "lua", "LOGLAUNCH", "snlua", ...)
 	if ok then
 		return { [skynet.address(addr)] = ... }
 	else
@@ -180,4 +193,14 @@ end
 function COMMAND.info(address)
 	address = adjust_address(address)
 	return skynet.call(address,"debug","INFO")
+end
+
+function COMMAND.logon(address)
+	address = adjust_address(address)
+	core.command("LOGON", skynet.address(address))
+end
+
+function COMMAND.logoff(address)
+	address = adjust_address(address)
+	core.command("LOGOFF", skynet.address(address))
 end

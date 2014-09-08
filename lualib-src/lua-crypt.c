@@ -836,6 +836,10 @@ lb64decode(lua_State *L) {
 	return 1;
 }
 
+// defined in lsha1.c
+int lsha1(lua_State *L);
+int lhmac_sha1(lua_State *L);
+
 int
 luaopen_crypt(lua_State *L) {
 	luaL_checkversion(L);
@@ -852,6 +856,8 @@ luaopen_crypt(lua_State *L) {
 		{ "dhsecret", ldhsecret },
 		{ "base64encode", lb64encode },
 		{ "base64decode", lb64decode },
+		{ "sha1", lsha1 },
+		{ "hmac_sha1", lhmac_sha1 },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);
