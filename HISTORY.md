@@ -1,3 +1,10 @@
+v0.7.0 (2014-9-8)
+-----------
+* Use sproto instead of cjson
+* Add message logger
+* Add hmac-sha1
+* Some minor bugfix
+
 v0.6.2 (2014-9-1)
 -----------
 * bugfix: only skynet.call response PTYPE_ERROR
