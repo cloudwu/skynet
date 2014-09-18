@@ -32,15 +32,18 @@ end
 
 local CMD = {}
 
+local env_mt = { __index = _ENV }
+
 function CMD.new(name, t)
 	local dt = type(t)
 	local value
 	if dt == "table" then
 		value = t
 	elseif dt == "string" then
-		value = {}
+		value = setmetatable({}, env_mt)
 		local f = load(t, "=" .. name, "t", value)
 		f()
+		setmetatable(value, nil)
 	elseif dt == "nil" then
 		value = {}
 	else
