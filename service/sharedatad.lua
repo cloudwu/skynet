@@ -39,7 +39,7 @@ function CMD.new(name, t)
 		value = t
 	elseif dt == "string" then
 		value = {}
-		local f = load(t, "=" .. name, "t", env)
+		local f = load(t, "=" .. name, "t", value)
 		f()
 	elseif dt == "nil" then
 		value = {}
