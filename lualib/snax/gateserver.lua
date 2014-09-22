@@ -96,7 +96,7 @@ function gateserver.start(handler)
 
 	function MSG.error(fd, msg)
 		if handler.error then
-			handler.error(fd)
+			handler.error(fd, msg)
 		end
 		close_fd(fd)
 	end

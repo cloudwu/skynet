@@ -122,7 +122,7 @@ local function dispatch_wakeup()
 		local session = sleep_session[co]
 		if session then
 			session_id_coroutine[session] = "BREAK"
-			return suspend(co, coroutine.resume(co, true))
+			return suspend(co, coroutine.resume(co, true, "BREAK"))
 		end
 	end
 end
@@ -246,7 +246,8 @@ function skynet.sleep(ti)
 	session = tonumber(session)
 	local succ, ret = coroutine_yield("SLEEP", session)
 	sleep_session[coroutine.running()] = nil
-	if ret == true then
+	assert(succ, ret)
+	if ret == "BREAK" then
 		return "BREAK"
 	end
 end
