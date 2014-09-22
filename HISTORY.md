@@ -1,3 +1,9 @@
+v0.7.1 (2014-9-22)
+-----------
+* bugfix: wakeup sleep should return BREAK
+* bugfix: sharedatad load string
+* bugfix: dataserver forward error msg
+
 v0.7.0 (2014-9-8)
 -----------
 * Use sproto instead of cjson
