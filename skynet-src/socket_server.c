@@ -335,7 +335,6 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 			sock = -1;
 			continue;
 		}
-		sp_nonblocking(sock);
 		break;
 	}
 
