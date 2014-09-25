@@ -168,7 +168,7 @@ function suspend(co, result, command, param, size)
 		session_response[co] = true
 		local ret
 		if not dead_service[co_address] then
-			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) >= 0
+			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) ~= nil
 		elseif size == nil then
 			c.trash(param, size)
 			ret = false
@@ -202,9 +202,9 @@ function suspend(co, result, command, param, size)
 			local ret
 			if not dead_service[co_address] then
 				if ok then
-					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) >=0
+					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) ~= nil
 				else
-					ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") >=0
+					ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") ~= nil
 				end
 			else
 				ret = false
