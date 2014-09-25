@@ -143,13 +143,15 @@ end
 function suspend(co, result, command, param, size)
 	if not result then
 		local session = session_coroutine_id[co]
-		local addr = session_coroutine_address[co]
-		if session ~= 0 then
-			-- only call response error
-			c.send(addr, skynet.PTYPE_ERROR, session, "")
+		if session then -- coroutine may fork by others (session is nil)
+			local addr = session_coroutine_address[co]
+			if session ~= 0 then
+				-- only call response error
+				c.send(addr, skynet.PTYPE_ERROR, session, "")
+			end
+			session_coroutine_id[co] = nil
+			session_coroutine_address[co] = nil
 		end
-		session_coroutine_id[co] = nil
-		session_coroutine_address[co] = nil
 		error(debug.traceback(co,tostring(command)))
 	end
 	if command == "CALL" then
@@ -694,6 +696,10 @@ function skynet.task(ret)
 		t = t + 1
 	end
 	return t
+end
+
+function skynet.term(service)
+	return _error_dispatch(0, service)
 end
 
 -- Inject internal debug framework

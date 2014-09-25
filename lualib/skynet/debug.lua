@@ -54,6 +54,10 @@ function dbgcmd.RUN(source, filename)
 	skynet.ret(skynet.pack(table.concat(output, "\n")))
 end
 
+function dbgcmd.TERM(service)
+	skynet.term(service)
+end
+
 local function _debug_dispatch(session, address, cmd, ...)
 	local f = dbgcmd[cmd]
 	assert(f, cmd)
