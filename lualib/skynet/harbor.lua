@@ -19,4 +19,8 @@ function harbor.connect(id)
 	skynet.call(".cslave", "lua", "CONNECT", id)
 end
 
+function harbor.linkmaster()
+	skynet.call(".cslave", "lua", "LINKMASTER")
+end
+
 return harbor
