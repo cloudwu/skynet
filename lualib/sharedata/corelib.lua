@@ -59,15 +59,15 @@ function meta:__index(key)
 		local newobj, newtbl = needupdate(self.__gcobj)
 		if newobj then
 			local newgcobj = newtbl.__gcobj
-			-- todo: update
 			local root = findroot(self)
 			update(root, newobj, newgcobj)
 			if obj == self.__obj then
 				error ("The key [" .. genkey(self) .. "] doesn't exist after update")
 			end
+			obj = self.__obj
 		end
 	end
-	local v = index(self.__obj, key)
+	local v = index(obj, key)
 	if type(v) == "userdata" then
 		local r = setmetatable({
 			__obj = v,
@@ -127,7 +127,7 @@ end
 
 function conf.update(self, pointer)
 	local cobj = self.__obj
-	assert(isdirty(cobj), "Obly dirty object can be update")
+	assert(isdirty(cobj), "Only dirty object can be update")
 	core.update(self.__gcobj, pointer, { __gcobj = core.box(pointer) })
 end
 
