@@ -59,7 +59,7 @@ local function ready()
 		connect_slave(k,v)
 	end
 	for name,address in pairs(globalname) do
-		skynet.redirect(harbor_service, address, "harbor", "N " .. name)
+		skynet.redirect(harbor_service, address, "harbor", 0, "N " .. name)
 	end
 end
 
