@@ -3,7 +3,21 @@ local io = io
 
 local hotfix = {}
 
-local function collect_uv(f , uv)
+local function envid(f)
+	local i = 1
+	while true do
+		local name, value = debug.getupvalue(f, i)
+		if name == nil then
+			return
+		end
+		if name == "_ENV" then
+			return debug.upvalueid(f, i)
+		end
+		i = i + 1
+	end
+end
+
+local function collect_uv(f , uv, env)
 	local i = 1
 	while true do
 		local name, value = debug.getupvalue(f, i)
@@ -18,7 +32,9 @@ local function collect_uv(f , uv)
 			uv[name] = { func = f, index = i, id = id }
 
 			if type(value) == "function" then
-				collect_uv(value, uv)
+				if envid(value) == env then
+					collect_uv(value, uv, env)
+				end
 			end
 		end
 
@@ -30,7 +46,7 @@ local function collect_all_uv(funcs)
 	local global = {}
 	for _, v in pairs(funcs) do
 		if v[4] then
-			collect_uv(v[4], global)
+			collect_uv(v[4], global, envid(v[4]))
 		end
 	end
 

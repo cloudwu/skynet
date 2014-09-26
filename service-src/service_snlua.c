@@ -55,7 +55,7 @@ traceback (lua_State *L) {
 static void
 _report_launcher_error(struct skynet_context *ctx) {
 	// sizeof "ERROR" == 5
-	skynet_sendname(ctx, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
+	skynet_sendname(ctx, 0, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
 }
 
 static const char *

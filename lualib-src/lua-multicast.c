@@ -149,7 +149,7 @@ mc_nextid(lua_State *L) {
 }
 
 int
-luaopen_multicast_c(lua_State *L) {
+luaopen_multicast_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "pack", mc_packlocal },
 		{ "unpack", mc_unpacklocal },

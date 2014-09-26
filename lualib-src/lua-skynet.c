@@ -74,9 +74,16 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 }
 
 static int
+forward_cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
+	_cb(context, ud, type, session, source, msg, sz);
+	// don't delete msg in forward mode.
+	return 1;
+}
+
+static int
 _callback(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-
+	int forward = lua_toboolean(L, 2);
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);
 	lua_rawsetp(L, LUA_REGISTRYINDEX, _cb);
@@ -84,7 +91,11 @@ _callback(lua_State *L) {
 	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
 	lua_State *gL = lua_tothread(L,-1);
 
-	skynet_callback(context, gL, _cb);
+	if (forward) {
+		skynet_callback(context, gL, forward_cb);
+	} else {
+		skynet_callback(context, gL, _cb);
+	}
 
 	return 0;
 }
@@ -115,44 +126,13 @@ _genid(lua_State *L) {
 	return 1;
 }
 
-// copy from _send
-
-static int
-_sendname(lua_State *L, struct skynet_context * context, const char * dest) {
-	int type = luaL_checkinteger(L, 2);
-	int session = 0;
-	if (lua_isnil(L,3)) {
-		type |= PTYPE_TAG_ALLOCSESSION;
-	} else {
-		session = luaL_checkinteger(L,3);
+static const char *
+get_dest_string(lua_State *L, int index) {
+	const char * dest_string = lua_tostring(L, index);
+	if (dest_string == NULL) {
+		luaL_error(L, "dest address type (%s) must be a string or number.", lua_typename(L, lua_type(L,index)));
 	}
-
-	int mtype = lua_type(L,4);
-	switch (mtype) {
-	case LUA_TSTRING: {
-		size_t len = 0;
-		void * msg = (void *)lua_tolstring(L,4,&len);
-		session = skynet_sendname(context, dest, type, session , msg, len);
-		break;
-	}
-	case LUA_TNIL :
-		session = skynet_sendname(context, dest, type, session , NULL, 0);
-		break;
-	case LUA_TLIGHTUSERDATA: {
-		luaL_checktype(L, 4, LUA_TLIGHTUSERDATA);
-		void * msg = lua_touserdata(L,4);
-		int size = luaL_checkinteger(L,5);
-		session = skynet_sendname(context, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
-		break;
-	}
-	default:
-		luaL_error(L, "skynet.send invalid param %s", lua_typename(L,lua_type(L,4)));
-	}
-	if (session < 0) {
-		return 0;
-	}
-	lua_pushinteger(L,session);
-	return 1;
+	return dest_string;
 }
 
 /*
@@ -167,28 +147,10 @@ _sendname(lua_State *L, struct skynet_context * context, const char * dest) {
 static int
 _send(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	int addr_type = lua_type(L,1);
-	uint32_t dest = 0;
-	switch(addr_type) {
-	case LUA_TNUMBER:
-		dest = lua_tounsigned(L,1);
-		break;
-	case LUA_TSTRING: {
-		const char * addrname = lua_tostring(L,1);
-		if (addrname[0] == '.' || addrname[0] == ':') {
-			dest = skynet_queryname(context, addrname);
-			if (dest == 0) {
-				luaL_error(L, "Invalid name %s", addrname);
-			}
-		} else if ('0' <= addrname[0] && addrname[0] <= '9') {
-			luaL_error(L, "Invalid name %s: must not start with a digit", addrname);
-		} else {
-			return _sendname(L, context, addrname);
-		}
-		break;
-	}
-	default:
-		return luaL_error(L, "address must be number or string, got %s",lua_typename(L,addr_type));
+	uint32_t dest = lua_tounsigned(L, 1);
+	const char * dest_string = NULL;
+	if (dest == 0) {
+		dest_string = get_dest_string(L, 1);
 	}
 
 	int type = luaL_checkinteger(L, 2);
@@ -207,13 +169,21 @@ _send(lua_State *L) {
 		if (len == 0) {
 			msg = NULL;
 		}
-		session = skynet_send(context, 0, dest, type, session , msg, len);
+		if (dest_string) {
+			session = skynet_sendname(context, 0, dest_string, type, session , msg, len);
+		} else {
+			session = skynet_send(context, 0, dest, type, session , msg, len);
+		}
 		break;
 	}
 	case LUA_TLIGHTUSERDATA: {
 		void * msg = lua_touserdata(L,4);
 		int size = luaL_checkinteger(L,5);
-		session = skynet_send(context, 0, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		if (dest_string) {
+			session = skynet_sendname(context, 0, dest_string, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		} else {
+			session = skynet_send(context, 0, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		}
 		break;
 	}
 	default:
@@ -231,7 +201,11 @@ _send(lua_State *L) {
 static int
 _redirect(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	uint32_t dest = luaL_checkunsigned(L,1);
+	uint32_t dest = lua_tounsigned(L,1);
+	const char * dest_string = NULL;
+	if (dest == 0) {
+		dest_string = get_dest_string(L, 1);
+	}
 	uint32_t source = luaL_checkunsigned(L,2);
 	int type = luaL_checkinteger(L,3);
 	int session = luaL_checkinteger(L,4);
@@ -244,13 +218,21 @@ _redirect(lua_State *L) {
 		if (len == 0) {
 			msg = NULL;
 		}
-		session = skynet_send(context, source, dest, type, session , msg, len);
+		if (dest_string) {
+			session = skynet_sendname(context, source, dest_string, type, session , msg, len);
+		} else {
+			session = skynet_send(context, source, dest, type, session , msg, len);
+		}
 		break;
 	}
 	case LUA_TLIGHTUSERDATA: {
 		void * msg = lua_touserdata(L,5);
 		int size = luaL_checkinteger(L,6);
-		session = skynet_send(context, source, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		if (dest_string) {
+			session = skynet_sendname(context, source, dest_string, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		} else {
+			session = skynet_send(context, source, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
+		}
 		break;
 	}
 	default:
@@ -299,8 +281,28 @@ lpackstring(lua_State *L) {
 	return 1;
 }
 
+static int
+ltrash(lua_State *L) {
+	int t = lua_type(L,1);
+	switch (t) {
+	case LUA_TSTRING: {
+		break;
+	}
+	case LUA_TLIGHTUSERDATA: {
+		void * msg = lua_touserdata(L,1);
+		luaL_checkinteger(L,2);
+		skynet_free(msg);
+		break;
+	}
+	default:
+		luaL_error(L, "skynet.trash invalid param %s", lua_typename(L,t));
+	}
+
+	return 0;
+}
+
 int
-luaopen_skynet_c(lua_State *L) {
+luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
 	
 	luaL_Reg l[] = {
@@ -314,6 +316,7 @@ luaopen_skynet_c(lua_State *L) {
 		{ "pack", _luaseri_pack },
 		{ "unpack", _luaseri_unpack },
 		{ "packstring", lpackstring },
+		{ "trash" , ltrash },
 		{ "callback", _callback },
 		{ NULL, NULL },
 	};

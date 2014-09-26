@@ -1,3 +1,43 @@
+v0.7.1 (2014-9-22)
+-----------
+* bugfix: wakeup sleep should return BREAK
+* bugfix: sharedatad load string
+* bugfix: dataserver forward error msg
+
+v0.7.0 (2014-9-8)
+-----------
+* Use sproto instead of cjson
+* Add message logger
+* Add hmac-sha1
+* Some minor bugfix
+
+v0.6.2 (2014-9-1)
+-----------
+* bugfix: only skynet.call response PTYPE_ERROR
+
+v0.6.1 (2014-8-25)
+-----------
+* bugfix: datacenter.wakeup
+* change struct msg name to avoid conflict in mac
+* improve seri library
+
+v0.6.0 (2014-8-18)
+-----------
+* add sharedata
+* bugfix: service exit before init would not report back
+* add skynet.response and check multicall skynet.ret
+* skynet.newservice throw error when lanuch faild
+* Don't check imported function in snax.hotfix
+* snax service add change SERVICE_PATH and add it to package.path
+* skynet.redirect support string address
+* bugfix: skynet.harbor.link may block
+* add skynet.harbor.queryname to query globalname
+* add cluster.proxy 
+* add DEBUG command exit (send a message to lua service by DEBUG)
+* add DEBUG command run (debug_console command inject)
+* bugfix : socketchannel connect once
+* bugfix : mongo driver
+
 v0.5.2 (2014-8-11)
 -----------
 * Bugfix : httpd request

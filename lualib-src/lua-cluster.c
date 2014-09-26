@@ -203,7 +203,7 @@ lunpackresponse(lua_State *L) {
 }
 
 int
-luaopen_cluster_c(lua_State *L) {
+luaopen_cluster_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "packrequest", lpackrequest },
 		{ "unpackrequest", lunpackrequest },

@@ -1,5 +1,8 @@
+package.path = "./examples/?.lua;" .. package.path
+
 local skynet = require "skynet"
 local netpack = require "netpack"
+local proto = require "proto"
 
 local CMD = {}
 local SOCKET = {}
@@ -8,7 +11,7 @@ local agent = {}
 
 function SOCKET.open(fd, addr)
 	agent[fd] = skynet.newservice("agent")
-	skynet.call(agent[fd], "lua", "start", gate, fd)
+	skynet.call(agent[fd], "lua", "start", gate, fd, proto)
 end
 
 local function close_agent(fd)

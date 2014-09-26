@@ -589,11 +589,11 @@ read64(lua_State *L, uint32_t xx[2], uint32_t yy[2]) {
 	size_t sz = 0;
 	const uint8_t *x = (const uint8_t *)luaL_checklstring(L, 1, &sz);
 	if (sz != 8) {
-		luaL_error(L, "Invalid hmac x");
+		luaL_error(L, "Invalid uint64 x");
 	}
 	const uint8_t *y = (const uint8_t *)luaL_checklstring(L, 2, &sz);
 	if (sz != 8) {
-		luaL_error(L, "Invalid hmac y");
+		luaL_error(L, "Invalid uint64 y");
 	}
 	xx[0] = x[0] | x[1]<<8 | x[2]<<16 | x[3]<<24;
 	xx[1] = x[4] | x[5]<<8 | x[6]<<16 | x[7]<<24;
@@ -703,7 +703,7 @@ ldhexchange(lua_State *L) {
 	size_t sz = 0;
 	const uint8_t *x = (const uint8_t *)luaL_checklstring(L, 1, &sz);
 	if (sz != 8) {
-		luaL_error(L, "Invalid hmac x");
+		luaL_error(L, "Invalid dh uint64 key");
 	}
 	uint32_t xx[2];
 	xx[0] = x[0] | x[1]<<8 | x[2]<<16 | x[3]<<24;
@@ -836,6 +836,10 @@ lb64decode(lua_State *L) {
 	return 1;
 }
 
+// defined in lsha1.c
+int lsha1(lua_State *L);
+int lhmac_sha1(lua_State *L);
+
 int
 luaopen_crypt(lua_State *L) {
 	luaL_checkversion(L);
@@ -852,6 +856,8 @@ luaopen_crypt(lua_State *L) {
 		{ "dhsecret", ldhsecret },
 		{ "base64encode", lb64encode },
 		{ "base64decode", lb64decode },
+		{ "sha1", lsha1 },
+		{ "hmac_sha1", lhmac_sha1 },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);

@@ -145,6 +145,8 @@ local function connect(id, func)
 	suspend(s)
 	if s.connected then
 		return id
+	else
+		socket_pool[id] = nil
 	end
 end
 

@@ -97,9 +97,13 @@ static const char * load_config = "\
 
 int
 main(int argc, char *argv[]) {
-	const char * config_file = "config";
+	const char * config_file = NULL ;
 	if (argc > 1) {
 		config_file = argv[1];
+	} else {
+		fprintf(stderr, "Need a config file. Please read skynet wiki : https://github.com/cloudwu/skynet/wiki/Config\n"
+			"usage: skynet configfilename\n");
+		return 1;
 	}
 	skynet_globalinit();
 	skynet_env_init();

@@ -1,4 +1,8 @@
-return function (skynet)
+local io = io
+local table = table
+local debug = debug
+
+return function (skynet, dispatch_func)
 
 local internal_info_func
 
@@ -37,6 +41,17 @@ function dbgcmd.INFO()
 	else
 		skynet.ret(skynet.pack(nil))
 	end
+end
+
+function dbgcmd.EXIT()
+	skynet.exit()
+end
+
+function dbgcmd.RUN(source, filename)
+	local inject = require "skynet.inject"
+	local output = inject(source, filename , dispatch_func, skynet.register_protocol)
+	collectgarbage "collect"
+	skynet.ret(skynet.pack(table.concat(output, "\n")))
 end
 
 local function _debug_dispatch(session, address, cmd, ...)

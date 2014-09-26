@@ -117,7 +117,6 @@ local function register_global()
 
 	function cmd.REPORT(m)
 		mgr[m] = true
-		skynet.watch(m)
 	end
 
 	local function add_list(all, m)

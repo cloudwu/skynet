@@ -143,16 +143,11 @@ local function launch_master(conf)
 	local balance = 1
 
 	skynet.dispatch("lua", function(_,source,command, ...)
-		if command == "register_slave" then
-			table.insert(slave, source)
-			skynet.ret(skynet.pack(nil))
-		else
-			skynet.ret(skynet.pack(conf.command_handler(command, ...)))
-		end
+		skynet.ret(skynet.pack(conf.command_handler(command, ...)))
 	end)
 
 	for i=1,instance do
-		skynet.newservice(SERVICE_NAME)
+		table.insert(slave, skynet.newservice(SERVICE_NAME))
 	end
 
 	skynet.error(string.format("login server listen at : %s %d", host, port))
@@ -178,7 +173,6 @@ local function login(conf)
 	skynet.start(function()
 		local loginmaster = skynet.localname(name)
 		if loginmaster then
-			skynet.call(loginmaster, "lua", "register_slave")
 			local auth_handler = assert(conf.auth_handler)
 			launch_master = nil
 			conf = nil

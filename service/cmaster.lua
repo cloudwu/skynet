@@ -32,7 +32,7 @@ local function read_package(fd)
 	local sz = socket.read(fd, 1)
 	assert(sz, "closed")
 	sz = string.byte(sz)
-	local content = socket.read(fd, sz)
+	local content = assert(socket.read(fd, sz), "closed")
 	return skynet.unpack(content)
 end
 
