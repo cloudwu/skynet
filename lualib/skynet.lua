@@ -331,6 +331,7 @@ function skynet.time()
 end
 
 function skynet.exit()
+	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit
 	skynet.send(".launcher","lua","REMOVE",skynet.self())
 	-- report the sources that call me
 	for co, session in pairs(session_coroutine_id) do
