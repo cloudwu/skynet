@@ -211,11 +211,16 @@ bootstrap(struct skynet_context * logger, const char * cmdline) {
 
 void 
 skynet_start(struct skynet_config * config) {
+
+	// 初始化守护进程
 	if (config->daemon) {
 		if (daemon_init(config->daemon)) {
 			exit(1);
 		}
 	}
+
+	// 初始化服务harbor (特殊服务), 当一个消息的目的地址的高 8 位和本节点不同时，消息被投递到 harbor 服务中，它再通过 tcp 连接传输到目的节点的 harbor 服务中。
+	// 这里的 config->harbor 配置 remote id
 	skynet_harbor_init(config->harbor);
 	skynet_handle_init(config->harbor);
 	skynet_mq_init();
