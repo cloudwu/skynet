@@ -143,13 +143,15 @@ end
 function suspend(co, result, command, param, size)
 	if not result then
 		local session = session_coroutine_id[co]
-		local addr = session_coroutine_address[co]
-		if session ~= 0 then
-			-- only call response error
-			c.send(addr, skynet.PTYPE_ERROR, session, "")
+		if session then -- coroutine may fork by others (session is nil)
+			local addr = session_coroutine_address[co]
+			if session ~= 0 then
+				-- only call response error
+				c.send(addr, skynet.PTYPE_ERROR, session, "")
+			end
+			session_coroutine_id[co] = nil
+			session_coroutine_address[co] = nil
 		end
-		session_coroutine_id[co] = nil
-		session_coroutine_address[co] = nil
 		error(debug.traceback(co,tostring(command)))
 	end
 	if command == "CALL" then
@@ -166,7 +168,7 @@ function suspend(co, result, command, param, size)
 		session_response[co] = true
 		local ret
 		if not dead_service[co_address] then
-			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) >= 0
+			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) ~= nil
 		elseif size == nil then
 			c.trash(param, size)
 			ret = false
@@ -200,9 +202,9 @@ function suspend(co, result, command, param, size)
 			local ret
 			if not dead_service[co_address] then
 				if ok then
-					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) >=0
+					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) ~= nil
 				else
-					ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") >=0
+					ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") ~= nil
 				end
 			else
 				ret = false
@@ -329,6 +331,7 @@ function skynet.time()
 end
 
 function skynet.exit()
+	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit
 	skynet.send(".launcher","lua","REMOVE",skynet.self())
 	-- report the sources that call me
 	for co, session in pairs(session_coroutine_id) do
@@ -694,6 +697,10 @@ function skynet.task(ret)
 		t = t + 1
 	end
 	return t
+end
+
+function skynet.term(service)
+	return _error_dispatch(0, service)
 end
 
 -- Inject internal debug framework
