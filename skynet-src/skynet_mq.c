@@ -15,6 +15,7 @@
 // 1 means mq is in global mq , or the message is dispatching.
 
 #define MQ_IN_GLOBAL 1
+#define MQ_OVERLOAD 1024
 
 struct message_queue {
 	uint32_t handle;
@@ -24,6 +25,8 @@ struct message_queue {
 	int lock;
 	int release;
 	int in_global;
+	int overload;
+	int overload_threshold;
 	struct skynet_message *queue;
 	struct message_queue *next;
 };
@@ -116,6 +119,8 @@ skynet_mq_create(uint32_t handle) {
 	// If the service init success, skynet_context_new will call skynet_mq_force_push to push it to global queue.
 	q->in_global = MQ_IN_GLOBAL;
 	q->release = 0;
+	q->overload = 0;
+	q->overload_threshold = MQ_OVERLOAD;
 	q->queue = skynet_malloc(sizeof(struct skynet_message) * q->cap);
 	q->next = NULL;
 
@@ -151,16 +156,41 @@ skynet_mq_length(struct message_queue *q) {
 }
 
 int
+skynet_mq_overload(struct message_queue *q) {
+	if (q->overload) {
+		int overload = q->overload;
+		q->overload = 0;
+		return overload;
+	} 
+	return 0;
+}
+
+int
 skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 	int ret = 1;
 	LOCK(q)
 
 	if (q->head != q->tail) {
-		*message = q->queue[q->head];
+		*message = q->queue[q->head++];
 		ret = 0;
-		if ( ++ q->head >= q->cap) {
-			q->head = 0;
+		int head = q->head;
+		int tail = q->tail;
+		int cap = q->cap;
+
+		if (head >= cap) {
+			q->head = head = 0;
 		}
+		int length = tail - head;
+		if (length < 0) {
+			length += cap;
+		}
+		while (length > q->overload_threshold) {
+			q->overload = length;
+			q->overload_threshold *= 2;
+		}
+	} else {
+		// reset overload_threshold when queue is empty
+		q->overload_threshold = MQ_OVERLOAD;
 	}
 
 	if (ret) {
