@@ -178,6 +178,14 @@ skynet_context_grab(struct skynet_context *ctx) {
 	__sync_add_and_fetch(&ctx->ref,1);
 }
 
+void
+skynet_context_reserve(struct skynet_context *ctx) {
+	skynet_context_grab(ctx);
+	// don't count the context reserved, because skynet abort (the worker threads terminate) only when the total context is 0 .
+	// the reserved context will be release at last.
+	context_dec();
+}
+
 static void 
 delete_context(struct skynet_context *ctx) {
 	if (ctx->logfile) {
