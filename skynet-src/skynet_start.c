@@ -239,5 +239,4 @@ skynet_start(struct skynet_config * config) {
 	if (config->daemon) {
 		daemon_exit(config->daemon);
 	}
-	skynet_harbor_exit();
 }
