@@ -125,9 +125,9 @@ _worker(void *p) {
 	skynet_initthread(THREAD_WORKER);
 	struct message_queue * q = NULL;
 	for (;;) {
+		CHECK_ABORT
 		q = skynet_context_message_dispatch(sm, q, weight);
 		if (q == NULL) {
-			CHECK_ABORT
 			if (pthread_mutex_lock(&m->mutex) == 0) {
 				++ m->sleep;
 				// "spurious wakeup" is harmless,
