@@ -368,7 +368,7 @@ lunpack(lua_State *L) {
 	lua_pushinteger(L, message->id);
 	lua_pushinteger(L, message->ud);
 	if (message->buffer == NULL) {
-		lua_pushlstring(L, (char *)(message+1),size - sizeof(*message));
+		lua_pushlstring(L, (char *)(message+1),size - sizeof(*message) - 1);
 	} else {
 		lua_pushlightuserdata(L, message->buffer);
 	}
