@@ -37,6 +37,7 @@ function gateserver.start(handler)
 		local port = assert(conf.port)
 		maxclient = conf.maxclient or 1024
 		nodelay = conf.nodelay
+		skynet.error(string.format("Listen on %s:%d", address, port))
 		socket = socketdriver.listen(address, port)
 		socketdriver.start(socket)
 		if handler.open then

@@ -178,6 +178,14 @@ skynet_context_grab(struct skynet_context *ctx) {
 	__sync_add_and_fetch(&ctx->ref,1);
 }
 
+void
+skynet_context_reserve(struct skynet_context *ctx) {
+	skynet_context_grab(ctx);
+	// don't count the context reserved, because skynet abort (the worker threads terminate) only when the total context is 0 .
+	// the reserved context will be release at last.
+	context_dec();
+}
+
 static void 
 delete_context(struct skynet_context *ctx) {
 	if (ctx->logfile) {
@@ -282,6 +290,10 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		} else if (i==0 && weight >= 0) {
 			n = skynet_mq_length(q);
 			n >>= weight;
+		}
+		int overload = skynet_mq_overload(q);
+		if (overload) {
+			skynet_error(ctx, "May overload, message queue length = %d", overload);
 		}
 
 		skynet_monitor_trigger(sm, msg.source , handle);
