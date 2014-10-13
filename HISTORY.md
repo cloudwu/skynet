@@ -1,3 +1,8 @@
+v0.7.4 (2014-10-13)
+-----------
+* Bugfix : clear coroutine pool when GC
+* hotfix : A bug introduce by 0.7.3 
+
 v0.7.3 (2014-10-13)
 -----------
 * Add some logs (warning) when overload
