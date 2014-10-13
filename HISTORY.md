@@ -1,3 +1,8 @@
+v0.7.3 (2014-10-13)
+-----------
+* Add some logs (warning) when overload
+* Bugfix: crash on exit
+
 v0.7.2 (2014-9-29)
 -----------
 * Bugfix : datacenter.wait
