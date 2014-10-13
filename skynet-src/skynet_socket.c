@@ -36,10 +36,9 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	int sz = sizeof(*sm);
 	if (padding) {
 		if (result->data) {
-			sz += strlen(result->data) + 1;
+			sz += strlen(result->data);
 		} else {
 			result->data = "";
-			sz += 1;
 		}
 	}
 	sm = (struct skynet_socket_message *)skynet_malloc(sz);
