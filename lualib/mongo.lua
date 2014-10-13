@@ -129,6 +129,7 @@ function mongo.client( conf	)
 		response = dispatch_reply,
 		auth = mongo_auth(obj),
 		backup = backup,
+		nodelay = true,
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect(true)	-- try connect only	once

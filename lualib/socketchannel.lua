@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local socket = require "socket"
+local socketdriver = require "socketdriver"
 
 -- channel support auto reconnect , and capture socket error in request/response transaction
 -- { host = "", port = , auth = function(so) , response = function(so) session, data }
@@ -37,6 +38,7 @@ function socket_channel.channel(desc)
 		__sock = false,
 		__closed = false,
 		__authcoroutine = false,
+		__nodelay = desc.nodelay,
 	}
 
 	return setmetatable(c, channel_meta)
@@ -185,6 +187,9 @@ local function connect_once(self)
 		if not fd then
 			return false
 		end
+	end
+	if self.__nodelay then
+		socketdriver.nodelay(fd)
 	end
 
 	self.__sock = setmetatable( {fd} , channel_socket_meta )
