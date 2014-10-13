@@ -31,5 +31,17 @@ skynet_harbor_init(int harbor) {
 
 void
 skynet_harbor_start(void *ctx) {
+	// the HARBOR must be reserved to ensure the pointer is valid.
+	// It will be released at last by calling skynet_harbor_exit
+	skynet_context_reserve(ctx);
 	REMOTE = ctx;
+}
+
+void
+skynet_harbor_exit() {
+	struct skynet_context * ctx = REMOTE;
+	REMOTE= NULL;
+	if (ctx) {
+		skynet_context_release(ctx);
+	}
 }
