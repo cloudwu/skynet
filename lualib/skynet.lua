@@ -709,8 +709,15 @@ function skynet.term(service)
 	return _error_dispatch(0, service)
 end
 
+local function clear_pool()
+	coroutine_pool = {}
+end
+
 -- Inject internal debug framework
 local debug = require "skynet.debug"
-debug(skynet, dispatch_message)
+debug(skynet, {
+	dispatch = dispatch_message,
+	clear = clear_pool,
+})
 
 return skynet
