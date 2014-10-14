@@ -47,7 +47,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	sm->ud = result->ud;
 	if (padding) {
 		sm->buffer = NULL;
-		strcpy((char*)(sm+1), result->data);
+		strncpy((char*)(sm+1), result->data, strlen(result->data));
 	} else {
 		sm->buffer = result->data;
 	}
