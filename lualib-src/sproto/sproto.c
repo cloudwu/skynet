@@ -1076,9 +1076,15 @@ pack_seg(const uint8_t *src, uint8_t * buffer, int sz, int n) {
 
 static inline void
 write_ff(const uint8_t * src, uint8_t * des, int n) {
+	int i;
+	int align8_n = (n+7)&(~7);
+
 	des[0] = 0xff;
-	des[1] = n-1;
-	memcpy(des+2, src, n * 8);
+	des[1] = align8_n/8 - 1;
+	memcpy(des+2, src, n);
+	for(i=0; i< align8_n-n; i++){
+		des[n+2+i] = 0;
+	}
 }
 
 int 
@@ -1092,6 +1098,7 @@ sproto_pack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 	const uint8_t * src = srcv;
 	uint8_t * buffer = bufferv;
 	for (i=0;i<srcsz;i+=8) {
+		int n;
 		int padding = i+8 - srcsz;
 		if (padding > 0) {
 			int j;
@@ -1101,7 +1108,7 @@ sproto_pack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 			}
 			src = tmp;
 		}
-		int n = pack_seg(src, buffer, bufsz, ff_n);
+		n = pack_seg(src, buffer, bufsz, ff_n);
 		bufsz -= n;
 		if (n == 10) {
 			// first FF
@@ -1112,14 +1119,14 @@ sproto_pack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 			++ff_n;
 			if (ff_n == 256) {
 				if (bufsz >= 0) {
-					write_ff(ff_srcstart, ff_desstart, 256);
+					write_ff(ff_srcstart, ff_desstart, 256*8);
 				}
 				ff_n = 0;
 			}
 		} else {
 			if (ff_n > 0) {
 				if (bufsz >= 0) {
-					write_ff(ff_srcstart, ff_desstart, ff_n);
+					write_ff(ff_srcstart, ff_desstart, ff_n*8);
 				}
 				ff_n = 0;
 			}
@@ -1128,8 +1135,11 @@ sproto_pack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 		buffer += n;
 		size += n;
 	}
-	if (ff_n > 0 && bufsz >= 0) {
-		write_ff(ff_srcstart, ff_desstart, ff_n);
+	if(bufsz >= 0){
+		if(ff_n == 1)
+			write_ff(ff_srcstart, ff_desstart, 8);
+		else if (ff_n > 1)
+			write_ff(ff_srcstart, ff_desstart, srcsz - (intptr_t)(ff_srcstart - (const uint8_t*)srcv));
 	}
 	return size;
 }
@@ -1144,10 +1154,11 @@ sproto_unpack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 		--srcsz;
 		++src;
 		if (header == 0xff) {
+			int n;
 			if (srcsz < 0) {
 				return -1;
 			}
-			int n = (src[0] + 1) * 8;
+			n = (src[0] + 1) * 8;
 			if (srcsz < n + 1)
 				return -1;
 			srcsz -= n + 1;
