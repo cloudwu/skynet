@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local coroutine = coroutine
-local pcall = pcall
+local xpcall = xpcall
+local traceback = debug.traceback
 local table = table
 
 function skynet.queue()
@@ -17,7 +18,7 @@ function skynet.queue()
 			assert(ref == 0)
 		end
 		ref = ref + 1
-		local ok, err = pcall(f, ...)
+		local ok, err = xpcall(f, traceback, ...)
 		ref = ref - 1
 		if ref == 0 then
 			current_thread = nil
