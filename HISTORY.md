@@ -1,3 +1,8 @@
+v0.8.0 (2014-10-27)
+-----------
+* Add mysql client driver
+* Bugfix : skynet.queue
+
 v0.7.4 (2014-10-13)
 -----------
 * Bugfix : clear coroutine pool when GC
