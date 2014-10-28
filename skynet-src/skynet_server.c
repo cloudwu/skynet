@@ -695,7 +695,7 @@ skynet_sendname(struct skynet_context * context, uint32_t source, const char * a
 			if (type & PTYPE_TAG_DONTCOPY) {
 				skynet_free(data);
 			}
-			return session;
+			return -1;
 		}
 	} else {
 		_filter_args(context, type, &session, (void **)&data, &sz);
