@@ -61,8 +61,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	if (skynet_context_push((uint32_t)result->opaque, &message)) {
 		// todo: report somewhere to close socket
 		// don't call skynet_socket_close here (It will block mainloop)
-		if (sm->buffer)
-			skynet_free(sm->buffer);
+		skynet_free(sm->buffer);
 		skynet_free(sm);
 	}
 }
