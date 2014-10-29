@@ -83,7 +83,7 @@ local function readall(readbytes, bodylimit)
 	else
 		-- identity mode
 		if length then
-			if length > bodylimit then
+			if bodylimit and length > bodylimit then
 				return 413
 			end
 			if #body >= length then
