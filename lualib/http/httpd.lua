@@ -130,6 +130,7 @@ local function writeall(writefunc, statuscode, bodyfunc, header)
 				end
 			else
 				writefunc("\r\n0\r\n\r\n")
+				break
 			end
 		end
 	else
