@@ -6,7 +6,7 @@
 local socketchannel = require "socketchannel"
 local bit = require "bit32"
 local mysqlaux = require "mysqlaux.c"
-
+local crypt = require "crypt"
 
 
 local sub = string.sub
@@ -20,7 +20,7 @@ local bxor = bit.bxor
 local bor = bit.bor
 local lshift = bit.lshift
 local rshift = bit.rshift
-local sha1= mysqlaux.sha1_bin
+local sha1= crypt.sha1
 local concat = table.concat
 local unpack = unpack
 local setmetatable = setmetatable
