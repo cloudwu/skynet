@@ -87,16 +87,17 @@ local function launch_slave(auth_handler)
 		return ok, server, uid, secret
 	end
 
-	local function ret_pack(ok, err, ...)
+	local function ret_pack(fd, ok, err, ...)
 		if ok then
 			skynet.ret(skynet.pack(err, ...))
 		elseif err ~= socket_error then
+			socket.close(fd)
 			error(err)
 		end
 	end
 
-	skynet.dispatch("lua", function(_,_,...)
-		ret_pack(pcall(auth, ...))
+	skynet.dispatch("lua", function(_,_,fd,...)
+		ret_pack(fd,pcall(auth,fd,...))
 	end)
 end
 
