@@ -87,17 +87,16 @@ local function launch_slave(auth_handler)
 		return ok, server, uid, secret
 	end
 
-	local function ret_pack(fd, ok, err, ...)
+	local function ret_pack(ok, err, ...)
 		if ok then
 			skynet.ret(skynet.pack(err, ...))
-		elseif err ~= socket_error then
-			socket.close(fd)
+		else
 			error(err)
 		end
 	end
 
-	skynet.dispatch("lua", function(_,_,fd,...)
-		ret_pack(fd,pcall(auth,fd,...))
+	skynet.dispatch("lua", function(_,_,...)
+		ret_pack(pcall(auth, ...))
 	end)
 end
 
@@ -164,6 +163,7 @@ local function launch_master(conf)
 			if err ~= socket_error then
 				skynet.error(string.format("invalid client (fd = %d) error = %s", fd, err))
 			end
+			socket.start(fd)
 		end
 		socket.close(fd)
 	end)
