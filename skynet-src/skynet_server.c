@@ -169,7 +169,11 @@ skynet_context_new(const char * name, const char *param) {
 int
 skynet_context_newsession(struct skynet_context *ctx) {
 	// session always be a positive number
-	int session = (++ctx->session_id) & 0x7fffffff;
+	int session = ++ctx->session_id;
+	if (session <= 0) {
+		ctx->session_id = 1;
+		return 1;
+	}
 	return session;
 }
 
@@ -691,7 +695,7 @@ skynet_sendname(struct skynet_context * context, uint32_t source, const char * a
 			if (type & PTYPE_TAG_DONTCOPY) {
 				skynet_free(data);
 			}
-			return session;
+			return -1;
 		}
 	} else {
 		_filter_args(context, type, &session, (void **)&data, &sz);
