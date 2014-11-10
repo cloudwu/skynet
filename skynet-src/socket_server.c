@@ -528,7 +528,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 				n = 0;
 				break;
 			default:
-				fprintf(stderr, "socket-server: write to %d (fd=%d) error.",id,s->fd);
+				fprintf(stderr, "socket-server: write to %d (fd=%d) error :%s.\n",id,s->fd,strerror(errno));
 				force_close(ss,s,result);
 				return SOCKET_CLOSE;
 			}
@@ -660,7 +660,7 @@ block_readpipe(int pipefd, void *buffer, int sz) {
 		if (n<0) {
 			if (errno == EINTR)
 				continue;
-			fprintf(stderr, "socket-server : read pipe error %s.",strerror(errno));
+			fprintf(stderr, "socket-server : read pipe error %s.\n",strerror(errno));
 			return;
 		}
 		// must atomic read from a pipe
