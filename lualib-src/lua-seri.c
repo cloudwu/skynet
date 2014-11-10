@@ -179,7 +179,7 @@ wb_string(struct write_block *wb, const char *str, int len) {
 			wb_push(wb, str, len);
 		}
 	} else {
-		int n;
+		uint8_t n;
 		if (len < 0x10000) {
 			n = COMBINE_TYPE(TYPE_LONG_STRING, 2);
 			wb_push(wb, &n, 1);
