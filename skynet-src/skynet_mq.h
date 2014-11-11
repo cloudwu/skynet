@@ -30,6 +30,7 @@ void skynet_mq_push(struct message_queue *q, struct skynet_message *message);
 
 // return the length of message queue, for debug
 int skynet_mq_length(struct message_queue *q);
+int skynet_mq_overload(struct message_queue *q);
 
 void skynet_mq_init();
 

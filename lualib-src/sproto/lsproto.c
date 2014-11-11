@@ -19,17 +19,17 @@
 */
 LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
 #ifdef luaL_checkversion
-  luaL_checkversion(L);
+	luaL_checkversion(L);
 #endif
-  luaL_checkstack(L, nup, "too many upvalues");
-  for (; l->name != NULL; l++) {  /* fill the table with given functions */
-    int i;
-    for (i = 0; i < nup; i++)  /* copy upvalues to the top */
-      lua_pushvalue(L, -nup);
-    lua_pushcclosure(L, l->func, nup);  /* closure with those upvalues */
-    lua_setfield(L, -(nup + 2), l->name);
-  }
-  lua_pop(L, nup);  /* remove upvalues */
+	luaL_checkstack(L, nup, "too many upvalues");
+	for (; l->name != NULL; l++) {  /* fill the table with given functions */
+		int i;
+		for (i = 0; i < nup; i++)  /* copy upvalues to the top */
+			lua_pushvalue(L, -nup);
+		lua_pushcclosure(L, l->func, nup);  /* closure with those upvalues */
+		lua_setfield(L, -(nup + 2), l->name);
+	}
+	lua_pop(L, nup);  /* remove upvalues */
 }
 
 #define luaL_newlibtable(L,l) \
@@ -62,18 +62,20 @@ ldeleteproto(lua_State *L) {
 
 static int
 lquerytype(lua_State *L) {
+	const char * type_name;
 	struct sproto *sp = lua_touserdata(L,1);
+	struct sproto_type *st;
 	if (sp == NULL) {
 		return luaL_argerror(L, 1, "Need a sproto object");
 	}
-	const char * typename = luaL_checkstring(L,2);
-	struct sproto_type *st = sproto_type(sp, typename);
+	type_name = luaL_checkstring(L,2);
+	st = sproto_type(sp, type_name);
 	if (st) {
 		lua_pushlightuserdata(L, st);
 		return 1;
 	}
 
-	return luaL_error(L, "type %s not found", typename);
+	return luaL_error(L, "type %s not found", type_name);
 }
 
 struct encode_ud {
@@ -119,9 +121,10 @@ encode(void *ud, const char *tagname, int type, int index, struct sproto_type *s
 	switch (type) {
 	case SPROTO_TINTEGER: {
 		lua_Integer v = luaL_checkinteger(L, -1);
+		lua_Integer vh;
 		lua_pop(L,1);
 		// notice: in lua 5.2, lua_Integer maybe 52bit
-		lua_Integer vh = v >> 31;
+		vh = v >> 31;
 		if (vh == 0 || vh == -1) {
 			*(uint32_t *)value = (uint32_t)v;
 			return 4;
@@ -148,13 +151,14 @@ encode(void *ud, const char *tagname, int type, int index, struct sproto_type *s
 	}
 	case SPROTO_TSTRUCT: {
 		struct encode_ud sub;
+		int r;
 		sub.L = L;
 		sub.st = st;
 		sub.tbl_index = lua_gettop(L);
 		sub.array_tag = NULL;
 		sub.array_index = 0;
 		sub.deep = self->deep + 1;
-		int r = sproto_encode(st, value, length, encode, &sub);
+		r = sproto_encode(st, value, length, encode, &sub);
 		lua_pop(L,1);
 		return r;
 	}
@@ -165,6 +169,7 @@ encode(void *ud, const char *tagname, int type, int index, struct sproto_type *s
 
 static void *
 expand_buffer(lua_State *L, int osz, int nsz) {
+	void *output;
 	do {
 		osz *= 2;
 	} while (osz < nsz);
@@ -172,7 +177,7 @@ expand_buffer(lua_State *L, int osz, int nsz) {
 		luaL_error(L, "object is too large (>%d)", ENCODE_MAXSIZE);
 		return NULL;
 	}
-	void *output = lua_newuserdata(L, osz);
+	output = lua_newuserdata(L, osz);
 	lua_replace(L, lua_upvalueindex(1));
 	lua_pushinteger(L, osz);
 	lua_replace(L, lua_upvalueindex(2));
@@ -188,6 +193,7 @@ expand_buffer(lua_State *L, int osz, int nsz) {
  */
 static int
 lencode(lua_State *L) {
+	struct encode_ud self;
 	void * buffer = lua_touserdata(L, lua_upvalueindex(1));
 	int sz = lua_tointeger(L, lua_upvalueindex(2));
 
@@ -197,7 +203,6 @@ lencode(lua_State *L) {
 	}
 	luaL_checktype(L, 2, LUA_TTABLE);
 	luaL_checkstack(L, ENCODE_DEEPLEVEL + 8, NULL);
-	struct encode_ud self;
 	self.L = L;
 	self.st = st;
 	self.tbl_index = 2;
@@ -261,15 +266,16 @@ decode(void *ud, const char *tagname, int type, int index, struct sproto_type *s
 		break;
 	}
 	case SPROTO_TSTRUCT: {
-		lua_newtable(L);
 		struct decode_ud sub;
+		int r;
+		lua_newtable(L);
 		sub.L = L;
 		sub.result_index = lua_gettop(L);
 		sub.deep = self->deep + 1;
 		sub.array_index = 0;
 		sub.array_tag = NULL;
 
-		int r = sproto_decode(st, value, length, decode, &sub);
+		r = sproto_decode(st, value, length, decode, &sub);
 		if (r < 0 || r != length)
 			return r;
 		lua_settop(L, sub.result_index);
@@ -312,22 +318,25 @@ getbuffer(lua_State *L, int index, size_t *sz) {
 static int
 ldecode(lua_State *L) {
 	struct sproto_type * st = lua_touserdata(L, 1);
+	const void * buffer;
+	struct decode_ud self;
+	size_t sz;
+	int r;
 	if (st == NULL) {
 		return luaL_argerror(L, 1, "Need a sproto_type object");
 	}
-	size_t sz=0;
-	const void * buffer = getbuffer(L, 2, &sz);
+	sz = 0;
+	buffer = getbuffer(L, 2, &sz);
 	if (!lua_istable(L, -1)) {
 		lua_newtable(L);
 	}
 	luaL_checkstack(L, ENCODE_DEEPLEVEL*2 + 8, NULL);
-	struct decode_ud self;
 	self.L = L;
 	self.result_index = lua_gettop(L);
 	self.array_index = 0;
 	self.array_tag = NULL;
 	self.deep = 0;
-	int r = sproto_decode(st, buffer, (int)sz, decode, &self);
+	r = sproto_decode(st, buffer, (int)sz, decode, &self);
 	if (r < 0) {
 		return luaL_error(L, "decode error");
 	}
@@ -359,11 +368,12 @@ lpack(lua_State *L) {
 	// the worst-case space overhead of packing is 2 bytes per 2 KiB of input (256 words = 2KiB).
 	size_t maxsz = (sz + 2047) / 2048 * 2 + sz;
 	void * output = lua_touserdata(L, lua_upvalueindex(1));
+	int bytes;
 	int osz = lua_tointeger(L, lua_upvalueindex(2));
 	if (osz < maxsz) {
 		output = expand_buffer(L, osz, maxsz);
 	}
-	int bytes = sproto_pack(buffer, sz, output, maxsz);
+	bytes = sproto_pack(buffer, sz, output, maxsz);
 	if (bytes > maxsz) {
 		return luaL_error(L, "packing error, return size = %d", bytes);
 	}
@@ -402,14 +412,18 @@ pushfunction_withbuffer(lua_State *L, const char * name, lua_CFunction func) {
 static int
 lprotocol(lua_State *L) {
 	struct sproto * sp = lua_touserdata(L, 1);
+	struct sproto_type * request;
+	struct sproto_type * response;
+	int t;
+	int tag;
 	if (sp == NULL) {
 		return luaL_argerror(L, 1, "Need a sproto_type object");
 	}
-	int t = lua_type(L,2);
-	int tag;
+	t = lua_type(L,2);
 	if (t == LUA_TNUMBER) {
+		const char * name;
 		tag = lua_tointeger(L, 2);
-		const char * name = sproto_protoname(sp, tag);
+		name = sproto_protoname(sp, tag);
 		if (name == NULL)
 			return 0;
 		lua_pushstring(L, name);
@@ -420,13 +434,13 @@ lprotocol(lua_State *L) {
 			return 0;
 		lua_pushinteger(L, tag);
 	}
-	struct sproto_type * request = sproto_protoquery(sp, tag, SPROTO_REQUEST);
+	request = sproto_protoquery(sp, tag, SPROTO_REQUEST);
 	if (request == NULL) {
 		lua_pushnil(L);
 	} else {
 		lua_pushlightuserdata(L, request);
 	}
-	struct sproto_type * response = sproto_protoquery(sp, tag, SPROTO_RESPONSE);
+	response = sproto_protoquery(sp, tag, SPROTO_RESPONSE);
 	if (response == NULL) {
 		lua_pushnil(L);
 	} else {

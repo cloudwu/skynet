@@ -240,12 +240,19 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		buffer += need;
 		size -= need;
 		if (size == 0) {
-			lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
-			lua_pushinteger(L, fd);
-			lua_pushlightuserdata(L, uc->pack.buffer);
-			lua_pushinteger(L, uc->pack.size);
-			skynet_free(uc);
-			return 5;
+			if (q == NULL || q->head == q->tail ) {
+				lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
+				lua_pushinteger(L, fd);
+				lua_pushlightuserdata(L, uc->pack.buffer);
+				lua_pushinteger(L, uc->pack.size);
+				skynet_free(uc);
+				return 5;
+			}
+			else{
+				push_data(L, fd, uc->pack.buffer, uc->pack.size, 0);
+				skynet_free(uc);
+				return 1;
+			}
 		}
 		// more data
 		push_data(L, fd, uc->pack.buffer, uc->pack.size, 0);
@@ -274,13 +281,21 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		}
 		if (size == pack_size) {
 			// just one package
-			lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
-			lua_pushinteger(L, fd);
-			void * result = skynet_malloc(pack_size);
-			memcpy(result, buffer, size);
-			lua_pushlightuserdata(L, result);
-			lua_pushinteger(L, size);
-			return 5;
+			if ( q == NULL || q->head == q->tail) {
+				lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
+				lua_pushinteger(L, fd);
+				void * result = skynet_malloc(pack_size);
+				memcpy(result, buffer, size);
+				lua_pushlightuserdata(L, result);
+				lua_pushinteger(L, size);
+				return 5;
+			}
+			else{
+				push_data(L, fd, buffer, pack_size, 1);
+				buffer += pack_size;
+				size -= pack_size;
+				return 1;
+			}
 		}
 		// more data
 		push_data(L, fd, buffer, pack_size, 1);
@@ -302,9 +317,9 @@ filter_data(lua_State *L, int fd, uint8_t * buffer, int size) {
 }
 
 static void
-pushstring(lua_State *L, const char * msg) {
+pushstring(lua_State *L, const char * msg, int size) {
 	if (msg) {
-		lua_pushstring(L, msg);
+		lua_pushlstring(L, msg, size);
 	} else {
 		lua_pushliteral(L, "");
 	}
@@ -350,12 +365,12 @@ lfilter(lua_State *L) {
 		lua_pushvalue(L, lua_upvalueindex(TYPE_OPEN));
 		// ignore listen id (message->id);
 		lua_pushinteger(L, message->ud);
-		pushstring(L, buffer);
+		pushstring(L, buffer, size);
 		return 4;
 	case SKYNET_SOCKET_TYPE_ERROR:
 		lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
 		lua_pushinteger(L, message->id);
-		pushstring(L, buffer);
+		pushstring(L, buffer, size);
 		return 4;
 	default:
 		// never get here

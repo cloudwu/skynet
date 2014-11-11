@@ -403,7 +403,7 @@ static int traverseephemeron (global_State *g, Table *h) {
       reallymarkobject(g, gcvalue(gval(n)));  /* mark it now */
     }
   }
-  if (prop)
+  if (g->gcstate != GCSatomic || prop)
     linktable(h, &g->ephemeron);  /* have to propagate again */
   else if (hasclears)  /* does table have white keys? */
     linktable(h, &g->allweak);  /* may have to clean white keys */

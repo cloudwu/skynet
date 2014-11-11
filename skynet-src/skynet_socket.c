@@ -36,10 +36,9 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	int sz = sizeof(*sm);
 	if (padding) {
 		if (result->data) {
-			sz += strlen(result->data) + 1;
+			sz += strlen(result->data);
 		} else {
 			result->data = "";
-			sz += 1;
 		}
 	}
 	sm = (struct skynet_socket_message *)skynet_malloc(sz);
@@ -48,7 +47,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	sm->ud = result->ud;
 	if (padding) {
 		sm->buffer = NULL;
-		strcpy((char*)(sm+1), result->data);
+		memcpy(sm+1, result->data, sz - sizeof(*sm));
 	} else {
 		sm->buffer = result->data;
 	}
@@ -62,6 +61,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	if (skynet_context_push((uint32_t)result->opaque, &message)) {
 		// todo: report somewhere to close socket
 		// don't call skynet_socket_close here (It will block mainloop)
+		skynet_free(sm->buffer);
 		skynet_free(sm);
 	}
 }

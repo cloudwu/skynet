@@ -95,6 +95,7 @@ end
 
 local coroutine_pool = {}
 local coroutine_yield = coroutine.yield
+local coroutine_count = 0
 
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
@@ -109,6 +110,11 @@ local function co_create(f)
 				f(coroutine_yield())
 			end
 		end)
+		coroutine_count = coroutine_count + 1
+		if coroutine_count > 1024 then
+			skynet.error("May overload, create 1024 task")
+			coroutine_count = 0
+		end
 	else
 		coroutine.resume(co, f)
 	end
@@ -122,7 +128,7 @@ local function dispatch_wakeup()
 		local session = sleep_session[co]
 		if session then
 			session_id_coroutine[session] = "BREAK"
-			return suspend(co, coroutine.resume(co, true))
+			return suspend(co, coroutine.resume(co, true, "BREAK"))
 		end
 	end
 end
@@ -143,13 +149,15 @@ end
 function suspend(co, result, command, param, size)
 	if not result then
 		local session = session_coroutine_id[co]
-		local addr = session_coroutine_address[co]
-		if session ~= 0 then
-			-- only call response error
-			c.send(addr, skynet.PTYPE_ERROR, session, "")
+		if session then -- coroutine may fork by others (session is nil)
+			local addr = session_coroutine_address[co]
+			if session ~= 0 then
+				-- only call response error
+				c.send(addr, skynet.PTYPE_ERROR, session, "")
+			end
+			session_coroutine_id[co] = nil
+			session_coroutine_address[co] = nil
 		end
-		session_coroutine_id[co] = nil
-		session_coroutine_address[co] = nil
 		error(debug.traceback(co,tostring(command)))
 	end
 	if command == "CALL" then
@@ -166,7 +174,7 @@ function suspend(co, result, command, param, size)
 		session_response[co] = true
 		local ret
 		if not dead_service[co_address] then
-			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) >= 0
+			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) ~= nil
 		elseif size == nil then
 			c.trash(param, size)
 			ret = false
@@ -200,9 +208,9 @@ function suspend(co, result, command, param, size)
 			local ret
 			if not dead_service[co_address] then
 				if ok then
-					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) >=0
+					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) ~= nil
 				else
-					ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") >=0
+					ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") ~= nil
 				end
 			else
 				ret = false
@@ -246,7 +254,8 @@ function skynet.sleep(ti)
 	session = tonumber(session)
 	local succ, ret = coroutine_yield("SLEEP", session)
 	sleep_session[coroutine.running()] = nil
-	if ret == true then
+	assert(succ, ret)
+	if ret == "BREAK" then
 		return "BREAK"
 	end
 end
@@ -328,6 +337,7 @@ function skynet.time()
 end
 
 function skynet.exit()
+	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit
 	skynet.send(".launcher","lua","REMOVE",skynet.self())
 	-- report the sources that call me
 	for co, session in pairs(session_coroutine_id) do
@@ -695,8 +705,19 @@ function skynet.task(ret)
 	return t
 end
 
+function skynet.term(service)
+	return _error_dispatch(0, service)
+end
+
+local function clear_pool()
+	coroutine_pool = {}
+end
+
 -- Inject internal debug framework
 local debug = require "skynet.debug"
-debug(skynet, dispatch_message)
+debug(skynet, {
+	dispatch = dispatch_message,
+	clear = clear_pool,
+})
 
 return skynet

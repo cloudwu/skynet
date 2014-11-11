@@ -4,14 +4,15 @@ local LIMIT = 8192
 
 local function chunksize(readbytes, body)
 	while true do
-		if #body > 128 then
-			return
-		end
-		body = body .. readbytes()
 		local f,e = body:find("\r\n",1,true)
 		if f then
 			return tonumber(body:sub(1,f-1),16), body:sub(e+1)
 		end
+		if #body > 128 then
+			-- pervent the attacker send very long stream without \r\n
+			return
+		end
+		body = body .. readbytes()
 	end
 end
 

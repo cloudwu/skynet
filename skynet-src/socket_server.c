@@ -335,7 +335,6 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 			sock = -1;
 			continue;
 		}
-		sp_nonblocking(sock);
 		break;
 	}
 
@@ -832,7 +831,10 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 	result->data = NULL;
 
 	void * sin_addr = (u.s.sa_family == AF_INET) ? (void*)&u.v4.sin_addr : (void *)&u.v6.sin6_addr;
-	if (inet_ntop(u.s.sa_family, sin_addr, ss->buffer, sizeof(ss->buffer))) {
+	int sin_port = ntohs((u.s.sa_family == AF_INET) ? u.v4.sin_port : u.v6.sin6_port);
+	char tmp[INET6_ADDRSTRLEN];
+	if (inet_ntop(u.s.sa_family, sin_addr, tmp, sizeof(tmp))) {
+		snprintf(ss->buffer, sizeof(ss->buffer), "%s:%d", tmp, sin_port);
 		result->data = ss->buffer;
 	}
 

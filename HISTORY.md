@@ -1,3 +1,32 @@
+v0.8.0 (2014-10-27)
+-----------
+* Add mysql client driver
+* Bugfix : skynet.queue
+
+v0.7.4 (2014-10-13)
+-----------
+* Bugfix : clear coroutine pool when GC
+* hotfix : A bug introduce by 0.7.3 
+
+v0.7.3 (2014-10-13)
+-----------
+* Add some logs (warning) when overload
+* Bugfix: crash on exit
+
+v0.7.2 (2014-9-29)
+-----------
+* Bugfix : datacenter.wait
+* Bugfix : error in forker coroutine
+* Add skynet.term
+* Accept socket report port
+* sharedata can be update more than once
+
+v0.7.1 (2014-9-22)
+-----------
+* bugfix: wakeup sleep should return BREAK
+* bugfix: sharedatad load string
+* bugfix: dataserver forward error msg
+
 v0.7.0 (2014-9-8)
 -----------
 * Use sproto instead of cjson

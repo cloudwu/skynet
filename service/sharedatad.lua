@@ -4,6 +4,7 @@ local table = table
 
 local NORET = {}
 local pool = {}
+local pool_count = {}
 local objmap = {}
 
 local function newobj(name, tbl)
@@ -13,6 +14,7 @@ local function newobj(name, tbl)
 	local v = { value = tbl , obj = cobj, watch = {} }
 	objmap[cobj] = v
 	pool[name] = v
+	pool_count[name] = { n = 0, threshold = 16 }
 end
 
 local function collectobj()
@@ -32,15 +34,18 @@ end
 
 local CMD = {}
 
+local env_mt = { __index = _ENV }
+
 function CMD.new(name, t)
 	local dt = type(t)
 	local value
 	if dt == "table" then
 		value = t
 	elseif dt == "string" then
-		value = {}
-		local f = load(t, "=" .. name, "t", env)
+		value = setmetatable({}, env_mt)
+		local f = load(t, "=" .. name, "t", value)
 		f()
+		setmetatable(value, nil)
 	elseif dt == "nil" then
 		value = {}
 	else
@@ -52,10 +57,11 @@ end
 function CMD.delete(name)
 	local v = assert(pool[name])
 	pool[name] = nil
+	pool_count[name] = nil
 	assert(objmap[v.obj])
 	objmap[v.obj] = true
 	sharedata.host.decref(v.obj)
-	for _,response in ipairs(v.watch) do
+	for _,response in pairs(v.watch) do
 		response(true)
 	end
 end
@@ -83,21 +89,40 @@ function CMD.update(name, t)
 		objmap[oldcobj] = true
 		sharedata.host.decref(oldcobj)
 		pool[name] = nil
+		pool_count[name] = nil
 	end
 	CMD.new(name, t)
 	local newobj = pool[name].obj
 	if watch then
 		sharedata.host.markdirty(oldcobj)
-		for _,response in ipairs(watch) do
+		for _,response in pairs(watch) do
 			response(true, newobj)
 		end
 	end
+end
+
+local function check_watch(queue)
+	local n = 0
+	for k,response in pairs(queue) do
+		if not response "TEST" then
+			queue[k] = nil
+			n = n + 1
+		end
+	end
+	return n
 end
 
 function CMD.monitor(name, obj)
 	local v = assert(pool[name])
 	if obj ~= v.obj then
 		return v.obj
+	end
+
+	local n = pool_count[name].n
+	pool_count[name].n = n + 1
+	if n > pool_count[name].threshold then
+		n = n - check_watch(v.watch)
+		pool_count[name].threshold = n * 2
 	end
 
 	table.insert(v.watch, skynet.response())
