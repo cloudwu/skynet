@@ -40,8 +40,9 @@
 struct write_buffer {
 	struct write_buffer * next;
 	char *ptr;
-	int sz;
 	void *buffer;
+	int sz;
+	bool userobject;
 };
 
 struct wb_list {
@@ -68,6 +69,7 @@ struct socket_server {
 	int alloc_id;
 	int event_n;
 	int event_index;
+	struct socket_object_interface soi;
 	struct event ev[MAX_EVENT];
 	struct socket slot[MAX_SOCKET];
 	char buffer[MAX_INFO];
@@ -137,8 +139,39 @@ union sockaddr_all {
 	struct sockaddr_in6 v6;
 };
 
+struct send_object {
+	void * buffer;
+	int sz;
+	void (*free_func)(void *);
+};
+
 #define MALLOC skynet_malloc
 #define FREE skynet_free
+
+static inline bool
+send_object_init(struct socket_server *ss, struct send_object *so, void *object, int sz) {
+	if (sz < 0) {
+		so->buffer = ss->soi.buffer(object);
+		so->sz = ss->soi.size(object);
+		so->free_func = ss->soi.free;
+		return true;
+	} else {
+		so->buffer = object;
+		so->sz = sz;
+		so->free_func = FREE;
+		return false;
+	}
+}
+
+static inline void
+write_buffer_free(struct socket_server *ss, struct write_buffer *wb) {
+	if (wb->userobject) {
+		ss->soi.free(wb->buffer);
+	} else {
+		FREE(wb->buffer);
+	}
+	FREE(wb);
+}
 
 static void
 socket_keepalive(int fd) {
@@ -213,6 +246,7 @@ socket_server_create() {
 	ss->alloc_id = 0;
 	ss->event_n = 0;
 	ss->event_index = 0;
+	memset(&ss->soi, 0, sizeof(ss->soi));
 	FD_ZERO(&ss->rfds);
 	assert(ss->recvctrl_fd < FD_SETSIZE);
 
@@ -220,13 +254,12 @@ socket_server_create() {
 }
 
 static void
-free_wb_list(struct wb_list *list) {
+free_wb_list(struct socket_server *ss, struct wb_list *list) {
 	struct write_buffer *wb = list->head;
 	while (wb) {
 		struct write_buffer *tmp = wb;
 		wb = wb->next;
-		FREE(tmp->buffer);
-		FREE(tmp);
+		write_buffer_free(ss, tmp);
 	}
 	list->head = NULL;
 	list->tail = NULL;
@@ -242,8 +275,8 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 		return;
 	}
 	assert(s->type != SOCKET_TYPE_RESERVE);
-	free_wb_list(&s->high);
-	free_wb_list(&s->low);
+	free_wb_list(ss,&s->high);
+	free_wb_list(ss,&s->low);
 	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
 		sp_del(ss->event_fd, s->fd);
 	}
@@ -395,8 +428,7 @@ send_list(struct socket_server *ss, struct socket *s, struct wb_list *list, stru
 			break;
 		}
 		list->head = tmp->next;
-		FREE(tmp->buffer);
-		FREE(tmp);
+		write_buffer_free(ss,tmp);
 	}
 	list->tail = NULL;
 
@@ -469,10 +501,12 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 }
 
 static int
-append_sendbuffer_(struct wb_list *s, struct request_send * request, int n) {
+append_sendbuffer_(struct socket_server *ss, struct wb_list *s, struct request_send * request, int n) {
 	struct write_buffer * buf = MALLOC(sizeof(*buf));
-	buf->ptr = request->buffer+n;
-	buf->sz = request->sz - n;
+	struct send_object so;
+	buf->userobject = send_object_init(ss, &so, request->buffer, request->sz);
+	buf->ptr = so.buffer+n;
+	buf->sz = so.sz - n;
 	buf->buffer = request->buffer;
 	buf->next = NULL;
 	if (s->head == NULL) {
@@ -487,13 +521,13 @@ append_sendbuffer_(struct wb_list *s, struct request_send * request, int n) {
 }
 
 static inline void
-append_sendbuffer(struct socket *s, struct request_send * request, int n) {
-	s->wb_size += append_sendbuffer_(&s->high, request, n);
+append_sendbuffer(struct socket_server *ss, struct socket *s, struct request_send * request, int n) {
+	s->wb_size += append_sendbuffer_(ss, &s->high, request, n);
 }
 
 static inline void
-append_sendbuffer_low(struct socket *s, struct request_send * request) {
-	s->wb_size += append_sendbuffer_(&s->low, request, 0);
+append_sendbuffer_low(struct socket_server *ss,struct socket *s, struct request_send * request) {
+	s->wb_size += append_sendbuffer_(ss, &s->low, request, 0);
 }
 
 static inline int
@@ -512,15 +546,17 @@ static int
 send_socket(struct socket_server *ss, struct request_send * request, struct socket_message *result, int priority) {
 	int id = request->id;
 	struct socket * s = &ss->slot[HASH_ID(id)];
+	struct send_object so;
+	send_object_init(ss, &so, request->buffer, request->sz);
 	if (s->type == SOCKET_TYPE_INVALID || s->id != id 
 		|| s->type == SOCKET_TYPE_HALFCLOSE
 		|| s->type == SOCKET_TYPE_PACCEPT) {
-		FREE(request->buffer);
+		so.free_func(request->buffer);
 		return -1;
 	}
 	assert(s->type != SOCKET_TYPE_PLISTEN && s->type != SOCKET_TYPE_LISTEN);
 	if (send_buffer_empty(s) && s->type == SOCKET_TYPE_CONNECTED) {
-		int n = write(s->fd, request->buffer, request->sz);
+		int n = write(s->fd, so.buffer, so.sz);
 		if (n<0) {
 			switch(errno) {
 			case EINTR:
@@ -533,17 +569,17 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 				return SOCKET_CLOSE;
 			}
 		}
-		if (n == request->sz) {
-			FREE(request->buffer);
+		if (n == so.sz) {
+			so.free_func(request->buffer);
 			return -1;
 		}
-		append_sendbuffer(s, request, n);	// add to high priority list, even priority == PRIORITY_LOW
+		append_sendbuffer(ss, s, request, n);	// add to high priority list, even priority == PRIORITY_LOW
 		sp_write(ss->event_fd, s->fd, s, true);
 	} else {
 		if (priority == PRIORITY_LOW) {
-			append_sendbuffer_low(s, request);
+			append_sendbuffer_low(ss, s, request);
 		} else {
-			append_sendbuffer(s, request, 0);
+			append_sendbuffer(ss, s, request, 0);
 		}
 	}
 	return -1;
@@ -1092,3 +1128,9 @@ socket_server_nodelay(struct socket_server *ss, int id) {
 	request.u.setopt.value = 1;
 	send_request(ss, &request, 'T', sizeof(request.u.setopt));
 }
+
+void 
+socket_server_userobject(struct socket_server *ss, struct socket_object_interface *soi) {
+	ss->soi = *soi;
+}
+
