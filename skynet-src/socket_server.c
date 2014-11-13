@@ -1205,7 +1205,17 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			break;
 		default:
 			if (e->read) {
-				int type = (s->protocol == PROTOCOL_TCP ? forward_message_tcp : forward_message_udp)(ss, s, result);
+				int type;
+				if (s->protocol == PROTOCOL_TCP) {
+					type = forward_message_tcp(ss, s, result);
+				} else {
+					type = forward_message_udp(ss, s, result);
+					if (type == SOCKET_UDP) {
+						// try read again
+						--ss->event_index;
+						return SOCKET_UDP;
+					}
+				}
 				if (e->write) {
 					// Try to dispatch write message next step if write flag set.
 					e->read = false;
@@ -1452,6 +1462,8 @@ socket_server_udp(struct socket_server *ss, uintptr_t opaque, const char * addr,
 			return -1;
 		}
 	}
+	sp_nonblocking(fd);
+
 	int id = reserve_id(ss);
 	if (id < 0) {
 		close(fd);
