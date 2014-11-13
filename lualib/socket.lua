@@ -148,7 +148,7 @@ local function connect(id, func)
 		id = id,
 		buffer = newbuffer,
 		connected = false,
-		read_require = false,
+		read_required = false,
 		co = false,
 		callback = func,
 		protocol = "TCP",
@@ -373,8 +373,6 @@ local udp_socket = {}
 local function create_udp_object(id, cb)
 	socket_pool[id] = {
 		id = id,
-		read_require = false,
-		co = false,
 		connected = true,
 		protocol = "UDP",
 		callback = cb,
