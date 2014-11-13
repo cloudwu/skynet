@@ -240,19 +240,12 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		buffer += need;
 		size -= need;
 		if (size == 0) {
-			if (q == NULL || q->head == q->tail ) {
-				lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
-				lua_pushinteger(L, fd);
-				lua_pushlightuserdata(L, uc->pack.buffer);
-				lua_pushinteger(L, uc->pack.size);
-				skynet_free(uc);
-				return 5;
-			}
-			else{
-				push_data(L, fd, uc->pack.buffer, uc->pack.size, 0);
-				skynet_free(uc);
-				return 1;
-			}
+			lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
+			lua_pushinteger(L, fd);
+			lua_pushlightuserdata(L, uc->pack.buffer);
+			lua_pushinteger(L, uc->pack.size);
+			skynet_free(uc);
+			return 5;
 		}
 		// more data
 		push_data(L, fd, uc->pack.buffer, uc->pack.size, 0);
@@ -281,21 +274,13 @@ filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 		}
 		if (size == pack_size) {
 			// just one package
-			if ( q == NULL || q->head == q->tail) {
-				lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
-				lua_pushinteger(L, fd);
-				void * result = skynet_malloc(pack_size);
-				memcpy(result, buffer, size);
-				lua_pushlightuserdata(L, result);
-				lua_pushinteger(L, size);
-				return 5;
-			}
-			else{
-				push_data(L, fd, buffer, pack_size, 1);
-				buffer += pack_size;
-				size -= pack_size;
-				return 1;
-			}
+			lua_pushvalue(L, lua_upvalueindex(TYPE_DATA));
+			lua_pushinteger(L, fd);
+			void * result = skynet_malloc(pack_size);
+			memcpy(result, buffer, size);
+			lua_pushlightuserdata(L, result);
+			lua_pushinteger(L, size);
+			return 5;
 		}
 		// more data
 		push_data(L, fd, buffer, pack_size, 1);
