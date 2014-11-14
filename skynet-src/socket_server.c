@@ -1358,21 +1358,25 @@ do_bind(const char *host, int port, int protocol, int *family) {
 	if ( status != 0 ) {
 		return -1;
 	}
-	ai_hints = *ai_list;
-	freeaddrinfo( ai_list );
-	*family = ai_hints.ai_family;
-	fd = socket(*family, ai_hints.ai_socktype, 0);
+	*family = ai_list->ai_family;
+	fd = socket(*family, ai_list->ai_socktype, 0);
 	if (fd < 0) {
-		return -1;
+		goto _failed_fd;
 	}
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
-		return -1;
+		goto _failed;
 	}
-	status = bind(fd, (struct sockaddr *)ai_hints.ai_addr, ai_hints.ai_addrlen);
+	status = bind(fd, (struct sockaddr *)ai_list->ai_addr, ai_list->ai_addrlen);
 	if (status != 0)
-		return -1;
+		goto _failed;
 
+	freeaddrinfo( ai_list );
 	return fd;
+_failed:
+	close(fd);
+_failed_fd:
+	freeaddrinfo( ai_list );
+	return -1;
 }
 
 static int
