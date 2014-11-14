@@ -45,9 +45,6 @@ function init( ... )
 	print ("ping server start:", ...)
 	-- init queue
 	lock = queue()
-
--- You can return "queue" for queue service mode
---	return "queue"
 end
 
 function exit(...)
