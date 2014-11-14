@@ -24,7 +24,7 @@ static unsigned int num_escape_sql_str(unsigned char *dst, unsigned char *src, s
                 case '\n':
                 case '\r':
                 case '\t':
-                case 26:  /* \z */
+                case 26:  /* \Z */
                 case '\\':
                 case '\'':
                 case '"':
@@ -73,7 +73,7 @@ escape_sql_str(unsigned char *dst, unsigned char *src, size_t size)
                     
                 case 26:
                     *dst++ = '\\';
-                    *dst++ = 'z';
+                    *dst++ = 'Z';
                     break;
                     
                 case '\\':
