@@ -31,6 +31,6 @@ end
 		print(string.format("%s\tcount:%d time:%f", name, v.count, v.time))
 	end
 
-	print(snax.kill(ps,"exit"))
+	print(ps.post.exit("exit")) -- == snax.kill(ps, "exit")
 	skynet.exit()
 end)

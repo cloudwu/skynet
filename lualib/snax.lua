@@ -132,6 +132,14 @@ function snax.kill(obj, ...)
 	skynet_call(obj.handle, "snax", t.system.exit, ...)
 end
 
+function snax.self()
+	return snax.bind(skynet.self(), SERVICE_NAME)
+end
+
+function snax.exit(...)
+	snax.kill(snax.self(), ...)
+end
+
 local function test_result(ok, ...)
 	if ok then
 		return ...

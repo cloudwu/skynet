@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local queue = require "skynet.queue"
+local snax = require "snax"
 
 local i = 0
 local hello = "hello"
@@ -30,6 +31,10 @@ function accept.hello()
 	i = i + 1
 	print (i, hello)
 	end)
+end
+
+function accept.exit(...)
+	snax.exit(...)
 end
 
 function response.error()
