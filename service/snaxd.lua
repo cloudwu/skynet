@@ -53,8 +53,8 @@ local function timing( method, ... )
 end
 
 skynet.start(function()
+	local init = false
 	skynet.dispatch("snax", function ( session , source , id, ...)
-		local init = false
 		local method = func[id]
 
 		if method[2] == "system" then
