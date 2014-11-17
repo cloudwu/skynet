@@ -53,19 +53,31 @@ function gateserver.start(handler)
 
 	local MSG = {}
 
-	function MSG.data(fd, msg, sz)
+	local function dispatch_msg(fd, msg, sz)
 		if connection[fd] then
 			handler.message(fd, msg, sz)
+		else
+			skynet.error(string.format("Drop message from fd (%d) : %s", fd, netpack.tostring(msg,sz)))
 		end
 	end
 
-	function MSG.more()
-		for fd, msg, sz in netpack.pop, queue do
-			if connection[fd] then
-				handler.message(fd, msg, sz)
+	MSG.data = dispatch_msg
+
+	local function dispatch_queue()
+		local fd, msg, sz = netpack.pop(queue)
+		if fd then
+			-- may dispatch even the handler.message blocked
+			-- If the handler.message never block, the queue should be empty, so only fork once and then exit.
+			skynet.fork(dispatch_queue)
+			dispatch_msg(fd, msg, sz)
+
+			for fd, msg, sz in netpack.pop, queue do
+				dispatch_msg(fd, msg, sz)
 			end
 		end
 	end
+
+	MSG.more = dispatch_queue
 
 	function MSG.open(fd, msg)
 		if client_number >= maxclient then

@@ -90,7 +90,7 @@ local function launch_slave(auth_handler)
 	local function ret_pack(ok, err, ...)
 		if ok then
 			skynet.ret(skynet.pack(err, ...))
-		elseif err ~= socket_error then
+		else
 			error(err)
 		end
 	end
@@ -163,6 +163,7 @@ local function launch_master(conf)
 			if err ~= socket_error then
 				skynet.error(string.format("invalid client (fd = %d) error = %s", fd, err))
 			end
+			socket.start(fd)
 		end
 		socket.close(fd)
 	end)

@@ -38,4 +38,13 @@ int socket_server_bind(struct socket_server *, uintptr_t opaque, int fd);
 
 void socket_server_nodelay(struct socket_server *, int id);
 
+struct socket_object_interface {
+	void * (*buffer)(void *);
+	int (*size)(void *);
+	void (*free)(void *);
+};
+
+// if you send package sz == -1, use soi.
+void socket_server_userobject(struct socket_server *, struct socket_object_interface *soi);
+
 #endif

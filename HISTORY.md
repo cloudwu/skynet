@@ -1,3 +1,12 @@
+v0.8.1 (2014-11-3)
+-----------
+* Send to an invalid remote service will raise an error
+* Bugifx: socket open address string
+* Remove sha1 from mysqlaux
+* merge lua and sproto bugfix , use crypt lib instead
+* Fix a memory leak in socket
+* minor bugfix in http module
+
 v0.8.0 (2014-10-27)
 -----------
 * Add mysql client driver
