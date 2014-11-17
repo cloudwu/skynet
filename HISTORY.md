@@ -1,3 +1,12 @@
+v0.9.0 (2014-11-17)
+-----------
+* Add UDP support
+* Add IPv6 support
+* socket send package can define a release method
+* dispatch read before write in epoll
+* remove snax queue mode
+* Fix a bug in big-endian architecture
+
 v0.8.1 (2014-11-3)
 -----------
 * Send to an invalid remote service will raise an error
