@@ -119,12 +119,23 @@ socket_message[5] = function(id)
 	wakeup(s)
 end
 
+-- SKYNET_SOCKET_TYPE_UDP = 6
+socket_message[6] = function(id, size, data, address)
+	local s = socket_pool[id]
+	if s == nil or s.callback == nil then
+		skynet.error("socket: drop udp package from " .. id)
+		driver.drop(data, size)
+		return
+	end
+	s.callback(data, size, address)
+end
+
 skynet.register_protocol {
 	name = "socket",
 	id = skynet.PTYPE_SOCKET,	-- PTYPE_SOCKET = 6
 	unpack = driver.unpack,
-	dispatch = function (_, _, t, n1, n2, data)
-		socket_message[t](n1,n2,data)
+	dispatch = function (_, _, t, ...)
+		socket_message[t](...)
 	end
 }
 
@@ -137,9 +148,10 @@ local function connect(id, func)
 		id = id,
 		buffer = newbuffer,
 		connected = false,
-		read_require = false,
+		read_required = false,
 		co = false,
 		callback = func,
+		protocol = "TCP",
 	}
 	socket_pool[id] = s
 	suspend(s)
@@ -353,5 +365,40 @@ function socket.limit(id, limit)
 	local s = assert(socket_pool[id])
 	s.buffer_limit = limit
 end
+
+---------------------- UDP
+
+local udp_socket = {}
+
+local function create_udp_object(id, cb)
+	socket_pool[id] = {
+		id = id,
+		connected = true,
+		protocol = "UDP",
+		callback = cb,
+	}
+end
+
+function socket.udp(callback, host, port)
+	local id = driver.udp(host, port)
+	create_udp_object(id, callback)
+	return id
+end
+
+function socket.udp_connect(id, addr, port, callback)
+	local obj = socket_pool[id]
+	if obj then
+		assert(obj.protocol == "UDP")
+		if callback then
+			obj.callback = callback
+		end
+	else
+		create_udp_object(id, callback)
+	end
+	driver.udp_connect(id, addr, port)
+end
+
+socket.sendto = assert(driver.udp_send)
+socket.udp_address = assert(driver.udp_address)
 
 return socket
