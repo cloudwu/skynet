@@ -500,7 +500,7 @@ sproto_dump(struct sproto *s) {
 }
 
 // query
-int 
+int
 sproto_prototag(struct sproto *sp, const char * name) {
 	int i;
 	for (i=0;i<sp->protocol_n;i++) {
@@ -529,7 +529,7 @@ query_proto(struct sproto *sp, int tag) {
 	return NULL;
 }
 
-struct sproto_type * 
+struct sproto_type *
 sproto_protoquery(struct sproto *sp, int proto, int what) {
 	struct protocol * p;
 	if (what <0 || what >1) {
@@ -542,7 +542,7 @@ sproto_protoquery(struct sproto *sp, int proto, int what) {
 	return NULL;
 }
 
-const char * 
+const char *
 sproto_protoname(struct sproto *sp, int proto) {
 	struct protocol * p = query_proto(sp, proto);
 	if (p) {
@@ -551,7 +551,7 @@ sproto_protoname(struct sproto *sp, int proto) {
 	return NULL;
 }
 
-struct sproto_type * 
+struct sproto_type *
 sproto_type(struct sproto *sp, const char * type_name) {
 	int i;
 	for (i=0;i<sp->type_n;i++) {
@@ -806,7 +806,7 @@ encode_array(sproto_callback cb, void *ud, struct field *f, uint8_t *data, int s
 	return fill_size(data, sz);
 }
 
-int 
+int
 sproto_encode(struct sproto_type *st, void * buffer, int size, sproto_callback cb, void *ud) {
 	uint8_t * header = buffer;
 	uint8_t * data;
@@ -830,7 +830,7 @@ sproto_encode(struct sproto_type *st, void * buffer, int size, sproto_callback c
 			sz = encode_array(cb,ud, f, data, size);
 		} else {
 			switch(type) {
-			case SPROTO_TINTEGER: 
+			case SPROTO_TINTEGER:
 			case SPROTO_TBOOLEAN: {
 				union {
 					uint64_t u64;
@@ -971,7 +971,7 @@ decode_array(sproto_callback cb, void *ud, struct field *f, uint8_t * stream) {
 	}
 	case SPROTO_TBOOLEAN:
 		for (i=0;i<sz;i++) {
-			int value = stream[i];
+			uint64_t value = stream[i];
 			cb(ud, f->name, SPROTO_TBOOLEAN, i+1, NULL, &value, sizeof(value));
 		}
 		break;
@@ -1050,7 +1050,7 @@ sproto_decode(struct sproto_type *st, const void * data, int size, sproto_callba
 					}
 					break;
 				}
-				case SPROTO_TSTRING: 
+				case SPROTO_TSTRING:
 				case SPROTO_TSTRUCT: {
 					uint32_t sz = todword(currentdata);
 					if (cb(ud, f->name, f->type, 0, f->st, currentdata+SIZEOF_LENGTH, sz))
@@ -1124,7 +1124,7 @@ write_ff(const uint8_t * src, uint8_t * des, int n) {
 	}
 }
 
-int 
+int
 sproto_pack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 	uint8_t tmp[8];
 	int i;
@@ -1181,7 +1181,7 @@ sproto_pack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 	return size;
 }
 
-int 
+int
 sproto_unpack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 	const uint8_t * src = srcv;
 	uint8_t * buffer = bufferv;
