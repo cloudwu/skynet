@@ -48,7 +48,6 @@ void
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
-	// only one thread can set the slot (change q->queue[tail] from NULL to queue)
 	LOCK(q)
 	assert(queue->next == NULL);
 	if(q->tail) {
