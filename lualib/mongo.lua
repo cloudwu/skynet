@@ -227,7 +227,11 @@ function mongo_collection:insert(doc)
 	sock:request(pack)
 end
 
-function mongo_collection:batch_insert(docs)
+function mongo_collection:safe_insert(doc)
+	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})	
+end
+
+function mongo_collection:batch_insert(docs)		
 	for	i=1,#docs do
 		if docs[i]._id == nil then
 			docs[i]._id	= bson.objectid()
@@ -275,6 +279,27 @@ function mongo_collection:find(query, selector)
 		__flags	= 0,
 	} ,	cursor_meta)
 end
+
+-- collection:create_index({username = 1}, {unique = true})
+function mongo_collection:create_index(keys, option)
+	local name
+	for k, v in pairs(keys) do
+		assert(v == 1)
+		name = (name == nil) and k or (name .. "_" .. k)
+	end
+
+	local doc = {};
+	doc.name = name
+	doc.key = keys
+	for k, v in pairs(option) do
+		if v then
+			doc[k] = true
+		end
+	end
+	return self.database:runCommand("createIndexes", self.name, "indexes", {doc})
+end
+
+mongo_collection.ensure_index = mongo_collection.create_index;
 
 function mongo_cursor:hasNext()
 	if self.__ptr == nil then
