@@ -87,7 +87,7 @@ struct encode_ud {
 	int deep;
 };
 
-static int 
+static int
 encode(void *ud, const char *tagname, int type, int index, struct sproto_type *st, void *value, int length) {
 	struct encode_ud *self = ud;
 	lua_State *L = self->L;
@@ -189,7 +189,7 @@ expand_buffer(lua_State *L, int osz, int nsz) {
 	lightuserdata sproto_type
 	table source
 
-	return string 
+	return string
  */
 static int
 lencode(lua_State *L) {
@@ -229,7 +229,7 @@ struct decode_ud {
 	int deep;
 };
 
-static int 
+static int
 decode(void *ud, const char *tagname, int type, int index, struct sproto_type *st, void *value, int length) {
 	struct decode_ud * self = ud;
 	lua_State *L = self->L;
@@ -252,12 +252,12 @@ decode(void *ud, const char *tagname, int type, int index, struct sproto_type *s
 	switch (type) {
 	case SPROTO_TINTEGER: {
 		// notice: in lua 5.2, 52bit integer support (not 64)
-		lua_Integer v = *(lua_Integer *)value;
+		lua_Integer v = *(uint64_t*)value;
 		lua_pushinteger(L, v);
 		break;
 	}
 	case SPROTO_TBOOLEAN: {
-		int v = *(lua_Integer*)value;
+		int v = *(uint64_t*)value;
 		lua_pushboolean(L,v);
 		break;
 	}

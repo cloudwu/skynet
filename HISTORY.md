@@ -1,4 +1,10 @@
-v0.9.0 (2014-11-17)
+v0.9.2 (2014-12-8)
+-----------
+* Simplify the message queue
+* Add create_index in mongo driver
+* Fix a bug in big-endian architecture (sproto)
+
+v0.9.0 / v0.9.1 (2014-11-17)
 -----------
 * Add UDP support
 * Add IPv6 support

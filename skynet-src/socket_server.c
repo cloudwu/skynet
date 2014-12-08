@@ -628,7 +628,7 @@ append_sendbuffer_(struct socket_server *ss, struct wb_list *s, struct request_s
 	struct write_buffer * buf = MALLOC(size);
 	struct send_object so;
 	buf->userobject = send_object_init(ss, &so, request->buffer, request->sz);
-	buf->ptr = so.buffer+n;
+	buf->ptr = (char*)so.buffer+n;
 	buf->sz = so.sz - n;
 	buf->buffer = request->buffer;
 	buf->next = NULL;

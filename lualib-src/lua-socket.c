@@ -9,6 +9,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#include <sys/socket.h>
 #include <arpa/inet.h>
 
 #include "skynet_socket.h"
