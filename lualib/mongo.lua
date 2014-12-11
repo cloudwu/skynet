@@ -282,24 +282,38 @@ end
 
 -- collection:createIndex({username = 1}, {unique = true})
 function mongo_collection:createIndex(keys, option)
-	local name
-	for k, v in pairs(keys) do
-		assert(v == 1)
-		name = (name == nil) and k or (name .. "_" .. k)
+	local name = option.name
+	option.name = nil
+
+	if not name then
+		for k, v in pairs(keys) do
+			name = (name == nil) and k or (name .. "_" .. k)
+			name = name  .. "_" .. v
+		end		
 	end
+
 
 	local doc = {};
 	doc.name = name
 	doc.key = keys
 	for k, v in pairs(option) do
-		if v then
-			doc[k] = true
-		end
+		doc[k] = v
 	end
 	return self.database:runCommand("createIndexes", self.name, "indexes", {doc})
 end
 
 mongo_collection.ensureIndex = mongo_collection.createIndex;
+
+
+function mongo_collection:drop()
+	return self.database:runCommand("drop", self.name)
+end
+
+-- collection:dropIndex("age_1")
+-- collection:dropIndex("*")
+function mongo_collection:dropIndex(indexName)
+	return self.database:runCommand("dropIndexes", self.name, "index", indexName)
+end
 
 -- collection:findAndModify({query = {name = "userid"}, update = {["$inc"] = {nextid = 1}}, })
 -- keys, value type
