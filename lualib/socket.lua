@@ -58,7 +58,7 @@ socket_message[1] = function(id, size, data)
 		end
 	else
 		if s.buffer_limit and sz > s.buffer_limit then
-			skynet.error(string.format("socket buffer overlow: fd=%d size=%d", id , sz))
+			skynet.error(string.format("socket buffer overflow: fd=%d size=%d", id , sz))
 			driver.clear(s.buffer,buffer_pool)
 			driver.close(id)
 			return
