@@ -120,6 +120,8 @@ function mongo.client( conf	)
 	local obj =	{
 		host = first.host,
 		port = first.port or 27017,
+		username = first.username,
+		password = first.password,
 	}
 
 	obj.__id = 0
