@@ -84,12 +84,12 @@ local function dispatch_by_session(self)
 		local ok , session, result_ok, result_data = pcall(response, self.__sock)
 		if ok and session then
 			local co = self.__thread[session]
-			self.__thread[session] = nil
 			if co then
+				self.__thread[session] = nil
 				self.__result[co] = result_ok
 				self.__result_data[co] = result_data
 				skynet.wakeup(co)
-			else
+			elseif result_data then
 				skynet.error("socket: unknown session :", session)
 			end
 		else
