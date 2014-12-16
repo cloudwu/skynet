@@ -169,13 +169,25 @@ skynet_context_new(const char * name, const char *param) {
 int
 skynet_context_newsession(struct skynet_context *ctx) {
 	// session always be a positive number
-	int session = (++ctx->session_id) & 0x7fffffff;
+	int session = ++ctx->session_id;
+	if (session <= 0) {
+		ctx->session_id = 1;
+		return 1;
+	}
 	return session;
 }
 
 void 
 skynet_context_grab(struct skynet_context *ctx) {
 	__sync_add_and_fetch(&ctx->ref,1);
+}
+
+void
+skynet_context_reserve(struct skynet_context *ctx) {
+	skynet_context_grab(ctx);
+	// don't count the context reserved, because skynet abort (the worker threads terminate) only when the total context is 0 .
+	// the reserved context will be release at last.
+	context_dec();
 }
 
 static void 
@@ -282,6 +294,10 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		} else if (i==0 && weight >= 0) {
 			n = skynet_mq_length(q);
 			n >>= weight;
+		}
+		int overload = skynet_mq_overload(q);
+		if (overload) {
+			skynet_error(ctx, "May overload, message queue length = %d", overload);
 		}
 
 		skynet_monitor_trigger(sm, msg.source , handle);
@@ -679,7 +695,7 @@ skynet_sendname(struct skynet_context * context, uint32_t source, const char * a
 			if (type & PTYPE_TAG_DONTCOPY) {
 				skynet_free(data);
 			}
-			return session;
+			return -1;
 		}
 	} else {
 		_filter_args(context, type, &session, (void **)&data, &sz);

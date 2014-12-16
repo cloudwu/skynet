@@ -120,6 +120,8 @@ function mongo.client( conf	)
 	local obj =	{
 		host = first.host,
 		port = first.port or 27017,
+		username = first.username,
+		password = first.password,
 	}
 
 	obj.__id = 0
@@ -129,6 +131,7 @@ function mongo.client( conf	)
 		response = dispatch_reply,
 		auth = mongo_auth(obj),
 		backup = backup,
+		nodelay = true,
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect(true)	-- try connect only	once
@@ -226,7 +229,11 @@ function mongo_collection:insert(doc)
 	sock:request(pack)
 end
 
-function mongo_collection:batch_insert(docs)
+function mongo_collection:safe_insert(doc)
+	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})	
+end
+
+function mongo_collection:batch_insert(docs)		
 	for	i=1,#docs do
 		if docs[i]._id == nil then
 			docs[i]._id	= bson.objectid()
@@ -273,6 +280,48 @@ function mongo_collection:find(query, selector)
 		__document = {},
 		__flags	= 0,
 	} ,	cursor_meta)
+end
+
+-- collection:createIndex({username = 1}, {unique = true})
+function mongo_collection:createIndex(keys, option)
+	local name
+	for k, v in pairs(keys) do
+		assert(v == 1)
+		name = (name == nil) and k or (name .. "_" .. k)
+	end
+
+	local doc = {};
+	doc.name = name
+	doc.key = keys
+	for k, v in pairs(option) do
+		if v then
+			doc[k] = true
+		end
+	end
+	return self.database:runCommand("createIndexes", self.name, "indexes", {doc})
+end
+
+mongo_collection.ensureIndex = mongo_collection.createIndex;
+
+-- collection:findAndModify({query = {name = "userid"}, update = {["$inc"] = {nextid = 1}}, })
+-- keys, value type
+-- query, table	
+-- sort, table
+-- remove, bool 
+-- update, table 
+-- new, bool 
+-- fields, bool 
+-- upsert, boolean 
+function mongo_collection:findAndModify(doc)
+	assert(doc.query)
+	assert(doc.update or doc.remove)
+
+	local cmd = {"findAndModify", self.name};
+	for k, v in pairs(doc) do
+		table.insert(cmd, k)
+		table.insert(cmd, v)
+	end
+	return self.database:runCommand(unpack(cmd))
 end
 
 function mongo_cursor:hasNext()

@@ -15,6 +15,7 @@
 // 1 means mq is in global mq , or the message is dispatching.
 
 #define MQ_IN_GLOBAL 1
+#define MQ_OVERLOAD 1024
 
 struct message_queue {
 	uint32_t handle;
@@ -24,17 +25,16 @@ struct message_queue {
 	int lock;
 	int release;
 	int in_global;
+	int overload;
+	int overload_threshold;
 	struct skynet_message *queue;
 	struct message_queue *next;
 };
 
 struct global_queue {
-	uint32_t head;
-	uint32_t tail;
-	struct message_queue ** queue;
-	// We use a separated flag array to ensure the mq is pushed.
-	// See the comments below.
-	struct message_queue *list;
+	struct message_queue *head;
+	struct message_queue *tail;
+	int lock;
 };
 
 static struct global_queue *Q = NULL;
@@ -48,57 +48,32 @@ void
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
-	uint32_t tail = GP(__sync_fetch_and_add(&q->tail,1));
-
-	// only one thread can set the slot (change q->queue[tail] from NULL to queue)
-	if (!__sync_bool_compare_and_swap(&q->queue[tail], NULL, queue)) {
-		// The queue may full seldom, save queue in list
-		assert(queue->next == NULL);
-		struct message_queue * last;
-		do {
-			last = q->list;
-			queue->next = last;
-		} while(!__sync_bool_compare_and_swap(&q->list, last, queue));
-
-		return;
+	LOCK(q)
+	assert(queue->next == NULL);
+	if(q->tail) {
+		q->tail->next = queue;
+		q->tail = queue;
+	} else {
+		q->head = q->tail = queue;
 	}
+	UNLOCK(q)
 }
 
 struct message_queue * 
 skynet_globalmq_pop() {
 	struct global_queue *q = Q;
-	uint32_t head =  q->head;
 
-	if (head == q->tail) {
-		// The queue is empty.
-		return NULL;
-	}
-
-	uint32_t head_ptr = GP(head);
-
-	struct message_queue * list = q->list;
-	if (list) {
-		// If q->list is not empty, try to load it back to the queue
-		struct message_queue *newhead = list->next;
-		if (__sync_bool_compare_and_swap(&q->list, list, newhead)) {
-			// try load list only once, if success , push it back to the queue.
-			list->next = NULL;
-			skynet_globalmq_push(list);
+	LOCK(q)
+	struct message_queue *mq = q->head;
+	if(mq) {
+		q->head = mq->next;
+		if(q->head == NULL) {
+			assert(mq == q->tail);
+			q->tail = NULL;
 		}
+		mq->next = NULL;
 	}
-
-	struct message_queue * mq = q->queue[head_ptr];
-	if (mq == NULL) {
-		// globalmq push not complete
-		return NULL;
-	}
-	if (!__sync_bool_compare_and_swap(&q->head, head, head+1)) {
-		return NULL;
-	}
-	// only one thread can get the slot (change q->queue[head_ptr] to NULL)
-	if (!__sync_bool_compare_and_swap(&q->queue[head_ptr], mq, NULL)) {
-		return NULL;
-	}
+	UNLOCK(q)
 
 	return mq;
 }
@@ -116,6 +91,8 @@ skynet_mq_create(uint32_t handle) {
 	// If the service init success, skynet_context_new will call skynet_mq_force_push to push it to global queue.
 	q->in_global = MQ_IN_GLOBAL;
 	q->release = 0;
+	q->overload = 0;
+	q->overload_threshold = MQ_OVERLOAD;
 	q->queue = skynet_malloc(sizeof(struct skynet_message) * q->cap);
 	q->next = NULL;
 
@@ -151,16 +128,41 @@ skynet_mq_length(struct message_queue *q) {
 }
 
 int
+skynet_mq_overload(struct message_queue *q) {
+	if (q->overload) {
+		int overload = q->overload;
+		q->overload = 0;
+		return overload;
+	} 
+	return 0;
+}
+
+int
 skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 	int ret = 1;
 	LOCK(q)
 
 	if (q->head != q->tail) {
-		*message = q->queue[q->head];
+		*message = q->queue[q->head++];
 		ret = 0;
-		if ( ++ q->head >= q->cap) {
-			q->head = 0;
+		int head = q->head;
+		int tail = q->tail;
+		int cap = q->cap;
+
+		if (head >= cap) {
+			q->head = head = 0;
 		}
+		int length = tail - head;
+		if (length < 0) {
+			length += cap;
+		}
+		while (length > q->overload_threshold) {
+			q->overload = length;
+			q->overload_threshold *= 2;
+		}
+	} else {
+		// reset overload_threshold when queue is empty
+		q->overload_threshold = MQ_OVERLOAD;
 	}
 
 	if (ret) {
@@ -213,8 +215,6 @@ void
 skynet_mq_init() {
 	struct global_queue *q = skynet_malloc(sizeof(*q));
 	memset(q,0,sizeof(*q));
-	q->queue = skynet_malloc(MAX_GLOBAL_MQ * sizeof(struct message_queue *));
-	memset(q->queue, 0, sizeof(struct message_queue *) * MAX_GLOBAL_MQ);
 	Q=q;
 }
 

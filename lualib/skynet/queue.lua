@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local coroutine = coroutine
-local pcall = pcall
+local xpcall = xpcall
+local traceback = debug.traceback
 local table = table
 
 function skynet.queue()
@@ -9,21 +10,20 @@ function skynet.queue()
 	local thread_queue = {}
 	return function(f, ...)
 		local thread = coroutine.running()
-		if ref == 0 then
-			current_thread = thread
-		elseif current_thread ~= thread then
+		if current_thread and current_thread ~= thread then
 			table.insert(thread_queue, thread)
 			skynet.wait()
-			assert(ref == 0)
+			assert(ref == 0)	-- current_thread == thread
 		end
+		current_thread = thread
+
 		ref = ref + 1
-		local ok, err = pcall(f, ...)
+		local ok, err = xpcall(f, traceback, ...)
 		ref = ref - 1
 		if ref == 0 then
-			current_thread = nil
-			local co = table.remove(thread_queue,1)
-			if co then
-				skynet.wakeup(co)
+			current_thread = table.remove(thread_queue,1)
+			if current_thread then
+				skynet.wakeup(current_thread)
 			end
 		end
 		assert(ok,err)

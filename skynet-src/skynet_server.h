@@ -10,6 +10,7 @@ struct skynet_monitor;
 
 struct skynet_context * skynet_context_new(const char * name, const char * parm);
 void skynet_context_grab(struct skynet_context *);
+void skynet_context_reserve(struct skynet_context *ctx);
 struct skynet_context * skynet_context_release(struct skynet_context *);
 uint32_t skynet_context_handle(struct skynet_context *);
 int skynet_context_push(uint32_t handle, struct skynet_message *message);
