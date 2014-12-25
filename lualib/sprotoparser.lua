@@ -316,6 +316,7 @@ local function packgroup(t,p)
 		alltypes[name] = #alltypes
 		table.insert(alltypes, name)
 	end
+	table.sort(alltypes)	-- make result stable
 	tt = {}
 	for _,name in ipairs(alltypes) do
 		table.insert(tt, packtype(name, t[name], alltypes))
