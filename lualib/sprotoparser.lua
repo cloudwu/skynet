@@ -313,10 +313,12 @@ local function packgroup(t,p)
 	local tt, tp
 	local alltypes = {}
 	for name in pairs(t) do
-		alltypes[name] = #alltypes
 		table.insert(alltypes, name)
 	end
 	table.sort(alltypes)	-- make result stable
+	for idx, name in ipairs(alltypes) do
+		alltypes[name] = idx - 1
+	end
 	tt = {}
 	for _,name in ipairs(alltypes) do
 		table.insert(tt, packtype(name, t[name], alltypes))
