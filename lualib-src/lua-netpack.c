@@ -302,9 +302,9 @@ filter_data(lua_State *L, int fd, uint8_t * buffer, int size) {
 }
 
 static void
-pushstring(lua_State *L, const char * msg) {
+pushstring(lua_State *L, const char * msg, int size) {
 	if (msg) {
-		lua_pushstring(L, msg);
+		lua_pushlstring(L, msg, size);
 	} else {
 		lua_pushliteral(L, "");
 	}
@@ -350,12 +350,12 @@ lfilter(lua_State *L) {
 		lua_pushvalue(L, lua_upvalueindex(TYPE_OPEN));
 		// ignore listen id (message->id);
 		lua_pushinteger(L, message->ud);
-		pushstring(L, buffer);
+		pushstring(L, buffer, size);
 		return 4;
 	case SKYNET_SOCKET_TYPE_ERROR:
 		lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
 		lua_pushinteger(L, message->id);
-		pushstring(L, buffer);
+		pushstring(L, buffer, size);
 		return 4;
 	default:
 		// never get here

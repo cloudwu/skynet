@@ -33,7 +33,7 @@ local function update(db, key, value, ...)
 	end
 end
 
-local function wakeup(db, key1, key2, ...)
+local function wakeup(db, key1, ...)
 	if key1 == nil then
 		return
 	end
@@ -43,7 +43,7 @@ local function wakeup(db, key1, key2, ...)
 	end
 	if q[mode] == "queue" then
 		db[key1] = nil
-		if key2 then
+		if select("#", ...) ~= 1 then
 			-- throw error because can't wake up a branch
 			for _,response in ipairs(q) do
 				response(false)
@@ -53,7 +53,7 @@ local function wakeup(db, key1, key2, ...)
 		end
 	else
 		-- it's branch
-		return wakeup(q , key2, ...)
+		return wakeup(q , ...)
 	end
 end
 

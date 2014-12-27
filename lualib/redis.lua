@@ -84,6 +84,7 @@ function redis.connect(db_conf)
 		host = db_conf.host,
 		port = db_conf.port or 6379,
 		auth = redis_login(db_conf.auth, db_conf.db),
+		nodelay = true,
 	}
 	-- try connect first only once
 	channel:connect(true)
@@ -199,6 +200,7 @@ function redis.watch(db_conf)
 		host = db_conf.host,
 		port = db_conf.port or 6379,
 		auth = watch_login(obj, db_conf.auth),
+		nodelay = true,
 	}
 	obj.__sock = channel
 

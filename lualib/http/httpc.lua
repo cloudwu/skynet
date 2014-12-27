@@ -81,10 +81,10 @@ function httpc.request(method, host, url, recvheader, header, content)
 	end
 	local fd = socket.connect(hostname, port)
 	local ok , statuscode, body = pcall(request, fd,method, host, url, recvheader, header, content)
+	socket.close(fd)
 	if ok then
 		return statuscode, body
 	else
-		socket.close(fd)
 		error(statuscode)
 	end
 end

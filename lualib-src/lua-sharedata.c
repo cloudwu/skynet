@@ -747,9 +747,6 @@ lupdate(lua_State *L) {
 	luaL_checktype(L, 3, LUA_TTABLE);
 	struct ctrl * c= lua_touserdata(L, 1);
 	struct table *n = lua_touserdata(L, 2);
-	if (c->update) {
-		return luaL_error(L, "can't update more than once");
-	}
 	if (c->root == n) {
 		return luaL_error(L, "You should update a new object");
 	}

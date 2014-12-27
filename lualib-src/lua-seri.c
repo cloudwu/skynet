@@ -120,37 +120,37 @@ rb_read(struct read_block *rb, void *buffer, int sz) {
 
 static inline void
 wb_nil(struct write_block *wb) {
-	int n = TYPE_NIL;
+	uint8_t n = TYPE_NIL;
 	wb_push(wb, &n, 1);
 }
 
 static inline void
 wb_boolean(struct write_block *wb, int boolean) {
-	int n = COMBINE_TYPE(TYPE_BOOLEAN , boolean ? 1 : 0);
+	uint8_t n = COMBINE_TYPE(TYPE_BOOLEAN , boolean ? 1 : 0);
 	wb_push(wb, &n, 1);
 }
 
 static inline void
 wb_integer(struct write_block *wb, int v, int type) {
 	if (v == 0) {
-		int n = COMBINE_TYPE(type , 0);
+		uint8_t n = COMBINE_TYPE(type , 0);
 		wb_push(wb, &n, 1);
 	} else if (v<0) {
-		int n = COMBINE_TYPE(type , 4);
+		uint8_t n = COMBINE_TYPE(type , 4);
 		wb_push(wb, &n, 1);
 		wb_push(wb, &v, 4);
 	} else if (v<0x100) {
-		int n = COMBINE_TYPE(type , 1);
+		uint8_t n = COMBINE_TYPE(type , 1);
 		wb_push(wb, &n, 1);
 		uint8_t byte = (uint8_t)v;
 		wb_push(wb, &byte, 1);
 	} else if (v<0x10000) {
-		int n = COMBINE_TYPE(type , 2);
+		uint8_t n = COMBINE_TYPE(type , 2);
 		wb_push(wb, &n, 1);
 		uint16_t word = (uint16_t)v;
 		wb_push(wb, &word, 2);
 	} else {
-		int n = COMBINE_TYPE(type , 4);
+		uint8_t n = COMBINE_TYPE(type , 4);
 		wb_push(wb, &n, 1);
 		wb_push(wb, &v, 4);
 	}
@@ -158,14 +158,14 @@ wb_integer(struct write_block *wb, int v, int type) {
 
 static inline void
 wb_number(struct write_block *wb, double v) {
-	int n = COMBINE_TYPE(TYPE_NUMBER , 8);
+	uint8_t n = COMBINE_TYPE(TYPE_NUMBER , 8);
 	wb_push(wb, &n, 1);
 	wb_push(wb, &v, 8);
 }
 
 static inline void
 wb_pointer(struct write_block *wb, void *v) {
-	int n = TYPE_USERDATA;
+	uint8_t n = TYPE_USERDATA;
 	wb_push(wb, &n, 1);
 	wb_push(wb, &v, sizeof(v));
 }
@@ -173,13 +173,13 @@ wb_pointer(struct write_block *wb, void *v) {
 static inline void
 wb_string(struct write_block *wb, const char *str, int len) {
 	if (len < MAX_COOKIE) {
-		int n = COMBINE_TYPE(TYPE_SHORT_STRING, len);
+		uint8_t n = COMBINE_TYPE(TYPE_SHORT_STRING, len);
 		wb_push(wb, &n, 1);
 		if (len > 0) {
 			wb_push(wb, str, len);
 		}
 	} else {
-		int n;
+		uint8_t n;
 		if (len < 0x10000) {
 			n = COMBINE_TYPE(TYPE_LONG_STRING, 2);
 			wb_push(wb, &n, 1);
@@ -201,11 +201,11 @@ static int
 wb_table_array(lua_State *L, struct write_block * wb, int index, int depth) {
 	int array_size = lua_rawlen(L,index);
 	if (array_size >= MAX_COOKIE-1) {
-		int n = COMBINE_TYPE(TYPE_TABLE, MAX_COOKIE-1);
+		uint8_t n = COMBINE_TYPE(TYPE_TABLE, MAX_COOKIE-1);
 		wb_push(wb, &n, 1);
 		wb_integer(wb, array_size,TYPE_NUMBER);
 	} else {
-		int n = COMBINE_TYPE(TYPE_TABLE, array_size);
+		uint8_t n = COMBINE_TYPE(TYPE_TABLE, array_size);
 		wb_push(wb, &n, 1);
 	}
 
