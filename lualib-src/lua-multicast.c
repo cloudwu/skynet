@@ -134,7 +134,7 @@ mc_closelocal(lua_State *L) {
 static int
 mc_closelocal_pack(lua_State *L) {
 	struct mc_package *pack = lua_touserdata(L,1);
-	return closelocal_pack(pack);
+	return closelocal_pack(L, pack);
 }
 
 /*
