@@ -73,17 +73,18 @@ end
 local function dispatch_subscribe(channel, source, pack, msg, sz)
 	local self = dispatch[channel]
 	if not self then
-		mc.close(pack)
+		mc.close_pack(pack)
 		error ("Unknown channel " .. channel)
 	end
 
 	if self.__subscribe then
+		-- may yield in dispatch
 		local ok, err = pcall(self.__dispatch, self, source, self.__unpack(msg, sz))
-		mc.close(pack)
+		mc.close_pack(pack)
 		assert(ok, err)
 	else
 		-- maybe unsubscribe first, but the message is send out. drop the message unneed
-		mc.close(pack)
+		mc.close_pack(pack)
 	end
 end
 
