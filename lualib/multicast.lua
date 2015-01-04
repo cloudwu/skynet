@@ -78,6 +78,7 @@ local function dispatch_subscribe(channel, source, pack, msg, sz)
 	end
 
 	if self.__subscribe then
+		-- may yield in dispatch
 		local ok, err = pcall(self.__dispatch, self, source, self.__unpack(msg, sz))
 		mc.close_pack(pack)
 		assert(ok, err)
