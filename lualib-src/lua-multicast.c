@@ -83,7 +83,7 @@ mc_unpacklocal(lua_State *L) {
 	if (sz != sizeof(*pack)) {
 		return luaL_error(L, "Invalid multicast package size %d", sz);
 	}
-	lua_settop(L, 1);
+	lua_pushlightuserdata(L, (*pack));
 	lua_pushlightuserdata(L, (*pack)->data);
 	lua_pushunsigned(L, (*pack)->size);
 	return 3;
@@ -105,14 +105,8 @@ mc_bindrefer(lua_State *L) {
 	return 0;
 }
 
-/*
-	lightuserdata struct mc_package **
- */
 static int
-mc_closelocal(lua_State *L) {
-	struct mc_package **ptr = lua_touserdata(L,1);
-	struct mc_package *pack = *ptr;
-
+closelocal_pack(lua_State *L, struct mc_package *pack) {
 	int ref = __sync_sub_and_fetch(&pack->reference, 1);
 	if (ref <= 0) {
 		skynet_free(pack->data);
@@ -123,6 +117,24 @@ mc_closelocal(lua_State *L) {
 	}
 
 	return 0;
+}
+
+/*
+	lightuserdata struct mc_package **
+ */
+static int
+mc_closelocal(lua_State *L) {
+	struct mc_package **ptr = lua_touserdata(L,1);
+	return closelocal_pack(L, *ptr);
+}
+
+/*
+	lightuserdata struct mc_package *
+ */
+static int
+mc_closelocal_pack(lua_State *L) {
+	struct mc_package *pack = lua_touserdata(L,1);
+	return closelocal_pack(pack);
 }
 
 /*
@@ -155,6 +167,7 @@ luaopen_multicast_core(lua_State *L) {
 		{ "unpack", mc_unpacklocal },
 		{ "bind", mc_bindrefer },
 		{ "close", mc_closelocal },
+		{ "close_pack", mc_closelocal_pack },
 		{ "remote", mc_remote },
 		{ "packstring", mc_packstring },
 		{ "packremote", mc_packremote },
