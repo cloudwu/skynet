@@ -524,7 +524,7 @@ static int lp_choice (lua_State *L) {
 */
 static int lp_star (lua_State *L) {
   int size1;
-  int n = luaL_checkint(L, 2);
+  int n = (int)luaL_checkinteger(L, 2);
   TTree *tree1 = gettree(L, 1, &size1);
   if (n >= 0) {  /* seq tree1 (seq tree1 ... (seq tree1 (rep tree1))) */
     TTree *tree = newtree(L, (n + 1) * (size1 + 1));
@@ -747,7 +747,7 @@ static int lp_poscapture (lua_State *L) {
 
 
 static int lp_argcapture (lua_State *L) {
-  int n = luaL_checkint(L, 1);
+  int n = (int)luaL_checkinteger(L, 1);
   TTree *tree = newemptycap(L, Carg, 0);
   tree->key = n;
   luaL_argcheck(L, 0 < n && n <= SHRT_MAX, 1, "invalid argument index");

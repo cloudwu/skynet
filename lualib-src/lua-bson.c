@@ -433,7 +433,7 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 				luaL_error(L, "Invalid array key type : %s", lua_typename(L, kt));
 				return;
 			}
-			sz = bson_numstr(numberkey, lua_tounsigned(L,-2)-1);
+			sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
 			key = numberkey;
 
 			append_one(b, L, key, sz);
@@ -912,7 +912,7 @@ ltimestamp(lua_State *L) {
 		luaL_addlstring(&b, (const char *)&inc, sizeof(inc));
 		++inc;
 	} else {
-		uint32_t i = lua_tounsigned(L,2);
+		uint32_t i = (uint32_t)lua_tointeger(L,2);
 		luaL_addlstring(&b, (const char *)&i, sizeof(i));
 	}
 	luaL_addlstring(&b, (const char *)&d, sizeof(d));
@@ -996,8 +996,8 @@ lsubtype(lua_State *L, int subtype, const uint8_t * buf, size_t sz) {
 		}
 		const uint32_t * ts = (const uint32_t *)buf;
 		lua_pushvalue(L, lua_upvalueindex(8));
-		lua_pushunsigned(L, ts[1]);
-		lua_pushunsigned(L, ts[0]);
+		lua_pushinteger(L, (lua_Integer)ts[1]);
+		lua_pushinteger(L, (lua_Integer)ts[0]);
 		return 3;
 	}
 	case BSON_REGEX: {

@@ -127,7 +127,7 @@ lcopy(lua_State *L) {
 static int
 lnewwriter(lua_State *L) {
 	void * msg = lua_touserdata(L, 1);
-	uint32_t sz = luaL_checkunsigned(L, 2);
+	uint32_t sz = (uint32_t)luaL_checkinteger(L, 2);
 	struct boxstm * box = lua_newuserdata(L, sizeof(*box));
 	box->obj = stm_new(msg,sz);
 	lua_pushvalue(L, lua_upvalueindex(1));
@@ -149,7 +149,7 @@ static int
 lupdate(lua_State *L) {
 	struct boxstm * box = lua_touserdata(L, 1);
 	void * msg = lua_touserdata(L, 2);
-	uint32_t sz = luaL_checkunsigned(L, 3);
+	uint32_t sz = (uint32_t)luaL_checkinteger(L, 3);
 	stm_update(box->obj, msg, sz);
 
 	return 0;
@@ -199,7 +199,7 @@ lread(lua_State *L) {
 	if (copy) {
 		lua_settop(L, 2);
 		lua_pushlightuserdata(L, copy->msg);
-		lua_pushunsigned(L, copy->sz);
+		lua_pushinteger(L, copy->sz);
 		lua_call(L, 2, LUA_MULTRET);
 		lua_pushboolean(L, 1);
 		lua_replace(L, 1);

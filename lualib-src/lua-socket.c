@@ -215,7 +215,7 @@ lheader(lua_State *L) {
 		sz |= s[i];
 	}
 
-	lua_pushunsigned(L, sz);
+	lua_pushinteger(L, (lua_Integer)sz);
 
 	return 1;
 }
