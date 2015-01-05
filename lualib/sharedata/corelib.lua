@@ -91,24 +91,6 @@ function meta:__len()
 	return len(getcobj(self))
 end
 
-local function conf_ipairs(self, index)
-	local obj = getcobj(self)
-	index = index + 1
-	local value =  rawget(self, index)
-	if value then
-		return index, value
-	end
-	local sz = len(obj)
-	if sz < index then
-		return
-	end
-	return index, self[index]
-end
-
-function meta:__ipairs()
-	return conf_ipairs, self, 0
-end
-
 function meta:__pairs()
 	return conf.next, self, nil
 end
