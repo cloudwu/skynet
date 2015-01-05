@@ -23,16 +23,14 @@ Run these in different console
 
 ```
 ./skynet examples/config	# Launch first skynet node  (Gate server) and a skynet-master (see config for standalone option)
-lua examples/client.lua 	# Launch a client, and try to input some words.
+./3rd/lua/lua examples/client.lua 	# Launch a client, and try to input hello.
 ```
 
 ## About Lua
 
-Skynet put a modified version of lua 5.2.3 in 3rd/lua , it can share proto type between lua state (http://lua-users.org/lists/lua-l/2014-03/msg00489.html) .
+Skynet now use lua 5.3.0-rc3 , http://www.lua.org/work/lua-5.3.0-rc3.tar.gz
 
-Each lua file only load once and cache it in memory during skynet start . so if you want to reflush the cache , call skynet.cache.clear() .
-
-You can also use the offical lua version , edit the makefile by yourself .
+You can also use the other offical lua version , edit the makefile by yourself .
 
 ## How To (in Chinese)
 
