@@ -263,12 +263,8 @@ append_key(struct bson *bs, int type, const char *key, size_t sz) {
 
 static void
 append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
-	int64_t i = lua_tointeger(L, -1);
-	lua_Number d = lua_tonumber(L,-1);
-	if (i != d) {
-		append_key(bs, BSON_REAL, key, sz);
-		write_double(bs, d);
-	} else {
+	if (lua_isinteger(L, -1)) {
+		int64_t i = lua_tointeger(L, -1);
 		int si = i >> 31;
 		if (si == 0 || si == -1) {
 			append_key(bs, BSON_INT32, key, sz);
@@ -277,6 +273,10 @@ append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
 			append_key(bs, BSON_INT64, key, sz);
 			write_int64(bs, i);
 		}
+	} else {
+		lua_Number d = lua_tonumber(L,-1);
+		append_key(bs, BSON_REAL, key, sz);
+		write_double(bs, d);
 	}
 }
 
@@ -797,20 +797,18 @@ lreplace(lua_State *L) {
 		replace_object(L, type, &b);
 		break;
 	case BSON_INT32: {
-		double d = luaL_checknumber(L,3);
-		int32_t i = lua_tointeger(L,3);
-		if ((int32_t)d != i) {
-			luaL_error(L, "%f must be a 32bit integer ", d);
+		if (!lua_isinteger(L, 3)) {
+			luaL_error(L, "%f must be a 32bit integer ", lua_tonumber(L, 3));
 		}
+		int32_t i = lua_tointeger(L,3);
 		write_int32(&b, i);
 		break;
 	}
 	case BSON_INT64: {
-		double d = luaL_checknumber(L,3);
-		lua_Integer i = lua_tointeger(L,3);
-		if ((lua_Integer)d != i) {
-			luaL_error(L, "%f must be a 64bit integer ", d);
+		if (!lua_isinteger(L, 3)) {
+			luaL_error(L, "%f must be a 64bit integer ", lua_tonumber(L, 3));
 		}
+		int64_t i = lua_tointeger(L,3);
 		write_int64(&b, i);
 		break;
 	}
