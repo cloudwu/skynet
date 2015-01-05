@@ -53,7 +53,7 @@ local function genkey(self)
 	return key
 end
 
-function meta:__index(key)
+local function getcobj(self)
 	local obj = self.__obj
 	if isdirty(obj) then
 		local newobj, newtbl = needupdate(self.__gcobj)
@@ -67,6 +67,11 @@ function meta:__index(key)
 			obj = self.__obj
 		end
 	end
+	return obj
+end
+
+function meta:__index(key)
+	local obj = getcobj(self)
 	local v = index(obj, key)
 	if type(v) == "userdata" then
 		local r = setmetatable({
@@ -83,11 +88,11 @@ function meta:__index(key)
 end
 
 function meta:__len()
-	return len(self.__obj)
+	return len(getcobj(self))
 end
 
 local function conf_ipairs(self, index)
-	local obj = self.__obj
+	local obj = getcobj(self)
 	index = index + 1
 	local value =  rawget(self, index)
 	if value then
@@ -109,7 +114,8 @@ function meta:__pairs()
 end
 
 function conf.next(obj, key)
-	local nextkey = core.nextkey(obj.__obj, key)
+	local cobj = getcobj(obj)
+	local nextkey = core.nextkey(cobj, key)
 	if nextkey then
 		return nextkey, obj[nextkey]
 	end
