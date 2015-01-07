@@ -1,5 +1,5 @@
 /*
-** $Id: linit.c,v 1.37 2014/12/09 15:00:17 roberto Exp $
+** $Id: linit.c,v 1.38 2015/01/05 13:48:33 roberto Exp $
 ** Initialization of libraries for lua.c and other clients
 ** See Copyright Notice in lua.h
 */
@@ -7,9 +7,6 @@
 
 #define linit_c
 #define LUA_LIB
-
-#include "lprefix.h"
-
 
 /*
 ** If you embed Lua in your program and need to open the standard
@@ -26,6 +23,11 @@
 **  lua_setfield(L, -2, modname);
 **  lua_pop(L, 1);  // remove _PRELOAD table
 */
+
+#include "lprefix.h"
+
+
+#include <stddef.h>
 
 #include "lua.h"
 

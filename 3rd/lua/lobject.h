@@ -1,5 +1,5 @@
 /*
-** $Id: lobject.h,v 2.105 2014/12/19 13:36:32 roberto Exp $
+** $Id: lobject.h,v 2.106 2015/01/05 13:52:37 roberto Exp $
 ** Type definitions for Lua objects
 ** See Copyright Notice in lua.h
 */
@@ -473,7 +473,7 @@ typedef union TKey {
 
 
 /* copy a value into a key without messing up field 'next' */
-#define setkey(L,key,obj) \
+#define setnodekey(L,key,obj) \
 	{ TKey *k_=(key); const TValue *io_=(obj); \
 	  k_->nk.value_ = io_->value_; k_->nk.tt_ = io_->tt_; \
 	  (void)L; checkliveness(G(L),io_); }

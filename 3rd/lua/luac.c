@@ -1,5 +1,5 @@
 /*
-** $Id: luac.c,v 1.71 2014/11/26 12:08:59 lhf Exp $
+** $Id: luac.c,v 1.72 2015/01/06 03:09:13 lhf Exp $
 ** Lua compiler (saves bytecodes to files; also lists bytecodes)
 ** See Copyright Notice in lua.h
 */
@@ -50,14 +50,14 @@ static void cannot(const char* what)
 static void usage(const char* message)
 {
  if (*message=='-')
-  fprintf(stderr,"%s: unrecognized option " LUA_QS "\n",progname,message);
+  fprintf(stderr,"%s: unrecognized option '%s'\n",progname,message);
  else
   fprintf(stderr,"%s: %s\n",progname,message);
  fprintf(stderr,
   "usage: %s [options] [filenames]\n"
   "Available options are:\n"
   "  -l       list (use -l -l for full listing)\n"
-  "  -o name  output to file " LUA_QL("name") " (default is \"%s\")\n"
+  "  -o name  output to file 'name' (default is \"%s\")\n"
   "  -p       parse only\n"
   "  -s       strip debug information\n"
   "  -v       show version information\n"
@@ -92,7 +92,7 @@ static int doargs(int argc, char* argv[])
   {
    output=argv[++i];
    if (output==NULL || *output==0 || (*output=='-' && output[1]!=0))
-    usage(LUA_QL("-o") " needs argument");
+    usage("'-o' needs argument");
    if (IS("-")) output=NULL;
   }
   else if (IS("-p"))			/* parse only */
@@ -206,7 +206,7 @@ int main(int argc, char* argv[])
 }
 
 /*
-** $Id: print.c,v 1.74 2014/07/21 01:41:45 lhf Exp $
+** $Id: print.c,v 1.76 2015/01/05 16:12:50 lhf Exp $
 ** print bytecodes
 ** See Copyright Notice in lua.h
 */
@@ -263,8 +263,13 @@ static void PrintConstant(const Proto* f, int i)
 	printf(bvalue(o) ? "true" : "false");
 	break;
   case LUA_TNUMFLT:
-	printf(LUA_NUMBER_FMT,fltvalue(o));
+	{
+	char buff[100];
+	sprintf(buff,LUA_NUMBER_FMT,fltvalue(o));
+	printf("%s",buff);
+	if (buff[strspn(buff,"-0123456789")]=='\0') printf(".0");
 	break;
+	}
   case LUA_TNUMINT:
 	printf(LUA_INTEGER_FMT,ivalue(o));
 	break;

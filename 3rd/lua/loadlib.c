@@ -1,5 +1,5 @@
 /*
-** $Id: loadlib.c,v 1.123 2014/11/12 13:31:51 roberto Exp $
+** $Id: loadlib.c,v 1.124 2015/01/05 13:51:39 roberto Exp $
 ** Dynamic library loader for Lua
 ** See Copyright Notice in lua.h
 **
@@ -135,6 +135,18 @@ static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym);
 
 #include <dlfcn.h>
 
+/*
+** Macro to covert pointer to void* to pointer to function. This cast
+** is undefined according to ISO C, but POSIX assumes that it must work.
+** (The '__extension__' in gnu compilers is only to avoid warnings.)
+*/
+#if defined(__GNUC__)
+#define cast_func(p) (__extension__ (lua_CFunction)(p))
+#else
+#define cast_func(p) ((lua_CFunction)(p))
+#endif
+
+
 static void lsys_unloadlib (void *lib) {
   dlclose(lib);
 }
@@ -148,7 +160,7 @@ static void *lsys_load (lua_State *L, const char *path, int seeglb) {
 
 
 static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym) {
-  lua_CFunction f = (lua_CFunction)dlsym(lib, sym);
+  lua_CFunction f = cast_func(dlsym(lib, sym));
   if (f == NULL) lua_pushstring(L, dlerror());
   return f;
 }
