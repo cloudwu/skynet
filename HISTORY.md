@@ -1,3 +1,10 @@
+v0.9.3 (2014-1-5)
+-----------
+* Add : mongo createIndex
+* Update : sproto
+* bugfix : sharedata check dirty flag when len/pairs metamethod
+* bugfix : multicast
+
 v0.9.2 (2014-12-8)
 -----------
 * Simplify the message queue

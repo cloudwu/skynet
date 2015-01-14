@@ -83,7 +83,7 @@ mc_unpacklocal(lua_State *L) {
 	if (sz != sizeof(*pack)) {
 		return luaL_error(L, "Invalid multicast package size %d", sz);
 	}
-	lua_settop(L, 1);
+	lua_pushlightuserdata(L, *pack);
 	lua_pushlightuserdata(L, (*pack)->data);
 	lua_pushunsigned(L, (*pack)->size);
 	return 3;
@@ -92,6 +92,8 @@ mc_unpacklocal(lua_State *L) {
 /*
 	lightuserdata struct mc_package **
 	integer reference
+
+	return mc_package *
  */
 static int
 mc_bindrefer(lua_State *L) {
@@ -102,16 +104,17 @@ mc_bindrefer(lua_State *L) {
 	}
 	(*pack)->reference = ref;
 
-	return 0;
+	lua_pushlightuserdata(L, *pack);
+
+	return 1;
 }
 
 /*
-	lightuserdata struct mc_package **
+	lightuserdata struct mc_package *
  */
 static int
 mc_closelocal(lua_State *L) {
-	struct mc_package **ptr = lua_touserdata(L,1);
-	struct mc_package *pack = *ptr;
+	struct mc_package *pack = lua_touserdata(L,1);
 
 	int ref = __sync_sub_and_fetch(&pack->reference, 1);
 	if (ref <= 0) {
