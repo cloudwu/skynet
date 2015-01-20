@@ -775,8 +775,7 @@ lreplace(lua_State *L) {
 		return luaL_error(L, "call makeindex first");
 	}
 	lua_pushvalue(L,2);
-	lua_rawget(L, -2);
-	if (!lua_isnumber(L,-1)) {
+	if (lua_rawget(L, -2) != LUA_TNUMBER) {
 		return luaL_error(L, "Can't replace key : %s", lua_tostring(L,2));
 	}
 	int id = lua_tointeger(L, -1);
