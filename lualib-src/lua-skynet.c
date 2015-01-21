@@ -45,7 +45,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	lua_pushlightuserdata(L, (void *)msg);
 	lua_pushinteger(L,sz);
 	lua_pushinteger(L, session);
-	lua_pushnumber(L, source);
+	lua_pushinteger(L, source);
 
 	r = lua_pcall(L, 5, 0 , trace);
 
