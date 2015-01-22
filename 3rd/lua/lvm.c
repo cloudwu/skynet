@@ -493,8 +493,8 @@ lua_Integer luaV_shiftl (lua_Integer x, lua_Integer y) {
 static LClosure *getcached (Proto *p, UpVal **encup, StkId base) {
   LClosure *c = p->cache;
   if (c != NULL) {  /* is there a cached closure? */
-    int nup = p->sizeupvalues;
-    Upvaldesc *uv = p->upvalues;
+    int nup = p->sp->sizeupvalues;
+    Upvaldesc *uv = p->sp->upvalues;
     int i;
     for (i = 0; i < nup; i++) {  /* check whether it has right upvalues */
       TValue *v = uv[i].instack ? base + uv[i].idx : encup[uv[i].idx]->v;
@@ -514,8 +514,8 @@ static LClosure *getcached (Proto *p, UpVal **encup, StkId base) {
 */
 static void pushclosure (lua_State *L, Proto *p, UpVal **encup, StkId base,
                          StkId ra) {
-  int nup = p->sizeupvalues;
-  Upvaldesc *uv = p->upvalues;
+  int nup = p->sp->sizeupvalues;
+  Upvaldesc *uv = p->sp->upvalues;
   int i;
   LClosure *ncl = luaF_newLclosure(L, nup);
   ncl->p = p;
@@ -1012,10 +1012,10 @@ void luaV_execute (lua_State *L) {
           StkId nfunc = nci->func;  /* called function */
           StkId ofunc = oci->func;  /* caller function */
           /* last stack slot filled by 'precall' */
-          StkId lim = nci->u.l.base + getproto(nfunc)->numparams;
+          StkId lim = nci->u.l.base + getproto(nfunc)->sp->numparams;
           int aux;
           /* close all upvalues from previous call */
-          if (cl->p->sizep > 0) luaF_close(L, oci->u.l.base);
+          if (cl->p->sp->sizep > 0) luaF_close(L, oci->u.l.base);
           /* move new frame into old one */
           for (aux = 0; nfunc + aux < lim; aux++)
             setobjs2s(L, ofunc + aux, nfunc + aux);
@@ -1032,7 +1032,7 @@ void luaV_execute (lua_State *L) {
       vmcase(OP_RETURN) {
         int b = GETARG_B(i);
         if (b != 0) L->top = ra+b-1;
-        if (cl->p->sizep > 0) luaF_close(L, base);
+        if (cl->p->sp->sizep > 0) luaF_close(L, base);
         b = luaD_poscall(L, ra);
         if (!(ci->callstatus & CIST_REENTRY))  /* 'ci' still the called one */
           return;  /* external invocation: return */
@@ -1153,7 +1153,7 @@ void luaV_execute (lua_State *L) {
       vmcase(OP_VARARG) {
         int b = GETARG_B(i) - 1;
         int j;
-        int n = cast_int(base - ci->func) - cl->p->numparams - 1;
+        int n = cast_int(base - ci->func) - cl->p->sp->numparams - 1;
         if (b < 0) {  /* B == 0? */
           b = n;  /* get all var. arguments */
           Protect(luaD_checkstack(L, n));
