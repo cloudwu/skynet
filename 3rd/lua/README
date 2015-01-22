@@ -1,2 +1,5 @@
-Copy from Lua 5.3.0 final http://www.lua.org/ftp/lua-5.3.0.tar.gz
+This is a modify version of lua 5.3.0 (http://www.lua.org/ftp/lua-5.3.0.tar.gz) .
+
+For detail : http://lua-users.org/lists/lua-l/2014-03/msg00489.html
+
 

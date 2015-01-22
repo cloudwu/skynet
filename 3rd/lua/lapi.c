@@ -1011,7 +1011,7 @@ static Proto * cloneproto (lua_State *L, const Proto *src) {
   return f;
 }
 
-LUA_API void lua_clonefunction (lua_State *L, void * fp) {
+LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
   LClosure *cl;
   LClosure *f = cast(LClosure *, fp);
   lua_lock(L);
@@ -1027,13 +1027,13 @@ LUA_API void lua_clonefunction (lua_State *L, void * fp) {
   api_incr_top(L);
   luaF_initupvals(L, cl);
 
-  if (f->nupvalues >= 1) {  /* does it have an upvalue? */
+  if (cl->nupvalues >= 1) {  /* does it have an upvalue? */
     /* get global table from registry */
     Table *reg = hvalue(&G(L)->l_registry);
     const TValue *gt = luaH_getint(reg, LUA_RIDX_GLOBALS);
     /* set global table as 1st upvalue of 'f' (may be LUA_ENV) */
-    setobj(L, f->upvals[0]->v, gt);
-    luaC_upvalbarrier(L, f->upvals[0]);
+    setobj(L, cl->upvals[0]->v, gt);
+    luaC_upvalbarrier(L, cl->upvals[0]);
   }
   lua_unlock(L);
 }
