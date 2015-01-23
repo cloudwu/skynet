@@ -230,10 +230,10 @@ function mongo_collection:insert(doc)
 end
 
 function mongo_collection:safe_insert(doc)
-	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})	
+	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
 end
 
-function mongo_collection:batch_insert(docs)		
+function mongo_collection:batch_insert(docs)
 	for	i=1,#docs do
 		if docs[i]._id == nil then
 			docs[i]._id	= bson.objectid()
@@ -291,7 +291,7 @@ function mongo_collection:createIndex(keys, option)
 		for k, v in pairs(keys) do
 			name = (name == nil) and k or (name .. "_" .. k)
 			name = name  .. "_" .. v
-		end		
+		end
 	end
 
 
@@ -319,13 +319,13 @@ end
 
 -- collection:findAndModify({query = {name = "userid"}, update = {["$inc"] = {nextid = 1}}, })
 -- keys, value type
--- query, table	
+-- query, table
 -- sort, table
--- remove, bool 
--- update, table 
--- new, bool 
--- fields, bool 
--- upsert, boolean 
+-- remove, bool
+-- update, table
+-- new, bool
+-- fields, bool
+-- upsert, boolean
 function mongo_collection:findAndModify(doc)
 	assert(doc.query)
 	assert(doc.update or doc.remove)
@@ -335,7 +335,7 @@ function mongo_collection:findAndModify(doc)
 		table.insert(cmd, k)
 		table.insert(cmd, v)
 	end
-	return self.database:runCommand(unpack(cmd))
+	return self.database:runCommand(table.unpack(cmd))
 end
 
 function mongo_cursor:hasNext()
