@@ -540,7 +540,7 @@ lindexconf(lua_State *L) {
 		if (!lua_isinteger(L, 2)) {
 			return luaL_error(L, "Invalid key %f", lua_tonumber(L, 2));
 		}
-		lua_Integer key = lua_tointeger(L, 2);
+		key = (int)lua_tointeger(L, 2);
 		if (key > 0 && key <= tbl->sizearray) {
 			--key;
 			pushvalue(L, tbl->L, tbl->arraytype[key], &tbl->array[key]);
@@ -610,7 +610,7 @@ lnextkey(lua_State *L) {
 		if (!lua_isinteger(L, 2)) {
 			return 0;
 		}
-		lua_Integer key = lua_tointeger(L, 2);
+		key = (int)lua_tointeger(L, 2);
 		if (key > 0 && key <= sizearray) {
 			lua_Integer i;
 			for (i=key;i<sizearray;i++) {
