@@ -52,6 +52,7 @@ local watching_service = {}
 local watching_session = {}
 local dead_service = {}
 local error_queue = {}
+local fork_queue = {}
 
 -- suspend is function
 local suspend
@@ -467,8 +468,6 @@ function skynet.dispatch_unknown_response(unknown)
 	unknown_response = unknown
 	return prev
 end
-
-local fork_queue = {}
 
 local tunpack = table.unpack
 
