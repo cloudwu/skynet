@@ -401,7 +401,9 @@ local function yield_call(service, session)
 	watching_session[session] = service
 	local succ, msg, sz = coroutine_yield("CALL", session)
 	watching_session[session] = nil
-	assert(succ, debug.traceback())
+	if not succ then
+		error(debug.traceback())
+	end
 	return msg,sz
 end
 
