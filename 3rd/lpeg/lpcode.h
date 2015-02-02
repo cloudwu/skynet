@@ -1,5 +1,5 @@
 /*
-** $Id: lpcode.h,v 1.5 2013/04/04 21:24:45 roberto Exp $
+** $Id: lpcode.h,v 1.6 2013/11/28 14:56:02 roberto Exp $
 */
 
 #if !defined(lpcode_h)
@@ -17,7 +17,7 @@ int fixedlenx (TTree *tree, int count, int len);
 int hascaptures (TTree *tree);
 int lp_gc (lua_State *L);
 Instruction *compile (lua_State *L, Pattern *p);
-void reallocprog (lua_State *L, Pattern *p, int nsize);
+void realloccode (lua_State *L, Pattern *p, int nsize);
 int sizei (const Instruction *i);
 
 
