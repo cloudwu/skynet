@@ -22,6 +22,7 @@ function snax.interface(name)
 	local si = snax_interface(name, G)
 
 	local ret = {
+		name = name,
 		accept = {},
 		response = {},
 		system = {},
@@ -44,7 +45,10 @@ local skynet_call = skynet.call
 local function gen_post(type, handle)
 	return setmetatable({} , {
 		__index = function( t, k )
-			local id = assert(type.accept[k] , string.format("post %s no exist", k))
+			local id = type.accept[k]
+			if not id then
+				error(string.format("post %s:%s no exist", type.name, k))
+			end
 			return function(...)
 				skynet_send(handle, "snax", id, ...)
 			end
@@ -54,7 +58,10 @@ end
 local function gen_req(type, handle)
 	return setmetatable({} , {
 		__index = function( t, k )
-			local id = assert(type.response[k] , string.format("request %s no exist", k))
+			local id = type.response[k]
+			if not id then
+				error(string.format("request %s:%s no exist", type.name, k))
+			end
 			return function(...)
 				return skynet_call(handle, "snax", id, ...)
 			end
