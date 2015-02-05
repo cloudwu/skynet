@@ -4,7 +4,7 @@ local snax_interface = require "snax.interface"
 local snax = {}
 local typeclass = {}
 
-local G = { require = function() end }
+local G = skynet.getenv("snax_g") and require (skynet.getenv("snax_g")) or { require = function() end }
 
 skynet.register_protocol {
 	name = "snax",
