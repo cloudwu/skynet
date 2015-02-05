@@ -53,12 +53,12 @@ function command.GC()
 	return command.MEM()
 end
 
-function command.REMOVE(_, handle)
+function command.REMOVE(_, handle, kill)
 	services[handle] = nil
 	local response = instance[handle]
 	if response then
 		-- instance is dead
-		response(true)	-- return nil to caller of newservice
+		response(not kill)	-- return nil to caller of newservice, when kill == false
 		instance[handle] = nil
 	end
 

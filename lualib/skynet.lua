@@ -339,7 +339,7 @@ end
 
 function skynet.exit()
 	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit
-	skynet.send(".launcher","lua","REMOVE",skynet.self())
+	skynet.send(".launcher","lua","REMOVE",skynet.self(), false)
 	-- report the sources that call me
 	for co, session in pairs(session_coroutine_id) do
 		local address = session_coroutine_address[co]
@@ -362,7 +362,7 @@ end
 
 function skynet.kill(name)
 	if type(name) == "number" then
-		skynet.send(".launcher","lua","REMOVE",name)
+		skynet.send(".launcher","lua","REMOVE",name, true)
 		name = skynet.address(name)
 	end
 	c.command("KILL",name)
