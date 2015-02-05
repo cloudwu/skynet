@@ -58,7 +58,7 @@ function command.REMOVE(_, handle)
 	local response = instance[handle]
 	if response then
 		-- instance is dead
-		response(false)
+		response(true)	-- return nil to caller of newservice
 		instance[handle] = nil
 	end
 
