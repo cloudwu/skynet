@@ -41,7 +41,7 @@ function command.MEM()
 	local list = {}
 	for k,v in pairs(services) do
 		local kb, bytes = skynet.call(k,"debug","MEM")
-		list[skynet.address(k)] = string.format("%d Kb (%s)",kb,v)
+		list[skynet.address(k)] = string.format("%.2f Kb (%s)",kb,v)
 	end
 	return list
 end
