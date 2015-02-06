@@ -2,7 +2,6 @@ local skynet = require "skynet"
 local netpack = require "netpack"
 local socket = require "socket"
 local sproto = require "sproto"
-local bit32 = require "bit32"
 
 local host
 local send_request
@@ -35,11 +34,7 @@ local function request(name, args, response)
 end
 
 local function send_package(pack)
-	local size = #pack
-	local package = string.char(bit32.extract(size,8,8)) ..
-		string.char(bit32.extract(size,0,8))..
-		pack
-
+	local package = string.pack(">s2", pack)
 	socket.write(client_fd, package)
 end
 
