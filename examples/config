@@ -12,5 +12,6 @@ luaservice = root.."service/?.lua;"..root.."test/?.lua;"..root.."examples/?.lua"
 lualoader = "lualib/loader.lua"
 -- preload = "./examples/preload.lua"	-- run preload.lua before every lua service run
 snax = root.."examples/?.lua;"..root.."test/?.lua"
+-- snax_interface_g = "snax_g"
 cpath = root.."cservice/?.so"
 -- daemon = "./skynet.pid"
