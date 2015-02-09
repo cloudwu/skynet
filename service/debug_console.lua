@@ -228,9 +228,7 @@ function COMMAND.debug(address, fd)
 				skynet.send(agent, "lua", "cmd", "cont")
 				break
 			end
-			if cmdline ~= "" then
-				skynet.send(agent, "lua", "cmd", cmdline)
-			end
+			skynet.send(agent, "lua", "cmd", cmdline)
 		until stop or cmdline == "cont"
 	end)
 	skynet.call(agent, "lua", "start", address, fd)

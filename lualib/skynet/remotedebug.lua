@@ -65,25 +65,27 @@ local function hook_dispatch(dispatcher, resp, fd, channel)
 				if cmd == "cont" then
 					break
 				end
-				if sleep then
-					if cmd == "c" then
-						print "continue..."
-						prompt = string.format(":%08x>", address)
-						newline = true
-						return
+				if cmd ~= "" then
+					if sleep then
+						if cmd == "c" then
+							print "continue..."
+							prompt = string.format(":%08x>", address)
+							newline = true
+							return
+						end
 					end
-				end
 
-				local f = load("return "..cmd, "=(debug)", "t", env)
-				if not f then
-					local err
-					f,err = load(cmd, "=(debug)", "t", env)
+					local f = load("return "..cmd, "=(debug)", "t", env)
 					if not f then
-						socket.write(fd, err .. "\n")
+						local err
+						f,err = load(cmd, "=(debug)", "t", env)
+						if not f then
+							socket.write(fd, err .. "\n")
+						end
 					end
-				end
-				if f then
-					print(select(2,pcall(f)))
+					if f then
+						print(select(2,pcall(f)))
+					end
 				end
 				newline = true
 			else
