@@ -134,7 +134,7 @@ local function add_watch_hook()
 	end, "r")
 end
 
-local function watch_proto(protoname)
+local function watch_proto(protoname, cond)
 	local proto = assert(replace_upvalue(skynet.register_protocol, "proto"), "Can't find proto table")
 	local p = proto[protoname]
 	local dispatch = p.dispatch_origin or p.dispatch
@@ -143,8 +143,10 @@ local function watch_proto(protoname)
 	end
 	p.dispatch_origin = dispatch
 	p.dispatch = function(...)
-		p.dispatch = dispatch	-- restore origin dispatch function
-		add_watch_hook()
+		if not cond or cond(...) then
+			p.dispatch = dispatch	-- restore origin dispatch function
+			add_watch_hook()
+		end
 		dispatch(...)
 	end
 end
@@ -202,7 +204,6 @@ local function hook_dispatch(dispatcher, resp, fd, channel)
 	local function debug_hook()
 		while true do
 			if newline then
-				socket.write(fd, "\n")
 				socket.write(fd, prompt)
 				newline = false
 			end
