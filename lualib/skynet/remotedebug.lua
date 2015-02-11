@@ -194,6 +194,7 @@ local function hook_dispatch(dispatcher, resp, fd, channel)
 
 	local function watch_cmd(cmd)
 		local co = next(ctx_active)
+		watch_env._CO = co
 		if dbgcmd[cmd] then
 			dbgcmd[cmd](co)
 		else
