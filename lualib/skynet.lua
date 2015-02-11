@@ -233,6 +233,9 @@ function suspend(co, result, command, param, size)
 	elseif command == "QUIT" then
 		-- service exit
 		return
+	elseif command == nil then
+		-- debug trace
+		return
 	else
 		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
 	end
@@ -719,6 +722,7 @@ local debug = require "skynet.debug"
 debug(skynet, {
 	dispatch = dispatch_message,
 	clear = clear_pool,
+	suspend = suspend,
 })
 
 return skynet

@@ -60,7 +60,7 @@ end
 
 function dbgcmd.REMOTEDEBUG(...)
 	local remotedebug = require "skynet.remotedebug"
-	remotedebug.start(export.dispatch, ...)
+	remotedebug.start(export, ...)
 end
 
 local function _debug_dispatch(session, address, cmd, ...)
