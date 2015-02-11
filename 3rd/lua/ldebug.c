@@ -85,17 +85,24 @@ LUA_API int lua_getstack (lua_State *L, int level, lua_Debug *ar) {
   CallInfo *ci;
   if (level < 0) return 0;  /* invalid (negative) level */
   lua_lock(L);
-  for (ci = L->ci; level > 0 && ci != &L->base_ci; ci = ci->previous)
-    level--;
-  if (level == 0 && ci != &L->base_ci) {  /* level found? */
+  if (level == 0 && L->status == LUA_YIELD && isLua(L->ci)) {
+    ci = &(L->temp_ci);
+    *ci = *(L->ci);
+    ci->func = restorestack(L, ci->extra);
     status = 1;
     ar->i_ci = ci;
+  } else {
+    for (ci = L->ci; level > 0 && ci != &L->base_ci; ci = ci->previous)
+      level--;
+    if (level == 0 && ci != &L->base_ci) {  /* level found? */
+      status = 1;
+      ar->i_ci = ci;
+    }
+    else status = 0;  /* no such level */
   }
-  else status = 0;  /* no such level */
   lua_unlock(L);
   return status;
 }
-
 
 static const char *upvalname (Proto *p, int uv) {
   TString *s = check_exp(uv < p->sizeupvalues, p->sp->upvalues[uv].name);
@@ -130,7 +137,7 @@ static const char *findlocal (lua_State *L, CallInfo *ci, int n,
   else
     base = ci->func + 1;
   if (name == NULL) {  /* no 'standard' name? */
-    StkId limit = (ci == L->ci) ? L->top : ci->next->func;
+    StkId limit = (ci == L->ci || ci == &(L->temp_ci)) ? L->top : ci->next->func;
     if (limit - base >= n && n > 0)  /* is 'n' inside 'ci' stack? */
       name = "(*temporary)";  /* generic name for any valid slot */
     else

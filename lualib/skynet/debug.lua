@@ -58,6 +58,11 @@ function dbgcmd.TERM(service)
 	skynet.term(service)
 end
 
+function dbgcmd.REMOTEDEBUG(...)
+	local remotedebug = require "skynet.remotedebug"
+	remotedebug.start(export, ...)
+end
+
 local function _debug_dispatch(session, address, cmd, ...)
 	local f = dbgcmd[cmd]
 	assert(f, cmd)
