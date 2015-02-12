@@ -114,8 +114,7 @@ function linehook(mode, line)
 				return
 			end
 		end
-		-- Lua 5.3 report currentline seems wrong
-		change_prompt(string.format("%s(%d)>",ctx.filename, line-1))
+		change_prompt(string.format("%s(%d)>",ctx.filename, line))
 		return true	-- yield
 	end
 end
@@ -124,14 +123,18 @@ local function add_watch_hook()
 	local co = coroutine.running()
 	local ctx = {}
 	ctx_active[co] = ctx
-	local level = 3
-	sethook(function()
-		level = level - 1
-		if level == 0 then
-			ctx.needupdate = true
-			sethook(linehook, "crl")
+	local level = 1
+	sethook(function(mode)
+		if mode == "return" then
+			level = level - 1
+		else
+			level = level + 1
+			if level == 0 then
+				ctx.needupdate = true
+				sethook(linehook, "crl")
+			end
 		end
-	end, "r")
+	end, "cr")
 end
 
 local function watch_proto(protoname, cond)
