@@ -49,6 +49,22 @@ static int currentline (CallInfo *ci) {
 
 
 /*
+** If function yielded, its 'func' can be in the 'extra' field. The
+** next function restores 'func' to its correct value for debugging
+** purposes. (It exchanges 'func' and 'extra'; so, when called again,
+** after debugging, it also "re-restores" ** 'func' to its altered value.
+*/
+static void swapextra (lua_State *L) {
+  if (L->status == LUA_YIELD) {
+    CallInfo *ci = L->ci;  /* get function that yielded */
+    StkId temp = ci->func;  /* exchange its 'func' and 'extra' values */
+    ci->func = restorestack(L, ci->extra);
+    ci->extra = savestack(L, temp);
+  }
+}
+
+
+/*
 ** this function can be called asynchronous (e.g. during a signal)
 */
 LUA_API void lua_sethook (lua_State *L, lua_Hook func, int mask, int count) {
@@ -85,24 +101,17 @@ LUA_API int lua_getstack (lua_State *L, int level, lua_Debug *ar) {
   CallInfo *ci;
   if (level < 0) return 0;  /* invalid (negative) level */
   lua_lock(L);
-  if (level == 0 && L->status == LUA_YIELD && isLua(L->ci)) {
-    ci = &(L->temp_ci);
-    *ci = *(L->ci);
-    ci->func = restorestack(L, ci->extra);
+  for (ci = L->ci; level > 0 && ci != &L->base_ci; ci = ci->previous)
+    level--;
+  if (level == 0 && ci != &L->base_ci) {  /* level found? */
     status = 1;
     ar->i_ci = ci;
-  } else {
-    for (ci = L->ci; level > 0 && ci != &L->base_ci; ci = ci->previous)
-      level--;
-    if (level == 0 && ci != &L->base_ci) {  /* level found? */
-      status = 1;
-      ar->i_ci = ci;
-    }
-    else status = 0;  /* no such level */
   }
+  else status = 0;  /* no such level */
   lua_unlock(L);
   return status;
 }
+
 
 static const char *upvalname (Proto *p, int uv) {
   TString *s = check_exp(uv < p->sizeupvalues, p->sp->upvalues[uv].name);
@@ -137,7 +146,7 @@ static const char *findlocal (lua_State *L, CallInfo *ci, int n,
   else
     base = ci->func + 1;
   if (name == NULL) {  /* no 'standard' name? */
-    StkId limit = (ci == L->ci || ci == &(L->temp_ci)) ? L->top : ci->next->func;
+    StkId limit = (ci == L->ci) ? L->top : ci->next->func;
     if (limit - base >= n && n > 0)  /* is 'n' inside 'ci' stack? */
       name = "(*temporary)";  /* generic name for any valid slot */
     else
@@ -151,6 +160,7 @@ static const char *findlocal (lua_State *L, CallInfo *ci, int n,
 LUA_API const char *lua_getlocal (lua_State *L, const lua_Debug *ar, int n) {
   const char *name;
   lua_lock(L);
+  swapextra(L);
   if (ar == NULL) {  /* information about non-active function? */
     if (!isLfunction(L->top - 1))  /* not a Lua function? */
       name = NULL;
@@ -165,6 +175,7 @@ LUA_API const char *lua_getlocal (lua_State *L, const lua_Debug *ar, int n) {
       api_incr_top(L);
     }
   }
+  swapextra(L);
   lua_unlock(L);
   return name;
 }
@@ -172,12 +183,15 @@ LUA_API const char *lua_getlocal (lua_State *L, const lua_Debug *ar, int n) {
 
 LUA_API const char *lua_setlocal (lua_State *L, const lua_Debug *ar, int n) {
   StkId pos = 0;  /* to avoid warnings */
-  const char *name = findlocal(L, ar->i_ci, n, &pos);
+  const char *name;
   lua_lock(L);
+  swapextra(L);
+  name = findlocal(L, ar->i_ci, n, &pos);
   if (name) {
     setobjs2s(L, pos, L->top - 1);
     L->top--;  /* pop value */
   }
+  swapextra(L);
   lua_unlock(L);
   return name;
 }
@@ -277,6 +291,7 @@ LUA_API int lua_getinfo (lua_State *L, const char *what, lua_Debug *ar) {
   CallInfo *ci;
   StkId func;
   lua_lock(L);
+  swapextra(L);
   if (*what == '>') {
     ci = NULL;
     func = L->top - 1;
@@ -295,6 +310,7 @@ LUA_API int lua_getinfo (lua_State *L, const char *what, lua_Debug *ar) {
     setobjs2s(L, L->top, func);
     api_incr_top(L);
   }
+  swapextra(L);  /* correct before option 'L', which can raise a mem. error */
   if (strchr(what, 'L'))
     collectvalidlines(L, cl);
   lua_unlock(L);
