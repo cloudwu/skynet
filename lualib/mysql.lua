@@ -461,9 +461,7 @@ local function _mysql_login(self,user,password,database)
         local more_capabilities
         more_capabilities, pos = _get_byte2(packet, pos)
 
-        self._server_capabilities = bor(self._server_capabilities,
-                                        lshift(more_capabilities, 16))
-
+        self._server_capabilities = self._server_capabilities|more_capabilities<<16
 
         local len = 21 - 8 - 1
 
@@ -524,7 +522,7 @@ local function read_result(self, sock)
 
     if typ == 'OK' then
         local res = _parse_ok_packet(packet)
-        if res and band(res.server_status, SERVER_MORE_RESULTS_EXISTS) ~= 0 then
+        if res and res.server_status&SERVER_MORE_RESULTS_EXISTS ~= 0 then
             return res, "again"
         end
         return res
@@ -577,7 +575,7 @@ local function read_result(self, sock)
         if typ == 'EOF' then
             local warning_count, status_flags = _parse_eof_packet(packet)
 
-            if band(status_flags, SERVER_MORE_RESULTS_EXISTS) ~= 0 then
+            if status_flags&SERVER_MORE_RESULTS_EXISTS ~= 0 then
                 return rows, "again"
             end
 
