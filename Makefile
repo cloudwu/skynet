@@ -13,8 +13,8 @@ LUA_STATICLIB := 3rd/lua/liblua.a
 LUA_LIB ?= $(LUA_STATICLIB)
 LUA_INC ?= 3rd/lua
 
-$(LUA_STATICLIB) :
-	cd 3rd/lua && $(MAKE) CC=$(CC) $(PLAT)
+$(LUA_STATICLIB) : 
+	cd 3rd/lua && $(MAKE) CC='$(CC) -std=gnu99' $(PLAT)
 
 # jemalloc 
 
