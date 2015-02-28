@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include "msvcint.h"
 
 #include "lua.h"
@@ -41,8 +42,15 @@ LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
 static int
 lnewproto(lua_State *L) {
 	size_t sz = 0;
-	void * buffer = (void *)luaL_checklstring(L,1,&sz);
-	struct sproto * sp = sproto_create(buffer, sz);
+	void * buffer;
+	struct sproto * sp;
+	if (lua_isuserdata(L,1)) {
+		buffer = lua_touserdata(L,1);
+		sz = luaL_checkinteger(L,2);
+	} else {
+		buffer = (void *)luaL_checklstring(L,1,&sz);
+	}
+	sp = sproto_create(buffer, sz);
 	if (sp) {
 		lua_pushlightuserdata(L, sp);
 		return 1;
@@ -449,6 +457,31 @@ lprotocol(lua_State *L) {
 	return 3;
 }
 
+/* global sproto pointer for multi states */
+static void * G_sproto = NULL;
+static size_t G_sproto_sz = 0;
+
+static int
+lsaveproto(lua_State *L) {
+	size_t sz;
+	void * buffer = (void *)luaL_checklstring(L,1,&sz);
+	void * tmp = malloc(sz);
+	memcpy(tmp, buffer, sz);
+	if (G_sproto) {
+		free(G_sproto);
+	}
+	G_sproto = tmp;
+	G_sproto_sz = sz;
+	return 0;
+}
+
+static int
+lloadproto(lua_State *L) {
+	lua_pushlightuserdata(L, G_sproto);
+	lua_pushinteger(L, G_sproto_sz);
+	return 2;
+}
+
 int
 luaopen_sproto_core(lua_State *L) {
 #ifdef luaL_checkversion
@@ -461,6 +494,8 @@ luaopen_sproto_core(lua_State *L) {
 		{ "querytype", lquerytype },
 		{ "decode", ldecode },
 		{ "protocol", lprotocol },
+		{ "loadproto", lloadproto },
+		{ "saveproto", lsaveproto },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);
