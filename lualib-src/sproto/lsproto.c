@@ -6,6 +6,7 @@
 #include "lauxlib.h"
 #include "sproto.h"
 
+#define MAX_GLOBALSPROTO 16
 #define ENCODE_BUFFERSIZE 2050
 
 //#define ENCODE_BUFFERSIZE 2050
@@ -458,27 +459,46 @@ lprotocol(lua_State *L) {
 }
 
 /* global sproto pointer for multi states */
-static void * G_sproto = NULL;
-static size_t G_sproto_sz = 0;
+struct sproto_bin {
+	void *ptr;
+	size_t sz;
+};
+
+static struct sproto_bin G_sproto[MAX_GLOBALSPROTO];
 
 static int
 lsaveproto(lua_State *L) {
 	size_t sz;
 	void * buffer = (void *)luaL_checklstring(L,1,&sz);
-	void * tmp = malloc(sz);
-	memcpy(tmp, buffer, sz);
-	if (G_sproto) {
-		free(G_sproto);
+	int index = luaL_optinteger(L, 2, 0);
+	void * tmp;
+	struct sproto_bin * sbin = &G_sproto[index];
+	if (index < 0 || index >= MAX_GLOBALSPROTO) {
+		return luaL_error(L, "Invalid global slot index %d", index);
 	}
-	G_sproto = tmp;
-	G_sproto_sz = sz;
+	tmp = malloc(sz);
+	memcpy(tmp, buffer, sz);
+	if (sbin->ptr) {
+		free(sbin->ptr);
+	}
+	sbin->ptr = tmp;
+	sbin->sz = sz;
 	return 0;
 }
 
 static int
 lloadproto(lua_State *L) {
-	lua_pushlightuserdata(L, G_sproto);
-	lua_pushinteger(L, G_sproto_sz);
+	int index = luaL_optinteger(L, 1, 0);
+	struct sproto_bin * sbin = &G_sproto[index];
+	if (index < 0 || index >= MAX_GLOBALSPROTO) {
+		return luaL_error(L, "Invalid global slot index %d", index);
+	}
+	if (sbin->ptr == NULL) {
+		return luaL_error(L, "nil sproto at index %d", index);
+	}
+
+	lua_pushlightuserdata(L, sbin->ptr);
+	lua_pushinteger(L, sbin->sz);
 	return 2;
 }
 

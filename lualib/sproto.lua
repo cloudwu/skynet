@@ -12,8 +12,8 @@ function sproto_mt:__gc()
 	core.deleteproto(self.__cobj)
 end
 
-function sproto.new(pbin)
-	local cobj = assert(core.newproto(pbin))
+function sproto.new(...)
+	local cobj = assert(core.newproto(...))
 	local self = {
 		__cobj = cobj,
 		__tcache = setmetatable( {} , weak_mt ),

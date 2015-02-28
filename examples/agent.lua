@@ -2,6 +2,7 @@ local skynet = require "skynet"
 local netpack = require "netpack"
 local socket = require "socket"
 local sproto = require "sproto"
+local sprotoloader = require "sprotoloader"
 
 local host
 local send_request
@@ -61,9 +62,10 @@ skynet.register_protocol {
 	end
 }
 
-function CMD.start(gate, fd, proto)
-	host = sproto.new(proto.c2s):host "package"
-	send_request = host:attach(sproto.new(proto.s2c))
+function CMD.start(gate, fd)
+	-- slot 1,2 set at main.lua
+	host = sprotoloader.load(1):host "package"
+	send_request = host:attach(sprotoloader.load(2))
 	skynet.fork(function()
 		while true do
 			send_package(send_request "heartbeat")

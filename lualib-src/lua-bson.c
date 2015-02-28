@@ -9,24 +9,6 @@
 #include <string.h>
 #include <stdbool.h>
 
-#if defined(_WIN32) || defined(_WIN64)
-
-#include <winsock2.h>
-
-static void	
-init_winsock() {
-	WSADATA wsaData;
-	WSAStartup(MAKEWORD(2,2), &wsaData);
-}
-
-#else
-
-static void	
-init_winsock() {
-}
-
-#endif
-
 #define DEFAULT_CAP 64
 #define MAX_NUMBER 1024
 
@@ -1100,7 +1082,10 @@ static uint32_t oid_counter;
 
 static void
 init_oid_header() {
-	init_winsock();
+	if (oid_counter) {
+		// already init
+		return;
+	}
 	pid_t pid = getpid();
 	uint32_t h = 0;
 	char hostname[256];
@@ -1116,8 +1101,12 @@ init_oid_header() {
 	oid_header[2] = (h>>16) & 0xff;
 	oid_header[3] = pid & 0xff;
 	oid_header[4] = (pid >> 8) & 0xff;
-
-	oid_counter = h ^ time(NULL) ^ (uintptr_t)&h;
+	
+	uint32_t c = h ^ time(NULL) ^ (uintptr_t)&h;
+	if (c == 0) {
+		c = 1;
+	}
+	oid_counter = c;
 }
 
 static inline int
