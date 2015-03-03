@@ -87,7 +87,7 @@ static const char * load_config = "\
 	local config_name = ...\
 	local f = assert(io.open(config_name))\
 	local code = assert(f:read \'*a\')\
-	local function getenv(name) return assert(os.getenv(name), name) end\
+	local function getenv(name) return assert(os.getenv(name), \'os.getenv() failed: \' .. name) end\
 	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
 	f:close()\
 	local result = {}\
@@ -118,13 +118,13 @@ main(int argc, char *argv[]) {
 	int err = luaL_loadstring(L, load_config);
 	assert(err == LUA_OK);
 	lua_pushstring(L, config_file);
-	
+
 	err = lua_pcall(L, 1, 1, 0);
 	if (err) {
 		fprintf(stderr,"%s\n",lua_tostring(L,-1));
 		lua_close(L);
 		return 1;
-	} 
+	}
 	_init_env(L);
 
 	config.thread =  optint("thread",8);
