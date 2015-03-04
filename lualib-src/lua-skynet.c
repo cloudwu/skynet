@@ -16,7 +16,7 @@ struct snlua {
 	const char * preload;
 };
 
-static int 
+static int
 traceback (lua_State *L) {
 	const char *msg = lua_tostring(L, 1);
 	if (msg)
@@ -191,7 +191,7 @@ _send(lua_State *L) {
 	}
 	if (session < 0) {
 		// send to invalid address
-		// todo: maybe throw error whould be better
+		// todo: maybe throw an error would be better
 		return 0;
 	}
 	lua_pushinteger(L,session);
@@ -304,7 +304,7 @@ ltrash(lua_State *L) {
 int
 luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
-	
+
 	luaL_Reg l[] = {
 		{ "send" , _send },
 		{ "genid", _genid },
