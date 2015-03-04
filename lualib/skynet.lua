@@ -101,7 +101,6 @@ local coroutine_count = 0
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
 	if co == nil then
-		local print = print
 		co = coroutine.create(function(...)
 			f(...)
 			while true do
@@ -464,7 +463,7 @@ function skynet.dispatch_unknown_request(unknown)
 end
 
 local function unknown_response(session, address, msg, sz)
-	print("Response message :" , c.tostring(msg,sz))
+	skynet.error(string.format("Response message :" , c.tostring(msg,sz)))
 	error(string.format("Unknown session : %d from %x", session, address))
 end
 
