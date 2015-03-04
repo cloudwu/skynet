@@ -28,9 +28,9 @@ Run these in different console
 
 ## About Lua
 
-Skynet now use lua 5.3.0 final, http://www.lua.org/ftp/lua-5.3.0.tar.gz
+Skynet now use Lua 5.3.0 final, http://www.lua.org/ftp/lua-5.3.0.tar.gz
 
-You can also use the other offical lua version , edit the makefile by yourself .
+You can also use the other official Lua version , edit the makefile by yourself .
 
 ## How To (in Chinese)
 
