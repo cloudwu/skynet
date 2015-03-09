@@ -1,5 +1,5 @@
 /*
-** $Id: lptree.c,v 1.10 2013/04/12 16:30:33 roberto Exp $
+** $Id: lptree.c,v 1.13 2014/12/12 16:59:10 roberto Exp $
 ** Copyright 2013, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -209,9 +209,11 @@ static TTree *seqaux (TTree *tree, TTree *sib, int sibsize) {
 /*
 ** Add element 'idx' to 'ktable' of pattern at the top of the stack;
 ** create new 'ktable' if necessary. Return index of new element.
+** If new element is nil, does not add it to table (as it would be
+** useless) and returns 0, as ktable[0] is always nil.
 */
 static int addtoktable (lua_State *L, int idx) {
-  if (idx == 0 || lua_isnil(L, idx))  /* no actual value to insert? */
+  if (idx == 0)  /* no actual value to insert? */
     return 0;
   else {
     int n;
@@ -220,11 +222,15 @@ static int addtoktable (lua_State *L, int idx) {
     if (n == 0) {  /* is it empty/non-existent? */
       lua_pop(L, 1);  /* remove it */
       lua_createtable(L, 1, 0);  /* create a fresh table */
+      lua_pushvalue(L, -1);  /* make a copy */
+      lua_setfenv(L, -3);  /* set it as 'ktable' for pattern */
     }
-    lua_pushvalue(L, idx);  /* element to be added */
-    lua_rawseti(L, -2, n + 1);
-    lua_setfenv(L, -2);  /* set it as ktable for pattern */
-    return n + 1;
+    if (!lua_isnil(L, idx)) {  /* non-nil value? */
+      lua_pushvalue(L, idx);  /* element to be added */
+      lua_rawseti(L, -2, ++n);
+    }
+    lua_pop(L, 1);  /* remove 'ktable' */
+    return n;
   }
 }
 
@@ -524,8 +530,8 @@ static int lp_choice (lua_State *L) {
 */
 static int lp_star (lua_State *L) {
   int size1;
-  int n = luaL_checkint(L, 2);
-  TTree *tree1 = gettree(L, 1, &size1);
+  int n = (int)luaL_checkinteger(L, 2);
+  TTree *tree1 = getpatt(L, 1, &size1);
   if (n >= 0) {  /* seq tree1 (seq tree1 ... (seq tree1 (rep tree1))) */
     TTree *tree = newtree(L, (n + 1) * (size1 + 1));
     if (nullable(tree1))
@@ -634,8 +640,8 @@ static int lp_behind (lua_State *L) {
   TTree *tree;
   TTree *tree1 = getpatt(L, 1, NULL);
   int n = fixedlen(tree1);
-  luaL_argcheck(L, !hascaptures(tree1), 1, "pattern have captures");
   luaL_argcheck(L, n > 0, 1, "pattern may not have fixed length");
+  luaL_argcheck(L, !hascaptures(tree1), 1, "pattern have captures");
   luaL_argcheck(L, n <= MAXBEHIND, 1, "pattern too long to look behind");
   tree = newroot1sib(L, TBehind);
   tree->u.n = n;
@@ -747,7 +753,7 @@ static int lp_poscapture (lua_State *L) {
 
 
 static int lp_argcapture (lua_State *L) {
-  int n = luaL_checkint(L, 1);
+  int n = (int)luaL_checkinteger(L, 1);
   TTree *tree = newemptycap(L, Carg, 0);
   tree->key = n;
   luaL_argcheck(L, 0 < n && n <= SHRT_MAX, 1, "invalid argument index");
@@ -1139,7 +1145,7 @@ static int lp_type (lua_State *L) {
 int lp_gc (lua_State *L) {
   Pattern *p = getpattern(L, 1);
   if (p->codesize > 0)
-    reallocprog(L, p, 0);
+    realloccode(L, p, 0);
   return 0;
 }
 

@@ -230,10 +230,10 @@ function mongo_collection:insert(doc)
 end
 
 function mongo_collection:safe_insert(doc)
-	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})	
+	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
 end
 
-function mongo_collection:batch_insert(docs)		
+function mongo_collection:batch_insert(docs)
 	for	i=1,#docs do
 		if docs[i]._id == nil then
 			docs[i]._id	= bson.objectid()
@@ -279,8 +279,44 @@ function mongo_collection:find(query, selector)
 		__cursor = nil,
 		__document = {},
 		__flags	= 0,
+		__skip = 0,
+		__sortquery = nil,
+		__limit = 0,
 	} ,	cursor_meta)
 end
+
+function mongo_cursor:sort(key_list)
+	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key_list}
+	return self
+end
+
+function mongo_cursor:skip(amount)
+	self.__skip = amount
+	return self
+end
+
+function mongo_cursor:limit(amount)
+	self.__limit = amount
+	return self
+end
+
+function mongo_cursor:count(with_limit_and_skip)
+	local cmd = {
+		'count', self.__collection.name,
+		'query', self.__query,
+	}
+	if with_limit_and_skip then
+		local len = #cmd
+		cmd[len+1] = 'limit'
+		cmd[len+2] = self.__limit
+		cmd[len+3] = 'skip'
+		cmd[len+4] = self.__skip
+	end
+	local ret = self.__collection.database:runCommand(table.unpack(cmd))
+	assert(ret and ret.ok == 1)
+	return ret.n
+end
+
 
 -- collection:createIndex({username = 1}, {unique = true})
 function mongo_collection:createIndex(keys, option)
@@ -291,7 +327,7 @@ function mongo_collection:createIndex(keys, option)
 		for k, v in pairs(keys) do
 			name = (name == nil) and k or (name .. "_" .. k)
 			name = name  .. "_" .. v
-		end		
+		end
 	end
 
 
@@ -319,13 +355,13 @@ end
 
 -- collection:findAndModify({query = {name = "userid"}, update = {["$inc"] = {nextid = 1}}, })
 -- keys, value type
--- query, table	
+-- query, table
 -- sort, table
--- remove, bool 
--- update, table 
--- new, bool 
--- fields, bool 
--- upsert, boolean 
+-- remove, bool
+-- update, table
+-- new, bool
+-- fields, bool
+-- upsert, boolean
 function mongo_collection:findAndModify(doc)
 	assert(doc.query)
 	assert(doc.update or doc.remove)
@@ -335,7 +371,7 @@ function mongo_collection:findAndModify(doc)
 		table.insert(cmd, k)
 		table.insert(cmd, v)
 	end
-	return self.database:runCommand(unpack(cmd))
+	return self.database:runCommand(table.unpack(cmd))
 end
 
 function mongo_cursor:hasNext()
@@ -348,10 +384,11 @@ function mongo_cursor:hasNext()
 		local sock = conn.__sock
 		local pack
 		if self.__data == nil then
-			pack = driver.query(request_id,	self.__flags, self.__collection.full_name,0,0,self.__query,self.__selector)
+			local query = self.__sortquery or self.__query
+			pack = driver.query(request_id, self.__flags, self.__collection.full_name, self.__skip, -self.__limit, query, self.__selector)
 		else
 			if self.__cursor then
-				pack = driver.more(request_id, self.__collection.full_name,0,self.__cursor)
+				pack = driver.more(request_id, self.__collection.full_name, -self.__limit, self.__cursor)
 			else
 				-- no more
 				self.__document	= nil

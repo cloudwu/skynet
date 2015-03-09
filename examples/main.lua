@@ -1,9 +1,11 @@
 local skynet = require "skynet"
+local sprotoloader = require "sprotoloader"
 
 local max_client = 64
 
 skynet.start(function()
 	print("Server start")
+	skynet.uniqueservice("protoloader")
 	local console = skynet.newservice("console")
 	skynet.newservice("debug_console",8000)
 	skynet.newservice("simpledb")

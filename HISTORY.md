@@ -1,4 +1,13 @@
-v0.9.3 (2014-1-5)
+v1.0.0-alpha (2015-3-9)
+-----------
+* Update lua from 5.2 to 5.3
+* Add an online lua debugger
+* Add sharemap as an example use case of stm
+* Improve sproto for multi-state
+* Improve mongodb driver
+* Fix known bugs
+
+v0.9.3 (2015-1-5)
 -----------
 * Add : mongo createIndex
 * Update : sproto

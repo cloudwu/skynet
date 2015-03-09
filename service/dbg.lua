@@ -35,7 +35,7 @@ local function dump_list(list)
 end
 
 skynet.start(function()
-	local list = skynet.call(".launcher","lua", unpack(cmd))
+	local list = skynet.call(".launcher","lua", table.unpack(cmd))
 	if list then
 		dump_list(list)
 	end

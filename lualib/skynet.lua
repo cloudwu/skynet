@@ -22,7 +22,7 @@ local skynet = {
 	PTYPE_HARBOR = 5,
 	PTYPE_SOCKET = 6,
 	PTYPE_ERROR = 7,
-	PTYPE_QUEUE = 8,	-- use in deprecated mqueue, use skynet.queue instead
+	PTYPE_QUEUE = 8,	-- used in deprecated mqueue, use skynet.queue instead
 	PTYPE_DEBUG = 9,
 	PTYPE_LUA = 10,
 	PTYPE_SNAX = 11,
@@ -52,6 +52,7 @@ local watching_service = {}
 local watching_session = {}
 local dead_service = {}
 local error_queue = {}
+local fork_queue = {}
 
 -- suspend is function
 local suspend
@@ -100,7 +101,6 @@ local coroutine_count = 0
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
 	if co == nil then
-		local print = print
 		co = coroutine.create(function(...)
 			f(...)
 			while true do
@@ -232,6 +232,9 @@ function suspend(co, result, command, param, size)
 	elseif command == "QUIT" then
 		-- service exit
 		return
+	elseif command == nil then
+		-- debug trace
+		return
 	else
 		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
 	end
@@ -338,7 +341,7 @@ end
 
 function skynet.exit()
 	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit
-	skynet.send(".launcher","lua","REMOVE",skynet.self())
+	skynet.send(".launcher","lua","REMOVE",skynet.self(), false)
 	-- report the sources that call me
 	for co, session in pairs(session_coroutine_id) do
 		local address = session_coroutine_address[co]
@@ -361,7 +364,7 @@ end
 
 function skynet.kill(name)
 	if type(name) == "number" then
-		skynet.send(".launcher","lua","REMOVE",name)
+		skynet.send(".launcher","lua","REMOVE",name, true)
 		name = skynet.address(name)
 	end
 	c.command("KILL",name)
@@ -400,7 +403,9 @@ local function yield_call(service, session)
 	watching_session[session] = service
 	local succ, msg, sz = coroutine_yield("CALL", session)
 	watching_session[session] = nil
-	assert(succ, debug.traceback())
+	if not succ then
+		error(debug.traceback())
+	end
 	return msg,sz
 end
 
@@ -458,7 +463,7 @@ function skynet.dispatch_unknown_request(unknown)
 end
 
 local function unknown_response(session, address, msg, sz)
-	print("Response message :" , c.tostring(msg,sz))
+	skynet.error(string.format("Response message :" , c.tostring(msg,sz)))
 	error(string.format("Unknown session : %d from %x", session, address))
 end
 
@@ -467,8 +472,6 @@ function skynet.dispatch_unknown_response(unknown)
 	unknown_response = unknown
 	return prev
 end
-
-local fork_queue = {}
 
 local tunpack = table.unpack
 
@@ -718,6 +721,7 @@ local debug = require "skynet.debug"
 debug(skynet, {
 	dispatch = dispatch_message,
 	clear = clear_pool,
+	suspend = suspend,
 })
 
 return skynet

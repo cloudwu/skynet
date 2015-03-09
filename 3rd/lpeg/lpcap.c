@@ -1,5 +1,5 @@
 /*
-** $Id: lpcap.c,v 1.4 2013/03/21 20:25:12 roberto Exp $
+** $Id: lpcap.c,v 1.5 2014/12/12 16:58:47 roberto Exp $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -462,7 +462,7 @@ static int pushcapture (CapState *cs) {
     case Carg: {
       int arg = (cs->cap++)->idx;
       if (arg + FIXEDARGS > cs->ptop)
-        return luaL_error(L, "reference to absent argument #%d", arg);
+        return luaL_error(L, "reference to absent extra argument #%d", arg);
       lua_pushvalue(L, arg + FIXEDARGS);
       return 1;
     }
