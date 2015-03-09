@@ -35,3 +35,4 @@ You can also use the other official Lua version , edit the makefile by yourself 
 ## How To (in Chinese)
 
 * Read Wiki https://github.com/cloudwu/skynet/wiki
+* The FAQ in wiki https://github.com/cloudwu/skynet/wiki/FAQ
