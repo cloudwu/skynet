@@ -1,5 +1,5 @@
 /*
-** $Id: lpcode.c,v 1.18 2013/04/12 16:30:33 roberto Exp $
+** $Id: lpcode.c,v 1.21 2014/12/12 17:01:29 roberto Exp $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -33,26 +33,30 @@ static const Charset *fullset = &fullset_;
 */
 
 /*
-** Check whether a charset is empty (IFail), singleton (IChar),
-** full (IAny), or none of those (ISet).
+** Check whether a charset is empty (returns IFail), singleton (IChar),
+** full (IAny), or none of those (ISet). When singleton, '*c' returns
+** which character it is. (When generic set, the set was the input,
+** so there is no need to return it.)
 */
 static Opcode charsettype (const byte *cs, int *c) {
-  int count = 0;
+  int count = 0;  /* number of characters in the set */
   int i;
-  int candidate = -1;  /* candidate position for a char */
-  for (i = 0; i < CHARSETSIZE; i++) {
+  int candidate = -1;  /* candidate position for the singleton char */
+  for (i = 0; i < CHARSETSIZE; i++) {  /* for each byte */
     int b = cs[i];
-    if (b == 0) {
-      if (count > 1) return ISet;  /* else set is still empty */
+    if (b == 0) {  /* is byte empty? */
+      if (count > 1)  /* was set neither empty nor singleton? */
+        return ISet;  /* neither full nor empty nor singleton */
+      /* else set is still empty or singleton */
     }
-    else if (b == 0xFF) {
-      if (count < (i * BITSPERCHAR))
-        return ISet;
+    else if (b == 0xFF) {  /* is byte full? */
+      if (count < (i * BITSPERCHAR))  /* was set not full? */
+        return ISet;  /* neither full nor empty nor singleton */
       else count += BITSPERCHAR;  /* set is still full */
     }
-    else if ((b & (b - 1)) == 0) {  /* byte has only one bit? */
-      if (count > 0)
-        return ISet;  /* set is neither full nor empty */
+    else if ((b & (b - 1)) == 0) {  /* has byte only one bit? */
+      if (count > 0)  /* was set not empty? */
+        return ISet;  /* neither full nor empty nor singleton */
       else {  /* set has only one char till now; track it */
         count++;
         candidate = i;
@@ -77,6 +81,7 @@ static Opcode charsettype (const byte *cs, int *c) {
   }
 }
 
+
 /*
 ** A few basic operations on Charsets
 */
@@ -84,16 +89,11 @@ static void cs_complement (Charset *cs) {
   loopset(i, cs->cs[i] = ~cs->cs[i]);
 }
 
-
 static int cs_equal (const byte *cs1, const byte *cs2) {
   loopset(i, if (cs1[i] != cs2[i]) return 0);
   return 1;
 }
 
-
-/*
-** computes whether sets cs1 and cs2 are disjoint
-*/
 static int cs_disjoint (const Charset *cs1, const Charset *cs2) {
   loopset(i, if ((cs1->cs[i] & cs2->cs[i]) != 0) return 0;)
   return 1;
@@ -101,7 +101,8 @@ static int cs_disjoint (const Charset *cs1, const Charset *cs2) {
 
 
 /*
-** Convert a 'char' pattern (TSet, TChar, TAny) to a charset
+** If 'tree' is a 'char' pattern (TSet, TChar, TAny), convert it into a
+** charset and return 1; else return 0.
 */
 int tocharset (TTree *tree, Charset *cs) {
   switch (tree->tag) {
@@ -116,7 +117,7 @@ int tocharset (TTree *tree, Charset *cs) {
       return 1;
     }
     case TAny: {
-      loopset(i, cs->cs[i] = 0xFF);  /* add all to the set */
+      loopset(i, cs->cs[i] = 0xFF);  /* add all characters to the set */
       return 1;
     }
     default: return 0;
@@ -125,13 +126,16 @@ int tocharset (TTree *tree, Charset *cs) {
 
 
 /*
-** Checks whether a pattern has captures
+** Check whether a pattern tree has captures
 */
 int hascaptures (TTree *tree) {
  tailcall:
   switch (tree->tag) {
     case TCapture: case TRunTime:
       return 1;
+    case TCall:
+      tree = sib2(tree); goto tailcall;  /* return hascaptures(sib2(tree)); */
+    case TOpenCall: assert(0);
     default: {
       switch (numsiblings[tree->tag]) {
         case 1:  /* return hascaptures(sib1(tree)); */
@@ -161,7 +165,7 @@ int hascaptures (TTree *tree) {
 **    p is nullable => nullable(p)
 **    nofail(p) => p cannot fail
 ** The function assumes that TOpenCall is not nullable;
-** this will be checked again when the grammar is fixed.)
+** this will be checked again when the grammar is fixed.
 ** Run-time captures can do whatever they want, so the result
 ** is conservative.
 */
@@ -198,7 +202,7 @@ int checkaux (TTree *tree, int pred) {
     case TCall:  /* return checkaux(sib2(tree), pred); */
       tree = sib2(tree); goto tailcall;
     default: assert(0); return 0;
-  };
+  }
 }
 
 
@@ -245,16 +249,20 @@ int fixedlenx (TTree *tree, int count, int len) {
 /*
 ** Computes the 'first set' of a pattern.
 ** The result is a conservative aproximation:
-**   match p ax -> x' for some x ==> a in first(p).
+**   match p ax -> x (for some x) ==> a belongs to first(p)
+** or
+**   a not in first(p) ==> match p ax -> fail (for all x)
+**
 ** The set 'follow' is the first set of what follows the
 ** pattern (full set if nothing follows it).
-** The function returns 0 when this set can be used for
-** tests that avoid the pattern altogether.
+**
+** The function returns 0 when this resulting set can be used for
+** test instructions that avoid the pattern altogether.
 ** A non-zero return can happen for two reasons:
-** 1) match p '' -> ''            ==> returns 1.
-** (tests cannot be used because they always fail for an empty input)
-** 2) there is a match-time capture ==> returns 2.
-** (match-time captures should not be avoided by optimizations)
+** 1) match p '' -> ''            ==> return has bit 1 set
+** (tests cannot be used because they would always fail for an empty input);
+** 2) there is a match-time capture ==> return has bit 2 set
+** (optimizations should not bypass match-time captures).
 */
 static int getfirst (TTree *tree, const Charset *follow, Charset *firstset) {
  tailcall:
@@ -265,7 +273,7 @@ static int getfirst (TTree *tree, const Charset *follow, Charset *firstset) {
     }
     case TTrue: {
       loopset(i, firstset->cs[i] = follow->cs[i]);
-      return 1;
+      return 1;  /* accepts the empty string */
     }
     case TFalse: {
       loopset(i, firstset->cs[i] = 0);
@@ -280,7 +288,8 @@ static int getfirst (TTree *tree, const Charset *follow, Charset *firstset) {
     }
     case TSeq: {
       if (!nullable(sib1(tree))) {
-        /* return getfirst(sib1(tree), fullset, firstset); */
+        /* when p1 is not nullable, p2 has nothing to contribute;
+           return getfirst(sib1(tree), fullset, firstset); */
         tree = sib1(tree); follow = fullset; goto tailcall;
       }
       else {  /* FIRST(p1 p2, fl) = FIRST(p1, FIRST(p2, fl)) */
@@ -324,7 +333,7 @@ static int getfirst (TTree *tree, const Charset *follow, Charset *firstset) {
       /* else go through */
     }
     case TBehind: {  /* instruction gives no new information */
-      /* call 'getfirst' to check for math-time captures */
+      /* call 'getfirst' only to check for math-time captures */
       int e = getfirst(sib1(tree), follow, firstset);
       loopset(i, firstset->cs[i] = follow->cs[i]);  /* uses follow */
       return e | 1;  /* always can accept the empty string */
@@ -335,8 +344,8 @@ static int getfirst (TTree *tree, const Charset *follow, Charset *firstset) {
 
 
 /*
-** If it returns true, then pattern can fail only depending on the next
-** character of the subject
+** If 'headfail(tree)' true, then 'tree' can fail only depending on the
+** next character of the subject.
 */
 static int headfail (TTree *tree) {
  tailcall:
@@ -403,9 +412,9 @@ int sizei (const Instruction *i) {
   switch((Opcode)i->i.code) {
     case ISet: case ISpan: return CHARSETINSTSIZE;
     case ITestSet: return CHARSETINSTSIZE + 1;
-    case ITestChar: case ITestAny: case IChoice: case IJmp: 
-    case ICall: case IOpenCall: case ICommit: case IPartialCommit:
-    case IBackCommit: return 2;
+    case ITestChar: case ITestAny: case IChoice: case IJmp: case ICall:
+    case IOpenCall: case ICommit: case IPartialCommit: case IBackCommit:
+      return 2;
     default: return 1;
   }
 }
@@ -423,7 +432,8 @@ typedef struct CompileState {
 
 /*
 ** code generation is recursive; 'opt' indicates that the code is
-** being generated under a 'IChoice' operator jumping to its end.
+** being generated under a 'IChoice' operator jumping to its end
+** (that is, the match is "optional").
 ** 'tt' points to a previous test protecting this code. 'fl' is
 ** the follow set of the pattern.
 */
@@ -431,7 +441,7 @@ static void codegen (CompileState *compst, TTree *tree, int opt, int tt,
                      const Charset *fl);
 
 
-void reallocprog (lua_State *L, Pattern *p, int nsize) {
+void realloccode (lua_State *L, Pattern *p, int nsize) {
   void *ud;
   lua_Alloc f = lua_getallocf(L, &ud);
   void *newblock = f(ud, p->code, p->codesize * sizeof(Instruction),
@@ -446,7 +456,7 @@ void reallocprog (lua_State *L, Pattern *p, int nsize) {
 static int nextinstruction (CompileState *compst) {
   int size = compst->p->codesize;
   if (compst->ncode >= size)
-    reallocprog(compst->L, compst->p, size * 2);
+    realloccode(compst->L, compst->p, size * 2);
   return compst->ncode++;
 }
 
@@ -462,6 +472,9 @@ static int addinstruction (CompileState *compst, Opcode op, int aux) {
 }
 
 
+/*
+** Add an instruction followed by space for an offset (to be set later)
+*/
 static int addoffsetinst (CompileState *compst, Opcode op) {
   int i = addinstruction(compst, op, 0);  /* instruction */
   addinstruction(compst, (Opcode)0, 0);  /* open space for offset */
@@ -470,6 +483,9 @@ static int addoffsetinst (CompileState *compst, Opcode op) {
 }
 
 
+/*
+** Set the offset of an instruction
+*/
 static void setoffset (CompileState *compst, int instruction, int offset) {
   getinstr(compst, instruction + 1).offset = offset;
 }
@@ -478,7 +494,7 @@ static void setoffset (CompileState *compst, int instruction, int offset) {
 /*
 ** Add a capture instruction:
 ** 'op' is the capture instruction; 'cap' the capture kind;
-** 'key' the key into ktable; 'aux' is optional offset
+** 'key' the key into ktable; 'aux' is the optional capture offset
 **
 */
 static int addinstcap (CompileState *compst, Opcode op, int cap, int key,
@@ -494,12 +510,18 @@ static int addinstcap (CompileState *compst, Opcode op, int cap, int key,
 #define target(code,i)		((i) + code[i + 1].offset)
 
 
+/*
+** Patch 'instruction' to jump to 'target'
+*/
 static void jumptothere (CompileState *compst, int instruction, int target) {
   if (instruction >= 0)
     setoffset(compst, instruction, target - instruction);
 }
 
 
+/*
+** Patch 'instruction' to jump to current position
+*/
 static void jumptohere (CompileState *compst, int instruction) {
   jumptothere(compst, instruction, gethere(compst));
 }
@@ -863,7 +885,8 @@ static int codeseq1 (CompileState *compst, TTree *p1, TTree *p2,
 
 /*
 ** Main code-generation function: dispatch to auxiliar functions
-** according to kind of tree
+** according to kind of tree. ('needfollow' should return true
+** only for consructions that use 'fl'.)
 */
 static void codegen (CompileState *compst, TTree *tree, int opt, int tt,
                      const Charset *fl) {
@@ -906,6 +929,7 @@ static void peephole (CompileState *compst) {
   Instruction *code = compst->p->code;
   int i;
   for (i = 0; i < compst->ncode; i += sizei(&code[i])) {
+   redo:
     switch (code[i].i.code) {
       case IChoice: case ICall: case ICommit: case IPartialCommit:
       case IBackCommit: case ITestChar: case ITestSet:
@@ -927,8 +951,7 @@ static void peephole (CompileState *compst) {
             int fft = finallabel(code, ft);
             code[i] = code[ft];  /* jump becomes that instruction... */
             jumptothere(compst, i, fft);  /* but must correct its offset */
-            i--;  /* reoptimize its label */
-            break;
+            goto redo;  /* reoptimize its label */
           }
           default: {
             jumptothere(compst, i, ft);  /* optimize label */
@@ -950,10 +973,10 @@ static void peephole (CompileState *compst) {
 Instruction *compile (lua_State *L, Pattern *p) {
   CompileState compst;
   compst.p = p;  compst.ncode = 0;  compst.L = L;
-  reallocprog(L, p, 2);  /* minimum initial size */
+  realloccode(L, p, 2);  /* minimum initial size */
   codegen(&compst, p->tree, 0, NOINST, fullset);
   addinstruction(&compst, IEnd, 0);
-  reallocprog(L, p, compst.ncode);  /* set final size */
+  realloccode(L, p, compst.ncode);  /* set final size */
   peephole(&compst);
   return p->code;
 }

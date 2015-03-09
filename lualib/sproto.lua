@@ -12,8 +12,8 @@ function sproto_mt:__gc()
 	core.deleteproto(self.__cobj)
 end
 
-function sproto.new(pbin)
-	local cobj = assert(core.newproto(pbin))
+function sproto.new(...)
+	local cobj = assert(core.newproto(...))
 	local self = {
 		__cobj = cobj,
 		__tcache = setmetatable( {} , weak_mt ),
@@ -53,9 +53,9 @@ function sproto:encode(typename, tbl)
 	return core.encode(st, tbl)
 end
 
-function sproto:decode(typename, bin)
+function sproto:decode(typename, ...)
 	local st = querytype(self, typename)
-	return core.decode(st, bin)
+	return core.decode(st, ...)
 end
 
 function sproto:pencode(typename, tbl)

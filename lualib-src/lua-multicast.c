@@ -33,7 +33,7 @@ pack(lua_State *L, void *data, size_t size) {
 static int
 mc_packlocal(lua_State *L) {
 	void * data = lua_touserdata(L, 1);
-	size_t size = luaL_checkunsigned(L, 2);
+	size_t size = (size_t)luaL_checkinteger(L, 2);
 	if (size != (uint32_t)size) {
 		return luaL_error(L, "Size should be 32bit integer");
 	}
@@ -49,7 +49,7 @@ mc_packlocal(lua_State *L) {
 static int
 mc_packremote(lua_State *L) {
 	void * data = lua_touserdata(L, 1);
-	size_t size = luaL_checkunsigned(L, 2);
+	size_t size = (size_t)luaL_checkinteger(L, 2);
 	if (size != (uint32_t)size) {
 		return luaL_error(L, "Size should be 32bit integer");
 	}
@@ -85,7 +85,7 @@ mc_unpacklocal(lua_State *L) {
 	}
 	lua_pushlightuserdata(L, *pack);
 	lua_pushlightuserdata(L, (*pack)->data);
-	lua_pushunsigned(L, (*pack)->size);
+	lua_pushinteger(L, (lua_Integer)((*pack)->size));
 	return 3;
 }
 
@@ -137,16 +137,16 @@ mc_remote(lua_State *L) {
 	struct mc_package **ptr = lua_touserdata(L,1);
 	struct mc_package *pack = *ptr;
 	lua_pushlightuserdata(L, pack->data);
-	lua_pushunsigned(L, pack->size);
+	lua_pushinteger(L, (lua_Integer)(pack->size));
 	skynet_free(pack);
 	return 2;
 }
 
 static int
 mc_nextid(lua_State *L) {
-	uint32_t id = luaL_checkunsigned(L, 1);
+	uint32_t id = (uint32_t)luaL_checkinteger(L, 1);
 	id += 256;
-	lua_pushunsigned(L, id);
+	lua_pushinteger(L, (uint32_t)id);
 
 	return 1;
 }

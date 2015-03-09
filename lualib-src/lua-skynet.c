@@ -16,7 +16,7 @@ struct snlua {
 	const char * preload;
 };
 
-static int 
+static int
 traceback (lua_State *L) {
 	const char *msg = lua_tostring(L, 1);
 	if (msg)
@@ -45,7 +45,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	lua_pushlightuserdata(L, (void *)msg);
 	lua_pushinteger(L,sz);
 	lua_pushinteger(L, session);
-	lua_pushnumber(L, source);
+	lua_pushinteger(L, source);
 
 	r = lua_pcall(L, 5, 0 , trace);
 
@@ -136,7 +136,7 @@ get_dest_string(lua_State *L, int index) {
 }
 
 /*
-	unsigned address
+	uint32 address
 	 string address
 	integer type
 	integer session
@@ -147,7 +147,7 @@ get_dest_string(lua_State *L, int index) {
 static int
 _send(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	uint32_t dest = lua_tounsigned(L, 1);
+	uint32_t dest = (uint32_t)lua_tointeger(L, 1);
 	const char * dest_string = NULL;
 	if (dest == 0) {
 		dest_string = get_dest_string(L, 1);
@@ -191,7 +191,7 @@ _send(lua_State *L) {
 	}
 	if (session < 0) {
 		// send to invalid address
-		// todo: maybe throw error whould be better
+		// todo: maybe throw an error would be better
 		return 0;
 	}
 	lua_pushinteger(L,session);
@@ -201,12 +201,12 @@ _send(lua_State *L) {
 static int
 _redirect(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	uint32_t dest = lua_tounsigned(L,1);
+	uint32_t dest = (uint32_t)lua_tointeger(L,1);
 	const char * dest_string = NULL;
 	if (dest == 0) {
 		dest_string = get_dest_string(L, 1);
 	}
-	uint32_t source = luaL_checkunsigned(L,2);
+	uint32_t source = (uint32_t)luaL_checkinteger(L,2);
 	int type = luaL_checkinteger(L,3);
 	int session = luaL_checkinteger(L,4);
 
@@ -262,7 +262,7 @@ _tostring(lua_State *L) {
 static int
 _harbor(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	uint32_t handle = luaL_checkunsigned(L,1);
+	uint32_t handle = (uint32_t)luaL_checkinteger(L,1);
 	int harbor = 0;
 	int remote = skynet_isremote(context, handle, &harbor);
 	lua_pushinteger(L,harbor);
@@ -304,7 +304,7 @@ ltrash(lua_State *L) {
 int
 luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
-	
+
 	luaL_Reg l[] = {
 		{ "send" , _send },
 		{ "genid", _genid },

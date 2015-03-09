@@ -41,7 +41,7 @@ function command.MEM()
 	local list = {}
 	for k,v in pairs(services) do
 		local kb, bytes = skynet.call(k,"debug","MEM")
-		list[skynet.address(k)] = string.format("%d Kb (%s)",kb,v)
+		list[skynet.address(k)] = string.format("%.2f Kb (%s)",kb,v)
 	end
 	return list
 end
@@ -53,12 +53,12 @@ function command.GC()
 	return command.MEM()
 end
 
-function command.REMOVE(_, handle)
+function command.REMOVE(_, handle, kill)
 	services[handle] = nil
 	local response = instance[handle]
 	if response then
 		-- instance is dead
-		response(false)
+		response(not kill)	-- return nil to caller of newservice, when kill == false
 		instance[handle] = nil
 	end
 

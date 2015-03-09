@@ -37,7 +37,7 @@ fill_header(lua_State *L, uint8_t *buf, int sz, void *msg) {
 
 static void
 packreq_number(lua_State *L, int session, void * msg, size_t sz) {
-	uint32_t addr = lua_tounsigned(L,1);
+	uint32_t addr = (uint32_t)lua_tointeger(L,1);
 	uint8_t buf[TEMP_LENGTH];
 	fill_header(L, buf, sz+9, msg);
 	buf[2] = 0;
@@ -73,7 +73,7 @@ lpackrequest(lua_State *L) {
 	if (msg == NULL) {
 		return luaL_error(L, "Invalid request message");
 	}
-	size_t sz = luaL_checkunsigned(L,4);
+	size_t sz = (size_t)luaL_checkinteger(L,4);
 	int session = luaL_checkinteger(L,2);
 	if (session <= 0) {
 		return luaL_error(L, "Invalid request session %d", session);
@@ -112,8 +112,8 @@ unpackreq_number(lua_State *L, const uint8_t * buf, size_t sz) {
 	}
 	uint32_t address = unpack_uint32(buf+1);
 	uint32_t session = unpack_uint32(buf+5);
-	lua_pushunsigned(L, address);
-	lua_pushunsigned(L, session);
+	lua_pushinteger(L, (uint32_t)address);
+	lua_pushinteger(L, (uint32_t)session);
 	lua_pushlstring(L, (const char *)buf+9, sz-9);
 
 	return 3;
@@ -127,7 +127,7 @@ unpackreq_string(lua_State *L, const uint8_t * buf, size_t sz) {
 	}
 	lua_pushlstring(L, (const char *)buf+1, namesz);
 	uint32_t session = unpack_uint32(buf + namesz + 1);
-	lua_pushunsigned(L, session);
+	lua_pushinteger(L, (uint32_t)session);
 	lua_pushlstring(L, (const char *)buf+1+namesz+4, sz - namesz - 5);
 
 	return 3;
@@ -153,7 +153,7 @@ lunpackrequest(lua_State *L) {
  */
 static int
 lpackresponse(lua_State *L) {
-	uint32_t session = luaL_checkunsigned(L,1);
+	uint32_t session = (uint32_t)luaL_checkinteger(L,1);
 	// clusterd.lua:command.socket call lpackresponse,
 	// and the msg/sz is return by skynet.rawcall , so don't free(msg)
 	int ok = lua_toboolean(L,2);
@@ -167,7 +167,7 @@ lpackresponse(lua_State *L) {
 		}
 	} else {
 		msg = lua_touserdata(L,3);
-		sz = luaL_checkunsigned(L, 4);
+		sz = (size_t)luaL_checkinteger(L, 4);
 	}
 
 	uint8_t buf[TEMP_LENGTH];
@@ -195,7 +195,7 @@ lunpackresponse(lua_State *L) {
 		return 0;
 	}
 	uint32_t session = unpack_uint32((const uint8_t *)buf);
-	lua_pushunsigned(L, session);
+	lua_pushinteger(L, (lua_Integer)session);
 	lua_pushboolean(L, buf[4]);
 	lua_pushlstring(L, buf+5, sz-5);
 

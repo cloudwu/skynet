@@ -1,5 +1,4 @@
 local lpeg = require "lpeg"
-local bit32 = require "bit32"
 local table = require "table"
 
 local P = lpeg.P
@@ -196,18 +195,14 @@ end
 ]]
 
 local function packbytes(str)
-	local size = #str
-	return string.char(bit32.extract(size,0,8))..
-		string.char(bit32.extract(size,8,8))..
-		string.char(bit32.extract(size,16,8))..
-		string.char(bit32.extract(size,24,8))..
-		str
+	str = string.pack("<s4",str)
+	return str
 end
 
 local function packvalue(id)
 	id = (id + 1) * 2
-	assert(id >=0 and id < 65536)
-	return string.char(bit32.extract(id, 0, 8)) .. string.char(bit32.extract(id, 8, 8))
+	local str = string.pack("<I2", id)
+	return str
 end
 
 local function packfield(f)

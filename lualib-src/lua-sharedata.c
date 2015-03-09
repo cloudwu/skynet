@@ -1,5 +1,3 @@
-// build: gcc -O2 -Wall --shared -o conf.so luaconf.c 
-
 #include <lua.h>
 #include <lauxlib.h>
 #include <stdint.h>
@@ -11,15 +9,17 @@
 #define KEYTYPE_STRING 1
 
 #define VALUETYPE_NIL 0
-#define VALUETYPE_NUMBER 1
+#define VALUETYPE_REAL 1
 #define VALUETYPE_STRING 2
 #define VALUETYPE_BOOLEAN 3
 #define VALUETYPE_TABLE 4
+#define VALUETYPE_INTEGER 5
 
 struct table;
 
 union value {
 	lua_Number n;
+	lua_Integer d;
 	struct table * tbl;
 	int string;
 	int boolean;
@@ -71,11 +71,10 @@ countsize(lua_State *L, int sizearray) {
 		int type = lua_type(L, -2);
 		++n;
 		if (type == LUA_TNUMBER) {
-			lua_Number key = lua_tonumber(L, -2);
-			int nkey = (int)key;
-			if ((lua_Number)nkey != key) {
-				luaL_error(L, "Invalid key %f", key);
+			if (!lua_isinteger(L, -2)) {
+				luaL_error(L, "Invalid key %f", lua_tonumber(L, -2));
 			}
+			lua_Integer nkey = lua_tointeger(L, -2);
 			if (nkey > 0 && nkey <= sizearray) {
 				--n;
 			}
@@ -129,8 +128,13 @@ setvalue(struct context * ctx, lua_State *L, int index, struct node *n) {
 		n->valuetype = VALUETYPE_NIL;
 		break;
 	case LUA_TNUMBER:
-		n->v.n = lua_tonumber(L, index);
-		n->valuetype = VALUETYPE_NUMBER;
+		if (lua_isinteger(L, index)) {
+			n->v.d = lua_tointeger(L, index);
+			n->valuetype = VALUETYPE_INTEGER;
+		} else {
+			n->v.n = lua_tonumber(L, index);
+			n->valuetype = VALUETYPE_REAL;
+		}
 		break;
 	case LUA_TSTRING: {
 		size_t sz = 0;
@@ -468,8 +472,11 @@ ldeleteconf(lua_State *L) {
 static void
 pushvalue(lua_State *L, lua_State *sL, uint8_t vt, union value *v) {
 	switch(vt) {
-	case VALUETYPE_NUMBER:
+	case VALUETYPE_REAL:
 		lua_pushnumber(L, v->n);
+		break;
+	case VALUETYPE_INTEGER:
+		lua_pushinteger(L, v->d);
 		break;
 	case VALUETYPE_STRING: {
 		size_t sz = 0;
@@ -530,16 +537,15 @@ lindexconf(lua_State *L) {
 	size_t sz = 0;
 	const char * str = NULL;
 	if (kt == LUA_TNUMBER) {
-		lua_Number k = lua_tonumber(L, 2);
-		key = (int)k;
-		if ((lua_Number)key != k) {
-			return luaL_error(L, "Invalid key %f", k);
+		if (!lua_isinteger(L, 2)) {
+			return luaL_error(L, "Invalid key %f", lua_tonumber(L, 2));
 		}
+		key = (int)lua_tointeger(L, 2);
 		if (key > 0 && key <= tbl->sizearray) {
 			--key;
 			pushvalue(L, tbl->L, tbl->arraytype[key], &tbl->array[key]);
 			return 1;
-		} 
+		}
 		keytype = KEYTYPE_INTEGER;
 		keyhash = (uint32_t)key;
 	} else {
@@ -601,13 +607,12 @@ lnextkey(lua_State *L) {
 	const char *str = NULL;
 	int sizearray = tbl->sizearray;
 	if (kt == LUA_TNUMBER) {
-		lua_Number k = lua_tonumber(L,2);
-		key = (int)k;
-		if ((lua_Number)key != k) {
+		if (!lua_isinteger(L, 2)) {
 			return 0;
 		}
+		key = (int)lua_tointeger(L, 2);
 		if (key > 0 && key <= sizearray) {
-			int i;
+			lua_Integer i;
 			for (i=key;i<sizearray;i++) {
 				if (tbl->arraytype[i] != VALUETYPE_NIL) {
 					lua_pushinteger(L, i+1);

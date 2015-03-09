@@ -1,5 +1,5 @@
 /*
-** $Id: lualib.h,v 1.43.1.1 2013/04/12 18:48:47 roberto Exp $
+** $Id: lualib.h,v 1.44 2014/02/06 17:32:33 roberto Exp $
 ** Lua standard libraries
 ** See Copyright Notice in lua.h
 */
@@ -29,6 +29,9 @@ LUAMOD_API int (luaopen_os) (lua_State *L);
 #define LUA_STRLIBNAME	"string"
 LUAMOD_API int (luaopen_string) (lua_State *L);
 
+#define LUA_UTF8LIBNAME	"utf8"
+LUAMOD_API int (luaopen_utf8) (lua_State *L);
+
 #define LUA_BITLIBNAME	"bit32"
 LUAMOD_API int (luaopen_bit32) (lua_State *L);
 
@@ -41,8 +44,6 @@ LUAMOD_API int (luaopen_debug) (lua_State *L);
 #define LUA_LOADLIBNAME	"package"
 LUAMOD_API int (luaopen_package) (lua_State *L);
 
-#define LUA_CACHELIB
-LUAMOD_API int (luaopen_cache) (lua_State *L);
 
 /* open all previous libraries */
 LUALIB_API void (luaL_openlibs) (lua_State *L);
