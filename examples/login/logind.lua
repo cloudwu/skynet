@@ -54,9 +54,9 @@ function CMD.logout(uid, subid)
 	end
 end
 
-function server.command_handler(command, source, ...)
+function server.command_handler(command, ...)
 	local f = assert(CMD[command])
-	return f(source, ...)
+	return f(...)
 end
 
 login(server)
