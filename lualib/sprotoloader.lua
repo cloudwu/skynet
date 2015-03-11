@@ -16,7 +16,8 @@ loader.save = core.saveproto
 
 function loader.load(index)
 	local bin, sz = core.loadproto(index)
-	return sproto.new(bin,sz)
+	--  no __gc in metatable
+	return sproto.new(bin,sz, true)
 end
 
 return loader

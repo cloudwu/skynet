@@ -6,20 +6,21 @@ local host = {}
 
 local weak_mt = { __mode = "kv" }
 local sproto_mt = { __index = sproto }
+local sproto_nogc = { __index = sproto }
 local host_mt = { __index = host }
 
 function sproto_mt:__gc()
 	core.deleteproto(self.__cobj)
 end
 
-function sproto.new(...)
-	local cobj = assert(core.newproto(...))
+function sproto.new(bin,sz,nogc)
+	local cobj = assert(core.newproto(bin,sz))
 	local self = {
 		__cobj = cobj,
 		__tcache = setmetatable( {} , weak_mt ),
 		__pcache = setmetatable( {} , weak_mt ),
 	}
-	return setmetatable(self, sproto_mt)
+	return setmetatable(self, nogc and sproto_nogc or sproto_mt)
 end
 
 function sproto.parse(ptext)
