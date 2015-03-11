@@ -75,7 +75,7 @@ _query(const char * name) {
 static int
 _open_sym(struct skynet_module *mod) {
 	size_t name_size = strlen(mod->name);
-	char tmp[name_size + 9]; // create/init/release , longest name is release (7)
+	char tmp[name_size + 9]; // create/init/release/signal , longest name is release (7)
 	memcpy(tmp, mod->name, name_size);
 	strcpy(tmp+name_size, "_create");
 	mod->create = dlsym(mod->module, tmp);
@@ -83,6 +83,8 @@ _open_sym(struct skynet_module *mod) {
 	mod->init = dlsym(mod->module, tmp);
 	strcpy(tmp+name_size, "_release");
 	mod->release = dlsym(mod->module, tmp);
+	strcpy(tmp+name_size, "_signal");
+	mod->signal = dlsym(mod->module, tmp);
 
 	return mod->init == NULL;
 }
@@ -147,6 +149,13 @@ void
 skynet_module_instance_release(struct skynet_module *m, void *inst) {
 	if (m->release) {
 		m->release(inst);
+	}
+}
+
+void
+skynet_module_instance_signal(struct skynet_module *m, void *inst, int signal) {
+	if (m->signal) {
+		m->signal(inst, signal);
 	}
 }
 

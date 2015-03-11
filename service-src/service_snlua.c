@@ -156,3 +156,9 @@ snlua_release(struct snlua *l) {
 	lua_close(l->L);
 	skynet_free(l);
 }
+
+void
+snlua_signal(struct snlua *l, int signal) {
+	skynet_error(l->ctx, "recv a signal %d", signal);
+	skynet_sig_L = l->L;
+}
