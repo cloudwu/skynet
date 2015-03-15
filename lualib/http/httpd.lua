@@ -1,6 +1,7 @@
 local internal = require "http.internal"
 
 local table = table
+local string = string
 
 local httpd = {}
 
