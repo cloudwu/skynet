@@ -1,3 +1,9 @@
+v1.0.0-alpha2 (2015-3-16)
+-----------
+* Update examples client to lua 5.3
+* Patch lua 5.3 to interrupt the dead loop (for debug)
+* Update sproto (fix some bugs and support unordered map)
+
 v1.0.0-alpha (2015-3-9)
 -----------
 * Update lua from 5.2 to 5.3
