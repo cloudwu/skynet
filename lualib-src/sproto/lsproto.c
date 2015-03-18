@@ -145,8 +145,14 @@ encode(const struct sproto_arg *args) {
 	}
 	switch (args->type) {
 	case SPROTO_TINTEGER: {
-		lua_Integer v = luaL_checkinteger(L, -1);
+		lua_Integer v;
 		lua_Integer vh;
+		if (!lua_isinteger(L, -1)) {
+			return luaL_error(L, ".%s[%d] is not an integer (Is a %s)", 
+				args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
+		} else {
+			v = lua_tointeger(L, -1);
+		}
 		lua_pop(L,1);
 		// notice: in lua 5.2, lua_Integer maybe 52bit
 		vh = v >> 31;
@@ -167,7 +173,13 @@ encode(const struct sproto_arg *args) {
 	}
 	case SPROTO_TSTRING: {
 		size_t sz = 0;
-		const char * str = luaL_checklstring(L, -1, &sz);
+		const char * str;
+		if (!lua_isstring(L, -1)) {
+			return luaL_error(L, ".%s[%d] is not a string (Is a %s)", 
+				args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
+		} else {
+			str = lua_tolstring(L, -1, &sz);
+		}
 		if (sz > args->length)
 			return -1;
 		memcpy(args->value, str, sz);
