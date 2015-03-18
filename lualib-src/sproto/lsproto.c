@@ -39,6 +39,13 @@ LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
 #define luaL_newlib(L,l)  (luaL_newlibtable(L,l), luaL_setfuncs(L,l,0))
 #endif
 
+#if LUA_VERSION_NUM < 503
+
+// lua_isinteger is lua 5.3 api
+#define lua_isinteger lua_isnumber
+
+#endif
+
 static int
 lnewproto(lua_State *L) {
 	size_t sz = 0;
