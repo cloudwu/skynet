@@ -104,6 +104,7 @@ encode(const struct sproto_arg *args) {
 		return luaL_error(L, "The table is too deep");
 	if (args->index > 0) {
 		if (args->tagname != self->array_tag) {
+			// a new array
 			self->array_tag = args->tagname;
 			lua_getfield(L, self->tbl_index, args->tagname);
 			if (lua_isnil(L, -1)) {
@@ -176,6 +177,7 @@ encode(const struct sproto_arg *args) {
 	case SPROTO_TSTRUCT: {
 		struct encode_ud sub;
 		int r;
+		int top = lua_gettop(L);
 		sub.L = L;
 		sub.st = args->subtype;
 		sub.tbl_index = lua_gettop(L);
@@ -185,7 +187,7 @@ encode(const struct sproto_arg *args) {
 		lua_pushnil(L);	// prepare an iterator slot
 		sub.iter_index = sub.tbl_index + 1;
 		r = sproto_encode(args->subtype, args->value, args->length, encode, &sub);
-		lua_pop(L,2);	// pop the value and the iterator slot
+		lua_settop(L, top-1);	// pop the value
 		return r;
 	}
 	default:
@@ -222,29 +224,30 @@ lencode(lua_State *L) {
 	struct encode_ud self;
 	void * buffer = lua_touserdata(L, lua_upvalueindex(1));
 	int sz = lua_tointeger(L, lua_upvalueindex(2));
-
+	int tbl_index = 2;
 	struct sproto_type * st = lua_touserdata(L, 1);
 	if (st == NULL) {
 		return luaL_argerror(L, 1, "Need a sproto_type object");
 	}
-	luaL_checktype(L, 2, LUA_TTABLE);
+	luaL_checktype(L, tbl_index, LUA_TTABLE);
 	luaL_checkstack(L, ENCODE_DEEPLEVEL*2 + 8, NULL);
 	self.L = L;
 	self.st = st;
-	self.tbl_index = 2;
-	self.array_tag = NULL;
-	self.array_index = 0;
-	self.deep = 0;
-	lua_pushnil(L);	// for iterator (stack 3)
-	self.iter_index = 3;
+	self.tbl_index = tbl_index;
 	for (;;) {
-		int r = sproto_encode(st, buffer, sz, encode, &self);
+		int r;
+		self.array_tag = NULL;
+		self.array_index = 0;
+		self.deep = 0;
+
+		lua_settop(L, tbl_index);
+		lua_pushnil(L);	// for iterator (stack slot 3)
+		self.iter_index = tbl_index+1;
+
+		r = sproto_encode(st, buffer, sz, encode, &self);
 		if (r<0) {
 			buffer = expand_buffer(L, sz, sz*2);
 			sz *= 2;
-			// reset iterator slot
-			lua_pushnil(L);
-			lua_replace(L, 3);
 		} else {
 			lua_pushlstring(L, buffer, r);
 			return 1;
