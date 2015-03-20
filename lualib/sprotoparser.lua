@@ -84,7 +84,7 @@ local typedef = P {
 	FIELD = namedpat("field", (name * blanks * tag * blank0 * ":" * blank0 * (C"*")^0 * typename * mainkey^0)),
 	STRUCT = P"{" * multipat(V"FIELD" + V"TYPE") * P"}",
 	TYPE = namedpat("type", P"." * name * blank0 * V"STRUCT" ),
-	SUBPROTO = Ct((C"request" + C"response") * blanks * (name + V"STRUCT")),
+	SUBPROTO = Ct((C"request" + C"response") * blanks * (typename + V"STRUCT")),
 	PROTOCOL = namedpat("protocol", name * blanks * tag * blank0 * P"{" * multipat(V"SUBPROTO") * P"}"),
 	ALL = multipat(V"TYPE" + V"PROTOCOL"),
 }
@@ -186,6 +186,32 @@ local function checktype(types, ptype, t)
 	end
 end
 
+local function check_protocol(r)
+	local map = {}
+	local type = r.type
+	for name, v in pairs(r.protocol) do
+		local tag = v.tag
+		local request = v.request
+		local response = v.response
+		local p = map[tag]
+		
+		if p then
+			error(string.format("redefined protocol tag %d at %s", tag, name))
+		end
+
+		if request and not type[request] then
+			error(string.format("Undefined request type %s in protocol %s", request, name))
+		end
+
+		if response and not type[response] then
+			error(string.format("Undefined response type %s in protocol %s", response, name))
+		end
+
+		map[tag] = v
+	end
+	return r
+end
+
 local function flattypename(r)
 	for typename, t in pairs(r.type) do
 		for _, f in pairs(t) do
@@ -204,7 +230,7 @@ end
 local function parser(text,filename)
 	local state = { file = filename, pos = 0, line = 1 }
 	local r = lpeg.match(proto * -1 + exception , text , 1, state )
-	return flattypename(adjust(r))
+	return flattypename(check_protocol(adjust(r)))
 end
 
 --[[
