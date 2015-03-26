@@ -589,6 +589,26 @@ cmd_logoff(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+static const char *
+cmd_signal(struct skynet_context * context, const char * param) {
+	uint32_t handle = tohandle(context, param);
+	if (handle == 0)
+		return NULL;
+	struct skynet_context * ctx = skynet_handle_grab(handle);
+	if (ctx == NULL)
+		return NULL;
+	param = strchr(param, ' ');
+	int sig = 0;
+	if (param) {
+		sig = strtol(param, NULL, 0);
+	}
+	// NOTICE: the signal function should be thread safe.
+	skynet_module_instance_signal(ctx->mod, ctx->instance, sig);
+
+	skynet_context_release(ctx);
+	return NULL;
+}
+
 static struct command_func cmd_funcs[] = {
 	{ "TIMEOUT", cmd_timeout },
 	{ "REG", cmd_reg },
@@ -607,6 +627,7 @@ static struct command_func cmd_funcs[] = {
 	{ "MQLEN", cmd_mqlen },
 	{ "LOGON", cmd_logon },
 	{ "LOGOFF", cmd_logoff },
+	{ "SIGNAL", cmd_signal },
 	{ NULL, NULL },
 };
 

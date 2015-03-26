@@ -140,11 +140,11 @@ The schema text is like this:
 }
 
 .AddressBook {
-    person 0 : *Person
+    person 0 : *Person(id)	# (id) is optional, means Person.id is main index.
 }
 
 foobar 1 {	# define a new protocol (for RPC used) with tag 1
-    request person	# Associate the type person with foobar.request
+    request Person	# Associate the type Person with foobar.request
     response {	# define the foobar.response type
         ok 0 : boolean
     }
@@ -161,6 +161,7 @@ A schema text can be self-described by the sproto schema language.
         type 1 : string
         id 2 : integer
         array 3 : boolean
+        key 4 : integer	# optional tag for map
     }
     name 0 : string
     fields 1 : *field
@@ -183,10 +184,12 @@ Types
 =======
 
 * **string** : binary string
-* **integer** : integer, the max length of a integer is signed 64bit.
+* **integer** : integer, the max length of an integer is signed 64bit.
 * **boolean** : true or false
 
-You can add * before the typename to declare an array.
+You can add * before the typename to declare an array. 
+
+You can also specify a main index, the array whould be encode as an unordered map.
 
 User defined type can be any name in alphanumeric characters except the build-in typenames, and nested types are supported.
 
@@ -319,7 +322,19 @@ struct sproto_type * sproto_type(struct sproto *, const char * typename);
 Query the type object from a sproto object:
 
 ```C
-typedef int (*sproto_callback)(void *ud, const char *tagname, int type, int index, struct sproto_type *, void *value, int length);
+struct sproto_arg {
+	void *ud;
+	const char *tagname;
+	int tagid;
+	int type;
+	struct sproto_type *subtype;
+	void *value;
+	int length;
+	int index;	// array base 1
+	int mainindex;	// for map
+};
+
+typedef int (*sproto_callback)(const struct sproto_arg *args);
 
 int sproto_decode(struct sproto_type *, const void * data, int size, sproto_callback cb, void *ud);
 int sproto_encode(struct sproto_type *, void * buffer, int size, sproto_callback cb, void *ud);
@@ -334,13 +349,9 @@ int sproto_unpack(const void * src, int srcsz, void * buffer, int bufsz);
 
 pack and unpack the message with the 0 packing algorithm.
 
-JIT
+Other Implementions and bindings
 =====
-You may also interest in https://github.com/lvzixun/sproto-JIT
-
-C# version
-=====
-https://github.com/lvzixun/sproto-Csharp
+See Wiki https://github.com/cloudwu/sproto/wiki
 
 Question?
 ==========

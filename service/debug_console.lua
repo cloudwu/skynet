@@ -50,8 +50,11 @@ end
 
 local function docmd(cmdline, print, fd)
 	local split = split_cmdline(cmdline)
-	table.insert(split, fd)
-	local cmd = COMMAND[split[1]]
+	local command = split[1]
+	if command == "debug" then
+		table.insert(split, fd)
+	end
+	local cmd = COMMAND[command]
 	local ok, list
 	if cmd then
 		ok, list = pcall(cmd, select(2,table.unpack(split)))
@@ -126,6 +129,7 @@ function COMMAND.help()
 		logoff = "logoff address",
 		log = "launch a new lua service with log",
 		debug = "debug address : debug a lua service",
+		signal = "signal address sig",
 	}
 end
 
@@ -243,4 +247,13 @@ end
 function COMMAND.logoff(address)
 	address = adjust_address(address)
 	core.command("LOGOFF", skynet.address(address))
+end
+
+function COMMAND.signal(address, sig)
+	address = skynet.address(adjust_address(address))
+	if sig then
+		core.command("SIGNAL", string.format("%s %d",address,sig))
+	else
+		core.command("SIGNAL", address)
+	end
 end
