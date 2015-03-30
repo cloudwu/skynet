@@ -1,3 +1,6 @@
+local table = table
+local type = type
+
 local M = {}
 
 local LIMIT = 8192
@@ -83,7 +86,12 @@ function M.parseheader(lines, from, header)
 			end
 			name = name:lower()
 			if header[name] then
-				header[name] = header[name] .. ", " .. value
+				local v = header[name]
+				if type(v) == "table" then
+					table.insert(v, value)
+				else
+					header[name] = { v , value }
+				end
 			else
 				header[name] = value
 			end
