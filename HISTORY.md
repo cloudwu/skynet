@@ -1,3 +1,9 @@
+v1.0.0-alpha3 (2015-3-30)
+-----------
+* Update sproto (bugfix)
+* Add async dns query
+* improve httpc
+
 v1.0.0-alpha2 (2015-3-16)
 -----------
 * Update examples client to lua 5.3
