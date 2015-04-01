@@ -122,7 +122,8 @@ encode(const struct sproto_arg *args) {
 				return 0;
 			}
 			if (!lua_istable(L, -1)) {
-				return luaL_error(L, "%s is not a table", args->tagname);
+				return luaL_error(L, ".*%s(%d) should be a table (Is a %s)",
+					args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
 			}
 			if (self->array_index) {
 				lua_replace(L, self->array_index);
@@ -177,6 +178,10 @@ encode(const struct sproto_arg *args) {
 	}
 	case SPROTO_TBOOLEAN: {
 		int v = lua_toboolean(L, -1);
+		if (!lua_isboolean(L,-1)) {
+			return luaL_error(L, ".%s[%d] is not a boolean (Is a %s)",
+				args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
+		}
 		*(int *)args->value = v;
 		lua_pop(L,1);
 		return 4;
@@ -200,9 +205,13 @@ encode(const struct sproto_arg *args) {
 		struct encode_ud sub;
 		int r;
 		int top = lua_gettop(L);
+		if (!lua_istable(L, top)) {
+			return luaL_error(L, ".%s[%d] is not a table (Is a %s)", 
+				args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
+		}
 		sub.L = L;
 		sub.st = args->subtype;
-		sub.tbl_index = lua_gettop(L);
+		sub.tbl_index = top;
 		sub.array_tag = NULL;
 		sub.array_index = 0;
 		sub.deep = self->deep + 1;
