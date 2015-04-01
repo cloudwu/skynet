@@ -121,6 +121,9 @@ encode(const struct sproto_arg *args) {
 				self->array_index = 0;
 				return 0;
 			}
+			if (!lua_istable(L, -1)) {
+				return luaL_error(L, "%s is not a table", args->tagname);
+			}
 			if (self->array_index) {
 				lua_replace(L, self->array_index);
 			} else {
