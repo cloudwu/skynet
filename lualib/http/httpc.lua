@@ -16,6 +16,8 @@ local function request(fd, method, host, url, recvheader, header, content)
 		end
 		if header.host then
 			host = ""
+		else
+			host = string.format("host:%s\r\n", host)
 		end
 	else
 		host = string.format("host:%s\r\n",host)
