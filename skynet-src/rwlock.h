@@ -1,5 +1,5 @@
-#ifndef _RWLOCK_H_
-#define _RWLOCK_H_
+#ifndef SKYNET_RWLOCK_H
+#define SKYNET_RWLOCK_H
 
 struct rwlock {
 	int write;
