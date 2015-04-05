@@ -609,10 +609,6 @@ findtag(struct sproto_type *st, int tag) {
 
 static inline int
 fill_size(uint8_t * data, int sz) {
-	if (sz < 0)
-		return -1;
-	if (sz == 0)
-		return 0;
 	data[0] = sz & 0xff;
 	data[1] = (sz >> 8) & 0xff;
 	data[2] = (sz >> 16) & 0xff;
@@ -677,6 +673,11 @@ encode_object(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int si
 	args->value = data+SIZEOF_LENGTH;
 	args->length = size-SIZEOF_LENGTH;
 	sz = cb(args);
+	if (sz <= 0)
+		return sz;
+	if (args->type == SPROTO_TSTRING) {
+		--sz;	// the length of null string is 1
+	}
 	return fill_size(data, sz);
 }
 
@@ -718,7 +719,7 @@ encode_integer_array(sproto_callback cb, struct sproto_arg *args, uint8_t *buffe
 		sz = cb(args);
 		if (sz < 0)
 			return NULL;
-		if (sz == 0)
+		if (sz == 0)	// nil object, end of array
 			break;
 		if (size < sizeof(uint64_t))
 			return NULL;
@@ -798,7 +799,7 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 			sz = cb(args);
 			if (sz < 0)
 				return -1;
-			if (sz == 0)
+			if (sz == 0)	// nil object , end of array
 				break;
 			if (size < 1)
 				return -1;
@@ -817,10 +818,13 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 			args->value = buffer+SIZEOF_LENGTH;
 			args->length = size;
 			sz = cb(args);
-			if (sz < 0)
-				return -1;
 			if (sz == 0)
 				break;
+			if (sz < 0)
+				return -1;
+			if (args->type == SPROTO_TSTRING) {
+				--sz;
+			}
 			fill_size(buffer, sz);
 			buffer += SIZEOF_LENGTH+sz;
 			size -=sz;
@@ -829,7 +833,7 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 		break;
 	}
 	sz = buffer - (data + SIZEOF_LENGTH);
-	if (sz == 0)
+	if (sz == 0)	// empty array
 		return 0;
 	return fill_size(data, sz);
 }
@@ -878,7 +882,7 @@ sproto_encode(struct sproto_type *st, void * buffer, int size, sproto_callback c
 				sz = cb(&args);
 				if (sz < 0)
 					return -1;
-				if (sz == 0)
+				if (sz == 0)	// nil object
 					continue;
 				if (sz == sizeof(uint32_t)) {
 					if (u.u32 < 0x7fff) {
@@ -895,10 +899,9 @@ sproto_encode(struct sproto_type *st, void * buffer, int size, sproto_callback c
 				break;
 			}
 			case SPROTO_TSTRUCT:
-			case SPROTO_TSTRING: {
+			case SPROTO_TSTRING:
 				sz = encode_object(cb, &args, data, size);
 				break;
-			}
 			}
 		}
 		if (sz < 0)

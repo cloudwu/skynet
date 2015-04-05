@@ -199,7 +199,7 @@ encode(const struct sproto_arg *args) {
 			return -1;
 		memcpy(args->value, str, sz);
 		lua_pop(L,1);
-		return sz;
+		return sz + 1;	// The length of empty string is 1.
 	}
 	case SPROTO_TSTRUCT: {
 		struct encode_ud sub;
