@@ -13,14 +13,23 @@ function sproto_mt:__gc()
 	core.deleteproto(self.__cobj)
 end
 
-function sproto.new(bin,sz,nogc)
-	local cobj = assert(core.newproto(bin,sz))
+function sproto.new(bin)
+	local cobj = assert(core.newproto(bin))
 	local self = {
 		__cobj = cobj,
 		__tcache = setmetatable( {} , weak_mt ),
 		__pcache = setmetatable( {} , weak_mt ),
 	}
-	return setmetatable(self, nogc and sproto_nogc or sproto_mt)
+	return setmetatable(self, sproto_mt)
+end
+
+function sproto.sharenew(cobj)
+	local self = {
+		__cobj = cobj,
+		__tcache = setmetatable( {} , weak_mt ),
+		__pcache = setmetatable( {} , weak_mt ),
+	}
+	return setmetatable(self, sproto_nogc)
 end
 
 function sproto.parse(ptext)
