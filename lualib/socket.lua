@@ -1,5 +1,6 @@
 local driver = require "socketdriver"
 local skynet = require "skynet"
+local skynet_core = require "skynet.core"
 local assert = assert
 
 local socket = {}	-- api
@@ -127,7 +128,9 @@ socket_message[6] = function(id, size, data, address)
 		driver.drop(data, size)
 		return
 	end
-	s.callback(data, size, address)
+	local str = skynet.tostring(data, size)
+	skynet_core.trash(data, size)
+	s.callback(str, address)
 end
 
 skynet.register_protocol {
