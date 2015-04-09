@@ -250,7 +250,9 @@ function dns.server(server, port)
 		assert(server, "Can't get nameserver")
 	end
 	dns_server = socket.udp(function(data, sz, from)
-		resolve(skynet.tostring(data,sz))
+		local str = skynet.tostring(data,sz)
+		skynet.trash(data,sz)
+		resolve(str)
 	end)
 	socket.udp_connect(dns_server, server, port or 53)
 	return server
