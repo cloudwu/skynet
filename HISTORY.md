@@ -1,3 +1,9 @@
+v1.0.0-alpha4 (2015-4-13)
+-----------
+* sproto can share c struct between states
+* udp api changed (use lua string now)
+* fix memory leak in dns module
+
 v1.0.0-alpha3 (2015-3-30)
 -----------
 * Update sproto (bugfix)
