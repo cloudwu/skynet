@@ -99,6 +99,29 @@ local function queryproto(self, pname)
 	return v
 end
 
+function sproto:request_encode(protoname, tbl)
+	local p = queryproto(self, protoname)
+	return core.encode(p.request,tbl) , p.tag
+end
+
+function sproto:response_encode(protoname, tbl)
+	local p = queryproto(self, protoname)
+	return core.encode(p.response,tbl) , p.tag
+end
+
+function sproto:request_decode(protoname, ...)
+	local p = queryproto(self, protoname)
+	return core.decode(p.request,...)
+end
+
+function sproto:response_decode(protoname, ...)
+	local p = queryproto(self, protoname)
+	return core.decode(p.response,...)
+end
+
+sproto.pack = core.pack
+sproto.unpack = core.unpack
+
 local header_tmp = {}
 
 local function gen_response(self, response, session)
