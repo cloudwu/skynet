@@ -106,12 +106,12 @@ end
 
 function sproto:response_encode(protoname, tbl)
 	local p = queryproto(self, protoname)
-	return core.encode(p.response,tbl) , p.tag
+	return core.encode(p.response,tbl)
 end
 
 function sproto:request_decode(protoname, ...)
 	local p = queryproto(self, protoname)
-	return core.decode(p.request,...)
+	return core.decode(p.request,...) , p.name
 end
 
 function sproto:response_decode(protoname, ...)
