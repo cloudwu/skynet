@@ -602,11 +602,7 @@ read64(lua_State *L, uint32_t xx[2], uint32_t yy[2]) {
 }
 
 static int
-lhmac64(lua_State *L) {
-	uint32_t x[2], y[2];
-	read64(L, x, y);
-	uint32_t result[2];
-	hmac(x,y,result);
+pushqword(lua_State *L, uint32_t result[2]) {
 	uint8_t tmp[8];
 	tmp[0] = result[0] & 0xff;
 	tmp[1] = (result[0] >> 8 )& 0xff;
@@ -619,6 +615,40 @@ lhmac64(lua_State *L) {
 
 	lua_pushlstring(L, (const char *)tmp, 8);
 	return 1;
+}
+
+static int
+lhmac64(lua_State *L) {
+	uint32_t x[2], y[2];
+	read64(L, x, y);
+	uint32_t result[2];
+	hmac(x,y,result);
+	return pushqword(L, result);
+}
+
+/*
+	8bytes key
+	string text
+ */
+static int
+lhmac_hash(lua_State *L) {
+	uint32_t key[2];
+	size_t sz = 0;
+	const uint8_t *x = (const uint8_t *)luaL_checklstring(L, 1, &sz);
+	if (sz != 8) {
+		luaL_error(L, "Invalid uint64 key");
+	}
+	key[0] = x[0] | x[1]<<8 | x[2]<<16 | x[3]<<24;
+	key[1] = x[4] | x[5]<<8 | x[6]<<16 | x[7]<<24;
+	const char * text = luaL_checklstring(L, 2, &sz);
+	uint8_t h[8];
+	Hash(text,(int)sz,h);
+	uint32_t htext[2];
+	htext[0] = h[0] | h[1]<<8 | h[2]<<16 | h[3]<<24;
+	htext[1] = h[4] | h[5]<<8 | h[6]<<16 | h[7]<<24;
+	uint32_t result[2];
+	hmac(htext,key,result);
+	return pushqword(L, result);
 }
 
 // powmodp64 for DH-key exchange
@@ -858,6 +888,7 @@ luaopen_crypt(lua_State *L) {
 		{ "base64decode", lb64decode },
 		{ "sha1", lsha1 },
 		{ "hmac_sha1", lhmac_sha1 },
+		{ "hmac_hash", lhmac_hash },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);
