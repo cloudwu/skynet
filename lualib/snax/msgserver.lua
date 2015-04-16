@@ -178,7 +178,7 @@ function server.start(conf)
 		end
 
 		local text = string.format("%s:%s", username, index)
-		local v = crypt.hmac64(crypt.hashkey(text), u.secret)
+		local v = crypt.hmac_hash(u.secret, text)	-- equivalent to crypt.hmac64(crypt.hashkey(text), u.secret)
 		if v ~= hmac then
 			return "401 Unauthorized"
 		end
