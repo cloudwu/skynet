@@ -77,7 +77,6 @@ skynet_handle_retire(uint32_t handle) {
 	struct skynet_context * ctx = s->slot[hash];
 
 	if (ctx != NULL && skynet_context_handle(ctx) == handle) {
-		skynet_context_release(ctx);
 		s->slot[hash] = NULL;
 		ret = 1;
 		int i;
@@ -92,9 +91,16 @@ skynet_handle_retire(uint32_t handle) {
 			++j;
 		}
 		s->name_count = j;
+	} else {
+		ctx = NULL;
 	}
 
 	rwlock_wunlock(&s->lock);
+
+	if (ctx) {
+		// release ctx may call skynet_handle_* , so wunlock first.
+		skynet_context_release(ctx);
+	}
 
 	return ret;
 }
