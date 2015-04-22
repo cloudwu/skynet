@@ -44,7 +44,7 @@ function CMD.new(name, t)
 	elseif dt == "string" then
 		value = setmetatable({}, env_mt)
 		local f = load(t, "=" .. name, "t", value)
-		f()
+		assert(skynet.pcall(f))
 		setmetatable(value, nil)
 	elseif dt == "nil" then
 		value = {}
