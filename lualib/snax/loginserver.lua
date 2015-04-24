@@ -33,17 +33,17 @@ Success:
 ]]
 
 local socket_error = {}
-local function assert_socket(v, fd)
+local function assert_socket(service, v, fd)
 	if v then
 		return v
 	else
-		skynet.error(string.format("auth failed: socket (fd = %d) closed", fd))
+		skynet.error(string.format("%s failed: socket (fd = %d) closed", service, fd))
 		error(socket_error)
 	end
 end
 
-local function write(fd, text)
-	assert_socket(socket.write(fd, text), fd)
+local function write(service, fd, text)
+	assert_socket(service, socket.write(fd, text), fd)
 end
 
 local function launch_slave(auth_handler)
@@ -57,27 +57,27 @@ local function launch_slave(auth_handler)
 		socket.limit(fd, 8192)
 
 		local challenge = crypt.randomkey()
-		write(fd, crypt.base64encode(challenge).."\n")
+		write("auth", fd, crypt.base64encode(challenge).."\n")
 
-		local handshake = assert_socket(socket.readline(fd), fd)
+		local handshake = assert_socket("auth", socket.readline(fd), fd)
 		local clientkey = crypt.base64decode(handshake)
 		if #clientkey ~= 8 then
 			error "Invalid client key"
 		end
 		local serverkey = crypt.randomkey()
-		write(fd, crypt.base64encode(crypt.dhexchange(serverkey)).."\n")
+		write("auth", fd, crypt.base64encode(crypt.dhexchange(serverkey)).."\n")
 
 		local secret = crypt.dhsecret(clientkey, serverkey)
 
-		local response = assert_socket(socket.readline(fd), fd)
+		local response = assert_socket("auth", socket.readline(fd), fd)
 		local hmac = crypt.hmac64(challenge, secret)
 
 		if hmac ~= crypt.base64decode(response) then
-			write(fd, "400 Bad Request\n")
+			write("auth", fd, "400 Bad Request\n")
 			error "challenge failed"
 		end
 
-		local etoken = assert_socket(socket.readline(fd),fd)
+		local etoken = assert_socket("auth", socket.readline(fd),fd)
 
 		local token = crypt.desdecode(secret, crypt.base64decode(etoken))
 
@@ -91,7 +91,11 @@ local function launch_slave(auth_handler)
 		if ok then
 			skynet.ret(skynet.pack(err, ...))
 		else
-			error(err)
+			if err == socket_error then
+				skynet.ret(skynet.pack(nil, "socket error"))
+			else
+				skynet.ret(skynet.pack(false, err))
+			end
 		end
 	end
 
@@ -108,13 +112,15 @@ local function accept(conf, s, fd, addr)
 	socket.start(fd)
 
 	if not ok then
-		write(fd, "401 Unauthorized\n")
+		if ok ~= nil then
+			write("response 401", fd, "401 Unauthorized\n")
+		end
 		error(server)
 	end
 
 	if not conf.multilogin then
 		if user_login[uid] then
-			write(fd, "406 Not Acceptable\n")
+			write("response 406", fd, "406 Not Acceptable\n")
 			error(string.format("User %s is already login", uid))
 		end
 
@@ -127,9 +133,9 @@ local function accept(conf, s, fd, addr)
 
 	if ok then
 		err = err or ""
-		write(fd,  "200 "..crypt.base64encode(err).."\n")
+		write("response 200",fd,  "200 "..crypt.base64encode(err).."\n")
 	else
-		write(fd,  "403 Forbidden\n")
+		write("response 403",fd,  "403 Forbidden\n")
 		error(err)
 	end
 end
