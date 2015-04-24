@@ -91,7 +91,7 @@ local function launch_slave(auth_handler)
 		if ok then
 			skynet.ret(skynet.pack(err, ...))
 		else
-			error(err)
+			skynet.ret(skynet.pack(false, err, ...))
 		end
 	end
 
