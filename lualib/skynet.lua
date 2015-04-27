@@ -398,6 +398,7 @@ skynet.pack = assert(c.pack)
 skynet.packstring = assert(c.packstring)
 skynet.unpack = assert(c.unpack)
 skynet.tostring = assert(c.tostring)
+skynet.trash = assert(c.trash)
 
 local function yield_call(service, session)
 	watching_session[session] = service
@@ -619,8 +620,10 @@ end
 local function init_all()
 	local funcs = init_func
 	init_func = nil
-	for k,v in pairs(funcs) do
-		v()
+	if funcs then
+		for k,v in pairs(funcs) do
+			v()
+		end
 	end
 end
 
@@ -631,8 +634,12 @@ local function init_template(start)
 	init_all()
 end
 
+function skynet.pcall(start)
+	return xpcall(init_template, debug.traceback, start)
+end
+
 local function init_service(start)
-	local ok, err = xpcall(init_template, debug.traceback, start)
+	local ok, err = skynet.pcall(start)
 	if not ok then
 		skynet.error("init service failed: " .. tostring(err))
 		skynet.send(".launcher","lua", "ERROR")

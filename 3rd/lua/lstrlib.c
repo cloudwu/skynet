@@ -798,7 +798,8 @@ static int str_gsub (lua_State *L) {
 */
 
 /* maximum size of each formatted item (> len(format('%99.99f', -1e308))) */
-#define MAX_ITEM	512
+#define MAX_ITEM  \
+  (sizeof(lua_Number) <= 4 ? 150 : sizeof(lua_Number) <= 8 ? 450 : 5050)
 
 /* valid flags in a format specification */
 #define FLAGS	"-+ #0"

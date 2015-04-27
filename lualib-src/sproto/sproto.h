@@ -17,12 +17,12 @@ struct sproto_type;
 struct sproto * sproto_create(const void * proto, size_t sz);
 void sproto_release(struct sproto *);
 
-int sproto_prototag(struct sproto *, const char * name);
-const char * sproto_protoname(struct sproto *, int proto);
+int sproto_prototag(const struct sproto *, const char * name);
+const char * sproto_protoname(const struct sproto *, int proto);
 // SPROTO_REQUEST(0) : request, SPROTO_RESPONSE(1): response
-struct sproto_type * sproto_protoquery(struct sproto *, int proto, int what);
+struct sproto_type * sproto_protoquery(const struct sproto *, int proto, int what);
 
-struct sproto_type * sproto_type(struct sproto *, const char * type_name);
+struct sproto_type * sproto_type(const struct sproto *, const char * type_name);
 
 int sproto_pack(const void * src, int srcsz, void * buffer, int bufsz);
 int sproto_unpack(const void * src, int srcsz, void * buffer, int bufsz);
@@ -41,8 +41,8 @@ struct sproto_arg {
 
 typedef int (*sproto_callback)(const struct sproto_arg *args);
 
-int sproto_decode(struct sproto_type *, const void * data, int size, sproto_callback cb, void *ud);
-int sproto_encode(struct sproto_type *, void * buffer, int size, sproto_callback cb, void *ud);
+int sproto_decode(const struct sproto_type *, const void * data, int size, sproto_callback cb, void *ud);
+int sproto_encode(const struct sproto_type *, void * buffer, int size, sproto_callback cb, void *ud);
 
 // for debug use
 void sproto_dump(struct sproto *);

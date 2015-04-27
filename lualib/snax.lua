@@ -162,4 +162,8 @@ function snax.hotfix(obj, source, ...)
 	return test_result(skynet_call(obj.handle, "snax", t.system.hotfix, source, ...))
 end
 
+function snax.printf(fmt, ...)
+	skynet.error(string.format(fmt, ...))
+end
+
 return snax

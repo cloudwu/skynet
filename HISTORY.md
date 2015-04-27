@@ -1,3 +1,18 @@
+v1.0.0-alpha5 (2015-4-27)
+-----------
+* merge lua 5.3 offical bugfix 
+* improve sproto rpc api
+* fix a deadlock bug when service retire
+* improve cluster config reload
+* add skynet.pcall for calling a function with `require`
+* better error log in loginserver
+
+v1.0.0-alpha4 (2015-4-13)
+-----------
+* sproto can share c struct between states
+* udp api changed (use lua string now)
+* fix memory leak in dns module
+
 v1.0.0-alpha3 (2015-3-30)
 -----------
 * Update sproto (bugfix)
