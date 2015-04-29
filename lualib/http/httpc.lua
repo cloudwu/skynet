@@ -11,23 +11,21 @@ local function request(fd, method, host, url, recvheader, header, content)
 	local write = socket.writefunc(fd)
 	local header_content = ""
 	if header then
+		if not header.host then
+			header.host = host
+		end
 		for k,v in pairs(header) do
 			header_content = string.format("%s%s:%s\r\n", header_content, k, v)
 		end
-		if header.host then
-			host = ""
-		else
-			host = string.format("host:%s\r\n", host)
-		end
 	else
-		host = string.format("host:%s\r\n",host)
+		header_content = string.format("host:%s\r\n",host)
 	end
 
 	if content then
-		local data = string.format("%s %s HTTP/1.1\r\n%scontent-length:%d\r\n%s\r\n%s", method, url, host, #content, header_content, content)
+		local data = string.format("%s %s HTTP/1.1\r\n%scontent-length:%d\r\n\r\n%s", method, url, header_content, #content, content)
 		write(data)
 	else
-		local request_header = string.format("%s %s HTTP/1.1\r\nhost:%s\r\ncontent-length:0\r\n%s\r\n", method, url, host, header_content)
+		local request_header = string.format("%s %s HTTP/1.1\r\n%scontent-length:0\r\n\r\n", method, url, header_content)
 		write(request_header)
 	end
 
