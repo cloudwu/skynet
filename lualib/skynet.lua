@@ -175,6 +175,10 @@ function suspend(co, result, command, param, size)
 		local ret
 		if not dead_service[co_address] then
 			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) ~= nil
+			if not ret then
+				-- If the package is too large, returns nil. so we should report error back
+				c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
+			end
 		elseif size == nil then
 			c.trash(param, size)
 			ret = false
@@ -209,6 +213,10 @@ function suspend(co, result, command, param, size)
 			if not dead_service[co_address] then
 				if ok then
 					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) ~= nil
+					if not ret then
+						-- If the package is too large, returns false. so we should report error back
+						c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
+					end
 				else
 					ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") ~= nil
 				end
@@ -405,7 +413,7 @@ local function yield_call(service, session)
 	local succ, msg, sz = coroutine_yield("CALL", session)
 	watching_session[session] = nil
 	if not succ then
-		error(debug.traceback())
+		error "call failed"
 	end
 	return msg,sz
 end
