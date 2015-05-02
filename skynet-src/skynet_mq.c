@@ -122,7 +122,7 @@ skynet_mq_length(struct message_queue *q) {
 	if (head <= tail) {
 		return tail - head;
 	}
-	return tail + cap - head;
+	return (cap - head) + tail;
 }
 
 int
