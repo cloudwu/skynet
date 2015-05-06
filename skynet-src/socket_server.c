@@ -508,7 +508,7 @@ udp_socket_address(struct socket *s, const uint8_t udp_address[UDP_ADDRESS_SIZE]
 		memset(&sa->v6, 0, sizeof(sa->v6));
 		sa->s.sa_family = AF_INET6;
 		sa->v6.sin6_port = port;
-		memcpy(&sa->v6.sin6_addr, udp_address + 1 + sizeof(uint16_t), sizeof(sa->v6.sin6_addr));	// ipv4 address is 128 bits
+		memcpy(&sa->v6.sin6_addr, udp_address + 1 + sizeof(uint16_t), sizeof(sa->v6.sin6_addr)); // ipv6 address is 128 bits
 		return sizeof(sa->v6);
 	}
 	return 0;
