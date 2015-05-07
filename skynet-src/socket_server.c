@@ -720,6 +720,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 				append_sendbuffer_udp(ss,s,priority,request,udp_address);
 			} else {
 				so.free_func(request->buffer);
+				return -1;
 			}
 		}
 		sp_write(ss->event_fd, s->fd, s, true);
@@ -887,6 +888,7 @@ add_udp_socket(struct socket_server *ss, struct request_udp *udp) {
 	if (ns == NULL) {
 		close(udp->fd);
 		ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
+		return;
 	}
 	ns->type = SOCKET_TYPE_CONNECTED;
 	memset(ns->p.udp_address, 0, sizeof(ns->p.udp_address));
