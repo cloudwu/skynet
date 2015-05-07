@@ -599,7 +599,9 @@ static int
 ludp_address(lua_State *L) {
 	size_t sz = 0;
 	const uint8_t * addr = (const uint8_t *)luaL_checklstring(L, 1, &sz);
-	int port = addr[1] * 256 + addr[2];
+	uint16_t port = 0;
+	memcpy(&port, addr+1, sizeof(uint16_t));
+	port = ntohs(port);
 	const void * src = addr+3;
 	char tmp[256];
 	int family;
