@@ -124,6 +124,8 @@ local function dispatch_by_order(self)
 		if func == nil then
 			if not socket.block(self.__sock[1]) then
 				close_channel_socket(self)
+				self.__result[co] = socket_error
+				skynet.wakeup(co)
 				wakeup_all(self)
 			end
 		else
