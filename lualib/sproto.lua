@@ -122,6 +122,21 @@ end
 sproto.pack = core.pack
 sproto.unpack = core.unpack
 
+function sproto:default(typename, type)
+	if type == nil then
+		return core.default(querytype(self, typename))
+	else
+		local p = queryproto(self, typename)
+		if type == "REQUEST" then
+			return core.default(p.request)
+		elseif type == "RESPONSE" then
+			return core.default(p.response)
+		else
+			error "Invalid type"
+		end
+	end
+end
+
 local header_tmp = {}
 
 local function gen_response(self, response, session)
