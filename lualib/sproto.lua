@@ -101,22 +101,40 @@ end
 
 function sproto:request_encode(protoname, tbl)
 	local p = queryproto(self, protoname)
-	return core.encode(p.request,tbl) , p.tag
+	local request = p.request
+	if request then
+		return core.encode(request,tbl) , p.tag
+	else
+		return "" , p.tag
+	end
 end
 
 function sproto:response_encode(protoname, tbl)
 	local p = queryproto(self, protoname)
-	return core.encode(p.response,tbl)
+	local response = p.response
+	if response then
+		return core.encode(response,tbl)
+	else
+		return ""
+	end
 end
 
 function sproto:request_decode(protoname, ...)
 	local p = queryproto(self, protoname)
-	return core.decode(p.request,...) , p.name
+	local request = p.request
+	if request then
+		return core.decode(request,...) , p.name
+	else
+		return nil, p.name
+	end
 end
 
 function sproto:response_decode(protoname, ...)
 	local p = queryproto(self, protoname)
-	return core.decode(p.response,...)
+	local response = p.response
+	if response then
+		return core.decode(response,...)
+	end
 end
 
 sproto.pack = core.pack
@@ -128,9 +146,13 @@ function sproto:default(typename, type)
 	else
 		local p = queryproto(self, typename)
 		if type == "REQUEST" then
-			return core.default(p.request)
+			if p.request then
+				return core.default(p.request)
+			end
 		elseif type == "RESPONSE" then
-			return core.default(p.response)
+			if p.response then
+				return core.default(p.response)
+			end
 		else
 			error "Invalid type"
 		end
