@@ -44,6 +44,7 @@ local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
 local session_response = {}
+local unresponse = {}
 
 local wakeup_session = {}
 local sleep_session = {}
@@ -224,11 +225,13 @@ function suspend(co, result, command, param, size)
 				ret = false
 			end
 			release_watching(co_address)
+			unresponse[response] = nil
 			f = nil
 			return ret
 		end
 		watching_service[co_address] = watching_service[co_address] + 1
 		session_response[co] = response
+		unresponse[response] = true
 		return suspend(co, coroutine.resume(co, response))
 	elseif command == "EXIT" then
 		-- coroutine exit
@@ -360,6 +363,9 @@ function skynet.exit()
 		if session~=0 and address then
 			c.redirect(address, 0, skynet.PTYPE_ERROR, session, "")
 		end
+	end
+	for resp in pairs(unresponse) do
+		resp(false)
 	end
 	-- report the sources I call but haven't return
 	local tmp = {}
