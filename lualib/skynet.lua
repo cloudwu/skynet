@@ -97,7 +97,6 @@ end
 
 local coroutine_pool = {}
 local coroutine_yield = coroutine.yield
-local coroutine_count = 0
 
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
@@ -111,11 +110,6 @@ local function co_create(f)
 				f(coroutine_yield())
 			end
 		end)
-		coroutine_count = coroutine_count + 1
-		if coroutine_count > 1024 then
-			skynet.error("May overload, create 1024 task")
-			coroutine_count = 0
-		end
 	else
 		coroutine.resume(co, f)
 	end
