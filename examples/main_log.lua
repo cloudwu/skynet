@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local harbor = require "skynet.harbor"
+require "skynet.manager"	-- import skynet.monitor
 
 local function monitor_master()
 	harbor.linkmaster()

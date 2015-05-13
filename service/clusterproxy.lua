@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local cluster = require "cluster"
+require "skynet.manager"	-- inject skynet.forward_type
 
 local node, address = ...
 

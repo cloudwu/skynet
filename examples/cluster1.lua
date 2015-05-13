@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local cluster = require "cluster"
+require "skynet.manager"	-- import skynet.name
 
 skynet.start(function()
 	local sdb = skynet.newservice("simpledb")

@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+require "skynet.manager"	-- import skynet.register
 
 skynet.start(function()
 	skynet.dispatch("lua", function(session, address, ...)
