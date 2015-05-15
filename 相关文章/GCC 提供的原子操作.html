@@ -1,0 +1,327 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<!-- saved from url=(0063)http://www.cnblogs.com/FrankTan/archive/2010/12/11/1903377.html -->
+<html lang="zh-cn"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><script async="" src="./GCC 提供的原子操作_files/analytics.js"></script><script async="" src="http://ad.cnblogs.com/ad/postmoduletext?callback=jQuery1707788738843519241_1431193810114&adModuleId=2&content=GCC+%E6%8F%90%E4%BE%9B%E7%9A%84%E5%8E%9F%E5%AD%90%E6%93%8D%E4%BD%9C&_=1431193810233"></script>
+
+<title>GCC 提供的原子操作 - Frank Tan - 博客园</title>
+<link type="text/css" rel="stylesheet" href="./GCC 提供的原子操作_files/blog-common.css">
+<link id="MainCss" type="text/css" rel="stylesheet" href="./GCC 提供的原子操作_files/bundle-Cogitation.css">
+<link title="RSS" type="application/rss+xml" rel="alternate" href="http://www.cnblogs.com/FrankTan/rss">
+<link title="RSD" type="application/rsd+xml" rel="EditURI" href="http://www.cnblogs.com/FrankTan/rsd.xml">
+<link type="application/wlwmanifest+xml" rel="wlwmanifest" href="http://www.cnblogs.com/FrankTan/wlwmanifest.xml">
+<script type="text/javascript" src="./GCC 提供的原子操作_files/encoder.js"></script><script async="" type="text/javascript" src="./GCC 提供的原子操作_files/gpt.js"></script><script src="./GCC 提供的原子操作_files/jquery.js" type="text/javascript"></script><style type="text/css"></style>  
+<script type="text/javascript">var currentBlogApp = 'FrankTan', cb_enable_mathjax=false;</script>
+<script src="./GCC 提供的原子操作_files/blog-common.js" type="text/javascript"></script>
+<script async="" type="text/javascript" src="http://partner.googleadservices.com/gpt/pubads_impl_60.js"></script></head>
+<body>
+<a name="top"></a>
+
+<div id="top">
+	
+<div>
+	<table>
+		<tbody><tr>
+			<td class="HeaderTitles">
+				<h1 class="HeaderTitle"><a id="Header1_HeaderTitle" class="HeaderMainTitle" href="http://www.cnblogs.com/FrankTan/">Frank Tan</a></h1>
+				<p id="tagline"></p>
+			</td>
+		</tr>
+	</tbody></table>
+</div>
+<div class="HeaderBar">
+	<table id="HeaderBar" class="HeaderBar" cellpadding="0" cellspacing="0">
+		<tbody><tr>
+			<td class="HeaderBarTab" nowrap="">
+&nbsp;
+<a id="Header1_MyLinks1_HomeLink" href="http://www.cnblogs.com/">博客园</a> ::
+<a id="Header1_MyLinks1_MyHomeLink" href="http://www.cnblogs.com/FrankTan/">首页</a> ::
+<a href="http://q.cnblogs.com/" class="menu">博问</a> ::
+<a href="http://home.cnblogs.com/ing/" class="menu">闪存</a> ::
+<a id="Header1_MyLinks1_NewPostLink" rel="nofollow" href="http://i.cnblogs.com/EditPosts.aspx?opt=1">新随笔</a> ::
+<a id="Header1_MyLinks1_ContactLink" accesskey="9" rel="nofollow" href="http://space.cnblogs.com/msg/send/Frank+Tan">联系</a> ::
+<a id="Header1_MyLinks1_Syndication" href="http://www.cnblogs.com/FrankTan/rss">订阅</a>
+<a id="Header1_MyLinks1_XMLLink" class="XMLLink" href="http://www.cnblogs.com/FrankTan/rss"><img src="./GCC 提供的原子操作_files/xml.gif" alt="订阅"></a> ::
+<a id="Header1_MyLinks1_Admin" rel="nofollow" href="http://i.cnblogs.com/">管理</a> ::
+
+</td>
+			<td><img id="Header1_BlueTab" src="./GCC 提供的原子操作_files/BlueTabRight.gif" align="absmiddle"></td>
+			<td class="HeaderBarTabBack" nowrap="" width="100%">
+				
+<div class="BlogStatsBar">
+	<table class="BlogStatsBar">
+		<tbody><tr>
+			<td width="100%">
+			</td>
+			<td class="BlogStatsBar" nowrap="">
+				&nbsp;
+				13 
+				随笔&nbsp;::
+				0 文章
+				::
+				11 评论
+				::
+				0 引用
+			</td>
+		</tr>
+	</tbody></table>
+</div>
+
+			</td>
+		</tr>
+	</tbody></table>
+</div>
+
+</div>
+<div id="leftmenu">	
+
+	    <div id="blog-calendar" style=""><table id="blogCalendar" class="Cal" cellspacing="0" cellpadding="0" title="日历">
+	<tbody><tr><td colspan="7"><table class="CalTitle" cellspacing="0">
+		<tbody><tr><td class="CalNextPrev"><a href="javascript:void(0);" onclick="loadBlogCalendar(&#39;2015/04/01&#39;);return false;">&lt;</a></td><td align="center">2015年5月</td><td class="CalNextPrev" align="right"><a href="javascript:void(0);" onclick="loadBlogCalendar(&#39;2015/06/01&#39;);return false;">&gt;</a></td></tr>
+	</tbody></table></td></tr><tr><th class="CalDayHeader" align="center" abbr="日" scope="col">日</th><th class="CalDayHeader" align="center" abbr="一" scope="col">一</th><th class="CalDayHeader" align="center" abbr="二" scope="col">二</th><th class="CalDayHeader" align="center" abbr="三" scope="col">三</th><th class="CalDayHeader" align="center" abbr="四" scope="col">四</th><th class="CalDayHeader" align="center" abbr="五" scope="col">五</th><th class="CalDayHeader" align="center" abbr="六" scope="col">六</th></tr><tr><td class="CalOtherMonthDay" align="center">26</td><td class="CalOtherMonthDay" align="center">27</td><td class="CalOtherMonthDay" align="center">28</td><td class="CalOtherMonthDay" align="center">29</td><td class="CalOtherMonthDay" align="center">30</td><td align="center">1</td><td class="CalWeekendDay" align="center">2</td></tr><tr><td class="CalWeekendDay" align="center">3</td><td align="center">4</td><td align="center">5</td><td align="center">6</td><td align="center">7</td><td align="center">8</td><td class="CalWeekendDay" align="center">9</td></tr><tr><td class="CalTodayDay" align="center">10</td><td align="center">11</td><td align="center">12</td><td align="center">13</td><td align="center">14</td><td align="center">15</td><td class="CalWeekendDay" align="center">16</td></tr><tr><td class="CalWeekendDay" align="center">17</td><td align="center">18</td><td align="center">19</td><td align="center">20</td><td align="center">21</td><td align="center">22</td><td class="CalWeekendDay" align="center">23</td></tr><tr><td class="CalWeekendDay" align="center">24</td><td align="center">25</td><td align="center">26</td><td align="center">27</td><td align="center">28</td><td align="center">29</td><td class="CalWeekendDay" align="center">30</td></tr><tr><td class="CalWeekendDay" align="center">31</td><td class="CalOtherMonthDay" align="center">1</td><td class="CalOtherMonthDay" align="center">2</td><td class="CalOtherMonthDay" align="center">3</td><td class="CalOtherMonthDay" align="center">4</td><td class="CalOtherMonthDay" align="center">5</td><td class="CalOtherMonthDay" align="center">6</td></tr>
+</tbody></table></div><script type="text/javascript">loadBlogDefaultCalendar();</script>
+		
+<h3>公告</h3>
+<div class="News">
+	<div id="blog-news"><div id="profile_block">昵称：<a href="http://home.cnblogs.com/u/FrankTan/">Frank Tan</a><br>园龄：<a href="http://home.cnblogs.com/u/FrankTan/" title="入园时间：2009-12-24">5年4个月</a><br>粉丝：<a href="http://home.cnblogs.com/u/FrankTan/followers/">9</a><br>关注：<a href="http://home.cnblogs.com/u/FrankTan/followees/">0</a><div id="p_b_follow"><a href="javascript:void(0);" onclick="cnblogs.UserManager.FollowBlogger(&#39;44d8e2f9-9ef0-de11-ba8f-001cf0cd104b&#39;)">+加关注</a></div></div></div><script type="text/javascript">loadBlogNews();</script>
+</div>
+
+		<div id="blog-sidecolumn"><div id="sidebar_search" class="sidebar-block">
+<div class="mySearch">
+<h3 class="catListTitle">搜索</h3>
+<div id="widget_my_zzk" class="div_my_zzk"><input type="text" id="q" onkeydown="return zzk_go_enter(event);" class="input_my_zzk">&nbsp;<input onclick="zzk_go()" type="button" value="找找看" id="btnZzk" class="btn_my_zzk"></div>
+<div id="widget_my_google" class="div_my_zzk"><input type="text" name="google_q" id="google_q" onkeydown="return google_go_enter(event)" class="input_my_zzk">&nbsp;<input onclick="google_go()" type="button" value="谷歌搜索" class="btn_my_zzk"></div>
+</div>
+
+</div><div id="sidebar_shortcut" class="sidebar-block">
+<h3 class="catListTitle">常用链接</h3>
+<ul>
+<li><a href="http://www.cnblogs.com/FrankTan/p/" title="我的博客的随笔列表">我的随笔</a></li><li><a href="http://www.cnblogs.com/FrankTan/MyComments.html" title="我发表过的评论列表">我的评论</a></li><li><a href="http://www.cnblogs.com/FrankTan/OtherPosts.html" title="我评论过的随笔列表">我的参与</a></li><li><a href="http://www.cnblogs.com/FrankTan/RecentComments.html" title="我的博客的评论列表">最新评论</a></li><li><a href="http://www.cnblogs.com/FrankTan/tag/" title="我的博客的标签列表">我的标签</a></li>
+</ul>
+<div id="itemListLin_con" style="display:none;">
+
+</div></div><div id="sidebar_toptags" class="sidebar-block"></div><div id="sidebar_categories">
+		<h3>随笔分类</h3>
+		
+				<ul>
+			
+				<li><a id="CatList_LinkList_0_Link_0" href="http://www.cnblogs.com/FrankTan/category/225642.html">C/C++(6)</a> </li>
+			
+				<li><a id="CatList_LinkList_0_Link_1" href="http://www.cnblogs.com/FrankTan/category/225644.html">Linux(3)</a> </li>
+			
+				<li><a id="CatList_LinkList_0_Link_2" href="http://www.cnblogs.com/FrankTan/category/225645.html">Linux Kernel</a> </li>
+			
+				<li><a id="CatList_LinkList_0_Link_3" href="http://www.cnblogs.com/FrankTan/category/225646.html">Python</a> </li>
+			
+				<li><a id="CatList_LinkList_0_Link_4" href="http://www.cnblogs.com/FrankTan/category/225643.html">Shell(4)</a> </li>
+			
+				<li><a id="CatList_LinkList_0_Link_5" href="http://www.cnblogs.com/FrankTan/category/227991.html">valgrind(1)</a> </li>
+			
+				<li><a id="CatList_LinkList_0_Link_6" href="http://www.cnblogs.com/FrankTan/category/225641.html">生活(1)</a> </li>
+			
+				</ul>
+			
+	
+		<h3>随笔档案</h3>
+		
+				<ul>
+			
+				<li><a id="CatList_LinkList_1_Link_0" href="http://www.cnblogs.com/FrankTan/archive/2012/04.html">2012年4月 (1)</a> </li>
+			
+				<li><a id="CatList_LinkList_1_Link_1" href="http://www.cnblogs.com/FrankTan/archive/2011/02.html">2011年2月 (1)</a> </li>
+			
+				<li><a id="CatList_LinkList_1_Link_2" href="http://www.cnblogs.com/FrankTan/archive/2011/01.html">2011年1月 (3)</a> </li>
+			
+				<li><a id="CatList_LinkList_1_Link_3" href="http://www.cnblogs.com/FrankTan/archive/2010/12.html">2010年12月 (4)</a> </li>
+			
+				<li><a id="CatList_LinkList_1_Link_4" href="http://www.cnblogs.com/FrankTan/archive/2010/03.html">2010年3月 (3)</a> </li>
+			
+				<li><a id="CatList_LinkList_1_Link_5" href="http://www.cnblogs.com/FrankTan/archive/2010/01.html">2010年1月 (1)</a> </li>
+			
+				</ul>
+			
+	</div><div id="sidebar_recentcomments" class="sidebar-block"><div id="recent_comments_wrap">
+<h3 class="catListTitle">最新评论</h3>
+<div class="RecentComment" id="RecentComments">
+	<div id="RecentCommentsBlock"><ul>
+    <li class="recent_comment_title"><a href="http://www.cnblogs.com/FrankTan/archive/2010/03/01/1634516.html#3122030">1. Re:Bash Shell中命令行选项/参数处理</a></li>
+    <li class="recent_comment_body">getopt 最牛的可以提取参数，被提取的参数可以随便放位置，getopts就不行，提取参数必须放在其他的参数前面才行</li>
+    <li class="recent_comment_author">--linuxdog</li>
+</ul>
+</div>
+</div>
+</div></div><div id="sidebar_topviewedposts" class="sidebar-block"><div id="topview_posts_wrap">
+<h3 class="catListTitle">阅读排行榜</h3>
+<div class="RecentComment" id="TopViewPosts"> 
+	<div id="TopViewPostsBlock"><ul><li><a href="http://www.cnblogs.com/FrankTan/archive/2010/03/01/1634516.html">1. Bash Shell中命令行选项/参数处理(44670)</a></li><li><a href="./GCC 提供的原子操作_files/GCC 提供的原子操作.html">2. GCC 提供的原子操作(14314)</a></li><li><a href="http://www.cnblogs.com/FrankTan/archive/2010/01/08/1642569.html">3. 关于valgrind的 “Conditional jump or move depends on uninitialised value(s)”(3118)</a></li><li><a href="http://www.cnblogs.com/FrankTan/archive/2011/01/09/1931416.html">4. .bashrc和.bash_profile的区别(1481)</a></li><li><a href="http://www.cnblogs.com/FrankTan/archive/2010/03/23/1692831.html">5. 将文本由行转为列(963)</a></li></ul></div>
+</div>
+</div></div><div id="sidebar_topcommentedposts" class="sidebar-block"><div id="topfeedback_posts_wrap">
+<h3 class="catListTitle">评论排行榜</h3>
+<div class="RecentComment" id="TopCommentsPosts">
+	<div id="TopFeedbackPostsBlock"><ul><li><a href="http://www.cnblogs.com/FrankTan/archive/2010/01/08/1642569.html">1. 关于valgrind的 “Conditional jump or move depends on uninitialised value(s)”(3)</a></li><li><a href="http://www.cnblogs.com/FrankTan/archive/2010/03/01/1634516.html">2. Bash Shell中命令行选项/参数处理(3)</a></li><li><a href="http://www.cnblogs.com/FrankTan/archive/2012/04/11/2442151.html">3. Tracking your habits in Org-mode(3)</a></li><li><a href="http://www.cnblogs.com/FrankTan/archive/2010/12/30/1922466.html">4. 磁盘空间去向不明的问题(2)</a></li></ul></div>
+</div></div></div><div id="sidebar_topdiggedposts" class="sidebar-block"><div id="topdigg_posts_wrap">
+<h3 class="catListTitle">推荐排行榜</h3>
+<div class="RecentComment">
+	<div id="TopDiggPostsBlock"><ul><li><a href="http://www.cnblogs.com/FrankTan/archive/2010/03/01/1634516.html">1. Bash Shell中命令行选项/参数处理(7)</a></li></ul></div>
+</div></div></div></div><script type="text/javascript">loadBlogSideColumn();</script>
+	
+</div>
+<div id="main">
+	
+
+<div class="post">
+	<div class="postTitle">
+		<a id="cb_post_title_url" href="./GCC 提供的原子操作_files/GCC 提供的原子操作.html">GCC 提供的原子操作</a>
+	</div>
+	
+	<div class="postText">
+		<div id="cnblogs_post_body"><div><br><strong>GCC 提供的原子操作</strong><br><br>gcc从4.1.2提供了__sync_*系列的built-in函数，用于提供加减和逻辑运算的原子操作。<br><br>其声明如下：<br><br><div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./GCC 提供的原子操作_files/copycode.gif" alt="复制代码"></a></span></div><div><!--<br/><br/>Code highlighting produced by Actipro CodeHighlighter (freeware)<br/>http://www.CodeHighlighter.com/<br/><br/>--><span style="color: #000000;">type&nbsp;__sync_fetch_and_add&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_fetch_and_sub&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_fetch_and_or&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_fetch_and_and&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_fetch_and_xor&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_fetch_and_nand&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br><br><br>type&nbsp;__sync_add_and_fetch&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_sub_and_fetch&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_or_and_fetch&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_and_and_fetch&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_xor_and_fetch&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)<br>type&nbsp;__sync_nand_and_fetch&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;value,&nbsp;...)</span></div><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./GCC 提供的原子操作_files/copycode.gif" alt="复制代码"></a></span></div></div><p><br></p><br><br>这两组函数的区别在于第一组返回更新前的值，第二组返回更新后的值。<br><br>type可以是1,2,4或8字节长度的int类型，即：<br><div class="cnblogs_code"><div><!--<br/><br/>Code highlighting produced by Actipro CodeHighlighter (freeware)<br/>http://www.CodeHighlighter.com/<br/><br/>--><span style="color: #000000;"><br>int8_t&nbsp;</span><span style="color: #000000;">/</span><span style="color: #000000;">&nbsp;uint8_t<br>int16_t&nbsp;</span><span style="color: #000000;">/</span><span style="color: #000000;">&nbsp;uint16_t<br>int32_t&nbsp;</span><span style="color: #000000;">/</span><span style="color: #000000;">&nbsp;uint32_t<br>int64_t&nbsp;</span><span style="color: #000000;">/</span><span style="color: #000000;">&nbsp;uint64_t</span></div></div><p><br></p><br>后面的可扩展参数(...)用来指出哪些变量需要memory barrier,因为目前gcc实现的是full barrier（类似于linux kernel 中的mb(),表示这个操作之前的所有内存操作不会被重排序到这个操作之后）,所以可以略掉这个参数。<br><br><div class="cnblogs_code"><div><!--<br/><br/>Code highlighting produced by Actipro CodeHighlighter (freeware)<br/>http://www.CodeHighlighter.com/<br/><br/>--><span style="color: #000000;"><br></span><span style="color: #0000ff;">bool</span><span style="color: #000000;">&nbsp;__sync_bool_compare_and_swap&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;oldval&nbsp;type&nbsp;newval,&nbsp;...)<br>type&nbsp;__sync_val_compare_and_swap&nbsp;(type&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">ptr,&nbsp;type&nbsp;oldval&nbsp;type&nbsp;newval,&nbsp;...)</span></div></div><br><br>这两个函数提供原子的比较和交换，如果*ptr == oldval,就将newval写入*ptr,<br>第一个函数在相等并写入的情况下返回true.<br>第二个函数在返回操作之前的值。<br><br><div class="cnblogs_code"><div><!--<br/><br/>Code highlighting produced by Actipro CodeHighlighter (freeware)<br/>http://www.CodeHighlighter.com/<br/><br/>--><span style="color: #000000;">__sync_synchronize&nbsp;(...)</span></div></div><br>发出一个full barrier.<br><br>关于memory barrier,cpu会对我们的指令进行排序，一般说来会提高程序的效率，但有时候可能造成我们不希望得到的结果，举一个例子，比如我们有一个硬件设备，它有4个寄存器，当你发出一个操作指令的时候，一个寄存器存的是你的操作指令（比如READ），两个寄存器存的是参数（比如是地址和size），最后一个寄存器是控制寄存器，在所有的参数都设置好之后向其发出指令，设备开始读取参数，执行命令，程序可能如下：<br><div class="cnblogs_code"><div><!--<br/><br/>Code highlighting produced by Actipro CodeHighlighter (freeware)<br/>http://www.CodeHighlighter.com/<br/><br/>--><span style="color: #000000;">&nbsp;&nbsp;&nbsp;&nbsp;write1(dev.register_size,size);<br>&nbsp;&nbsp;&nbsp;&nbsp;write1(dev.register_addr,addr);<br>&nbsp;&nbsp;&nbsp;&nbsp;write1(dev.register_cmd,READ);<br>&nbsp;&nbsp;&nbsp;&nbsp;write1(dev.register_control,GO);</span></div></div><br>如果最后一条write1被换到了前几条语句之前，那么肯定不是我们所期望的，这时候我们可以在最后一条语句之前加入一个memory barrier,强制cpu执行完前面的写入以后再执行最后一条：<br><div class="cnblogs_code"><div><!--<br/><br/>Code highlighting produced by Actipro CodeHighlighter (freeware)<br/>http://www.CodeHighlighter.com/<br/><br/>--><span style="color: #000000;"><br>&nbsp;&nbsp;&nbsp;&nbsp;write1(dev.register_size,size);<br>&nbsp;&nbsp;&nbsp;&nbsp;write1(dev.register_addr,addr);<br>&nbsp;&nbsp;&nbsp;&nbsp;write1(dev.register_cmd,READ);<br>&nbsp;&nbsp;&nbsp;&nbsp;__sync_synchronize();<br>&nbsp;&nbsp;&nbsp;&nbsp;write1(dev.register_control,GO);<br></span></div></div><br>memory barrier有几种类型：<br>&nbsp;&nbsp;&nbsp; acquire barrier : 不允许将barrier之后的内存读取指令移到barrier之前（linux kernel中的wmb()）。<br>&nbsp;&nbsp;&nbsp; release barrier : 不允许将barrier之前的内存读取指令移到barrier之后 (linux kernel中的rmb())。<br>&nbsp;&nbsp;&nbsp; full barrier&nbsp;&nbsp;&nbsp; : 以上两种barrier的合集(linux kernel中的mb())。<br><br><br>还有两个函数：<br><br>type __sync_lock_test_and_set (type *ptr, type value, ...)<br>&nbsp;&nbsp; 将*ptr设为value并返回*ptr操作之前的值。<br><br>void __sync_lock_release (type *ptr, ...)<br>&nbsp;&nbsp;&nbsp;&nbsp; 将*ptr置0<br><br><br>示例程序：<br><div class="cnblogs_code"><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./GCC 提供的原子操作_files/copycode.gif" alt="复制代码"></a></span></div><div><!--<br/><br/>Code highlighting produced by Actipro CodeHighlighter (freeware)<br/>http://www.CodeHighlighter.com/<br/><br/>--><span style="color: #000000;"><br>#include&nbsp;</span><span style="color: #000000;">&lt;</span><span style="color: #000000;">stdio.h</span><span style="color: #000000;">&gt;</span><span style="color: #000000;"><br>#include&nbsp;</span><span style="color: #000000;">&lt;</span><span style="color: #000000;">pthread.h</span><span style="color: #000000;">&gt;</span><span style="color: #000000;"><br>#include&nbsp;</span><span style="color: #000000;">&lt;</span><span style="color: #000000;">stdlib.h</span><span style="color: #000000;">&gt;</span><span style="color: #000000;"><br><br></span><span style="color: #0000ff;">static</span><span style="color: #000000;">&nbsp;</span><span style="color: #0000ff;">int</span><span style="color: #000000;">&nbsp;count&nbsp;</span><span style="color: #000000;">=</span><span style="color: #000000;">&nbsp;</span><span style="color: #800080;">0</span><span style="color: #000000;">;<br><br><br></span><span style="color: #0000ff;">void</span><span style="color: #000000;">&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">test_func(</span><span style="color: #0000ff;">void</span><span style="color: #000000;">&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">arg)<br>{<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000ff;">int</span><span style="color: #000000;">&nbsp;i</span><span style="color: #000000;">=</span><span style="color: #800080;">0</span><span style="color: #000000;">;<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000ff;">for</span><span style="color: #000000;">(i</span><span style="color: #000000;">=</span><span style="color: #800080;">0</span><span style="color: #000000;">;i</span><span style="color: #000000;">&lt;</span><span style="color: #800080;">20000</span><span style="color: #000000;">;</span><span style="color: #000000;">++</span><span style="color: #000000;">i){<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;__sync_fetch_and_add(</span><span style="color: #000000;">&amp;</span><span style="color: #000000;">count,</span><span style="color: #800080;">1</span><span style="color: #000000;">);<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000ff;">return</span><span style="color: #000000;">&nbsp;NULL;<br>}<br><br></span><span style="color: #0000ff;">int</span><span style="color: #000000;">&nbsp;main(</span><span style="color: #0000ff;">int</span><span style="color: #000000;">&nbsp;argc,&nbsp;</span><span style="color: #0000ff;">const</span><span style="color: #000000;">&nbsp;</span><span style="color: #0000ff;">char</span><span style="color: #000000;">&nbsp;</span><span style="color: #000000;">*</span><span style="color: #000000;">argv[])<br>{<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pthread_t&nbsp;id[</span><span style="color: #800080;">20</span><span style="color: #000000;">];<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000ff;">int</span><span style="color: #000000;">&nbsp;i&nbsp;</span><span style="color: #000000;">=</span><span style="color: #000000;">&nbsp;</span><span style="color: #800080;">0</span><span style="color: #000000;">;<br><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000ff;">for</span><span style="color: #000000;">(i</span><span style="color: #000000;">=</span><span style="color: #800080;">0</span><span style="color: #000000;">;i</span><span style="color: #000000;">&lt;</span><span style="color: #800080;">20</span><span style="color: #000000;">;</span><span style="color: #000000;">++</span><span style="color: #000000;">i){<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pthread_create(</span><span style="color: #000000;">&amp;</span><span style="color: #000000;">id[i],NULL,test_func,NULL);<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000ff;">for</span><span style="color: #000000;">(i</span><span style="color: #000000;">=</span><span style="color: #800080;">0</span><span style="color: #000000;">;i</span><span style="color: #000000;">&lt;</span><span style="color: #800080;">20</span><span style="color: #000000;">;</span><span style="color: #000000;">++</span><span style="color: #000000;">i){<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pthread_join(id[i],NULL);<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf(</span><span style="color: #800000;">"</span><span style="color: #800000;">%d\n</span><span style="color: #800000;">"</span><span style="color: #000000;">,count);<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000ff;">return</span><span style="color: #000000;">&nbsp;</span><span style="color: #800080;">0</span><span style="color: #000000;">;<br>}</span></div><div class="cnblogs_code_toolbar"><span class="cnblogs_code_copy"><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img src="./GCC 提供的原子操作_files/copycode.gif" alt="复制代码"></a></span></div></div><p>参考：<br></p><p><br></p><p></p><div>1. http://refspecs.freestandards.org/elf/IA64-SysV-psABI.pdf&nbsp;&nbsp; section 7.4</div><p>2. http://gcc.gnu.org/onlinedocs/gcc-4.1.2/gcc/Atomic-Builtins.html#Atomic-Builtins<br></p><p></p><p>&nbsp;</p></div></div><div id="MySignature"></div>
+<div class="clear"></div>
+<div id="blog_post_info_block">
+<div id="BlogPostCategory">分类: <a href="http://www.cnblogs.com/FrankTan/category/225642.html">C/C++</a></div>
+<div id="EntryTag"></div>
+<div id="blog_post_info"><div id="green_channel">
+绿色通道：
+<a href="javascript:void(0);" id="green_channel_digg" onclick="DiggIt(1903377,cb_blogId,1);green_channel_success(this,&#39;谢谢推荐！&#39;);">好文要顶</a>
+<a id="green_channel_follow" onclick="c_follow();" href="javascript:void(0);">关注我</a>
+<a id="green_channel_favorite" onclick="AddToWz(cb_entryId);return false;" href="javascript:void(0);">收藏该文</a><a id="green_channel_contact" href="http://space.cnblogs.com/msg/send/Frank+Tan" target="_blank">与我联系</a>
+<a id="green_channel_weibo" href="javascript:void(0);" title="分享至新浪微博" onclick="ShareToTsina()"><img src="./GCC 提供的原子操作_files/icon_weibo_24.png" alt=""></a>
+</div>
+<div id="author_profile">
+<div id="author_profile_info" class="author_profile_info">
+<a href="http://home.cnblogs.com/u/FrankTan/" target="_blank"><img src="./GCC 提供的原子操作_files/sample_face.gif" class="author_avatar" alt=""></a>
+<div id="author_profile_detail" class="author_profile_info">
+<a href="http://home.cnblogs.com/u/FrankTan/">Frank Tan</a><br>
+<a href="http://home.cnblogs.com/u/FrankTan/followees">关注 - 0</a><br>
+<a href="http://home.cnblogs.com/u/FrankTan/followers">粉丝 - 9</a>
+</div>
+</div>
+<div class="clear"></div>
+<div id="author_profile_honor"></div>
+<div id="author_profile_follow">
+    <a href="javascript:void(0);" onclick="c_follow();return false;">+加关注</a>
+</div>
+</div>
+<div id="div_digg">										
+    <div class="diggit" onclick="votePost(1903377,&#39;Digg&#39;)">
+        <span class="diggnum" id="digg_count">0</span>
+    </div>
+	<div class="buryit" onclick="votePost(1903377,&#39;Bury&#39;)"> 
+		<span class="burynum" id="bury_count">0</span>
+	</div>
+	<div class="clear"></div>	
+	<div class="diggword" id="digg_tips">
+    (请您对文章做出评价)
+    </div>	
+</div>
+</div>
+<div class="clear"></div>
+<div id="post_next_prev"><a href="http://www.cnblogs.com/FrankTan/archive/2010/12/11/1902746.html" class="p_n_p_prefix">« </a> 上一篇：<a href="http://www.cnblogs.com/FrankTan/archive/2010/12/11/1902746.html" title="发布于2010-12-11 00:02">为什么LIKELY和UNLIKELY要用两个叹号</a><br><a href="http://www.cnblogs.com/FrankTan/archive/2010/12/15/1906273.html" class="p_n_p_prefix">» </a> 下一篇：<a href="http://www.cnblogs.com/FrankTan/archive/2010/12/15/1906273.html" title="发布于2010-12-15 09:07">gtest的浮点数比较断言</a><br></div>
+</div>
+
+
+	</div>
+	
+	<div class="postfoot">
+		posted on <span id="post-date">2010-12-11 20:03</span> <a href="http://www.cnblogs.com/FrankTan/">Frank Tan</a> 阅读(<span id="post_view_count">14314</span>) 评论(<span id="post_comment_count">0</span>)  <a href="http://i.cnblogs.com/EditPosts.aspx?postid=1903377" rel="nofollow">编辑</a> <a href="http://www.cnblogs.com/FrankTan/archive/2010/12/11/1903377.html#" onclick="AddToWz(1903377);return false;">收藏</a>
+	</div>
+</div>
+<script type="text/javascript">var allowComments=true,isLogined=false,cb_blogId=64726,cb_entryId=1903377,cb_blogApp=currentBlogApp,cb_blogUserGuid='44d8e2f9-9ef0-de11-ba8f-001cf0cd104b',cb_entryCreatedDate='2010/12/11 20:03:00';loadViewCount(cb_entryId);</script>
+
+<a name="!comments"></a><div id="blog-comments-placeholder"></div><script type="text/javascript">var commentManager = new blogCommentManager();commentManager.renderComments(0);</script>
+<div id="comment_form" class="commentform">
+<a name="commentform"></a>
+<div id="divCommentShow"></div>
+<div id="comment_nav"><span id="span_refresh_tips"></span><a href="javascript:void(0);" id="lnk_RefreshComments" onclick="return RefreshCommentList();">刷新评论</a><a href="http://www.cnblogs.com/FrankTan/archive/2010/12/11/1903377.html#" onclick="return RefreshPage();">刷新页面</a><a href="http://www.cnblogs.com/FrankTan/archive/2010/12/11/1903377.html#top">返回顶部</a></div>
+<div id="comment_form_container"><div class="login_tips">注册用户登录后才能发表评论，请 <a rel="nofollow" href="javascript:void(0);" class="underline" onclick="return login(&#39;commentform&#39;);">登录</a> 或 <a rel="nofollow" href="javascript:void(0);" class="underline" onclick="return register();">注册</a>，<a href="http://www.cnblogs.com/">访问</a>网站首页。</div></div>
+<div class="ad_text_commentbox" id="ad_text_under_commentbox"></div>
+<div id="site_nav_under"><a href="http://www.cnblogs.com/" target="_blank" title="开发者的网上家园">博客园首页</a><a href="http://q.cnblogs.com/" target="_blank" title="程序员问答社区">博问</a><a href="http://news.cnblogs.com/" target="_blank" title="IT新闻">新闻</a><a href="http://home.cnblogs.com/ing/" target="_blank">闪存</a><a href="http://job.cnblogs.com/" target="_blank">程序员招聘</a><a href="http://kb.cnblogs.com/" target="_blank">知识库</a></div>
+<div id="opt_under_post"></div>
+<script type="text/javascript">
+    var enableGoogleAd = canShowAdsense(); var googletag = googletag || {}; googletag.cmd = googletag.cmd || [];
+    fixPostBodyFormat();
+</script>
+<div id="ad_under_post_holder">
+<script type="text/javascript">
+    var googletag = googletag || {};
+    googletag.cmd = googletag.cmd || [];
+    (function () {
+        if (enableGoogleAd) {
+            var gads = document.createElement('script');
+            gads.async = true;
+            gads.type = 'text/javascript';
+            var useSSL = 'https:' == document.location.protocol;
+            gads.src = (useSSL ? 'https:' : 'http:') + '//www.googletagservices.com/tag/js/gpt.js';
+            var node = document.getElementsByTagName('script')[0];
+            node.parentNode.insertBefore(gads, node);
+        }
+    })();
+</script>
+<script type="text/javascript">
+    try {
+        if (enableGoogleAd) {
+            googletag.cmd.push(function () {
+                googletag.defineSlot('/1090369/cnblogs_blogpost_C1_sitehome', [300, 250], 'div-gpt-ad-1346480159711-0').addService(googletag.pubads());
+                googletag.defineSlot('/1090369/cnblogs_blogpost_C2', [468, 60], 'div-gpt-ad-1410860226396-0').addService(googletag.pubads());
+                googletag.pubads().enableSingleRequest();
+                googletag.enableServices();
+            });
+        };
+    } catch (e) { }
+</script>
+<div id="google_ad_c1" class="c_ad_block">
+    <div id="div-gpt-ad-1346480159711-0" style="width:300px; height:250px;">
+    <script type="text/javascript">
+        try {
+            if (enableGoogleAd) {
+                googletag.cmd.push(function () { googletag.display('div-gpt-ad-1346480159711-0'); });            
+            } else {
+                $('#div-gpt-ad-1346480159711-0').hide();
+            }
+    } catch (e) { }
+    </script>
+    </div>
+</div>
+</div>
+<div id="under_post_news"><div class="itnews c_ad_block"><b>最新IT新闻</b>:<br> ·  <a href="http://news.cnblogs.com/n/520672/" target="_blank">未来缺什么样的程序员？</a><br> ·  <a href="http://news.cnblogs.com/n/520671/" target="_blank">特斯拉计划明年推Model 3 售价3.5万美元</a><br> ·  <a href="http://news.cnblogs.com/n/520670/" target="_blank">揭秘苹果手表的中国产业链：层层选拔像竞赛</a><br> ·  <a href="http://news.cnblogs.com/n/520669/" target="_blank">写代码可能是成为软件工程师最容易的部分</a><br> ·  <a href="http://news.cnblogs.com/n/520668/" target="_blank">科学让巧克力变得更加美妙你知道吗</a><br>» <a href="http://news.cnblogs.com/" title="IT新闻" target="_blank">更多新闻...</a></div></div>
+<div id="google_ad_c2" class="c_ad_block">
+<div id="div-gpt-ad-1410860226396-0" style="width:468px; height:60px;">
+<script type="text/javascript">
+try {
+    if (enableGoogleAd) {
+        googletag.cmd.push(function () { googletag.display('div-gpt-ad-1410860226396-0'); });
+    } else {
+        $('#div-gpt-ad-1346480159711-0').hide();
+    }
+} catch (e) { }
+</script>
+</div>
+</div>
+<div id="under_post_kb"><div class="itnews c_ad_block" id="kb_block"><b>最新知识库文章</b>:<br><div id="kb_recent"> ·  <a href="http://kb.cnblogs.com/page/520024/" target="_blank">面向服务体系和遗留系统</a><br> ·  <a href="http://kb.cnblogs.com/page/520272/" target="_blank">运维的本质——可视化</a><br> ·  <a href="http://kb.cnblogs.com/page/519824/" target="_blank">携程App的网络性能优化实践</a><br> ·  <a href="http://kb.cnblogs.com/page/519475/" target="_blank">技术领导力：作为技术团队领导经常为人所忽略的技能和职责</a><br> ·  <a href="http://kb.cnblogs.com/page/519674/" target="_blank">在LinkedIn做面试官的故事</a><br></div>» <a href="http://kb.cnblogs.com/" target="_blank">更多知识库文章...</a></div></div>
+<div id="HistoryToday" class="c_ad_block"></div>
+<script type="text/javascript">
+$(function () {
+    loadNewsAndKb();
+    loadBlogSignature();
+    LoadPostInfoBlock(cb_blogId, cb_entryId, cb_blogApp, cb_blogUserGuid);
+    GetPrevNextPost(cb_entryId, cb_blogId, cb_entryCreatedDate);
+    loadOptUnderPost();
+    GetHistoryToday(cb_blogId, cb_blogApp, cb_entryCreatedDate);
+    setTimeout(function () { incrementViewCount(cb_entryId); }, 200);
+});
+</script><script async="" type="text/javascript" src="./GCC 提供的原子操作_files/check_359604.js"></script><iframe src="about:blank" width="0" height="0" style="visibility: hidden !important; display: none !important; opacity: 0 !important;"></iframe>
+</div>
+
+</div>
+<div class="footer">
+
+<p id="footer">
+	Powered by: 
+	<br>
+	
+	<a id="Footer1_Hyperlink3" name="Hyperlink1" href="http://www.cnblogs.com/" style="font-family:Verdana;font-size:12px;">博客园</a>
+	<br>
+	Copyright © Frank Tan
+</p>
+</div>
+
+
+</body></html>

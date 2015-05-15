@@ -6,8 +6,13 @@
 #include "malloc_hook.h"
 #include "skynet.h"
 
+// 当前内存使用的容量
 static size_t _used_memory = 0;
+
+// 
 static size_t _memory_block = 0;
+
+// 
 typedef struct _mem_data {
 	uint32_t handle;
 	ssize_t allocated;
