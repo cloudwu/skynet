@@ -1,5 +1,5 @@
 local function getupvaluetable(u, func, unique)
-	i = 1
+	local i = 1
 	while true do
 		local name, value = debug.getupvalue(func, i)
 		if name == nil then
