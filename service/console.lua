@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local snax	 = require "snax"
+local snax   = require "snax"
 local socket = require "socket"
 
 local function console_main_loop()
