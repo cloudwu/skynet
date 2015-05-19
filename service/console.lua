@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+local snax   = require "snax"
 local socket = require "socket"
 
 local function console_main_loop()
@@ -6,7 +7,10 @@ local function console_main_loop()
 	socket.lock(stdin)
 	while true do
 		local cmdline = socket.readline(stdin, "\n")
-		if cmdline ~= "" then
+		local i,j = cmdline:find("^snax%s+%w")
+		if i then
+			pcall(snax.newservice, cmdline:sub(j))
+		elseif cmdline ~= "" then
 			pcall(skynet.newservice,cmdline)
 		end
 	end
