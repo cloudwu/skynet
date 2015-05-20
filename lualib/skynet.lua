@@ -44,6 +44,7 @@ local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
 local session_response = {}
+local unresponse = {}
 
 local wakeup_session = {}
 local sleep_session = {}
@@ -96,7 +97,6 @@ end
 
 local coroutine_pool = {}
 local coroutine_yield = coroutine.yield
-local coroutine_count = 0
 
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
@@ -110,11 +110,6 @@ local function co_create(f)
 				f(coroutine_yield())
 			end
 		end)
-		coroutine_count = coroutine_count + 1
-		if coroutine_count > 1024 then
-			skynet.error("May overload, create 1024 task")
-			coroutine_count = 0
-		end
 	else
 		coroutine.resume(co, f)
 	end
@@ -128,7 +123,7 @@ local function dispatch_wakeup()
 		local session = sleep_session[co]
 		if session then
 			session_id_coroutine[session] = "BREAK"
-			return suspend(co, coroutine.resume(co, true, "BREAK"))
+			return suspend(co, coroutine.resume(co, false, "BREAK"))
 		end
 	end
 end
@@ -224,11 +219,13 @@ function suspend(co, result, command, param, size)
 				ret = false
 			end
 			release_watching(co_address)
+			unresponse[response] = nil
 			f = nil
 			return ret
 		end
 		watching_service[co_address] = watching_service[co_address] + 1
 		session_response[co] = response
+		unresponse[response] = true
 		return suspend(co, coroutine.resume(co, response))
 	elseif command == "EXIT" then
 		-- coroutine exit
@@ -265,9 +262,13 @@ function skynet.sleep(ti)
 	session = tonumber(session)
 	local succ, ret = coroutine_yield("SLEEP", session)
 	sleep_session[coroutine.running()] = nil
-	assert(succ, ret)
+	if succ then
+		return
+	end
 	if ret == "BREAK" then
 		return "BREAK"
+	else
+		error(ret)
 	end
 end
 
@@ -277,39 +278,10 @@ end
 
 function skynet.wait()
 	local session = c.genid()
-	coroutine_yield("SLEEP", session)
+	local ret, msg = coroutine_yield("SLEEP", session)
 	local co = coroutine.running()
 	sleep_session[co] = nil
 	session_id_coroutine[session] = nil
-end
-
-local function globalname(name, handle)
-	local c = string.sub(name,1,1)
-	assert(c ~= ':')
-	if c == '.' then
-		return false
-	end
-
-	assert(#name <= 16)	-- GLOBALNAME_LENGTH is 16, defined in skynet_harbor.h
-	assert(tonumber(name) == nil)	-- global name can't be number
-
-	local harbor = require "skynet.harbor"
-
-	harbor.globalname(name, handle)
-
-	return true
-end
-
-function skynet.register(name)
-	if not globalname(name) then
-		c.command("REG", name)
-	end
-end
-
-function skynet.name(name, handle)
-	if not globalname(name, handle) then
-		c.command("NAME", name .. " " .. skynet.address(handle))
-	end
 end
 
 local self_handle
@@ -323,13 +295,6 @@ end
 
 function skynet.localname(name)
 	local addr = c.command("QUERY", name)
-	if addr then
-		return string_to_handle(addr)
-	end
-end
-
-function skynet.launch(...)
-	local addr = c.command("LAUNCH", table.concat({...}," "))
 	if addr then
 		return string_to_handle(addr)
 	end
@@ -357,6 +322,9 @@ function skynet.exit()
 			c.redirect(address, 0, skynet.PTYPE_ERROR, session, "")
 		end
 	end
+	for resp in pairs(unresponse) do
+		resp(false)
+	end
 	-- report the sources I call but haven't return
 	local tmp = {}
 	for session, address in pairs(watching_session) do
@@ -368,14 +336,6 @@ function skynet.exit()
 	c.command("EXIT")
 	-- quit service
 	coroutine_yield "QUIT"
-end
-
-function skynet.kill(name)
-	if type(name) == "number" then
-		skynet.send(".launcher","lua","REMOVE",name, true)
-		name = skynet.address(name)
-	end
-	c.command("KILL",name)
 end
 
 function skynet.getenv(key)
@@ -524,7 +484,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 	end
 end
 
-local function dispatch_message(...)
+function skynet.dispatch_message(...)
 	local succ, err = pcall(raw_dispatch_message,...)
 	while true do
 		local key,co = next(fork_queue)
@@ -646,7 +606,7 @@ function skynet.pcall(start)
 	return xpcall(init_template, debug.traceback, start)
 end
 
-local function init_service(start)
+function skynet.init_service(start)
 	local ok, err = skynet.pcall(start)
 	if not ok then
 		skynet.error("init service failed: " .. tostring(err))
@@ -658,54 +618,14 @@ local function init_service(start)
 end
 
 function skynet.start(start_func)
-	c.callback(dispatch_message)
+	c.callback(skynet.dispatch_message)
 	skynet.timeout(0, function()
-		init_service(start_func)
-	end)
-end
-
-function skynet.filter(f ,start_func)
-	c.callback(function(...)
-		dispatch_message(f(...))
-	end)
-	skynet.timeout(0, function()
-		init_service(start_func)
-	end)
-end
-
-function skynet.forward_type(map, start_func)
-	c.callback(function(ptype, msg, sz, ...)
-		local prototype = map[ptype]
-		if prototype then
-			dispatch_message(prototype, msg, sz, ...)
-		else
-			dispatch_message(ptype, msg, sz, ...)
-			c.trash(msg, sz)
-		end
-	end, true)
-	skynet.timeout(0, function()
-		init_service(start_func)
+		skynet.init_service(start_func)
 	end)
 end
 
 function skynet.endless()
 	return c.command("ENDLESS")~=nil
-end
-
-function skynet.abort()
-	c.command("ABORT")
-end
-
-function skynet.monitor(service, query)
-	local monitor
-	if query then
-		monitor = skynet.queryservice(true, service)
-	else
-		monitor = skynet.uniqueservice(true, service)
-	end
-	assert(monitor, "Monitor launch failed")
-	c.command("MONITOR", string.format(":%08x", monitor))
-	return monitor
 end
 
 function skynet.mqlen()
@@ -734,7 +654,7 @@ end
 -- Inject internal debug framework
 local debug = require "skynet.debug"
 debug(skynet, {
-	dispatch = dispatch_message,
+	dispatch = skynet.dispatch_message,
 	clear = clear_pool,
 	suspend = suspend,
 })

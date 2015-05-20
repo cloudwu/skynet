@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local core = require "skynet.core"
+require "skynet.manager"	-- import manager apis
 local string = string
 
 local services = {}

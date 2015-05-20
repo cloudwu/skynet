@@ -500,7 +500,11 @@ sproto_dump(struct sproto *s) {
 	printf("=== %d protocol ===\n", s->protocol_n);
 	for (i=0;i<s->protocol_n;i++) {
 		struct protocol *p = &s->proto[i];
-		printf("\t%s (%d) request:%s", p->name, p->tag, p->p[SPROTO_REQUEST]->name);
+		if (p->p[SPROTO_REQUEST]) {
+			printf("\t%s (%d) request:%s", p->name, p->tag, p->p[SPROTO_REQUEST]->name);
+		} else {
+			printf("\t%s (%d) request:(null)", p->name, p->tag);
+		}
 		if (p->p[SPROTO_RESPONSE]) {
 			printf(" response:%s", p->p[SPROTO_RESPONSE]->name);
 		}

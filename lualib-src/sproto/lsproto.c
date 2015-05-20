@@ -573,6 +573,55 @@ lloadproto(lua_State *L) {
 	return 1;
 }
 
+static int
+encode_default(const struct sproto_arg *args) {
+	lua_State *L = args->ud;
+	lua_pushstring(L, args->tagname);
+	if (args->index > 0) {
+		lua_newtable(L);
+	} else {
+		switch(args->type) {
+		case SPROTO_TINTEGER:
+			lua_pushinteger(L, 0);
+			break;
+		case SPROTO_TBOOLEAN:
+			lua_pushboolean(L, 0);
+			break;
+		case SPROTO_TSTRING:
+			lua_pushliteral(L, "");
+			break;
+		case SPROTO_TSTRUCT:
+			lua_createtable(L, 0, 1);
+			lua_pushstring(L, sproto_name(args->subtype));
+			lua_setfield(L, -2, "__type");
+			break;
+		}
+	}
+	lua_rawset(L, -3);
+	return 0;
+}
+
+/*
+	lightuserdata sproto_type
+	return default table
+ */
+static int
+ldefault(lua_State *L) {
+	int ret;
+	// 32 is enough for dummy buffer, because ldefault encode nothing but the header.
+	char dummy[32];
+	struct sproto_type * st = lua_touserdata(L, 1);
+	if (st == NULL) {
+		return luaL_argerror(L, 1, "Need a sproto_type object");
+	}
+	lua_newtable(L);
+	ret = sproto_encode(st, dummy, sizeof(dummy), encode_default, L);
+	if (ret<0) {
+		return luaL_error(L, "dummy buffer (%d) is too small", (int)sizeof(dummy));
+	}
+	return 1;
+}
+
 int
 luaopen_sproto_core(lua_State *L) {
 #ifdef luaL_checkversion
@@ -587,6 +636,7 @@ luaopen_sproto_core(lua_State *L) {
 		{ "protocol", lprotocol },
 		{ "loadproto", lloadproto },
 		{ "saveproto", lsaveproto },
+		{ "default", ldefault },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);

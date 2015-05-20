@@ -534,12 +534,6 @@ lnodelay(lua_State *L) {
 	skynet_socket_nodelay(ctx,id);
 	return 0;
 }
-/*
-int skynet_socket_udp(struct skynet_context *ctx, const char * addr, int port);
-int skynet_socket_udp_connect(struct skynet_context *ctx, int id, const char * addr, int port);
-int skynet_socket_udp_send(struct skynet_context *ctx, int id, const char * address, const void *buffer, int sz);
-const char * skynet_socket_udp_address(struct skynet_context *ctx, struct skynet_socket_message *, int *addrsz);
-*/
 
 static int
 ludp(lua_State *L) {
@@ -599,7 +593,9 @@ static int
 ludp_address(lua_State *L) {
 	size_t sz = 0;
 	const uint8_t * addr = (const uint8_t *)luaL_checklstring(L, 1, &sz);
-	int port = addr[1] * 256 + addr[2];
+	uint16_t port = 0;
+	memcpy(&port, addr+1, sizeof(uint16_t));
+	port = ntohs(port);
 	const void * src = addr+3;
 	char tmp[256];
 	int family;

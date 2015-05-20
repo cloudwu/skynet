@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local harbor = require "skynet.harbor"
+require "skynet.manager"	-- import skynet.launch, ...
 
 skynet.start(function()
 	local standalone = skynet.getenv "standalone"

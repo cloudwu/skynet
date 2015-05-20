@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+require "skynet.manager"	-- import skynet.launch, ...
 
 local globalname = {}
 local queryname = {}
