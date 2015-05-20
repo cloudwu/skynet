@@ -54,7 +54,7 @@ end
 
 skynet.start(function()
 	local init = false
-	skynet.dispatch("snax", function ( session , source , id, ...)
+	local function dispatcher( session , source , id, ...)
 		local method = func[id]
 
 		if method[2] == "system" then
@@ -84,5 +84,11 @@ skynet.start(function()
 			assert(init, "Init first")
 			timing(method, ...)
 		end
-	end)
+	end
+	skynet.dispatch("snax", dispatcher)
+
+	-- set lua dispatcher
+	function snax.enablecluster()
+		skynet.dispatch("lua", dispatcher)
+	end
 end)

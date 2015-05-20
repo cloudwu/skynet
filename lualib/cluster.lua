@@ -24,6 +24,15 @@ function cluster.proxy(node, name)
 	return skynet.call(clusterd, "lua", "proxy", node, name)
 end
 
+function cluster.snax(node, name, address)
+	local snax = require "snax"
+	if not address then
+		address = cluster.call(node, ".service", "QUERY", "snaxd" , name)
+	end
+	local handle = skynet.call(clusterd, "lua", "proxy", node, address)
+	return snax.bind(handle, name)
+end
+
 skynet.init(function()
 	clusterd = skynet.uniqueservice("clusterd")
 end)

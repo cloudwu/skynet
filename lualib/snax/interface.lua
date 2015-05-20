@@ -64,7 +64,7 @@ return function (name , G, loader)
 	local pattern
 
 	do
-		local path = skynet.getenv "snax"
+		local path = assert(skynet.getenv "snax" , "please set snax in config file")
 
 		local errlist = {}
 

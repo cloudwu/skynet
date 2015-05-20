@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local cluster = require "cluster"
 require "skynet.manager"	-- import skynet.name
+local snax = require "snax"
 
 skynet.start(function()
 	local sdb = skynet.newservice("simpledb")
@@ -11,4 +12,6 @@ skynet.start(function()
 	print(skynet.call(".simpledb", "lua", "GET", "b"))
 	cluster.open "db"
 	cluster.open "db2"
+	-- unique snax service
+	snax.uniqueservice "pingserver"
 end)

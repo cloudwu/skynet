@@ -6,4 +6,8 @@ skynet.start(function()
 	print(skynet.call(proxy, "lua", "GET", "a"))
 	print(cluster.call("db", ".simpledb", "GET", "a"))
 	print(cluster.call("db2", ".simpledb", "GET", "b"))
+
+	-- test snax service
+	local pingserver = cluster.snax("db", "pingserver")
+	print(pingserver.req.ping "hello")
 end)
