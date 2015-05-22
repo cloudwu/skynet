@@ -608,8 +608,8 @@ encode_default(const struct sproto_arg *args) {
 static int
 ldefault(lua_State *L) {
 	int ret;
-	// 32 is enough for dummy buffer, because ldefault encode nothing but the header.
-	char dummy[32];
+	// 64 is always enough for dummy buffer, except the type has many fields ( > 27).
+	char dummy[64];
 	struct sproto_type * st = lua_touserdata(L, 1);
 	if (st == NULL) {
 		return luaL_argerror(L, 1, "Need a sproto_type object");
@@ -617,7 +617,18 @@ ldefault(lua_State *L) {
 	lua_newtable(L);
 	ret = sproto_encode(st, dummy, sizeof(dummy), encode_default, L);
 	if (ret<0) {
-		return luaL_error(L, "dummy buffer (%d) is too small", (int)sizeof(dummy));
+		// try again
+		int sz = sizeof(dummy) * 2;
+		void * tmp = lua_newuserdata(L, sz);
+		lua_insert(L, -2);
+		for (;;) {
+			ret = sproto_encode(st, tmp, sz, encode_default, L);
+			if (ret >= 0)
+				break;
+			sz *= 2;
+			tmp = lua_newuserdata(L, sz);
+			lua_replace(L, -3);
+		}
 	}
 	return 1;
 }
