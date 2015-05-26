@@ -20,7 +20,7 @@ extern size_t mallctl_int64(const char* name, size_t* newval);
 // 与上面的 mallctl_opt 类似, 只不过这次操作的是 int 类型
 extern int    mallctl_opt(const char* name, int* newval);
 
-// 打印当前所有服务使用的内存信息
+// 打印当前所有使用的内存信息
 extern void   dump_c_mem(void);
 
 #endif /* SKYNET_MALLOC_HOOK_H */
