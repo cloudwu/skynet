@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local netpack = require "netpack"
+require "skynet.manager"
 
 local CMD = {}
 local SOCKET = {}
@@ -15,6 +16,7 @@ end
 local function close_agent(fd)
 	local a = agent[fd]
 	if a then
+		-- The better way is send a message to agent, and let agent exit self.
 		skynet.kill(a)
 		agent[fd] = nil
 	end
