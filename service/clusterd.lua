@@ -20,6 +20,7 @@ local function open_channel(t, key)
 		host = host,
 		port = tonumber(port),
 		response = read_response,
+		nodelay = true,
 	}
 	assert(c:connect(true))
 	t[key] = c
