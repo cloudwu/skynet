@@ -88,7 +88,7 @@ local function verify_domain_name(name)
 	if #name > MAX_DOMAIN_LEN then
 		return false
 	end
-	if not name:match("^[%l%d-%.]+$") then
+	if not name:match("^[_%l%d%-%.]+$") then
 		return false
 	end
 	for w in name:gmatch("([_%w%-]+)%.?") do
