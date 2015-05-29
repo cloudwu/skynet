@@ -4,6 +4,7 @@ local socket = require "socket"
 local sproto = require "sproto"
 local sprotoloader = require "sprotoloader"
 
+local WATCHDOG
 local host
 local send_request
 
@@ -24,6 +25,10 @@ end
 
 function REQUEST:handshake()
 	return { msg = "Welcome to skynet, I will send heartbeat every 5 sec." }
+end
+
+function REQUEST:quit()
+	skynet.call(WATCHDOG, "lua", "close", client_fd)
 end
 
 local function request(name, args, response)
@@ -62,7 +67,10 @@ skynet.register_protocol {
 	end
 }
 
-function CMD.start(gate, fd)
+function CMD.start(conf)
+	local fd = conf.client
+	local gate = conf.gate
+	WATCHDOG = conf.watchdog
 	-- slot 1,2 set at main.lua
 	host = sprotoloader.load(1):host "package"
 	send_request = host:attach(sprotoloader.load(2))
@@ -75,6 +83,11 @@ function CMD.start(gate, fd)
 
 	client_fd = fd
 	skynet.call(gate, "lua", "forward", fd)
+end
+
+function CMD.disconnect()
+	-- todo: do something before exit
+	skynet.exit()
 end
 
 skynet.start(function()

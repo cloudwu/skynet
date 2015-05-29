@@ -30,6 +30,8 @@ set 3 {
 	}
 }
 
+quit 4 {}
+
 ]]
 
 proto.s2c = sprotoparser.parse [[

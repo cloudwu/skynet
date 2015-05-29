@@ -210,6 +210,16 @@ push_more(lua_State *L, int fd, uint8_t *buffer, int size) {
 	}
 }
 
+static void
+close_uncomplete(lua_State *L, int fd) {
+	struct queue *q = lua_touserdata(L,1);
+	struct uncomplete * uc = find_uncomplete(q, fd);
+	if (uc) {
+		skynet_free(uc->pack.buffer);
+		skynet_free(uc);
+	}
+}
+
 static int
 filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 	struct queue *q = lua_touserdata(L,1);
@@ -343,6 +353,8 @@ lfilter(lua_State *L) {
 		// ignore listen fd connect
 		return 1;
 	case SKYNET_SOCKET_TYPE_CLOSE:
+		// no more data in fd (message->id)
+		close_uncomplete(L, message->id);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_CLOSE));
 		lua_pushinteger(L, message->id);
 		return 3;
@@ -353,6 +365,8 @@ lfilter(lua_State *L) {
 		pushstring(L, buffer, size);
 		return 4;
 	case SKYNET_SOCKET_TYPE_ERROR:
+		// no more data in fd (message->id)
+		close_uncomplete(L, message->id);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
 		lua_pushinteger(L, message->id);
 		pushstring(L, buffer, size);

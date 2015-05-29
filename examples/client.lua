@@ -104,7 +104,11 @@ while true do
 	dispatch_package()
 	local cmd = socket.readstdin()
 	if cmd then
-		send_request("get", { what = cmd })
+		if cmd == "quit" then
+			send_request("quit")
+		else
+			send_request("get", { what = cmd })
+		end
 	else
 		socket.usleep(100)
 	end
