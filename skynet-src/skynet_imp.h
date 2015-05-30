@@ -8,6 +8,7 @@ struct skynet_config {
 	const char * module_path;
 	const char * bootstrap;
 	const char * logger;
+	const char * logservice;
 };
 
 #define THREAD_WORKER 0
