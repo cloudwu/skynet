@@ -171,7 +171,7 @@ end
 
 local function adjust_address(address)
 	if address:sub(1,1) ~= ":" then
-		address = tonumber("0x" .. address) | (skynet.harbor(skynet.self()) << 24)
+		address = assert(tonumber("0x" .. address), "Need an address") | (skynet.harbor(skynet.self()) << 24)
 	end
 	return address
 end

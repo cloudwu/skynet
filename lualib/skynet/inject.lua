@@ -44,7 +44,7 @@ return function(skynet, source, filename , ...)
 	if proto then
 		for k,v in pairs(proto) do
 			local name, dispatch = v.name, v.dispatch
-			if name and dispatch then
+			if name and dispatch and not p[name] then
 				local pp = {}
 				p[name] = pp
 				getupvaluetable(pp, dispatch, unique)
