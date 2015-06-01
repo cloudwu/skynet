@@ -174,7 +174,7 @@ function suspend(co, result, command, param, size)
 				-- If the package is too large, returns nil. so we should report error back
 				c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 			end
-		elseif size == nil then
+		elseif size ~= nil then
 			c.trash(param, size)
 			ret = false
 		end
@@ -432,7 +432,7 @@ function skynet.dispatch_unknown_request(unknown)
 end
 
 local function unknown_response(session, address, msg, sz)
-	skynet.error(string.format("Response message :" , c.tostring(msg,sz)))
+	skynet.error(string.format("Response message : %s" , c.tostring(msg,sz)))
 	error(string.format("Unknown session : %d from %x", session, address))
 end
 
@@ -479,7 +479,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			session_coroutine_address[co] = source
 			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
 		else
-			unknown_request(session, source, msg, sz, proto[prototype])
+			unknown_request(session, source, msg, sz, proto[prototype].name)
 		end
 	end
 end
