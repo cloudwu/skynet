@@ -59,6 +59,7 @@ channel_release(struct channel *c) {
 		free(p);
 		p = next;
 	}
+	free(c);
 	return NULL;
 }
 
