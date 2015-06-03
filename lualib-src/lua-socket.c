@@ -190,7 +190,10 @@ pop_lstring(lua_State *L, struct socket_buffer *sb, int sz, int skip) {
 			}
 			break;
 		}
-		luaL_addlstring(&b, current->msg + sb->offset, (sz - skip < bytes) ? sz - skip : bytes);
+		int real_sz = sz - skip;
+		if (real_sz > 0) {
+			luaL_addlstring(&b, current->msg + sb->offset, (real_sz < bytes) ? real_sz : bytes);
+		}
 		return_free_node(L,2,sb);
 		sz-=bytes;
 		if (sz==0)
