@@ -450,6 +450,7 @@ function skynet.fork(func,...)
 		func(tunpack(args))
 	end)
 	table.insert(fork_queue, co)
+	return co
 end
 
 local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
