@@ -82,7 +82,7 @@ skynet_current_handle(void) {
 		void * handle = pthread_getspecific(G_NODE.handle_key);
 		return (uint32_t)(uintptr_t)handle;
 	} else {
-		uintptr_t v = (uint32_t)(-THREAD_MAIN);
+		uint32_t v = (uint32_t)(-THREAD_MAIN);
 		return v;
 	}
 }
