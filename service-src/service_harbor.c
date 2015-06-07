@@ -365,6 +365,7 @@ dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
 	while ((m = pop_queue(queue)) != NULL) {
 		m->header.destination |= (handle & HANDLE_MASK);
 		send_remote(context, fd, m->buffer, m->size, &m->header);
+		skynet_free(m->buffer);
 	}
 }
 
@@ -381,6 +382,7 @@ dispatch_queue(struct harbor *h, int id) {
 	struct harbor_msg * m;
 	while ((m = pop_queue(queue)) != NULL) {
 		send_remote(h->ctx, fd, m->buffer, m->size, &m->header);
+		skynet_free(m->buffer);
 	}
 	release_queue(queue);
 	s->queue = NULL;
