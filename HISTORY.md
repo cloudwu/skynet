@@ -1,3 +1,15 @@
+v1.0.0-alpha7 (2015-6-8)
+-----------
+* console support launch snax service
+* Add cluster.snax
+* Add nodelay in clusterd
+* Merge sproto bugfix patch
+* Move some skynet api into skynet.manager
+* DNS support underscore
+* Add logservice in config file for user defined log service
+* skynet.fork returns coroutine
+* Fix a few of bugs , see the commits log
+
 v1.0.0-alpha6 (2015-5-18)
 -----------
 * bugfix: httpc.get
