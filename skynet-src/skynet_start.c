@@ -112,9 +112,10 @@ thread_timer(void *p) {
 	// wakeup socket thread
 	skynet_socket_exit();
 	// wakeup all worker thread
-	// we don't need lock m before set m->quit, because it can only set once.
+	pthread_mutex_lock(&m->mutex);
 	m->quit = 1;
 	pthread_cond_broadcast(&m->cond);
+	pthread_mutex_unlock(&m->mutex);
 	return NULL;
 }
 
