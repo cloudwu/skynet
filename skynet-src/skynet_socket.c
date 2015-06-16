@@ -107,7 +107,6 @@ skynet_socket_poll() {
 static int
 check_wsz(struct skynet_context *ctx, int id, void *buffer, int64_t wsz) {
 	if (wsz < 0) {
-		skynet_free(buffer);
 		return -1;
 	} else if (wsz > 1024 * 1024) {
 		int kb4 = wsz / 1024 / 4;
