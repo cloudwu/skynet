@@ -1,5 +1,5 @@
 /*
-** $Id: ldump.c,v 2.34 2014/11/02 19:19:04 roberto Exp $
+** $Id: ldump.c,v 2.36 2015/03/30 15:43:51 roberto Exp $
 ** save precompiled Lua chunks
 ** See Copyright Notice in lua.h
 */
@@ -74,19 +74,20 @@ static void DumpString (const TString *s, DumpState *D) {
   if (s == NULL)
     DumpByte(0, D);
   else {
-    size_t size = s->len + 1;  /* include trailing '\0' */
+    size_t size = tsslen(s) + 1;  /* include trailing '\0' */
+    const char *str = getstr(s);
     if (size < 0xFF)
       DumpByte(cast_int(size), D);
     else {
       DumpByte(0xFF, D);
       DumpVar(size, D);
     }
-    DumpVector(getstr(s), size - 1, D);  /* no need to save '\0' */
+    DumpVector(str, size - 1, D);  /* no need to save '\0' */
   }
 }
 
 
-static void DumpCode (const SharedProto *f, DumpState *D) {
+static void DumpCode (const Proto *f, DumpState *D) {
   DumpInt(f->sizecode, D);
   DumpVector(f->code, f->sizecode, D);
 }
@@ -96,7 +97,7 @@ static void DumpFunction(const Proto *f, TString *psource, DumpState *D);
 
 static void DumpConstants (const Proto *f, DumpState *D) {
   int i;
-  int n = f->sp->sizek;
+  int n = f->sizek;
   DumpInt(n, D);
   for (i = 0; i < n; i++) {
     const TValue *o = &f->k[i];
@@ -126,14 +127,14 @@ static void DumpConstants (const Proto *f, DumpState *D) {
 
 static void DumpProtos (const Proto *f, DumpState *D) {
   int i;
-  int n = f->sp->sizep;
+  int n = f->sizep;
   DumpInt(n, D);
   for (i = 0; i < n; i++)
-    DumpFunction(f->p[i], f->sp->source, D);
+    DumpFunction(f->p[i], f->source, D);
 }
 
 
-static void DumpUpvalues (const SharedProto *f, DumpState *D) {
+static void DumpUpvalues (const Proto *f, DumpState *D) {
   int i, n = f->sizeupvalues;
   DumpInt(n, D);
   for (i = 0; i < n; i++) {
@@ -143,7 +144,7 @@ static void DumpUpvalues (const SharedProto *f, DumpState *D) {
 }
 
 
-static void DumpDebug (const SharedProto *f, DumpState *D) {
+static void DumpDebug (const Proto *f, DumpState *D) {
   int i, n;
   n = (D->strip) ? 0 : f->sizelineinfo;
   DumpInt(n, D);
@@ -162,8 +163,7 @@ static void DumpDebug (const SharedProto *f, DumpState *D) {
 }
 
 
-static void DumpFunction (const Proto *fp, TString *psource, DumpState *D) {
-  const SharedProto *f = fp->sp;
+static void DumpFunction (const Proto *f, TString *psource, DumpState *D) {
   if (D->strip || f->source == psource)
     DumpString(NULL, D);  /* no debug info or same source as its parent */
   else
@@ -174,9 +174,9 @@ static void DumpFunction (const Proto *fp, TString *psource, DumpState *D) {
   DumpByte(f->is_vararg, D);
   DumpByte(f->maxstacksize, D);
   DumpCode(f, D);
-  DumpConstants(fp, D);
+  DumpConstants(f, D);
   DumpUpvalues(f, D);
-  DumpProtos(fp, D);
+  DumpProtos(f, D);
   DumpDebug(f, D);
 }
 
@@ -208,7 +208,7 @@ int luaU_dump(lua_State *L, const Proto *f, lua_Writer w, void *data,
   D.strip = strip;
   D.status = 0;
   DumpHeader(&D);
-  DumpByte(f->sp->sizeupvalues, &D);
+  DumpByte(f->sizeupvalues, &D);
   DumpFunction(f, NULL, &D);
   return D.status;
 }

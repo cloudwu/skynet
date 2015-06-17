@@ -1,5 +1,5 @@
 /*
-** $Id: lobject.c,v 2.101 2014/12/26 14:43:45 roberto Exp $
+** $Id: lobject.c,v 2.104 2015/04/11 18:30:08 roberto Exp $
 ** Some generic functions over Lua objects
 ** See Copyright Notice in lua.h
 */
@@ -10,6 +10,8 @@
 #include "lprefix.h"
 
 
+#include <locale.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,8 +41,12 @@ LUAI_DDEF const TValue luaO_nilobject_ = {NILCONSTANT};
 int luaO_int2fb (unsigned int x) {
   int e = 0;  /* exponent */
   if (x < 8) return x;
-  while (x >= 0x10) {
-    x = (x+1) >> 1;
+  while (x >= (8 << 4)) {  /* coarse steps */
+    x = (x + 0xf) >> 4;  /* x = ceil(x / 16) */
+    e += 4;
+  }
+  while (x >= (8 << 1)) {  /* fine steps */
+    x = (x + 1) >> 1;  /* x = ceil(x / 2) */
     e++;
   }
   return ((e+1) << 3) | (cast_int(x) - 8);
@@ -55,8 +61,11 @@ int luaO_fb2int (int x) {
 }
 
 
+/*
+** Computes ceil(log2(x))
+*/
 int luaO_ceillog2 (unsigned int x) {
-  static const lu_byte log_2[256] = {
+  static const lu_byte log_2[256] = {  /* log_2[i] = ceil(log2(i - 1)) */
     0,1,2,2,3,3,3,3,4,4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
     6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
     7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
@@ -149,13 +158,13 @@ void luaO_arith (lua_State *L, int op, const TValue *p1, const TValue *p2,
   }
   /* could not perform raw operation; try metamethod */
   lua_assert(L != NULL);  /* should not fail when folding (compile time) */
-  luaT_trybinTM(L, p1, p2, res, cast(TMS, op - LUA_OPADD + TM_ADD));
+  luaT_trybinTM(L, p1, p2, res, cast(TMS, (op - LUA_OPADD) + TM_ADD));
 }
 
 
 int luaO_hexavalue (int c) {
   if (lisdigit(c)) return c - '0';
-  else return ltolower(c) - 'a' + 10;
+  else return (ltolower(c) - 'a') + 10;
 }
 
 
@@ -172,9 +181,8 @@ static int isneg (const char **s) {
 ** Lua's implementation for 'lua_strx2number'
 ** ===================================================================
 */
-#if !defined(lua_strx2number)
 
-#include <math.h>
+#if !defined(lua_strx2number)
 
 /* maximum number of significant digits to read (to avoid overflows
    even with single floats) */
@@ -185,21 +193,22 @@ static int isneg (const char **s) {
 ** C99 specification for 'strtod'
 */
 static lua_Number lua_strx2number (const char *s, char **endptr) {
+  int dot = lua_getlocaledecpoint();
   lua_Number r = 0.0;  /* result (accumulator) */
   int sigdig = 0;  /* number of significant digits */
   int nosigdig = 0;  /* number of non-significant digits */
   int e = 0;  /* exponent correction */
   int neg;  /* 1 if number is negative */
-  int dot = 0;  /* true after seen a dot */
+  int hasdot = 0;  /* true after seen a dot */
   *endptr = cast(char *, s);  /* nothing is valid yet */
   while (lisspace(cast_uchar(*s))) s++;  /* skip initial spaces */
   neg = isneg(&s);  /* check signal */
   if (!(*s == '0' && (*(s + 1) == 'x' || *(s + 1) == 'X')))  /* check '0x' */
     return 0.0;  /* invalid format (no '0x') */
   for (s += 2; ; s++) {  /* skip '0x' and read numeral */
-    if (*s == '.') {
-      if (dot) break;  /* second dot? stop loop */
-      else dot = 1;
+    if (*s == dot) {
+      if (hasdot) break;  /* second dot? stop loop */
+      else hasdot = 1;
     }
     else if (lisxdigit(cast_uchar(*s))) {
       if (sigdig == 0 && *s == '0')  /* non-significant digit (zero)? */
@@ -207,7 +216,7 @@ static lua_Number lua_strx2number (const char *s, char **endptr) {
       else if (++sigdig <= MAXSIGDIG)  /* can read it without overflow? */
           r = (r * cast_num(16.0)) + luaO_hexavalue(*s);
       else e++; /* too many digits; ignore, but still count for exponent */
-      if (dot) e--;  /* decimal digit? correct exponent */
+      if (hasdot) e--;  /* decimal digit? correct exponent */
     }
     else break;  /* neither a dot nor a digit */
   }
@@ -244,7 +253,7 @@ static const char *l_str2d (const char *s, lua_Number *result) {
     *result = lua_strx2number(s, &endptr);
   else
     *result = lua_str2number(s, &endptr);
-  if (endptr == s) return 0;  /* nothing recognized */
+  if (endptr == s) return NULL;  /* nothing recognized */
   while (lisspace(cast_uchar(*endptr))) endptr++;
   return (*endptr == '\0' ? endptr : NULL);  /* OK if no trailing characters */
 }
@@ -290,7 +299,7 @@ size_t luaO_str2num (const char *s, TValue *o) {
   }
   else
     return 0;  /* conversion failed */
-  return (e - s + 1);  /* success; return string size */
+  return (e - s) + 1;  /* success; return string size */
 }
 
 
@@ -329,7 +338,7 @@ void luaO_tostring (lua_State *L, StkId obj) {
     len = lua_number2str(buff, fltvalue(obj));
 #if !defined(LUA_COMPAT_FLOATSTRING)
     if (buff[strspn(buff, "-0123456789")] == '\0') {  /* looks like an int? */
-      buff[len++] = '.';
+      buff[len++] = lua_getlocaledecpoint();
       buff[len++] = '0';  /* adds '.0' to result */
     }
 #endif

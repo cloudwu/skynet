@@ -1,5 +1,5 @@
 /*
-** $Id: luac.c,v 1.72 2015/01/06 03:09:13 lhf Exp $
+** $Id: luac.c,v 1.75 2015/03/12 01:58:27 lhf Exp $
 ** Lua compiler (saves bytecodes to files; also lists bytecodes)
 ** See Copyright Notice in lua.h
 */
@@ -149,9 +149,9 @@ static const Proto* combine(lua_State* L, int n)
   for (i=0; i<n; i++)
   {
    f->p[i]=toproto(L,i-n-1);
-   if (f->p[i]->sp->sizeupvalues>0) f->p[i]->sp->upvalues[0].instack=0;
+   if (f->p[i]->sizeupvalues>0) f->p[i]->upvalues[0].instack=0;
   }
-  f->sp->sizelineinfo=0;
+  f->sizelineinfo=0;
   return f;
  }
 }
@@ -206,7 +206,7 @@ int main(int argc, char* argv[])
 }
 
 /*
-** $Id: print.c,v 1.76 2015/01/05 16:12:50 lhf Exp $
+** $Id: luac.c,v 1.75 2015/03/12 01:58:27 lhf Exp $
 ** print bytecodes
 ** See Copyright Notice in lua.h
 */
@@ -226,7 +226,7 @@ int main(int argc, char* argv[])
 static void PrintString(const TString* ts)
 {
  const char* s=getstr(ts);
- size_t i,n=ts->len;
+ size_t i,n=tsslen(ts);
  printf("%c",'"');
  for (i=0; i<n; i++)
  {
@@ -282,14 +282,13 @@ static void PrintConstant(const Proto* f, int i)
  }
 }
 
-#define UPVALNAME(x) ((f->sp->upvalues[x].name) ? getstr(f->sp->upvalues[x].name) : "-")
+#define UPVALNAME(x) ((f->upvalues[x].name) ? getstr(f->upvalues[x].name) : "-")
 #define MYK(x)		(-1-(x))
 
 static void PrintCode(const Proto* f)
 {
- const SharedProto *sp = f->sp;
- const Instruction* code=sp->code;
- int pc,n=sp->sizecode;
+ const Instruction* code=f->code;
+ int pc,n=f->sizecode;
  for (pc=0; pc<n; pc++)
  {
   Instruction i=code[pc];
@@ -393,7 +392,7 @@ static void PrintCode(const Proto* f)
 #define SS(x)	((x==1)?"":"s")
 #define S(x)	(int)(x),SS(x)
 
-static void PrintHeader(const SharedProto* f)
+static void PrintHeader(const Proto* f)
 {
  const char* s=f->source ? getstr(f->source) : "=?";
  if (*s=='@' || *s=='=')
@@ -415,9 +414,8 @@ static void PrintHeader(const SharedProto* f)
 
 static void PrintDebug(const Proto* f)
 {
- const SharedProto *sp = f->sp;
  int i,n;
- n=sp->sizek;
+ n=f->sizek;
  printf("constants (%d) for %p:\n",n,VOID(f));
  for (i=0; i<n; i++)
  {
@@ -425,26 +423,26 @@ static void PrintDebug(const Proto* f)
   PrintConstant(f,i);
   printf("\n");
  }
- n=sp->sizelocvars;
+ n=f->sizelocvars;
  printf("locals (%d) for %p:\n",n,VOID(f));
  for (i=0; i<n; i++)
  {
   printf("\t%d\t%s\t%d\t%d\n",
-  i,getstr(sp->locvars[i].varname),sp->locvars[i].startpc+1,sp->locvars[i].endpc+1);
+  i,getstr(f->locvars[i].varname),f->locvars[i].startpc+1,f->locvars[i].endpc+1);
  }
- n=f->sp->sizeupvalues;
+ n=f->sizeupvalues;
  printf("upvalues (%d) for %p:\n",n,VOID(f));
  for (i=0; i<n; i++)
  {
   printf("\t%d\t%s\t%d\t%d\n",
-  i,UPVALNAME(i),sp->upvalues[i].instack,sp->upvalues[i].idx);
+  i,UPVALNAME(i),f->upvalues[i].instack,f->upvalues[i].idx);
  }
 }
 
 static void PrintFunction(const Proto* f, int full)
 {
- int i,n=f->sp->sizep;
- PrintHeader(f->sp);
+ int i,n=f->sizep;
+ PrintHeader(f);
  PrintCode(f);
  if (full) PrintDebug(f);
  for (i=0; i<n; i++) PrintFunction(f->p[i],full);

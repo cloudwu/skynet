@@ -96,52 +96,39 @@ void luaF_close (lua_State *L, StkId level) {
 }
 
 
-Proto *luaF_newproto (lua_State *L, SharedProto *sp) {
+Proto *luaF_newproto (lua_State *L) {
   GCObject *o = luaC_newobj(L, LUA_TPROTO, sizeof(Proto));
   Proto *f = gco2p(o);
-  f->sp = NULL;
   f->k = NULL;
+  f->sizek = 0;
   f->p = NULL;
+  f->sizep = 0;
+  f->code = NULL;
   f->cache = NULL;
-  if (sp == NULL) {
-    sp = luaM_new(L, SharedProto);
-    sp->l_G = G(L);
-    sp->sizek = 0;
-    sp->sizep = 0;
-    sp->code = NULL;
-    sp->sizecode = 0;
-    sp->lineinfo = NULL;
-    sp->sizelineinfo = 0;
-    sp->upvalues = NULL;
-    sp->sizeupvalues = 0;
-    sp->numparams = 0;
-    sp->is_vararg = 0;
-    sp->maxstacksize = 0;
-    sp->locvars = NULL;
-    sp->sizelocvars = 0;
-    sp->linedefined = 0;
-    sp->lastlinedefined = 0;
-    sp->source = NULL;
-  }
-  f->sp = sp;
+  f->sizecode = 0;
+  f->lineinfo = NULL;
+  f->sizelineinfo = 0;
+  f->upvalues = NULL;
+  f->sizeupvalues = 0;
+  f->numparams = 0;
+  f->is_vararg = 0;
+  f->maxstacksize = 0;
+  f->locvars = NULL;
+  f->sizelocvars = 0;
+  f->linedefined = 0;
+  f->lastlinedefined = 0;
+  f->source = NULL;
   return f;
-}
-
-static void freesharedproto (lua_State *L, SharedProto *f) {
-  if (f == NULL || G(L) != f->l_G)
-    return;
-  luaM_freearray(L, f->code, f->sizecode);
-  luaM_freearray(L, f->lineinfo, f->sizelineinfo);
-  luaM_freearray(L, f->locvars, f->sizelocvars);
-  luaM_freearray(L, f->upvalues, f->sizeupvalues);
-  luaM_free(L, f);
 }
 
 
 void luaF_freeproto (lua_State *L, Proto *f) {
-  luaM_freearray(L, f->p, f->sp->sizep);
-  luaM_freearray(L, f->k, f->sp->sizek);
-  freesharedproto(L, f->sp);
+  luaM_freearray(L, f->code, f->sizecode);
+  luaM_freearray(L, f->p, f->sizep);
+  luaM_freearray(L, f->k, f->sizek);
+  luaM_freearray(L, f->lineinfo, f->sizelineinfo);
+  luaM_freearray(L, f->locvars, f->sizelocvars);
+  luaM_freearray(L, f->upvalues, f->sizeupvalues);
   luaM_free(L, f);
 }
 
@@ -150,9 +137,8 @@ void luaF_freeproto (lua_State *L, Proto *f) {
 ** Look for n-th local variable at line 'line' in function 'func'.
 ** Returns NULL if not found.
 */
-const char *luaF_getlocalname (const Proto *fp, int local_number, int pc) {
+const char *luaF_getlocalname (const Proto *f, int local_number, int pc) {
   int i;
-  const SharedProto *f = fp->sp;
   for (i = 0; i<f->sizelocvars && f->locvars[i].startpc <= pc; i++) {
     if (pc < f->locvars[i].endpc) {  /* is variable active? */
       local_number--;

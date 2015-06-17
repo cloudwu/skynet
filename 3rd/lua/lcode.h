@@ -40,7 +40,7 @@ typedef enum BinOpr {
 typedef enum UnOpr { OPR_MINUS, OPR_BNOT, OPR_NOT, OPR_LEN, OPR_NOUNOPR } UnOpr;
 
 
-#define getcode(fs,e)	((fs)->f->sp->code[(e)->u.info])
+#define getcode(fs,e)	((fs)->f->code[(e)->u.info])
 
 #define luaK_codeAsBx(fs,o,A,sBx)	luaK_codeABx(fs,o,A,(sBx)+MAXARG_sBx)
 

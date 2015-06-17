@@ -1,5 +1,5 @@
 /*
-** $Id: ltable.c,v 2.100 2015/01/05 13:52:37 roberto Exp $
+** $Id: ltable.c,v 2.111 2015/06/09 14:21:13 roberto Exp $
 ** Lua tables (hash)
 ** See Copyright Notice in lua.h
 */
@@ -14,8 +14,8 @@
 ** Implementation of tables (aka arrays, objects, or hash tables).
 ** Tables keep its elements in two parts: an array part and a hash part.
 ** Non-negative integer keys are all candidates to be kept in the array
-** part. The actual size of the array is the largest 'n' such that at
-** least half the slots between 0 and n are in use.
+** part. The actual size of the array is the largest 'n' such that
+** more than half the slots between 1 and n are in use.
 ** Hash uses a mix of chained scatter table with Brent's variation.
 ** A main invariant of these tables is that, if an element is not
 ** in its main position (i.e. the 'original' position that its hash gives
@@ -23,9 +23,7 @@
 ** Hence even when the load factor reaches 100%, performance remains good.
 */
 
-#include <float.h>
 #include <math.h>
-#include <string.h>
 #include <limits.h>
 
 #include "lua.h"
@@ -71,7 +69,7 @@
 #define hashmod(t,n)	(gnode(t, ((n) % ((sizenode(t)-1)|1))))
 
 
-#define hashpointer(t,p)	hashmod(t, point2int(p))
+#define hashpointer(t,p)	hashmod(t, point2uint(p))
 
 
 #define dummynode		(&dummynode_)
@@ -85,31 +83,33 @@ static const Node dummynode_ = {
 
 
 /*
-** Checks whether a float has a value representable as a lua_Integer
-** (and does the conversion if so)
+** Hash for floating-point numbers.
+** The main computation should be just
+**     n = frepx(n, &i); return (n * INT_MAX) + i
+** but there are some numerical subtleties.
+** In a two-complement representation, INT_MAX does not has an exact
+** representation as a float, but INT_MIN does; because the absolute
+** value of 'frexp' is smaller than 1 (unless 'n' is inf/NaN), the
+** absolute value of the product 'frexp * -INT_MIN' is smaller or equal
+** to INT_MAX. Next, the use of 'unsigned int' avoids overflows when
+** adding 'i'; the use of '~u' (instead of '-u') avoids problems with
+** INT_MIN.
 */
-static int numisinteger (lua_Number x, lua_Integer *p) {
-  if ((x) == l_floor(x))  /* integral value? */
-    return lua_numbertointeger(x, p);  /* try as an integer */
-  else return 0;
-}
-
-
-/*
-** hash for floating-point numbers
-*/
-static Node *hashfloat (const Table *t, lua_Number n) {
+#if !defined(l_hashfloat)
+static int l_hashfloat (lua_Number n) {
   int i;
-  n = l_mathop(frexp)(n, &i) * cast_num(INT_MAX - DBL_MAX_EXP);
-  i += cast_int(n);
-  if (i < 0) {
-    if (cast(unsigned int, i) == 0u - i)  /* use unsigned to avoid overflows */
-      i = 0;  /* handle INT_MIN */
-    i = -i;  /* must be a positive value */
+  lua_Integer ni;
+  n = l_mathop(frexp)(n, &i) * -cast_num(INT_MIN);
+  if (!lua_numbertointeger(n, &ni)) {  /* is 'n' inf/-inf/NaN? */
+    lua_assert(luai_numisnan(n) || l_mathop(fabs)(n) == HUGE_VAL);
+    return 0;
   }
-  return hashmod(t, i);
+  else {  /* normal case */
+    unsigned int u = cast(unsigned int, i) + cast(unsigned int, ni);
+    return cast_int(u <= cast(unsigned int, INT_MAX) ? u : ~u);
+  }
 }
-
+#endif
 
 
 /*
@@ -121,13 +121,13 @@ static Node *mainposition (const Table *t, const TValue *key) {
     case LUA_TNUMINT:
       return hashint(t, ivalue(key));
     case LUA_TNUMFLT:
-      return hashfloat(t, fltvalue(key));
+      return hashmod(t, l_hashfloat(fltvalue(key)));
     case LUA_TSHRSTR:
       return hashstr(t, tsvalue(key));
     case LUA_TLNGSTR: {
       TString *s = tsvalue(key);
       if (s->extra == 0) {  /* no hash? */
-        s->hash = luaS_hash(getstr(s), s->len, s->hash);
+        s->hash = luaS_hash(getstr(s), s->u.lnglen, s->hash);
         s->extra = 1;  /* now it has its hash */
       }
       return hashstr(t, tsvalue(key));
@@ -219,28 +219,29 @@ int luaH_next (lua_State *L, Table *t, StkId key) {
 /*
 ** Compute the optimal size for the array part of table 't'. 'nums' is a
 ** "count array" where 'nums[i]' is the number of integers in the table
-** between 2^(i - 1) + 1 and 2^i. Put in '*narray' the optimal size, and
-** return the number of elements that will go to that part.
+** between 2^(i - 1) + 1 and 2^i. 'pna' enters with the total number of
+** integer keys in the table and leaves with the number of keys that
+** will go to the array part; return the optimal size.
 */
-static unsigned int computesizes (unsigned int nums[], unsigned int *narray) {
+static unsigned int computesizes (unsigned int nums[], unsigned int *pna) {
   int i;
-  unsigned int twotoi;  /* 2^i */
+  unsigned int twotoi;  /* 2^i (candidate for optimal size) */
   unsigned int a = 0;  /* number of elements smaller than 2^i */
   unsigned int na = 0;  /* number of elements to go to array part */
-  unsigned int n = 0;  /* optimal size for array part */
-  for (i = 0, twotoi = 1; twotoi/2 < *narray; i++, twotoi *= 2) {
+  unsigned int optimal = 0;  /* optimal size for array part */
+  /* loop while keys can fill more than half of total size */
+  for (i = 0, twotoi = 1; *pna > twotoi / 2; i++, twotoi *= 2) {
     if (nums[i] > 0) {
       a += nums[i];
       if (a > twotoi/2) {  /* more than half elements present? */
-        n = twotoi;  /* optimal size (till now) */
-        na = a;  /* all elements up to 'n' will go to array part */
+        optimal = twotoi;  /* optimal size (till now) */
+        na = a;  /* all elements up to 'optimal' will go to array part */
       }
     }
-    if (a == *narray) break;  /* all elements already counted */
   }
-  *narray = n;
-  lua_assert(*narray/2 <= na && na <= *narray);
-  return na;
+  lua_assert((optimal == 0 || optimal / 2 < na) && na <= optimal);
+  *pna = na;
+  return optimal;
 }
 
 
@@ -255,6 +256,11 @@ static int countint (const TValue *key, unsigned int *nums) {
 }
 
 
+/*
+** Count keys in array part of table 't': Fill 'nums[i]' with
+** number of keys that will go into corresponding slice and return
+** total number of non-nil keys.
+*/
 static unsigned int numusearray (const Table *t, unsigned int *nums) {
   int lg;
   unsigned int ttlg;  /* 2^lg */
@@ -281,8 +287,7 @@ static unsigned int numusearray (const Table *t, unsigned int *nums) {
 }
 
 
-static int numusehash (const Table *t, unsigned int *nums,
-                       unsigned int *pnasize) {
+static int numusehash (const Table *t, unsigned int *nums, unsigned int *pna) {
   int totaluse = 0;  /* total number of elements */
   int ause = 0;  /* elements added to 'nums' (can go to array part) */
   int i = sizenode(t);
@@ -293,7 +298,7 @@ static int numusehash (const Table *t, unsigned int *nums,
       totaluse++;
     }
   }
-  *pnasize += ause;
+  *pna += ause;
   return totaluse;
 }
 
@@ -363,7 +368,7 @@ void luaH_resize (lua_State *L, Table *t, unsigned int nasize,
     }
   }
   if (!isdummy(nold))
-    luaM_freearray(L, nold, cast(size_t, twoto(oldhsize))); /* free old array */
+    luaM_freearray(L, nold, cast(size_t, twoto(oldhsize))); /* free old hash */
 }
 
 
@@ -376,21 +381,22 @@ void luaH_resizearray (lua_State *L, Table *t, unsigned int nasize) {
 ** nums[i] = number of keys 'k' where 2^(i - 1) < k <= 2^i
 */
 static void rehash (lua_State *L, Table *t, const TValue *ek) {
-  unsigned int nasize, na;
+  unsigned int asize;  /* optimal size for array part */
+  unsigned int na;  /* number of keys in the array part */
   unsigned int nums[MAXABITS + 1];
   int i;
   int totaluse;
   for (i = 0; i <= MAXABITS; i++) nums[i] = 0;  /* reset counts */
-  nasize = numusearray(t, nums);  /* count keys in array part */
-  totaluse = nasize;  /* all those keys are integer keys */
-  totaluse += numusehash(t, nums, &nasize);  /* count keys in hash part */
+  na = numusearray(t, nums);  /* count keys in array part */
+  totaluse = na;  /* all those keys are integer keys */
+  totaluse += numusehash(t, nums, &na);  /* count keys in hash part */
   /* count extra key */
-  nasize += countint(ek, nums);
+  na += countint(ek, nums);
   totaluse++;
   /* compute new size for array part */
-  na = computesizes(nums, &nasize);
+  asize = computesizes(nums, &na);
   /* resize the table to new computed sizes */
-  luaH_resize(L, t, nasize, totaluse - na);
+  luaH_resize(L, t, asize, totaluse - na);
 }
 
 
@@ -443,14 +449,13 @@ TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
   TValue aux;
   if (ttisnil(key)) luaG_runerror(L, "table index is nil");
   else if (ttisfloat(key)) {
-    lua_Number n = fltvalue(key);
     lua_Integer k;
-    if (luai_numisnan(n))
-      luaG_runerror(L, "table index is NaN");
-    if (numisinteger(n, &k)) {  /* index is int? */
+    if (luaV_tointeger(key, &k, 0)) {  /* index is int? */
       setivalue(&aux, k);
       key = &aux;  /* insert it as an integer */
     }
+    else if (luai_numisnan(fltvalue(key)))
+      luaG_runerror(L, "table index is NaN");
   }
   mp = mainposition(t, key);
   if (!ttisnil(gval(mp)) || isdummy(mp)) {  /* main position is taken? */
@@ -544,10 +549,10 @@ const TValue *luaH_get (Table *t, const TValue *key) {
     case LUA_TNIL: return luaO_nilobject;
     case LUA_TNUMFLT: {
       lua_Integer k;
-      if (numisinteger(fltvalue(key), &k)) /* index is int? */
+      if (luaV_tointeger(key, &k, 0)) /* index is int? */
         return luaH_getint(t, k);  /* use specialized version */
-      /* else go through */
-    }
+      /* else... */
+    }  /* FALLTHROUGH */
     default: {
       Node *n = mainposition(t, key);
       for (;;) {  /* check whether 'key' is somewhere in the chain */

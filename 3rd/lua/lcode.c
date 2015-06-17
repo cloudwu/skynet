@@ -1,5 +1,5 @@
 /*
-** $Id: lcode.c,v 2.99 2014/12/29 16:49:25 roberto Exp $
+** $Id: lcode.c,v 2.101 2015/04/29 18:24:11 roberto Exp $
 ** Code generator for Lua
 ** See Copyright Notice in lua.h
 */
@@ -29,8 +29,8 @@
 #include "lvm.h"
 
 
-/* Maximum number of registers in a Lua function */
-#define MAXREGS		250
+/* Maximum number of registers in a Lua function (must fit in 8 bits) */
+#define MAXREGS		255
 
 
 #define hasjumps(e)	((e)->t != (e)->f)
@@ -55,7 +55,7 @@ void luaK_nil (FuncState *fs, int from, int n) {
   Instruction *previous;
   int l = from + n - 1;  /* last register to set nil */
   if (fs->pc > fs->lasttarget) {  /* no jumps to current position? */
-    previous = &fs->f->sp->code[fs->pc-1];
+    previous = &fs->f->code[fs->pc-1];
     if (GET_OPCODE(*previous) == OP_LOADNIL) {
       int pfrom = GETARG_A(*previous);
       int pl = pfrom + GETARG_B(*previous);
@@ -95,7 +95,7 @@ static int condjump (FuncState *fs, OpCode op, int A, int B, int C) {
 
 
 static void fixjump (FuncState *fs, int pc, int dest) {
-  Instruction *jmp = &fs->f->sp->code[pc];
+  Instruction *jmp = &fs->f->code[pc];
   int offset = dest-(pc+1);
   lua_assert(dest != NO_JUMP);
   if (abs(offset) > MAXARG_sBx)
@@ -115,7 +115,7 @@ int luaK_getlabel (FuncState *fs) {
 
 
 static int getjump (FuncState *fs, int pc) {
-  int offset = GETARG_sBx(fs->f->sp->code[pc]);
+  int offset = GETARG_sBx(fs->f->code[pc]);
   if (offset == NO_JUMP)  /* point to itself represents end of list */
     return NO_JUMP;  /* end of list */
   else
@@ -124,7 +124,7 @@ static int getjump (FuncState *fs, int pc) {
 
 
 static Instruction *getjumpcontrol (FuncState *fs, int pc) {
-  Instruction *pi = &fs->f->sp->code[pc];
+  Instruction *pi = &fs->f->code[pc];
   if (pc >= 1 && testTMode(GET_OPCODE(*(pi-1))))
     return pi-1;
   else
@@ -197,10 +197,10 @@ void luaK_patchclose (FuncState *fs, int list, int level) {
   level++;  /* argument is +1 to reserve 0 as non-op */
   while (list != NO_JUMP) {
     int next = getjump(fs, list);
-    lua_assert(GET_OPCODE(fs->f->sp->code[list]) == OP_JMP &&
-                (GETARG_A(fs->f->sp->code[list]) == 0 ||
-                 GETARG_A(fs->f->sp->code[list]) >= level));
-    SETARG_A(fs->f->sp->code[list], level);
+    lua_assert(GET_OPCODE(fs->f->code[list]) == OP_JMP &&
+                (GETARG_A(fs->f->code[list]) == 0 ||
+                 GETARG_A(fs->f->code[list]) >= level));
+    SETARG_A(fs->f->code[list], level);
     list = next;
   }
 }
@@ -230,13 +230,13 @@ static int luaK_code (FuncState *fs, Instruction i) {
   Proto *f = fs->f;
   dischargejpc(fs);  /* 'pc' will change */
   /* put new instruction in code array */
-  luaM_growvector(fs->ls->L, f->sp->code, fs->pc, f->sp->sizecode, Instruction,
+  luaM_growvector(fs->ls->L, f->code, fs->pc, f->sizecode, Instruction,
                   MAX_INT, "opcodes");
-  f->sp->code[fs->pc] = i;
+  f->code[fs->pc] = i;
   /* save corresponding line information */
-  luaM_growvector(fs->ls->L, f->sp->lineinfo, fs->pc, f->sp->sizelineinfo, int,
+  luaM_growvector(fs->ls->L, f->lineinfo, fs->pc, f->sizelineinfo, int,
                   MAX_INT, "opcodes");
-  f->sp->lineinfo[fs->pc] = fs->ls->lastline;
+  f->lineinfo[fs->pc] = fs->ls->lastline;
   return fs->pc++;
 }
 
@@ -277,10 +277,11 @@ int luaK_codek (FuncState *fs, int reg, int k) {
 
 void luaK_checkstack (FuncState *fs, int n) {
   int newstack = fs->freereg + n;
-  if (newstack > fs->f->sp->maxstacksize) {
+  if (newstack > fs->f->maxstacksize) {
     if (newstack >= MAXREGS)
-      luaX_syntaxerror(fs->ls, "function or expression too complex");
-    fs->f->sp->maxstacksize = cast_byte(newstack);
+      luaX_syntaxerror(fs->ls,
+        "function or expression needs too many registers");
+    fs->f->maxstacksize = cast_byte(newstack);
   }
 }
 
@@ -322,13 +323,13 @@ static int addk (FuncState *fs, TValue *key, TValue *v) {
       return k;  /* reuse index */
   }
   /* constant not found; create a new entry */
-  oldsize = f->sp->sizek;
+  oldsize = f->sizek;
   k = fs->nk;
   /* numerical value does not need GC barrier;
      table has no metatable, so it does not need to invalidate cache */
   setivalue(idx, k);
-  luaM_growvector(L, f->k, k, f->sp->sizek, TValue, MAXARG_Ax, "constants");
-  while (oldsize < f->sp->sizek) setnilvalue(&f->k[oldsize++]);
+  luaM_growvector(L, f->k, k, f->sizek, TValue, MAXARG_Ax, "constants");
+  while (oldsize < f->sizek) setnilvalue(&f->k[oldsize++]);
   setobj(L, &f->k[k], v);
   fs->nk++;
   luaC_barrier(L, f, v);
@@ -573,8 +574,8 @@ int luaK_exp2RK (FuncState *fs, expdesc *e) {
     case VKFLT: {
       e->u.info = luaK_numberK(fs, e->u.nval);
       e->k = VK;
-      /* go through */
     }
+    /* FALLTHROUGH */
     case VK: {
      vk:
       if (e->u.info <= MAXINDEXRK)  /* constant fits in 'argC'? */
@@ -793,7 +794,7 @@ static int constfolding (FuncState *fs, int op, expdesc *e1, expdesc *e2) {
 static void codeexpval (FuncState *fs, OpCode op,
                         expdesc *e1, expdesc *e2, int line) {
   lua_assert(op >= OP_ADD);
-  if (op <= OP_BNOT && constfolding(fs, op - OP_ADD + LUA_OPADD, e1, e2))
+  if (op <= OP_BNOT && constfolding(fs, (op - OP_ADD) + LUA_OPADD, e1, e2))
     return;  /* result has been folded */
   else {
     int o1, o2;
@@ -920,11 +921,11 @@ void luaK_posfix (FuncState *fs, BinOpr op,
       break;
     }
     case OPR_EQ: case OPR_LT: case OPR_LE: {
-      codecomp(fs, cast(OpCode, op - OPR_EQ + OP_EQ), 1, e1, e2);
+      codecomp(fs, cast(OpCode, (op - OPR_EQ) + OP_EQ), 1, e1, e2);
       break;
     }
     case OPR_NE: case OPR_GT: case OPR_GE: {
-      codecomp(fs, cast(OpCode, op - OPR_NE + OP_EQ), 0, e1, e2);
+      codecomp(fs, cast(OpCode, (op - OPR_NE) + OP_EQ), 0, e1, e2);
       break;
     }
     default: lua_assert(0);
@@ -933,7 +934,7 @@ void luaK_posfix (FuncState *fs, BinOpr op,
 
 
 void luaK_fixline (FuncState *fs, int line) {
-  fs->f->sp->lineinfo[fs->pc - 1] = line;
+  fs->f->lineinfo[fs->pc - 1] = line;
 }
 
 

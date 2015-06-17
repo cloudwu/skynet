@@ -1,5 +1,5 @@
 /*
-** $Id: lfunc.h,v 2.14 2014/06/19 18:27:20 roberto Exp $
+** $Id: lfunc.h,v 2.15 2015/01/13 15:49:11 roberto Exp $
 ** Auxiliary functions to manipulate prototypes and closures
 ** See Copyright Notice in lua.h
 */
@@ -23,6 +23,13 @@
 
 
 /*
+** maximum number of upvalues in a closure (both C and Lua). (Value
+** must fit in a VM register.)
+*/
+#define MAXUPVAL	255
+
+
+/*
 ** Upvalues for Lua closures
 */
 struct UpVal {
@@ -40,7 +47,7 @@ struct UpVal {
 #define upisopen(up)	((up)->v != &(up)->u.value)
 
 
-LUAI_FUNC Proto *luaF_newproto (lua_State *L, SharedProto *sp);
+LUAI_FUNC Proto *luaF_newproto (lua_State *L);
 LUAI_FUNC CClosure *luaF_newCclosure (lua_State *L, int nelems);
 LUAI_FUNC LClosure *luaF_newLclosure (lua_State *L, int nelems);
 LUAI_FUNC void luaF_initupvals (lua_State *L, LClosure *cl);

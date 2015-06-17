@@ -1,5 +1,5 @@
 /*
-** $Id: ldebug.c,v 2.110 2015/01/02 12:52:22 roberto Exp $
+** $Id: ldebug.c,v 2.115 2015/05/22 17:45:56 roberto Exp $
 ** Debug Interface
 ** See Copyright Notice in lua.h
 */
@@ -32,6 +32,10 @@
 
 
 #define noLuaClosure(f)		((f) == NULL || (f)->c.tt == LUA_TCCL)
+
+
+/* Active Lua function (given call info) */
+#define ci_func(ci)		(clLvalue((ci)->func))
 
 
 static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name);
@@ -114,15 +118,15 @@ LUA_API int lua_getstack (lua_State *L, int level, lua_Debug *ar) {
 
 
 static const char *upvalname (Proto *p, int uv) {
-  TString *s = check_exp(uv < p->sizeupvalues, p->sp->upvalues[uv].name);
+  TString *s = check_exp(uv < p->sizeupvalues, p->upvalues[uv].name);
   if (s == NULL) return "?";
   else return getstr(s);
 }
 
 
 static const char *findvararg (CallInfo *ci, int n, StkId *pos) {
-  int nparams = clLvalue(ci->func)->p->sp->numparams;
-  if (n >= ci->u.l.base - ci->func - nparams)
+  int nparams = clLvalue(ci->func)->p->numparams;
+  if (n >= cast_int(ci->u.l.base - ci->func) - nparams)
     return NULL;  /* no such vararg */
   else {
     *pos = ci->func + nparams + n;
@@ -168,7 +172,7 @@ LUA_API const char *lua_getlocal (lua_State *L, const lua_Debug *ar, int n) {
       name = luaF_getlocalname(clLvalue(L->top - 1)->p, n, 0);
   }
   else {  /* active function; get information through 'ar' */
-    StkId pos = 0;  /* to avoid warnings */
+    StkId pos = NULL;  /* to avoid warnings */
     name = findlocal(L, ar->i_ci, n, &pos);
     if (name) {
       setobj2s(L, L->top, pos);
@@ -182,7 +186,7 @@ LUA_API const char *lua_getlocal (lua_State *L, const lua_Debug *ar, int n) {
 
 
 LUA_API const char *lua_setlocal (lua_State *L, const lua_Debug *ar, int n) {
-  StkId pos = 0;  /* to avoid warnings */
+  StkId pos = NULL;  /* to avoid warnings */
   const char *name;
   lua_lock(L);
   swapextra(L);
@@ -205,7 +209,7 @@ static void funcinfo (lua_Debug *ar, Closure *cl) {
     ar->what = "C";
   }
   else {
-    SharedProto *p = cl->l.p->sp;
+    Proto *p = cl->l.p;
     ar->source = p->source ? getstr(p->source) : "=?";
     ar->linedefined = p->linedefined;
     ar->lastlinedefined = p->lastlinedefined;
@@ -223,12 +227,12 @@ static void collectvalidlines (lua_State *L, Closure *f) {
   else {
     int i;
     TValue v;
-    int *lineinfo = f->l.p->sp->lineinfo;
+    int *lineinfo = f->l.p->lineinfo;
     Table *t = luaH_new(L);  /* new table to store active lines */
     sethvalue(L, L->top, t);  /* push it on stack */
     api_incr_top(L);
     setbvalue(&v, 1);  /* boolean 'true' to be the value of all indices */
-    for (i = 0; i < f->l.p->sp->sizelineinfo; i++)  /* for all lines with code */
+    for (i = 0; i < f->l.p->sizelineinfo; i++)  /* for all lines with code */
       luaH_setint(L, t, lineinfo[i], &v);  /* table[line] = true */
   }
 }
@@ -254,8 +258,8 @@ static int auxgetinfo (lua_State *L, const char *what, lua_Debug *ar,
           ar->nparams = 0;
         }
         else {
-          ar->isvararg = f->l.p->sp->is_vararg;
-          ar->nparams = f->l.p->sp->numparams;
+          ar->isvararg = f->l.p->is_vararg;
+          ar->nparams = f->l.p->numparams;
         }
         break;
       }
@@ -295,7 +299,7 @@ LUA_API int lua_getinfo (lua_State *L, const char *what, lua_Debug *ar) {
   if (*what == '>') {
     ci = NULL;
     func = L->top - 1;
-    api_check(ttisfunction(func), "function expected");
+    api_check(L, ttisfunction(func), "function expected");
     what++;  /* skip the '>' */
     L->top--;  /* pop function */
   }
@@ -366,7 +370,7 @@ static int findsetreg (Proto *p, int lastpc, int reg) {
   int setreg = -1;  /* keep last instruction that changed 'reg' */
   int jmptarget = 0;  /* any code before this address is conditional */
   for (pc = 0; pc < lastpc; pc++) {
-    Instruction i = p->sp->code[pc];
+    Instruction i = p->code[pc];
     OpCode op = GET_OPCODE(i);
     int a = GETARG_A(i);
     switch (op) {
@@ -416,7 +420,7 @@ static const char *getobjname (Proto *p, int lastpc, int reg,
   /* else try symbolic execution */
   pc = findsetreg(p, lastpc, reg);
   if (pc != -1) {  /* could find instruction? */
-    Instruction i = p->sp->code[pc];
+    Instruction i = p->code[pc];
     OpCode op = GET_OPCODE(i);
     switch (op) {
       case OP_MOVE: {
@@ -442,7 +446,7 @@ static const char *getobjname (Proto *p, int lastpc, int reg,
       case OP_LOADK:
       case OP_LOADKX: {
         int b = (op == OP_LOADK) ? GETARG_Bx(i)
-                                 : GETARG_Ax(p->sp->code[pc + 1]);
+                                 : GETARG_Ax(p->code[pc + 1]);
         if (ttisstring(&p->k[b])) {
           *name = svalue(&p->k[b]);
           return "constant";
@@ -465,7 +469,7 @@ static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name) {
   TMS tm = (TMS)0;  /* to avoid warnings */
   Proto *p = ci_func(ci)->p;  /* calling function */
   int pc = currentpc(ci);  /* calling instruction index */
-  Instruction i = p->sp->code[pc];  /* calling instruction */
+  Instruction i = p->code[pc];  /* calling instruction */
   if (ci->callstatus & CIST_HOOKED) {  /* was it called inside a hook? */
     *name = "?";
     return "hook";
@@ -595,19 +599,16 @@ l_noret luaG_ordererror (lua_State *L, const TValue *p1, const TValue *p2) {
 }
 
 
-static void addinfo (lua_State *L, const char *msg) {
-  CallInfo *ci = L->ci;
-  if (isLua(ci)) {  /* is Lua code? */
-    char buff[LUA_IDSIZE];  /* add file:line information */
-    int line = currentline(ci);
-    TString *src = ci_func(ci)->p->sp->source;
-    if (src)
-      luaO_chunkid(buff, getstr(src), LUA_IDSIZE);
-    else {  /* no source available; use "?" instead */
-      buff[0] = '?'; buff[1] = '\0';
-    }
-    luaO_pushfstring(L, "%s:%d: %s", buff, line, msg);
+/* add src:line information to 'msg' */
+const char *luaG_addinfo (lua_State *L, const char *msg, TString *src,
+                                        int line) {
+  char buff[LUA_IDSIZE];
+  if (src)
+    luaO_chunkid(buff, getstr(src), LUA_IDSIZE);
+  else {  /* no source available; use "?" instead */
+    buff[0] = '?'; buff[1] = '\0';
   }
+  return luaO_pushfstring(L, "%s:%d: %s", buff, line, msg);
 }
 
 
@@ -624,10 +625,14 @@ l_noret luaG_errormsg (lua_State *L) {
 
 
 l_noret luaG_runerror (lua_State *L, const char *fmt, ...) {
+  CallInfo *ci = L->ci;
+  const char *msg;
   va_list argp;
   va_start(argp, fmt);
-  addinfo(L, luaO_pushvfstring(L, fmt, argp));
+  msg = luaO_pushvfstring(L, fmt, argp);  /* format message */
   va_end(argp);
+  if (isLua(ci))  /* if Lua function, add source:line information */
+    luaG_addinfo(L, msg, ci_func(ci)->p->source, currentline(ci));
   luaG_errormsg(L);
 }
 

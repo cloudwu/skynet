@@ -100,7 +100,7 @@ static TString *LoadString (LoadState *S) {
 }
 
 
-static void LoadCode (LoadState *S, SharedProto *f) {
+static void LoadCode (LoadState *S, Proto *f) {
   int n = LoadInt(S);
   f->code = luaM_newvector(S->L, n, Instruction);
   f->sizecode = n;
@@ -115,7 +115,7 @@ static void LoadConstants (LoadState *S, Proto *f) {
   int i;
   int n = LoadInt(S);
   f->k = luaM_newvector(S->L, n, TValue);
-  f->sp->sizek = n;
+  f->sizek = n;
   for (i = 0; i < n; i++)
     setnilvalue(&f->k[i]);
   for (i = 0; i < n; i++) {
@@ -149,17 +149,17 @@ static void LoadProtos (LoadState *S, Proto *f) {
   int i;
   int n = LoadInt(S);
   f->p = luaM_newvector(S->L, n, Proto *);
-  f->sp->sizep = n;
+  f->sizep = n;
   for (i = 0; i < n; i++)
     f->p[i] = NULL;
   for (i = 0; i < n; i++) {
-    f->p[i] = luaF_newproto(S->L, NULL);
-    LoadFunction(S, f->p[i], f->sp->source);
+    f->p[i] = luaF_newproto(S->L);
+    LoadFunction(S, f->p[i], f->source);
   }
 }
 
 
-static void LoadUpvalues (LoadState *S, SharedProto *f) {
+static void LoadUpvalues (LoadState *S, Proto *f) {
   int i, n;
   n = LoadInt(S);
   f->upvalues = luaM_newvector(S->L, n, Upvaldesc);
@@ -173,7 +173,7 @@ static void LoadUpvalues (LoadState *S, SharedProto *f) {
 }
 
 
-static void LoadDebug (LoadState *S, SharedProto *f) {
+static void LoadDebug (LoadState *S, Proto *f) {
   int i, n;
   n = LoadInt(S);
   f->lineinfo = luaM_newvector(S->L, n, int);
@@ -195,8 +195,7 @@ static void LoadDebug (LoadState *S, SharedProto *f) {
 }
 
 
-static void LoadFunction (LoadState *S, Proto *fp, TString *psource) {
-  SharedProto *f = fp->sp;
+static void LoadFunction (LoadState *S, Proto *f, TString *psource) {
   f->source = LoadString(S);
   if (f->source == NULL)  /* no source in dump? */
     f->source = psource;  /* reuse parent's source */
@@ -206,9 +205,9 @@ static void LoadFunction (LoadState *S, Proto *fp, TString *psource) {
   f->is_vararg = LoadByte(S);
   f->maxstacksize = LoadByte(S);
   LoadCode(S, f);
-  LoadConstants(S, fp);
+  LoadConstants(S, f);
   LoadUpvalues(S, f);
-  LoadProtos(S, fp);
+  LoadProtos(S, f);
   LoadDebug(S, f);
 }
 
@@ -269,7 +268,7 @@ LClosure *luaU_undump(lua_State *L, ZIO *Z, Mbuffer *buff,
   cl = luaF_newLclosure(L, LoadByte(&S));
   setclLvalue(L, L->top, cl);
   incr_top(L);
-  cl->p = luaF_newproto(L, NULL);
+  cl->p = luaF_newproto(L);
   LoadFunction(&S, cl->p, NULL);
   lua_assert(cl->nupvalues == cl->p->sizeupvalues);
   luai_verifycode(L, buff, cl->p);
