@@ -63,7 +63,17 @@
 
 #endif
 
+/* Add by skynet */
+lua_State * skynet_sig_L = NULL;
 
+LUA_API void 
+lua_checksig_(lua_State *L) {
+  if (skynet_sig_L == G(L)->mainthread) {
+    skynet_sig_L = NULL;
+    lua_pushnil(L);
+    lua_error(L);
+  }
+}
 
 /*
 ** Try to convert a value to a float. The float case is already handled
@@ -1028,6 +1038,7 @@ void luaV_execute (lua_State *L) {
         vmbreak;
       }
       vmcase(OP_JMP) {
+        lua_checksig(L);
         dojump(ci, i, 0);
         vmbreak;
       }
@@ -1080,6 +1091,7 @@ void luaV_execute (lua_State *L) {
       vmcase(OP_CALL) {
         int b = GETARG_B(i);
         int nresults = GETARG_C(i) - 1;
+        lua_checksig(L);
         if (b != 0) L->top = ra+b;  /* else previous instruction set top */
         if (luaD_precall(L, ra, nresults)) {  /* C function? */
           if (nresults >= 0) L->top = ci->top;  /* adjust results */
@@ -1094,6 +1106,7 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_TAILCALL) {
         int b = GETARG_B(i);
+        lua_checksig(L);
         if (b != 0) L->top = ra+b;  /* else previous instruction set top */
         lua_assert(GETARG_C(i) - 1 == LUA_MULTRET);
         if (luaD_precall(L, ra, LUA_MULTRET))  /* C function? */
@@ -1203,6 +1216,7 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_TFORLOOP) {
         l_tforloop:
+        lua_checksig(L);
         if (!ttisnil(ra + 1)) {  /* continue loop? */
           setobjs2s(L, ra, ra + 1);  /* save control variable */
            ci->u.l.savedpc += GETARG_sBx(i);  /* jump back */
