@@ -404,12 +404,7 @@ typedef struct LocVar {
   int endpc;    /* first point where variable is dead */
 } LocVar;
 
-
-/*
-** Function Prototypes
-*/
-typedef struct Proto {
-  CommonHeader;
+typedef struct SharedProto {
   lu_byte numparams;  /* number of fixed parameters */
   lu_byte is_vararg;
   lu_byte maxstacksize;  /* number of registers needed by this function */
@@ -421,14 +416,23 @@ typedef struct Proto {
   int sizelocvars;
   int linedefined;
   int lastlinedefined;
-  TValue *k;  /* constants used by the function */
+  void *l_G;  /* global state belongs to */
   Instruction *code;  /* opcodes */
-  struct Proto **p;  /* functions defined inside the function */
   int *lineinfo;  /* map from opcodes to source lines (debug information) */
   LocVar *locvars;  /* information about local variables (debug information) */
   Upvaldesc *upvalues;  /* upvalue information */
-  struct LClosure *cache;  /* last-created closure with this prototype */
   TString  *source;  /* used for debug information */
+} SharedProto;
+
+/*
+** Function Prototypes
+*/
+typedef struct Proto {
+  CommonHeader;
+  struct SharedProto *sp;
+  TValue *k;  /* constants used by the function */
+  struct Proto **p;  /* functions defined inside the function */
+  struct LClosure *cache;  /* last-created closure with this prototype */
   GCObject *gclist;
 } Proto;
 

@@ -465,6 +465,20 @@ static lu_mem traversetable (global_State *g, Table *h) {
                          sizeof(Node) * cast(size_t, sizenode(h));
 }
 
+static int marksharedproto (global_State *g, SharedProto *f) {
+  int i;
+  if (g != f->l_G)
+    return 0;
+  markobjectN(g, f->source);
+  for (i = 0; i < f->sizeupvalues; i++)  /* mark upvalue names */
+    markobjectN(g, f->upvalues[i].name);
+  for (i = 0; i < f->sizelocvars; i++)  /* mark local-variable names */
+    markobjectN(g, f->locvars[i].varname);
+  return sizeof(Instruction) * f->sizecode +
+         sizeof(int) * f->sizelineinfo +
+         sizeof(LocVar) * f->sizelocvars +
+         sizeof(Upvaldesc) * f->sizeupvalues;
+}
 
 /*
 ** Traverse a prototype. (While a prototype is being build, its
@@ -475,21 +489,13 @@ static int traverseproto (global_State *g, Proto *f) {
   int i;
   if (f->cache && iswhite(f->cache))
     f->cache = NULL;  /* allow cache to be collected */
-  markobjectN(g, f->source);
-  for (i = 0; i < f->sizek; i++)  /* mark literals */
+  for (i = 0; i < f->sp->sizek; i++)  /* mark literals */
     markvalue(g, &f->k[i]);
-  for (i = 0; i < f->sizeupvalues; i++)  /* mark upvalue names */
-    markobjectN(g, f->upvalues[i].name);
-  for (i = 0; i < f->sizep; i++)  /* mark nested protos */
+  for (i = 0; i < f->sp->sizep; i++)  /* mark nested protos */
     markobjectN(g, f->p[i]);
-  for (i = 0; i < f->sizelocvars; i++)  /* mark local-variable names */
-    markobjectN(g, f->locvars[i].varname);
-  return sizeof(Proto) + sizeof(Instruction) * f->sizecode +
-                         sizeof(Proto *) * f->sizep +
-                         sizeof(TValue) * f->sizek +
-                         sizeof(int) * f->sizelineinfo +
-                         sizeof(LocVar) * f->sizelocvars +
-                         sizeof(Upvaldesc) * f->sizeupvalues;
+  return sizeof(Proto) + sizeof(Proto *) * f->sp->sizep +
+                         sizeof(TValue) * f->sp->sizek +
+                         marksharedproto(g, f->sp);
 }
 
 

@@ -87,7 +87,7 @@ static void DumpString (const TString *s, DumpState *D) {
 }
 
 
-static void DumpCode (const Proto *f, DumpState *D) {
+static void DumpCode (const SharedProto *f, DumpState *D) {
   DumpInt(f->sizecode, D);
   DumpVector(f->code, f->sizecode, D);
 }
@@ -97,7 +97,7 @@ static void DumpFunction(const Proto *f, TString *psource, DumpState *D);
 
 static void DumpConstants (const Proto *f, DumpState *D) {
   int i;
-  int n = f->sizek;
+  int n = f->sp->sizek;
   DumpInt(n, D);
   for (i = 0; i < n; i++) {
     const TValue *o = &f->k[i];
@@ -127,14 +127,14 @@ static void DumpConstants (const Proto *f, DumpState *D) {
 
 static void DumpProtos (const Proto *f, DumpState *D) {
   int i;
-  int n = f->sizep;
+  int n = f->sp->sizep;
   DumpInt(n, D);
   for (i = 0; i < n; i++)
-    DumpFunction(f->p[i], f->source, D);
+    DumpFunction(f->p[i], f->sp->source, D);
 }
 
 
-static void DumpUpvalues (const Proto *f, DumpState *D) {
+static void DumpUpvalues (const SharedProto *f, DumpState *D) {
   int i, n = f->sizeupvalues;
   DumpInt(n, D);
   for (i = 0; i < n; i++) {
@@ -144,7 +144,7 @@ static void DumpUpvalues (const Proto *f, DumpState *D) {
 }
 
 
-static void DumpDebug (const Proto *f, DumpState *D) {
+static void DumpDebug (const SharedProto *f, DumpState *D) {
   int i, n;
   n = (D->strip) ? 0 : f->sizelineinfo;
   DumpInt(n, D);
@@ -163,7 +163,8 @@ static void DumpDebug (const Proto *f, DumpState *D) {
 }
 
 
-static void DumpFunction (const Proto *f, TString *psource, DumpState *D) {
+static void DumpFunction (const Proto *fp, TString *psource, DumpState *D) {
+  const SharedProto *f = fp->sp;
   if (D->strip || f->source == psource)
     DumpString(NULL, D);  /* no debug info or same source as its parent */
   else
@@ -174,9 +175,9 @@ static void DumpFunction (const Proto *f, TString *psource, DumpState *D) {
   DumpByte(f->is_vararg, D);
   DumpByte(f->maxstacksize, D);
   DumpCode(f, D);
-  DumpConstants(f, D);
+  DumpConstants(fp, D);
   DumpUpvalues(f, D);
-  DumpProtos(f, D);
+  DumpProtos(fp, D);
   DumpDebug(f, D);
 }
 
@@ -208,7 +209,7 @@ int luaU_dump(lua_State *L, const Proto *f, lua_Writer w, void *data,
   D.strip = strip;
   D.status = 0;
   DumpHeader(&D);
-  DumpByte(f->sizeupvalues, &D);
+  DumpByte(f->sp->sizeupvalues, &D);
   DumpFunction(f, NULL, &D);
   return D.status;
 }

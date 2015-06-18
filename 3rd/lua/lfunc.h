@@ -47,7 +47,7 @@ struct UpVal {
 #define upisopen(up)	((up)->v != &(up)->u.value)
 
 
-LUAI_FUNC Proto *luaF_newproto (lua_State *L);
+LUAI_FUNC Proto *luaF_newproto (lua_State *L, SharedProto *sp);
 LUAI_FUNC CClosure *luaF_newCclosure (lua_State *L, int nelems);
 LUAI_FUNC LClosure *luaF_newLclosure (lua_State *L, int nelems);
 LUAI_FUNC void luaF_initupvals (lua_State *L, LClosure *cl);
