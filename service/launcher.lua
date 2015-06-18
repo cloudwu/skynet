@@ -6,6 +6,8 @@ local string = string
 local services = {}
 local command = {}
 local instance = {} -- for confirm (function command.LAUNCH / command.ERROR / command.LAUNCHOK)
+local server_status = true -- true : open, false : close
+local need_clean_servers = {} -- when server stop, need clean servers
 
 local function handle_to_address(handle)
 	return tonumber("0x" .. string.sub(handle , 2))
@@ -21,6 +23,14 @@ function command.LIST()
 	return list
 end
 
+function command.CLEAN_LIST()
+	local list = {}
+	for k,v in pairs(need_clean_servers) do
+		list[skynet.address(k)] = v
+	end
+	return list
+end
+
 function command.STAT()
 	local list = {}
 	for k,v in pairs(services) do
@@ -28,6 +38,22 @@ function command.STAT()
 		list[skynet.address(k)] = stat
 	end
 	return list
+end
+
+function command.STOP()
+	for k,v in pairs(need_clean_servers) do
+		skynet.call(k, "lua", "STOP")
+	end
+end
+
+function command.CLEAN_OK()
+	-- kill all server
+	for k,v in pairs(services) do
+		skynet.kill(k)
+		services[k] = nil
+	end
+	core.command("STOPSERVER", "STOP SERVER BY COMMAND")
+	--skynet.exit()
 end
 
 function command.KILL(_, handle)
@@ -68,12 +94,16 @@ function command.REMOVE(_, handle, kill)
 end
 
 local function launch_service(service, ...)
-	local param = table.concat({...}, " ")
+	local param_table = {...}
+	local param = table.concat(param_table, " ")
 	local inst = skynet.launch(service, param)
 	local response = skynet.response()
 	if inst then
 		services[inst] = service .. " " .. param
 		instance[inst] = response
+		if param_table[2] == "need_clean" then
+			need_clean_servers[inst] = service .. " " .. param_table[1]
+		end
 	else
 		response(false)
 		return

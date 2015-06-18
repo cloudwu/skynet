@@ -116,12 +116,16 @@ struct skynet_context *
 skynet_context_new(const char * name, const char *param) {
 	struct skynet_module * mod = skynet_module_query(name);
 
-	if (mod == NULL)
+	if (mod == NULL) {
+		printf(" (mod == NULL)\n");
 		return NULL;
+	}
 
 	void *inst = skynet_module_instance_create(mod);
-	if (inst == NULL)
+	if (inst == NULL) {
+		printf(" (inst == NULL)\n");
 		return NULL;
+	}
 	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
 	CHECKCALLING_INIT(ctx)
 
@@ -162,6 +166,7 @@ skynet_context_new(const char * name, const char *param) {
 		skynet_handle_retire(handle);
 		struct drop_t d = { handle };
 		skynet_mq_release(queue, drop_message, &d);
+		printf("if (r == 1) \n");
 		return NULL;
 	}
 }
@@ -609,6 +614,11 @@ cmd_signal(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+static const char *
+cmd_stopserver(struct skynet_context * context, const char * param) {
+	exit(1);
+}
+
 static struct command_func cmd_funcs[] = {
 	{ "TIMEOUT", cmd_timeout },
 	{ "REG", cmd_reg },
@@ -628,6 +638,7 @@ static struct command_func cmd_funcs[] = {
 	{ "LOGON", cmd_logon },
 	{ "LOGOFF", cmd_logoff },
 	{ "SIGNAL", cmd_signal },
+	{ "STOPSERVER", cmd_stopserver },
 	{ NULL, NULL },
 };
 
