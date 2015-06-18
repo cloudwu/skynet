@@ -116,16 +116,13 @@ struct skynet_context *
 skynet_context_new(const char * name, const char *param) {
 	struct skynet_module * mod = skynet_module_query(name);
 
-	if (mod == NULL) {
-		printf(" (mod == NULL)\n");
+	if (mod == NULL)
 		return NULL;
-	}
 
 	void *inst = skynet_module_instance_create(mod);
-	if (inst == NULL) {
-		printf(" (inst == NULL)\n");
+	if (inst == NULL)
 		return NULL;
-	}
+	
 	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
 	CHECKCALLING_INIT(ctx)
 
@@ -166,7 +163,6 @@ skynet_context_new(const char * name, const char *param) {
 		skynet_handle_retire(handle);
 		struct drop_t d = { handle };
 		skynet_mq_release(queue, drop_message, &d);
-		printf("if (r == 1) \n");
 		return NULL;
 	}
 }
