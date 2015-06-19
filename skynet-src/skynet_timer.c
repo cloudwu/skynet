@@ -117,7 +117,6 @@ move_list(struct timer *T, int level, int idx) {
 
 static void
 timer_shift(struct timer *T) {
-	LOCK(T);
 	int mask = TIME_NEAR;
 	uint32_t ct = ++T->time;
 	if (ct == 0) {
@@ -137,7 +136,6 @@ timer_shift(struct timer *T) {
 			++i;
 		}
 	}
-	UNLOCK(T);
 }
 
 static inline void
@@ -160,7 +158,6 @@ dispatch_list(struct timer_node *current) {
 
 static inline void
 timer_execute(struct timer *T) {
-	LOCK(T);
 	int idx = T->time & TIME_NEAR_MASK;
 	
 	while (T->near[idx].head.next) {
@@ -170,12 +167,12 @@ timer_execute(struct timer *T) {
 		dispatch_list(current);
 		LOCK(T);
 	}
-
-	UNLOCK(T);
 }
 
 static void 
 timer_update(struct timer *T) {
+	LOCK(T);
+
 	// try to dispatch timeout 0 (rare condition)
 	timer_execute(T);
 
@@ -184,6 +181,7 @@ timer_update(struct timer *T) {
 
 	timer_execute(T);
 
+	UNLOCK(T);
 }
 
 static struct timer *
