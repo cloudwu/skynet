@@ -7,7 +7,7 @@ local services = {}
 local command = {}
 local instance = {} -- for confirm (function command.LAUNCH / command.ERROR / command.LAUNCHOK)
 local server_status = true -- true : open, false : close
-local need_clean_servers = {} -- when server stop, need clean servers
+local need_clean_services = {} -- when server stop, need clean services
 
 local function handle_to_address(handle)
 	return tonumber("0x" .. string.sub(handle , 2))
@@ -25,7 +25,7 @@ end
 
 function command.CLEAN_LIST()
 	local list = {}
-	for k,v in pairs(need_clean_servers) do
+	for k,v in pairs(need_clean_services) do
 		list[skynet.address(k)] = v
 	end
 	return list
@@ -41,7 +41,7 @@ function command.STAT()
 end
 
 function command.STOP()
-	for k,v in pairs(need_clean_servers) do
+	for k,v in pairs(need_clean_services) do
 		skynet.call(k, "lua", "STOP")
 	end
 end
@@ -102,7 +102,7 @@ local function launch_service(service, ...)
 		services[inst] = service .. " " .. param
 		instance[inst] = response
 		if param_table[2] == "need_clean" then
-			need_clean_servers[inst] = service .. " " .. param_table[1]
+			need_clean_services[inst] = service .. " " .. param_table[1]
 		end
 	else
 		response(false)
