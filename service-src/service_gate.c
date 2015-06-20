@@ -135,7 +135,7 @@ _ctrl(struct gate * g, const void * msg, int sz) {
 		skynet_socket_start(ctx, g->listen_id);
 		return;
 	}
-        if (memcmp(command, "close", i) == 0) {
+	if (memcmp(command, "close", i) == 0) {
 		if (g->listen_id >= 0) {
 			skynet_socket_close(ctx, g->listen_id);
 			g->listen_id = -1;
