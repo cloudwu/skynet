@@ -131,5 +131,6 @@ clean :
 
 cleanall: clean
 	cd 3rd/jemalloc && $(MAKE) clean
+	cd 3rd/lua && $(MAKE) clean
 	rm -f $(LUA_STATICLIB)
 
