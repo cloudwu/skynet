@@ -1135,9 +1135,8 @@ lobjectid(lua_State *L) {
 		}
 	} else {
 		time_t ti = time(NULL);
-		uint32_t id = oid_counter;
 		// old_counter is a static var, use atom inc.
-		__sync_add_and_fetch(&oid_counter,1);
+		uint32_t id = __sync_fetch_and_add(&oid_counter,1);
 
 		oid[2] = (ti>>24) & 0xff;
 		oid[3] = (ti>>16) & 0xff;
