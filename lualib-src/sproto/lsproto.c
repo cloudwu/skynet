@@ -44,6 +44,10 @@ LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
 // lua_isinteger is lua 5.3 api
 #define lua_isinteger lua_isnumber
 
+// work around , use push & lua_gettable may be better
+#define lua_geti lua_rawgeti
+#define lua_seti lua_rawseti
+
 #endif
 
 static int
@@ -139,7 +143,7 @@ encode(const struct sproto_arg *args) {
 			lua_insert(L, -2);
 			lua_replace(L, self->iter_index);
 		} else {
-			lua_rawgeti(L, self->array_index, args->index);
+			lua_geti(L, self->array_index, args->index);
 		}
 	} else {
 		lua_getfield(L, self->tbl_index, args->tagname);
@@ -350,7 +354,7 @@ decode(const struct sproto_arg *args) {
 				luaL_error(L, "Can't find main index (tag=%d) in [%s]", args->mainindex, args->tagname);
 			}
 			lua_pushvalue(L, sub.result_index);
-			lua_rawset(L, self->array_index);
+			lua_settable(L, self->array_index);
 			lua_settop(L, sub.result_index-1);
 			return 0;
 		} else {
@@ -367,7 +371,7 @@ decode(const struct sproto_arg *args) {
 		luaL_error(L, "Invalid type");
 	}
 	if (args->index > 0) {
-		lua_rawseti(L, self->array_index, args->index);
+		lua_seti(L, self->array_index, args->index);
 	} else {
 		if (self->mainindex_tag == args->tagid) {
 			// This tag is marked, save the value to key_index
