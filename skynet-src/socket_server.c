@@ -687,7 +687,11 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		so.free_func(request->buffer);
 		return -1;
 	}
-	assert(s->type != SOCKET_TYPE_PLISTEN && s->type != SOCKET_TYPE_LISTEN);
+	if (s->type == SOCKET_TYPE_PLISTEN || s->type == SOCKET_TYPE_LISTEN) {
+		fprintf(stderr, "socket-server: write to listen fd %d.\n", id);
+		so.free_func(request->buffer);
+		return -1;
+	}
 	if (send_buffer_empty(s) && s->type == SOCKET_TYPE_CONNECTED) {
 		if (s->protocol == PROTOCOL_TCP) {
 			int n = write(s->fd, so.buffer, so.sz);
@@ -700,6 +704,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 				default:
 					fprintf(stderr, "socket-server: write to %d (fd=%d) error :%s.\n",id,s->fd,strerror(errno));
 					force_close(ss,s,result);
+					so.free_func(request->buffer);
 					return SOCKET_CLOSE;
 				}
 			}
