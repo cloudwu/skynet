@@ -303,7 +303,11 @@ local function wait_for_response(self, response)
 	self.__result_data[co] = nil
 
 	if result == socket_error then
-		error(socket_error)
+		if result_data then
+			error(result_data)
+		else
+			error(socket_error)
+		end
 	else
 		assert(result, result_data)
 		return result_data
