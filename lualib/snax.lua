@@ -5,7 +5,9 @@ local snax = {}
 local typeclass = {}
 
 local interface_g = skynet.getenv("snax_interface_g")
-local G = interface_g and require (interface_g) or { require = function() end }
+local empty_require
+empty_require = function() return empty_require end
+local G = interface_g and require (interface_g) or { require = empty_require }
 interface_g = nil
 
 skynet.register_protocol {
