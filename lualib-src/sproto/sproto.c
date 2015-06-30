@@ -152,7 +152,7 @@ struct_field(const uint8_t * stream, size_t sz) {
 	sz -= header;
 	stream += header;
 	for (i=0;i<fn;i++) {
-		int value= toword(field + i * SIZEOF_FIELD + SIZEOF_HEADER);
+		int value= toword(field + i * SIZEOF_FIELD);
 		uint32_t dsz;
 		if (value != 0)
 			continue;
