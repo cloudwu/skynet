@@ -260,7 +260,7 @@ wb_table(lua_State *L, struct write_block *wb, int index, int depth) {
 	if (index < 0) {
 		index = lua_gettop(L) + index + 1;
 	}
-	if (luaL_getmetafield(L, index, "__pairs")) {
+	if (luaL_getmetafield(L, index, "__pairs") != LUA_TNIL) {
 		uint8_t n = COMBINE_TYPE(TYPE_TABLE, 0);
 		wb_push(wb, &n, 1);
 		lua_pushvalue(L, index);
