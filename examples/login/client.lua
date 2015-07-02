@@ -131,7 +131,7 @@ local text = "echo"
 local index = 1
 
 print("connect")
-local fd = assert(socket.connect("127.0.0.1", 8888))
+fd = assert(socket.connect("127.0.0.1", 8888))
 last = ""
 
 local handshake = string.format("%s@%s#%s:%d", crypt.base64encode(token.user), crypt.base64encode(token.server),crypt.base64encode(subid) , index)
@@ -151,7 +151,7 @@ socket.close(fd)
 index = index + 1
 
 print("connect again")
-local fd = assert(socket.connect("127.0.0.1", 8888))
+fd = assert(socket.connect("127.0.0.1", 8888))
 last = ""
 
 local handshake = string.format("%s@%s#%s:%d", crypt.base64encode(token.user), crypt.base64encode(token.server),crypt.base64encode(subid) , index)
