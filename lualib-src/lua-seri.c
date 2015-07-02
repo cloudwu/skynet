@@ -255,13 +255,38 @@ wb_table_hash(lua_State *L, struct write_block * wb, int index, int depth, int a
 }
 
 static void
+wb_table_metapairs(lua_State *L, struct write_block *wb, int index, int depth) {
+	uint8_t n = COMBINE_TYPE(TYPE_TABLE, 0);
+	wb_push(wb, &n, 1);
+	lua_pushvalue(L, index);
+	lua_call(L, 1, 3);
+	for(;;) {
+		lua_pushvalue(L, -2);
+		lua_pushvalue(L, -2);
+		lua_copy(L, -5, -3);
+		lua_call(L, 2, 2);
+		int type = lua_type(L, -2);
+		if (type == LUA_TNIL)
+			break;
+		pack_one(L, wb, -2, depth);
+		pack_one(L, wb, -1, depth);
+		lua_pop(L, 1);
+	}
+	wb_nil(wb);
+}
+
+static void
 wb_table(lua_State *L, struct write_block *wb, int index, int depth) {
 	luaL_checkstack(L, LUA_MINSTACK, NULL);
 	if (index < 0) {
 		index = lua_gettop(L) + index + 1;
 	}
-	int array_size = wb_table_array(L, wb, index, depth);
-	wb_table_hash(L, wb, index, depth, array_size);
+	if (luaL_getmetafield(L, index, "__pairs") != LUA_TNIL) {
+		wb_table_metapairs(L, wb, index, depth);
+	} else {
+		int array_size = wb_table_array(L, wb, index, depth);
+		wb_table_hash(L, wb, index, depth, array_size);
+	}
 }
 
 static void
