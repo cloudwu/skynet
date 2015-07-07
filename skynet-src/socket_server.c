@@ -1265,7 +1265,7 @@ send_request(struct socket_server *ss, struct request_package *request, char typ
 static int
 open_request(struct socket_server *ss, struct request_package *req, uintptr_t opaque, const char *addr, int port) {
 	int len = strlen(addr);
-	if (len + sizeof(req->u.open) > 256) {
+	if (len + sizeof(req->u.open) >= 256) {
 		fprintf(stderr, "socket-server : Invalid addr %s.\n",addr);
 		return -1;
 	}
