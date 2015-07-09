@@ -487,10 +487,10 @@ lunpack(lua_State *L) {
 		return luaL_error(L, "Invalid unpack stream");
 	if (r > osz) {
 		output = expand_buffer(L, osz, r);
+		r = sproto_unpack(buffer, sz, output, r);
+		if (r < 0)
+			return luaL_error(L, "Invalid unpack stream");
 	}
-	r = sproto_unpack(buffer, sz, output, r);
-	if (r < 0)
-		return luaL_error(L, "Invalid unpack stream");
 	lua_pushlstring(L, output, r);
 	return 1;
 }
