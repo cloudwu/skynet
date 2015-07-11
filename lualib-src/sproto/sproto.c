@@ -83,7 +83,7 @@ static void *
 pool_alloc(struct pool *p, size_t sz) {
 	// align by 8
 	sz = (sz + 7) & ~7;
-	if (sz > CHUNK_SIZE) {
+	if (sz >= CHUNK_SIZE) {
 		return pool_newchunk(p, sz);
 	}
 	if (p->current == NULL) {
@@ -97,7 +97,7 @@ pool_alloc(struct pool *p, size_t sz) {
 		return ret;
 	}
 
-	if (sz > p->current_used) {
+	if (sz >= p->current_used) {
 		return pool_newchunk(p, sz);
 	} else {
 		void * ret = pool_newchunk(p, CHUNK_SIZE);
@@ -305,7 +305,7 @@ import_type(struct sproto *s, struct sproto_type *t, const uint8_t * stream) {
 		if (stream == NULL)
 			return NULL;
 		tag = f->tag;
-		if (tag < last)
+		if (tag <= last)
 			return NULL;	// tag must in ascending order
 		if (tag > last+1) {
 			++maxn;
@@ -394,7 +394,7 @@ create_from_bundle(struct sproto *s, const uint8_t * stream, size_t sz) {
 	const uint8_t * protocoldata = NULL;
 	int fn = struct_field(stream, sz);
 	int i;
-	if (fn < 0)
+	if (fn < 0 || fn > 2)
 		return NULL;
 
 	stream += SIZEOF_HEADER;
