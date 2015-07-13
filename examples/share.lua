@@ -43,7 +43,7 @@ skynet.start(function()
 	for k,v in pairs(nobj) do
 		skynet.error(string.format("nobj[%s]=%s", k,v))
 	end
-	for k,v in ipairs(nobj) do
+	for k,v in ipairs(nobj.b) do
 		skynet.error(string.format("nobj.b[%d]=%s", k,v))
 	end
 
