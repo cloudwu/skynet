@@ -17,6 +17,7 @@ struct snlua {
 // LUA_CACHELIB may defined in patched lua for shared proto
 #ifdef LUA_CACHELIB
 
+LUAMOD_API int luaopen_cache(lua_State *L);
 #define codecache luaopen_cache
 
 #else
