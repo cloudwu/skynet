@@ -62,7 +62,7 @@ function command.listen(source, addr, port)
 end
 
 local function send_request(source, node, addr, msg, sz)
-	local session = node_session[node]
+	local session = node_session[node] or 1
 	-- msg is a local pointer, cluster.packrequest will free it
 	local request, new_session = cluster.packrequest(addr, session, msg, sz)
 	local c = node_channel[node]
