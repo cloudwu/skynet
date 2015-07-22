@@ -74,8 +74,9 @@ lpackrequest(lua_State *L) {
 		return luaL_error(L, "Invalid request message");
 	}
 	size_t sz = (size_t)luaL_checkinteger(L,4);
-	int session = luaL_checkinteger(L,2);
+	int session = luaL_optinteger(L,2,1);	// new connection start with 1
 	if (session <= 0) {
+		skynet_free(msg);
 		return luaL_error(L, "Invalid request session %d", session);
 	}
 	int addr_type = lua_type(L,1);
