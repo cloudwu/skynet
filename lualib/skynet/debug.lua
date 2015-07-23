@@ -63,6 +63,10 @@ function dbgcmd.REMOTEDEBUG(...)
 	remotedebug.start(export, ...)
 end
 
+function dbgcmd.SUPPORT(pname)
+	return skynet.ret(skynet.pack(skynet.dispatch(pname) ~= nil))
+end
+
 local function _debug_dispatch(session, address, cmd, ...)
 	local f = dbgcmd[cmd]
 	assert(f, cmd)
