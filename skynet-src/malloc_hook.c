@@ -2,6 +2,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <lua.h>
 
 #include "malloc_hook.h"
 #include "skynet.h"
@@ -223,4 +224,18 @@ skynet_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
 	} else {
 		return skynet_realloc(ptr, nsize);
 	}
+}
+
+int
+dump_mem_lua(lua_State *L) {
+	int i;
+	lua_newtable(L);
+	for(i=0; i<SLOT_SIZE; i++) {
+		mem_data* data = &mem_stats[i];
+		if(data->handle != 0 && data->allocated != 0) {
+			lua_pushinteger(L, data->allocated);
+			lua_rawseti(L, -2, (lua_Integer)data->handle);
+		}
+	}
+	return 1;
 }
