@@ -218,6 +218,7 @@ skynet_strdup(const char *str) {
 
 void * 
 skynet_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+	printf("%p osize = %d nsize = %d\n", ptr, (int)osize, (int)nsize);
 	if (nsize == 0) {
 		skynet_free(ptr);
 		return NULL;

@@ -12,6 +12,7 @@
 struct snlua {
 	lua_State * L;
 	struct skynet_context * ctx;
+	FILE *f;
 };
 
 // LUA_CACHELIB may defined in patched lua for shared proto
@@ -143,17 +144,35 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	return 0;
 }
 
+static void * 
+lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+	struct snlua * l = ud;
+	if (l->f) {
+		fprintf(l->f, "%p %d %d\n", ptr, (int)osize, (int)nsize);
+	}
+	if (nsize == 0) {
+		skynet_free(ptr);
+		return NULL;
+	} else {
+		return skynet_realloc(ptr, nsize);
+	}
+}
+
 struct snlua *
 snlua_create(void) {
 	struct snlua * l = skynet_malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
-	l->L = lua_newstate(skynet_lalloc, NULL);
+	char tmp[L_tmpnam];
+	l->f = fopen(tmpnam(tmp),"wb");
+//	printf("%s\n", tmp);
+	l->L = lua_newstate(lalloc, l);
 	return l;
 }
 
 void
 snlua_release(struct snlua *l) {
 	lua_close(l->L);
+	fclose(l->f);
 	skynet_free(l);
 }
 
