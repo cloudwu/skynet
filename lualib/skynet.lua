@@ -415,9 +415,13 @@ function skynet.wakeup(co)
 end
 
 function skynet.dispatch(typename, func)
-	local p = assert(proto[typename],tostring(typename))
-	assert(p.dispatch == nil, tostring(typename))
-	p.dispatch = func
+	local p = proto[typename]
+	if func then
+		assert(p and (p.dispatch == nil), tostring(typename))
+		p.dispatch = func
+	else
+		return p and p.dispatch
+	end
 end
 
 local function unknown_request(session, address, msg, sz, prototype)
@@ -466,7 +470,15 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			suspend(co, coroutine.resume(co, true, msg, sz))
 		end
 	else
-		local p = assert(proto[prototype], prototype)
+		local p = proto[prototype]
+		if p == nil then
+			if session ~= 0 then
+				c.send(source, skynet.PTYPE_ERROR, session, "")
+			else
+				unknown_request(session, source, msg, sz, prototype)
+			end
+			return
+		end
 		local f = p.dispatch
 		if f then
 			local ref = watching_service[source]

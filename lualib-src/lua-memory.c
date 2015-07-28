@@ -42,6 +42,7 @@ luaopen_memory(lua_State *L) {
 		{ "block", lblock },
 		{ "dumpinfo", ldumpinfo },
 		{ "dump", ldump },
+		{ "info", dump_mem_lua },
 		{ NULL, NULL },
 	};
 

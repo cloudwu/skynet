@@ -24,7 +24,6 @@ local function open_channel(t, key)
 	}
 	assert(c:connect(true))
 	t[key] = c
-	node_session[key] = 1
 	return c
 end
 
@@ -63,11 +62,11 @@ function command.listen(source, addr, port)
 end
 
 local function send_request(source, node, addr, msg, sz)
-	local request
-	local c = node_channel[node]
-	local session = node_session[node]
+	local session = node_session[node] or 1
 	-- msg is a local pointer, cluster.packrequest will free it
-	request, node_session[node] = cluster.packrequest(addr, session , msg, sz)
+	local request, new_session = cluster.packrequest(addr, session, msg, sz)
+	local c = node_channel[node]
+	node_session[node] = new_session
 
 	return c:request(request, session)
 end
