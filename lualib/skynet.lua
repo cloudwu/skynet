@@ -417,8 +417,9 @@ end
 function skynet.dispatch(typename, func)
 	local p = proto[typename]
 	if func then
-		assert(p and (p.dispatch == nil), tostring(typename))
+		local ret = p.dispatch
 		p.dispatch = func
+		return ret
 	else
 		return p and p.dispatch
 	end
