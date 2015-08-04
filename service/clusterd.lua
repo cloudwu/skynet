@@ -65,8 +65,10 @@ local function send_request(source, node, addr, msg, sz)
 	local session = node_session[node] or 1
 	-- msg is a local pointer, cluster.packrequest will free it
 	local request, new_session = cluster.packrequest(addr, session, msg, sz)
-	local c = node_channel[node]
 	node_session[node] = new_session
+
+	-- node_channel[node] may yield or throw error
+	local c = node_channel[node]
 
 	return c:request(request, session)
 end
