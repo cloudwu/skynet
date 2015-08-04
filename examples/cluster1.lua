@@ -6,6 +6,7 @@ local snax = require "snax"
 skynet.start(function()
 	local sdb = skynet.newservice("simpledb")
 	skynet.name(".simpledb", sdb)
+
 	print(skynet.call(".simpledb", "lua", "SET", "a", "foobar"))
 	print(skynet.call(".simpledb", "lua", "SET", "b", "foobar2"))
 	print(skynet.call(".simpledb", "lua", "GET", "a"))
