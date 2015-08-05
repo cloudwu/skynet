@@ -146,7 +146,7 @@ dispatch_list(struct timer_node *current) {
 		message.source = 0;
 		message.session = event->session;
 		message.data = NULL;
-		message.sz = (size_t)MESSAGE_TYPE_SHIFT << MESSAGE_TYPE_SHIFT;
+		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
 
 		skynet_context_push(event->handle, &message);
 		
