@@ -1,6 +1,8 @@
 #include "skynet.h"
 #include "skynet_harbor.h"
 #include "skynet_server.h"
+#include "skynet_mq.h"
+#include "skynet_handle.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -11,8 +13,8 @@ static unsigned int HARBOR = ~0;
 
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
-	int type = rmsg->sz >> HANDLE_REMOTE_SHIFT;
-	rmsg->sz &= HANDLE_MASK;
+	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
+	rmsg->sz &= MESSAGE_TYPE_MASK;
 	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR && REMOTE);
 	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg) , source, type , session);
 }

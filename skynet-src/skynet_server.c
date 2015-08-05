@@ -246,8 +246,8 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	assert(ctx->init);
 	CHECKCALLING_BEGIN(ctx)
 	pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx->handle));
-	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
-	size_t sz = msg->sz & HANDLE_MASK;
+	int type = msg->sz >> MESSAGE_TYPE_SHIFT;
+	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
 	if (ctx->logfile) {
 		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
 	}
@@ -662,13 +662,13 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 		*data = msg;
 	}
 
-	*sz |= type << HANDLE_REMOTE_SHIFT;
+	*sz |= (size_t)type << MESSAGE_TYPE_SHIFT;
 }
 
 int
 skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
-	if ((sz & HANDLE_MASK) != sz) {
-		skynet_error(context, "The message to %x is too large (sz = %lu)", destination, sz);
+	if ((sz & MESSAGE_TYPE_MASK) != sz) {
+		skynet_error(context, "The message to %x is too large", destination);
 		skynet_free(data);
 		return -1;
 	}
@@ -751,7 +751,7 @@ skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t
 	smsg.source = source;
 	smsg.session = session;
 	smsg.data = msg;
-	smsg.sz = sz | type << HANDLE_REMOTE_SHIFT;
+	smsg.sz = sz | (size_t)type << MESSAGE_TYPE_SHIFT;
 
 	skynet_mq_push(ctx->queue, &smsg);
 }
