@@ -88,7 +88,7 @@ packreq_number(lua_State *L, int session, void * msg, uint32_t sz) {
 	} else {
 		int part = (sz - 1) / MULTI_PART + 1;
 		fill_header(L, buf, 13, msg);
-		buf[2] = 0x80;
+		buf[2] = 1;
 		fill_uint32(buf+3, addr);
 		fill_uint32(buf+7, (uint32_t)session);
 		fill_uint32(buf+11, sz);
