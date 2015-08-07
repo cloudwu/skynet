@@ -228,6 +228,7 @@ function COMMAND.debug(address, fd)
 	skynet.fork(function()
 		repeat
 			local cmdline = socket.readline(fd, "\n")
+            cmdline = cmdline:gsub("(.*)\r$", "%1")
 			if not cmdline then
 				skynet.send(agent, "lua", "cmd", "cont")
 				break
