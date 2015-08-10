@@ -248,18 +248,16 @@ function suspend(co, result, command, param, size)
 end
 
 function skynet.timeout(ti, func)
-	local session = c.command("TIMEOUT",tostring(ti))
+	local session = c.intcommand("TIMEOUT",ti)
 	assert(session)
-	session = tonumber(session)
 	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
 end
 
 function skynet.sleep(ti)
-	local session = c.command("TIMEOUT",tostring(ti))
+	local session = c.intcommand("TIMEOUT",ti)
 	assert(session)
-	session = tonumber(session)
 	local succ, ret = coroutine_yield("SLEEP", session)
 	sleep_session[coroutine.running()] = nil
 	if succ then
@@ -301,11 +299,11 @@ function skynet.localname(name)
 end
 
 function skynet.now()
-	return tonumber(c.command("NOW"))
+	return c.intcommand("NOW")
 end
 
 function skynet.starttime()
-	return tonumber(c.command("STARTTIME"))
+	return c.intcommand("STARTTIME")
 end
 
 function skynet.time()
@@ -643,7 +641,7 @@ function skynet.endless()
 end
 
 function skynet.mqlen()
-	return tonumber(c.command "MQLEN")
+	return c.intcommand "MQLEN"
 end
 
 function skynet.task(ret)
