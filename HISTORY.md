@@ -1,3 +1,12 @@
+v1.0.0-alpha9 (2015-8-10)
+-----------
+* Improve lua serialization , support pairs metamethod.
+* Bugfix : sproto (See commits log of sproto)
+* Add user log service support (In config)
+* Remove the size limit of cluster RPC message.
+* Remove the size limit of local message.
+* Other minor bugfix (See commits log)
+
 v1.0.0-alpha8 (2015-6-29)
 -----------
 * Update lua 5.3.1
