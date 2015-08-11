@@ -1,6 +1,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "skynet.h"
 
@@ -28,10 +29,7 @@ fill_uint32(uint8_t * buf, uint32_t n) {
 
 static void
 fill_header(lua_State *L, uint8_t *buf, int sz, void *msg) {
-	if (sz >= 0x10000) {
-		skynet_free(msg);
-		luaL_error(L, "request message is too long %d", sz);
-	}
+	assert(sz < 0x10000);
 	buf[0] = (sz >> 8) & 0xff;
 	buf[1] = sz & 0xff;
 }
