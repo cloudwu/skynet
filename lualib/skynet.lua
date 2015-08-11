@@ -271,7 +271,7 @@ function skynet.sleep(ti)
 end
 
 function skynet.yield()
-	return skynet.sleep("0")
+	return skynet.sleep(0)
 end
 
 function skynet.wait()

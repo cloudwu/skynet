@@ -32,6 +32,11 @@ function SOCKET.error(fd, msg)
 	close_agent(fd)
 end
 
+function SOCKET.warning(fd, size)
+	-- size K bytes havn't send out in fd
+	print("socket warning", fd, size)
+end
+
 function SOCKET.data(fd, msg)
 end
 

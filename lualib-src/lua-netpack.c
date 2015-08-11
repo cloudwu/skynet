@@ -19,6 +19,7 @@
 #define TYPE_ERROR 3
 #define TYPE_OPEN 4
 #define TYPE_CLOSE 5
+#define TYPE_WARNING 6
 
 /*
 	Each package is uint16 + data , uint16 (serialized in big-endian) is the number of bytes comprising the data .
@@ -371,6 +372,11 @@ lfilter(lua_State *L) {
 		lua_pushinteger(L, message->id);
 		pushstring(L, buffer, size);
 		return 4;
+	case SKYNET_SOCKET_TYPE_WARNING:
+		lua_pushvalue(L, lua_upvalueindex(TYPE_WARNING));
+		lua_pushinteger(L, message->id);
+		lua_pushinteger(L, message->ud);
+		return 4;
 	default:
 		// never get here
 		return 1;
@@ -537,8 +543,9 @@ luaopen_netpack(lua_State *L) {
 	lua_pushliteral(L, "error");
 	lua_pushliteral(L, "open");
 	lua_pushliteral(L, "close");
+	lua_pushliteral(L, "warning");
 
-	lua_pushcclosure(L, lfilter, 5);
+	lua_pushcclosure(L, lfilter, 6);
 	lua_setfield(L, -2, "filter");
 
 	return 1;

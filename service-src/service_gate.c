@@ -262,6 +262,9 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 			skynet_socket_start(ctx, message->ud);
 		}
 		break;
+	case SKYNET_SOCKET_TYPE_WARNING:
+		skynet_error(ctx, "fd (%d) send buffer (%d)K", message->id, message->ud);
+		break;
 	}
 }
 

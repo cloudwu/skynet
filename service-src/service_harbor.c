@@ -662,6 +662,13 @@ mainloop(struct skynet_context * context, void * ud, int type, int session, uint
 		case SKYNET_SOCKET_TYPE_CONNECT:
 			// fd forward to this service
 			break;
+		case SKYNET_SOCKET_TYPE_WARNING: {
+			int id = harbor_id(h, message->id);
+			if (id) {
+				skynet_error(context, "message havn't send to Harbor (%d) reach %d K", id, message->ud);
+			}
+			break;
+		}
 		default:
 			skynet_error(context, "recv invalid socket message type %d", type);
 			break;

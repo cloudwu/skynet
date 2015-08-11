@@ -109,10 +109,13 @@ check_wsz(struct skynet_context *ctx, int id, void *buffer, int64_t wsz) {
 	if (wsz < 0) {
 		return -1;
 	} else if (wsz > 1024 * 1024) {
-		int kb4 = wsz / 1024 / 4;
-		if (kb4 % 256 == 0) {
-			skynet_error(ctx, "%d Mb bytes on socket %d need to send out", (int)(wsz / (1024 * 1024)), id);
-		}
+		struct skynet_socket_message tmp;
+		tmp.type = SKYNET_SOCKET_TYPE_WARNING;
+		tmp.id = id;
+		tmp.ud = (int)(wsz / 1024);
+		tmp.buffer = NULL;
+		skynet_send(ctx, 0, skynet_context_handle(ctx), PTYPE_SOCKET, 0 , &tmp, sizeof(tmp));
+//		skynet_error(ctx, "%d Mb bytes on socket %d need to send out", (int)(wsz / (1024 * 1024)), id);
 	}
 	return 0;
 }
