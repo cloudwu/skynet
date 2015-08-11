@@ -146,7 +146,7 @@ dispatch_list(struct timer_node *current) {
 		message.source = 0;
 		message.session = event->session;
 		message.data = NULL;
-		message.sz = PTYPE_RESPONSE << HANDLE_REMOTE_SHIFT;
+		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
 
 		skynet_context_push(event->handle, &message);
 		
@@ -214,7 +214,7 @@ skynet_timeout(uint32_t handle, int time, int session) {
 		message.source = 0;
 		message.session = session;
 		message.data = NULL;
-		message.sz = PTYPE_RESPONSE << HANDLE_REMOTE_SHIFT;
+		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
 
 		if (skynet_context_push(handle, &message)) {
 			return -1;

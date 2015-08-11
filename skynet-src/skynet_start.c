@@ -8,6 +8,7 @@
 #include "skynet_monitor.h"
 #include "skynet_socket.h"
 #include "skynet_daemon.h"
+#include "skynet_harbor.h"
 
 #include <pthread.h>
 #include <unistd.h>

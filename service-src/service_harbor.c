@@ -1,6 +1,7 @@
 #include "skynet.h"
 #include "skynet_harbor.h"
 #include "skynet_socket.h"
+#include "skynet_handle.h"
 
 /*
 	harbor listen the PTYPE_HARBOR (in text)
@@ -323,9 +324,13 @@ forward_local_messsage(struct harbor *h, void *msg, int sz) {
 
 static void
 send_remote(struct skynet_context * ctx, int fd, const char * buffer, size_t sz, struct remote_message_header * cookie) {
-	uint32_t sz_header = sz+sizeof(*cookie);
+	size_t sz_header = sz+sizeof(*cookie);
+	if (sz_header > UINT32_MAX) {
+		skynet_error(ctx, "remote message from :%08x to :%08x is too large.", cookie->source, cookie->destination);
+		return;
+	}
 	uint8_t * sendbuf = skynet_malloc(sz_header+4);
-	to_bigendian(sendbuf, sz_header);
+	to_bigendian(sendbuf, (uint32_t)sz_header);
 	memcpy(sendbuf+4, buffer, sz);
 	header_to_message(cookie, sendbuf+4+sz);
 

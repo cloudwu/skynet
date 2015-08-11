@@ -11,7 +11,7 @@ local command = {}
 local function read_response(sock)
 	local sz = socket.header(sock:read(2))
 	local msg = sock:read(sz)
-	return cluster.unpackresponse(msg)	-- session, ok, data
+	return cluster.unpackresponse(msg)	-- session, ok, data, padding
 end
 
 local function open_channel(t, key)
@@ -64,19 +64,23 @@ end
 local function send_request(source, node, addr, msg, sz)
 	local session = node_session[node] or 1
 	-- msg is a local pointer, cluster.packrequest will free it
-	local request, new_session = cluster.packrequest(addr, session, msg, sz)
+	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
 	node_session[node] = new_session
 
 	-- node_channel[node] may yield or throw error
 	local c = node_channel[node]
 
-	return c:request(request, session)
+	return c:request(request, session, padding)
 end
 
 function command.req(...)
 	local ok, msg, sz = pcall(send_request, ...)
 	if ok then
-		skynet.ret(msg, sz)
+		if type(msg) == "table" then
+			skynet.ret(cluster.concat(msg))
+		else
+			skynet.ret(msg)
+		end
 	else
 		skynet.error(msg)
 		skynet.response()(false)
@@ -93,23 +97,51 @@ function command.proxy(source, node, name)
 	skynet.ret(skynet.pack(proxy[fullname]))
 end
 
-local request_fd = {}
+local large_request = {}
 
 function command.socket(source, subcmd, fd, msg)
 	if subcmd == "data" then
-		local addr, session, msg = cluster.unpackrequest(msg)
-		local ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg)
+		local sz
+		local addr, session, msg, padding = cluster.unpackrequest(msg)
+		if padding then
+			local req = large_request[session] or { addr = addr }
+			large_request[session] = req
+			table.insert(req, msg)
+			return
+		else
+			local req = large_request[session]
+			if req then
+				large_request[session] = nil
+				table.insert(req, msg)
+				msg,sz = cluster.concat(req)
+				addr = req.addr
+			end
+			if not msg then
+				local response = cluster.packresponse(session, false, "Invalid large req")
+				socket.write(fd, response)
+				return
+			end
+		end
+		local ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
 		local response
 		if ok then
 			response = cluster.packresponse(session, true, msg, sz)
+			if type(response) == "table" then
+				for _, v in ipairs(response) do
+					socket.lwrite(fd, v)
+				end
+			else
+				socket.write(fd, response)
+			end
 		else
 			response = cluster.packresponse(session, false, msg)
+			socket.write(fd, response)
 		end
-		socket.write(fd, response)
 	elseif subcmd == "open" then
 		skynet.error(string.format("socket accept from %s", msg))
 		skynet.call(source, "lua", "accept", fd)
 	else
+		large_request = {}
 		skynet.error(string.format("socket %s %d : %s", subcmd, fd, msg))
 	end
 end
