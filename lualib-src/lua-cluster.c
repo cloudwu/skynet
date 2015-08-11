@@ -28,7 +28,7 @@ fill_uint32(uint8_t * buf, uint32_t n) {
 }
 
 static void
-fill_header(lua_State *L, uint8_t *buf, int sz, void *msg) {
+fill_header(lua_State *L, uint8_t *buf, int sz) {
 	assert(sz < 0x10000);
 	buf[0] = (sz >> 8) & 0xff;
 	buf[1] = sz & 0xff;
@@ -75,7 +75,7 @@ packreq_number(lua_State *L, int session, void * msg, uint32_t sz) {
 	uint32_t addr = (uint32_t)lua_tointeger(L,1);
 	uint8_t buf[TEMP_LENGTH];
 	if (sz < MULTI_PART) {
-		fill_header(L, buf, sz+9, msg);
+		fill_header(L, buf, sz+9);
 		buf[2] = 0;
 		fill_uint32(buf+3, addr);
 		fill_uint32(buf+7, (uint32_t)session);
@@ -85,7 +85,7 @@ packreq_number(lua_State *L, int session, void * msg, uint32_t sz) {
 		return 0;
 	} else {
 		int part = (sz - 1) / MULTI_PART + 1;
-		fill_header(L, buf, 13, msg);
+		fill_header(L, buf, 13);
 		buf[2] = 1;
 		fill_uint32(buf+3, addr);
 		fill_uint32(buf+7, (uint32_t)session);
@@ -106,7 +106,7 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 
 	uint8_t buf[TEMP_LENGTH];
 	if (sz < MULTI_PART) {
-		fill_header(L, buf, sz+6+namelen, msg);
+		fill_header(L, buf, sz+6+namelen);
 		buf[2] = 0x80;
 		buf[3] = (uint8_t)namelen;
 		memcpy(buf+4, name, namelen);
@@ -117,7 +117,7 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 		return 0;
 	} else {
 		int part = (sz - 1) / MULTI_PART + 1;
-		fill_header(L, buf, 10+namelen, msg);
+		fill_header(L, buf, 10+namelen);
 		buf[2] = 0x81;
 		buf[3] = (uint8_t)namelen;
 		memcpy(buf+4, name, namelen);
@@ -144,7 +144,7 @@ packreq_multi(lua_State *L, int session, void * msg, uint32_t sz) {
 			s = sz;
 			buf[2] = 3;	// the last multi part
 		}
-		fill_header(L, buf, s+5, msg);
+		fill_header(L, buf, s+5);
 		fill_uint32(buf+3, (uint32_t)session);
 		memcpy(buf+7, ptr, s);
 		lua_pushlstring(L, (const char *)buf, s+7);
@@ -356,7 +356,7 @@ lpackresponse(lua_State *L) {
 			uint8_t buf[TEMP_LENGTH];
 
 			// multi part begin
-			fill_header(L, buf, 9, msg);
+			fill_header(L, buf, 9);
 			fill_uint32(buf+2, session);
 			buf[6] = 2;
 			fill_uint32(buf+7, (uint32_t)sz);
@@ -374,7 +374,7 @@ lpackresponse(lua_State *L) {
 					s = sz;
 					buf[6] = 4;
 				}
-				fill_header(L, buf, s+5, msg);
+				fill_header(L, buf, s+5);
 				fill_uint32(buf+2, session);
 				memcpy(buf+7,ptr,s);
 				lua_pushlstring(L, (const char *)buf, s+7);
@@ -387,7 +387,7 @@ lpackresponse(lua_State *L) {
 	}
 
 	uint8_t buf[TEMP_LENGTH];
-	fill_header(L, buf, sz+5, msg);
+	fill_header(L, buf, sz+5);
 	fill_uint32(buf+2, session);
 	buf[6] = ok;
 	memcpy(buf+7,msg,sz);
