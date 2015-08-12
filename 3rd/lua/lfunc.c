@@ -135,6 +135,7 @@ static void freesharedproto (lua_State *L, SharedProto *f) {
   luaM_freearray(L, f->lineinfo, f->sizelineinfo);
   luaM_freearray(L, f->locvars, f->sizelocvars);
   luaM_freearray(L, f->upvalues, f->sizeupvalues);
+  luaM_free(L, f);
 }
 
 void luaF_freeproto (lua_State *L, Proto *f) {
