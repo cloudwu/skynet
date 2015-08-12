@@ -449,57 +449,6 @@ lpack(lua_State *L) {
 }
 
 static int
-lpack_string(lua_State *L) {
-	uint8_t tmp[SMALLSTRING+2];
-	size_t len;
-	uint8_t *buffer;
-	const char * ptr = tolstring(L, &len, 1);
-	if (len > 0x10000) {
-		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
-	}
-
-	if (len <= SMALLSTRING) {
-		buffer = tmp;
-	} else {
-		buffer = lua_newuserdata(L, len + 2);
-	}
-
-	write_size(buffer, len);
-	memcpy(buffer+2, ptr, len);
-	lua_pushlstring(L, (const char *)buffer, len+2);
-
-	return 1;
-}
-
-static int
-lpack_padding(lua_State *L) {
-	uint8_t tmp[SMALLSTRING+2];
-	size_t content_sz;
-	uint8_t *buffer;
-	const char * ptr = tolstring(L, &content_sz, 2);
-	size_t cookie_sz = 0;
-	const char * cookie = luaL_checklstring(L,1,&cookie_sz);
-	size_t len = cookie_sz + content_sz;
-
-	if (len > 0x10000) {
-		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
-	}
-
-	if (len <= SMALLSTRING) {
-		buffer = tmp;
-	} else {
-		buffer = lua_newuserdata(L, len + 2);
-	}
-
-	write_size(buffer, len);
-	memcpy(buffer+2, ptr, content_sz);
-	memcpy(buffer+2+content_sz, cookie, cookie_sz);
-	lua_pushlstring(L, (const char *)buffer, len+2);
-
-	return 1;
-}
-
-static int
 ltostring(lua_State *L) {
 	void * ptr = lua_touserdata(L, 1);
 	int size = luaL_checkinteger(L, 2);
@@ -518,8 +467,6 @@ luaopen_netpack(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "pop", lpop },
 		{ "pack", lpack },
-		{ "pack_string", lpack_string },
-		{ "pack_padding", lpack_padding },
 		{ "clear", lclear },
 		{ "tostring", ltostring },
 		{ NULL, NULL },

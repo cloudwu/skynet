@@ -236,7 +236,7 @@ function server.start(conf)
 
 	local function do_request(fd, message)
 		local u = assert(connection[fd], "invalid fd")
-		local session = string.unpack("I4", message, -4)
+		local session = string.unpack(">I4", message, -4)
 		message = message:sub(1,-5)
 		local p = u.response[session]
 		if p then
@@ -257,16 +257,16 @@ function server.start(conf)
 			p = { fd }
 			u.response[session] = p
 			local ok, result = pcall(conf.request_handler, u.username, message)
-			result = result or ""
 			-- NOTICE: YIELD here, socket may close.
+			result = result or ""
 			if not ok then
 				skynet.error(result)
-				result = "\0" .. session
+				result = string.pack(">BI4", 0, session)
 			else
-				result = result .. '\1' .. session
+				result = result .. string.pack(">BI4", 1, session)
 			end
 
-			p[2] = netpack.pack_string(result)
+			p[2] = string.pack(">s2",result)
 			p[3] = u.version
 			p[4] = u.index
 		else
