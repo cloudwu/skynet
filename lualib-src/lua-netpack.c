@@ -506,19 +506,8 @@ ltostring(lua_State *L) {
 	if (ptr == NULL) {
 		lua_pushliteral(L, "");
 	} else {
-		if (lua_isnumber(L, 3)) {
-			int offset = lua_tointeger(L, 3);
-			if (offset < 0) {
-				return luaL_error(L, "Invalid offset %d", offset);
-			}
-			if (offset > size) {
-				offset = size;
-			}
-			lua_pushlstring(L, (const char *)ptr + offset, size-offset);
-		} else {
-			lua_pushlstring(L, (const char *)ptr, size);
-			skynet_free(ptr);
-		}
+		lua_pushlstring(L, (const char *)ptr, size);
+		skynet_free(ptr);
 	}
 	return 1;
 }
