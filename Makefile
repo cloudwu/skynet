@@ -5,7 +5,8 @@ CSERVICE_PATH ?= cservice
 
 SKYNET_BUILD_PATH ?= .
 
-CFLAGS = -g -O2 -Wall -I$(LUA_INC) $(MYCFLAGS) 
+CFLAGS = -g -O2 -Wall -I$(LUA_INC) $(MYCFLAGS)
+# CFLAGS += -DUSE_PTHREAD_LOCK
 
 # lua
 
@@ -79,7 +80,7 @@ $(LUA_CLIB_PATH)/socketdriver.so : lualib-src/lua-socket.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src
 
 $(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@ -Iskynet-src
 
 $(LUA_CLIB_PATH)/mongo.so : lualib-src/lua-mongo.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src
@@ -109,7 +110,7 @@ $(LUA_CLIB_PATH)/crypt.so : lualib-src/lua-crypt.c lualib-src/lsha1.c | $(LUA_CL
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
 
 $(LUA_CLIB_PATH)/sharedata.so : lualib-src/lua-sharedata.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ 
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@ 
 
 $(LUA_CLIB_PATH)/stm.so : lualib-src/lua-stm.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@ 
@@ -124,7 +125,7 @@ $(LUA_CLIB_PATH)/mysqlaux.so : lualib-src/lua-mysqlaux.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@	
 
 $(LUA_CLIB_PATH)/debugchannel.so : lualib-src/lua-debugchannel.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) $^ -o $@	
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@	
 
 clean :
 	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so

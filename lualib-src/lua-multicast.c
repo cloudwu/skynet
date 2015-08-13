@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "atomic.h"
+
 struct mc_package {
 	int reference;
 	uint32_t size;
@@ -116,7 +118,7 @@ static int
 mc_closelocal(lua_State *L) {
 	struct mc_package *pack = lua_touserdata(L,1);
 
-	int ref = __sync_sub_and_fetch(&pack->reference, 1);
+	int ref = ATOM_DEC(&pack->reference);
 	if (ref <= 0) {
 		skynet_free(pack->data);
 		skynet_free(pack);

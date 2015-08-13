@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include "atomic.h"
 
 #define DEFAULT_CAP 64
 #define MAX_NUMBER 1024
@@ -1140,7 +1141,7 @@ lobjectid(lua_State *L) {
 	} else {
 		time_t ti = time(NULL);
 		// old_counter is a static var, use atom inc.
-		uint32_t id = __sync_fetch_and_add(&oid_counter,1);
+		uint32_t id = ATOM_FINC(&oid_counter);
 
 		oid[2] = (ti>>24) & 0xff;
 		oid[3] = (ti>>16) & 0xff;
