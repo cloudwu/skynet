@@ -219,8 +219,8 @@ unpackreq_number(lua_State *L, const uint8_t * buf, int sz) {
 
 static int
 unpackmreq_number(lua_State *L, const uint8_t * buf, int sz) {
-	if (sz != 15) {
-		return luaL_error(L, "Invalid cluster message size %d (multi req must be 15)", sz);
+	if (sz != 13) {
+		return luaL_error(L, "Invalid cluster message size %d (multi req must be 13)", sz);
 	}
 	uint32_t address = unpack_uint32(buf+1);
 	uint32_t session = unpack_uint32(buf+5);

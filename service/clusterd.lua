@@ -97,6 +97,21 @@ function command.proxy(source, node, name)
 	skynet.ret(skynet.pack(proxy[fullname]))
 end
 
+local register_name = {}
+
+function command.register(source, name, addr)
+	assert(register_name[name] == nil)
+	addr = addr or source
+	local old_name = register_name[addr]
+	if old_name then
+		register_name[old_name] = nil
+	end
+	register_name[addr] = name
+	register_name[name] = addr
+	skynet.ret(nil)
+	skynet.error(string.format("Register [%s] :%08x", name, addr))
+end
+
 local large_request = {}
 
 function command.socket(source, subcmd, fd, msg)
@@ -122,8 +137,20 @@ function command.socket(source, subcmd, fd, msg)
 				return
 			end
 		end
-		local ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
-		local response
+		local ok, response
+		if addr == 0 then
+			local name = skynet.unpack(msg, sz)
+			local addr = register_name[name]
+			if addr then
+				ok = true
+				msg, sz = skynet.pack(addr)
+			else
+				ok = false
+				msg = "name not found"
+			end
+		else
+			ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
+		end
 		if ok then
 			response = cluster.packresponse(session, true, msg, sz)
 			if type(response) == "table" then
