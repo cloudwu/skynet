@@ -172,6 +172,9 @@ _send(lua_State *L) {
 	uint32_t dest = (uint32_t)lua_tointeger(L, 1);
 	const char * dest_string = NULL;
 	if (dest == 0) {
+		if (lua_type(L,1) == LUA_TNUMBER) {
+			return luaL_error(L, "Invalid service address 0");
+		}
 		dest_string = get_dest_string(L, 1);
 	}
 
