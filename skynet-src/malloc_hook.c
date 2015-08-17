@@ -2,9 +2,11 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <lua.h>
 
 #include "malloc_hook.h"
 #include "skynet.h"
+#include "atomic.h"
 
 static size_t _used_memory = 0;
 static size_t _memory_block = 0;
@@ -31,11 +33,11 @@ get_allocated_field(uint32_t handle) {
 	ssize_t old_alloc = data->allocated;
 	if(old_handle == 0 || old_alloc <= 0) {
 		// data->allocated may less than zero, because it may not count at start.
-		if(!__sync_bool_compare_and_swap(&data->handle, old_handle, handle)) {
+		if(!ATOM_CAS(&data->handle, old_handle, handle)) {
 			return 0;
 		}
 		if (old_alloc < 0) {
-			__sync_bool_compare_and_swap(&data->allocated, old_alloc, 0);
+			ATOM_CAS(&data->allocated, old_alloc, 0);
 		}
 	}
 	if(data->handle != handle) {
@@ -46,21 +48,21 @@ get_allocated_field(uint32_t handle) {
 
 inline static void 
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
-	__sync_add_and_fetch(&_used_memory, __n);
-	__sync_add_and_fetch(&_memory_block, 1); 
+	ATOM_ADD(&_used_memory, __n);
+	ATOM_INC(&_memory_block); 
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
-		__sync_add_and_fetch(allocated, __n);
+		ATOM_ADD(allocated, __n);
 	}
 }
 
 inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
-	__sync_sub_and_fetch(&_used_memory, __n);
-	__sync_sub_and_fetch(&_memory_block, 1);
+	ATOM_SUB(&_used_memory, __n);
+	ATOM_DEC(&_memory_block);
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
-		__sync_sub_and_fetch(allocated, __n);
+		ATOM_SUB(allocated, __n);
 	}
 }
 
@@ -106,7 +108,7 @@ mallctl_int64(const char* name, size_t* newval) {
 	} else {
 		je_mallctl(name, &v, &len, NULL, 0);
 	}
-	// printf("name: %s, value: %zd\n", name, v);
+	// skynet_error(NULL, "name: %s, value: %zd\n", name, v);
 	return v;
 }
 
@@ -117,9 +119,9 @@ mallctl_opt(const char* name, int* newval) {
 	if(newval) {
 		int ret = je_mallctl(name, &v, &len, newval, sizeof(int));
 		if(ret == 0) {
-			printf("set new value(%d) for (%s) succeed\n", *newval, name);
+			skynet_error(NULL, "set new value(%d) for (%s) succeed\n", *newval, name);
 		} else {
-			printf("set new value(%d) for (%s) failed: error -> %d\n", *newval, name, ret);
+			skynet_error(NULL, "set new value(%d) for (%s) failed: error -> %d\n", *newval, name, ret);
 		}
 	} else {
 		je_mallctl(name, &v, &len, NULL, 0);
@@ -196,15 +198,15 @@ void
 dump_c_mem() {
 	int i;
 	size_t total = 0;
-	printf("dump all service mem:\n");
+	skynet_error(NULL, "dump all service mem:");
 	for(i=0; i<SLOT_SIZE; i++) {
 		mem_data* data = &mem_stats[i];
 		if(data->handle != 0 && data->allocated != 0) {
 			total += data->allocated;
-			printf("0x%x -> %zdkb\n", data->handle, data->allocated >> 10);
+			skynet_error(NULL, "0x%x -> %zdkb", data->handle, data->allocated >> 10);
 		}
 	}
-	printf("+total: %zdkb\n",total >> 10);
+	skynet_error(NULL, "+total: %zdkb",total >> 10);
 }
 
 char *
@@ -223,4 +225,18 @@ skynet_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
 	} else {
 		return skynet_realloc(ptr, nsize);
 	}
+}
+
+int
+dump_mem_lua(lua_State *L) {
+	int i;
+	lua_newtable(L);
+	for(i=0; i<SLOT_SIZE; i++) {
+		mem_data* data = &mem_stats[i];
+		if(data->handle != 0 && data->allocated != 0) {
+			lua_pushinteger(L, data->allocated);
+			lua_rawseti(L, -2, (lua_Integer)data->handle);
+		}
+	}
+	return 1;
 }

@@ -4,7 +4,9 @@ local snax_interface = require "snax.interface"
 local snax = {}
 local typeclass = {}
 
-local G = { require = function() end }
+local interface_g = skynet.getenv("snax_interface_g")
+local G = interface_g and require (interface_g) or { require = function() end }
+interface_g = nil
 
 skynet.register_protocol {
 	name = "snax",
@@ -22,6 +24,7 @@ function snax.interface(name)
 	local si = snax_interface(name, G)
 
 	local ret = {
+		name = name,
 		accept = {},
 		response = {},
 		system = {},
@@ -44,7 +47,10 @@ local skynet_call = skynet.call
 local function gen_post(type, handle)
 	return setmetatable({} , {
 		__index = function( t, k )
-			local id = assert(type.accept[k] , string.format("post %s no exist", k))
+			local id = type.accept[k]
+			if not id then
+				error(string.format("post %s:%s no exist", type.name, k))
+			end
 			return function(...)
 				skynet_send(handle, "snax", id, ...)
 			end
@@ -54,7 +60,10 @@ end
 local function gen_req(type, handle)
 	return setmetatable({} , {
 		__index = function( t, k )
-			local id = assert(type.response[k] , string.format("request %s no exist", k))
+			local id = type.response[k]
+			if not id then
+				error(string.format("request %s:%s no exist", type.name, k))
+			end
 			return function(...)
 				return skynet_call(handle, "snax", id, ...)
 			end
@@ -132,6 +141,14 @@ function snax.kill(obj, ...)
 	skynet_call(obj.handle, "snax", t.system.exit, ...)
 end
 
+function snax.self()
+	return snax.bind(skynet.self(), SERVICE_NAME)
+end
+
+function snax.exit(...)
+	snax.kill(snax.self(), ...)
+end
+
 local function test_result(ok, ...)
 	if ok then
 		return ...
@@ -143,6 +160,10 @@ end
 function snax.hotfix(obj, source, ...)
 	local t = snax.interface(obj.type)
 	return test_result(skynet_call(obj.handle, "snax", t.system.hotfix, source, ...))
+end
+
+function snax.printf(fmt, ...)
+	skynet.error(string.format(fmt, ...))
 end
 
 return snax

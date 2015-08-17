@@ -61,8 +61,10 @@ return function (name , G, loader)
 
 	setmetatable(G,	{ __index = env , __newindex = init_system })
 
+	local pattern
+
 	do
-		local path = skynet.getenv "snax"
+		local path = assert(skynet.getenv "snax" , "please set snax in config file")
 
 		local errlist = {}
 
@@ -70,6 +72,7 @@ return function (name , G, loader)
 			local filename = string.gsub(pat, "?", name)
 			local f , err = loader(filename, "bt", G)
 			if f then
+				pattern = pat
 				mainfunc = f
 				break
 			else
@@ -90,5 +93,5 @@ return function (name , G, loader)
 		G[k] = v
 	end
 
-	return func
+	return func, pattern
 end

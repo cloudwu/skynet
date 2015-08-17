@@ -135,7 +135,7 @@ _ctrl(struct gate * g, const void * msg, int sz) {
 		skynet_socket_start(ctx, g->listen_id);
 		return;
 	}
-    if (memcmp(command, "close", i) == 0) {
+	if (memcmp(command, "close", i) == 0) {
 		if (g->listen_id >= 0) {
 			skynet_socket_close(ctx, g->listen_id);
 			g->listen_id = -1;
@@ -261,6 +261,9 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 			c->remote_name[sz] = '\0';
 			skynet_socket_start(ctx, message->ud);
 		}
+		break;
+	case SKYNET_SOCKET_TYPE_WARNING:
+		skynet_error(ctx, "fd (%d) send buffer (%d)K", message->id, message->ud);
 		break;
 	}
 }

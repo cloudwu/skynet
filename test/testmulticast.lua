@@ -27,7 +27,7 @@ skynet.start(function()
 	local channel = mc.new()
 	print("New channel", channel)
 	for i=1,10 do
-		local sub = skynet.newservice("testmulticast", "sub")
+		local sub = skynet.newservice(SERVICE_NAME, "sub")
 		skynet.call(sub, "lua", "init", channel.channel)
 	end
 

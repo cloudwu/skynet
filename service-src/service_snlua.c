@@ -3,7 +3,6 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
-#include <assert.h>
 
 #include <assert.h>
 #include <string.h>
@@ -55,7 +54,7 @@ traceback (lua_State *L) {
 static void
 _report_launcher_error(struct skynet_context *ctx) {
 	// sizeof "ERROR" == 5
-	skynet_sendname(ctx, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
+	skynet_sendname(ctx, 0, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
 }
 
 static const char *
@@ -156,4 +155,13 @@ void
 snlua_release(struct snlua *l) {
 	lua_close(l->L);
 	skynet_free(l);
+}
+
+void
+snlua_signal(struct snlua *l, int signal) {
+	skynet_error(l->ctx, "recv a signal %d", signal);
+#ifdef lua_checksig
+	// If our lua support signal (modified lua version by skynet), trigger it.
+	skynet_sig_L = l->L;
+#endif
 }
