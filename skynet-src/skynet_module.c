@@ -1,6 +1,7 @@
 #include "skynet.h"
 
 #include "skynet_module.h"
+#include "spinlock.h"
 
 #include <assert.h>
 #include <string.h>
@@ -13,7 +14,7 @@
 
 struct modules {
 	int count;
-	int lock;
+	struct spinlock lock;
 	const char * path;
 	struct skynet_module m[MAX_MODULE_TYPE];
 };
@@ -95,7 +96,7 @@ skynet_module_query(const char * name) {
 	if (result)
 		return result;
 
-	while(__sync_lock_test_and_set(&M->lock,1)) {}
+	SPIN_LOCK(M)
 
 	result = _query(name); // double check
 
@@ -114,21 +115,22 @@ skynet_module_query(const char * name) {
 		}
 	}
 
-	__sync_lock_release(&M->lock);
+	SPIN_UNLOCK(M)
 
 	return result;
 }
 
 void 
 skynet_module_insert(struct skynet_module *mod) {
-	while(__sync_lock_test_and_set(&M->lock,1)) {}
+	SPIN_LOCK(M)
 
 	struct skynet_module * m = _query(mod->name);
 	assert(m == NULL && M->count < MAX_MODULE_TYPE);
 	int index = M->count;
 	M->m[index] = *mod;
 	++M->count;
-	__sync_lock_release(&M->lock);
+
+	SPIN_UNLOCK(M)
 }
 
 void * 
@@ -164,7 +166,8 @@ skynet_module_init(const char *path) {
 	struct modules *m = skynet_malloc(sizeof(*m));
 	m->count = 0;
 	m->path = skynet_strdup(path);
-	m->lock = 0;
+
+	SPIN_INIT(m)
 
 	M = m;
 }

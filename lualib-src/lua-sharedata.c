@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "atomic.h"
 
 #define KEYTYPE_INTEGER 0
 #define KEYTYPE_STRING 1
@@ -663,7 +664,7 @@ releaseobj(lua_State *L) {
 	struct ctrl *c = lua_touserdata(L, 1);
 	struct table *tbl = c->root;
 	struct state *s = lua_touserdata(tbl->L, 1);
-	__sync_fetch_and_sub(&s->ref, 1);
+	ATOM_DEC(&s->ref);
 	c->root = NULL;
 	c->update = NULL;
 
@@ -674,7 +675,7 @@ static int
 lboxconf(lua_State *L) {
 	struct table * tbl = get_table(L,1);	
 	struct state * s = lua_touserdata(tbl->L, 1);
-	__sync_fetch_and_add(&s->ref, 1);
+	ATOM_INC(&s->ref);
 
 	struct ctrl * c = lua_newuserdata(L, sizeof(*c));
 	c->root = tbl;
@@ -719,7 +720,7 @@ static int
 lincref(lua_State *L) {
 	struct table *tbl = get_table(L,1);
 	struct state * s = lua_touserdata(tbl->L, 1);
-	int ref = __sync_add_and_fetch(&s->ref, 1);
+	int ref = ATOM_INC(&s->ref);
 	lua_pushinteger(L , ref);
 
 	return 1;
@@ -729,7 +730,7 @@ static int
 ldecref(lua_State *L) {
 	struct table *tbl = get_table(L,1);
 	struct state * s = lua_touserdata(tbl->L, 1);
-	int ref = __sync_sub_and_fetch(&s->ref, 1);
+	int ref = ATOM_DEC(&s->ref);
 	lua_pushinteger(L , ref);
 
 	return 1;

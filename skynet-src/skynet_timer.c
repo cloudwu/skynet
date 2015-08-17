@@ -4,6 +4,7 @@
 #include "skynet_mq.h"
 #include "skynet_server.h"
 #include "skynet_handle.h"
+#include "spinlock.h"
 
 #include <time.h>
 #include <assert.h>
@@ -16,9 +17,6 @@
 #endif
 
 typedef void (*timer_execute_func)(void *ud,void *arg);
-
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
 #define TIME_NEAR_SHIFT 8
 #define TIME_NEAR (1 << TIME_NEAR_SHIFT)
@@ -45,7 +43,7 @@ struct link_list {
 struct timer {
 	struct link_list near[TIME_NEAR];
 	struct link_list t[4][TIME_LEVEL];
-	int lock;
+	struct spinlock lock;
 	uint32_t time;
 	uint32_t current;
 	uint32_t starttime;
@@ -97,12 +95,12 @@ timer_add(struct timer *T,void *arg,size_t sz,int time) {
 	struct timer_node *node = (struct timer_node *)skynet_malloc(sizeof(*node)+sz);
 	memcpy(node+1,arg,sz);
 
-	LOCK(T);
+	SPIN_LOCK(T);
 
 		node->expire=time+T->time;
 		add_node(T,node);
 
-	UNLOCK(T);
+	SPIN_UNLOCK(T);
 }
 
 static void
@@ -162,16 +160,16 @@ timer_execute(struct timer *T) {
 	
 	while (T->near[idx].head.next) {
 		struct timer_node *current = link_clear(&T->near[idx]);
-		UNLOCK(T);
+		SPIN_UNLOCK(T);
 		// dispatch_list don't need lock T
 		dispatch_list(current);
-		LOCK(T);
+		SPIN_LOCK(T);
 	}
 }
 
 static void 
 timer_update(struct timer *T) {
-	LOCK(T);
+	SPIN_LOCK(T);
 
 	// try to dispatch timeout 0 (rare condition)
 	timer_execute(T);
@@ -181,7 +179,7 @@ timer_update(struct timer *T) {
 
 	timer_execute(T);
 
-	UNLOCK(T);
+	SPIN_UNLOCK(T);
 }
 
 static struct timer *
@@ -201,7 +199,8 @@ timer_create_timer() {
 		}
 	}
 
-	r->lock = 0;
+	SPIN_INIT(r)
+
 	r->current = 0;
 
 	return r;
