@@ -416,7 +416,7 @@ getslot(struct shrmap_slot *s, struct slotinfo *info) {
 	TString *ts = s->str;
 	while (ts) {
 		++info->len;
-		info->size += ts->shrlen;
+		info->size += sizelstring(ts->shrlen);
 		ts = ts->u.hnext;
 	}
 	rwlock_runlock(&s->lock);
