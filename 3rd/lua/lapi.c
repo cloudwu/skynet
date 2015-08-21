@@ -1000,7 +1000,7 @@ static Proto * cloneproto (lua_State *L, const Proto *src) {
     const TValue *s=&src->k[i];
     TValue *o=&f->k[i];
     if (ttisstring(s)) {
-      TString * str = luaS_newlstr(L,svalue(s),vslen(s));
+      TString * str = luaS_clonestring(L,tsvalue(s));
       setsvalue2n(L,o,str);
     } else {
       setobj(L,o,s);
@@ -1288,7 +1288,7 @@ static UpVal **getupvalref (lua_State *L, int fidx, int n, LClosure **pf) {
   StkId fi = index2addr(L, fidx);
   api_check(L, ttisLclosure(fi), "Lua function expected");
   f = clLvalue(fi);
-  api_check(L, (1 <= n && n <= f->p->sizeupvalues), "invalid upvalue index");
+  api_check(L, (1 <= n && n <= f->p->sp->sizeupvalues), "invalid upvalue index");
   if (pf) *pf = f;
   return &f->upvals[n - 1];  /* get its upvalue pointer */
 }

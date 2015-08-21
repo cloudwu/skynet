@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <stddef.h>
 
+#define LUA_USE_APICHECK
 
 /*
 ** ===================================================================
