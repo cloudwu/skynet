@@ -317,8 +317,11 @@ forward_local_messsage(struct harbor *h, void *msg, int sz) {
 	destination = (destination & HANDLE_MASK) | ((uint32_t)h->id << HANDLE_REMOTE_SHIFT);
 
 	if (skynet_send(h->ctx, header.source, destination, type, (int)header.session, (void *)msg, sz-HEADER_COOKIE_LENGTH) < 0) {
-		skynet_send(h->ctx, destination, header.source , PTYPE_ERROR, (int)header.session, NULL, 0);
-		skynet_error(h->ctx, "Unknown destination :%x from :%x", destination, header.source);
+		if (type != PTYPE_ERROR) {
+			// don't need report error when type is error
+			skynet_send(h->ctx, destination, header.source , PTYPE_ERROR, (int)header.session, NULL, 0);
+		}
+		skynet_error(h->ctx, "Unknown destination :%x from :%x type(%d)", destination, header.source, type);
 	}
 }
 
