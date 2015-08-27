@@ -43,6 +43,8 @@ LUAI_FUNC Udata *luaS_newudata (lua_State *L, size_t s);
 LUAI_FUNC TString *luaS_newlstr (lua_State *L, const char *str, size_t l);
 LUAI_FUNC TString *luaS_new (lua_State *L, const char *str);
 
+#define ENABLE_SHORT_STRING_TABLE
+
 LUA_API void luaS_initshr();
 LUA_API void luaS_exitshr();
 LUA_API void luaS_expandshr(int n);
