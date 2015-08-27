@@ -49,6 +49,7 @@ struct queue {
 static void
 clear_list(struct uncomplete * uc) {
 	while (uc) {
+		skynet_free(uc->pack.buffer);
 		void * tmp = uc;
 		uc = uc->next;
 		skynet_free(tmp);
