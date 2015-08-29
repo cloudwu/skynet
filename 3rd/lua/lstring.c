@@ -252,36 +252,33 @@ struct shrmap {
 	int n;
 };
 
-static struct shrmap *SSM = NULL;
+static struct shrmap SSM;
 
 LUA_API void
 luaS_initshr() {
-	struct shrmap * s = malloc(sizeof(*s));
-	memset(s, 0, sizeof(*s));
+	struct shrmap * s = &SSM;
 	int i;
 	for (i=0;i<SHRSTR_SLOT;i++) {
 		rwlock_init(&s->h[i].lock);
 	}
-	SSM = s;
 }
 
 LUA_API void
 luaS_exitshr() {
 	int i;
 	for (i=0;i<SHRSTR_SLOT;i++) {
-		TString *str = SSM->h[i].str;
+		TString *str = SSM.h[i].str;
 		while (str) {
 			TString * next = str->u.hnext;
 			free(str);
 			str = next;
 		}
 	}
-	free(SSM);
 }
 
 static TString *
 query_string(unsigned int h, const char *str, lu_byte l) {
-	struct shrmap_slot *s = &SSM->h[HASH_NODE(h)];
+	struct shrmap_slot *s = &SSM.h[HASH_NODE(h)];
 	rwlock_rlock(&s->lock);
 	TString *ts = s->str;
 	while (ts) {
@@ -299,7 +296,7 @@ query_string(unsigned int h, const char *str, lu_byte l) {
 static TString *
 query_ptr(TString *t) {
 	unsigned int h = t->hash;
-	struct shrmap_slot *s = &SSM->h[HASH_NODE(h)];
+	struct shrmap_slot *s = &SSM.h[HASH_NODE(h)];
 	rwlock_rlock(&s->lock);
 	TString *ts = s->str;
 	while (ts) {
@@ -326,7 +323,7 @@ new_string(unsigned int h, const char *str, lu_byte l) {
 static TString *
 add_string(unsigned int h, const char *str, lu_byte l) {
 	TString * tmp = new_string(h, str, l);
-	struct shrmap_slot *s = &SSM->h[HASH_NODE(h)];
+	struct shrmap_slot *s = &SSM.h[HASH_NODE(h)];
 	rwlock_wlock(&s->lock);
 	TString *ts = s->str;
 	while (ts) {
@@ -366,9 +363,9 @@ internshrstr (lua_State *L, const char *str, size_t l) {
   ts = query_string(h0, str, l);
   if (ts)
     return ts;
-  // If SSM->n greate than 0, add it to SSM
-  if (SSM->n > 0) {
-    ATOM_DEC(&SSM->n);
+  // If SSM.n greate than 0, add it to SSM
+  if (SSM.n > 0) {
+    ATOM_DEC(&SSM.n);
     return add_string(h0, str, l);
   }
   // Else add it to global state (local)
@@ -377,7 +374,7 @@ internshrstr (lua_State *L, const char *str, size_t l) {
 
 LUA_API void
 luaS_expandshr(int n) {
-  ATOM_ADD(&SSM->n, n);
+  ATOM_ADD(&SSM.n, n);
 }
 
 LUAI_FUNC TString *
@@ -430,7 +427,7 @@ luaS_shrinfo(lua_State *L) {
 	int i;
 	int len = 0;
 	for (i=0;i<SHRSTR_SLOT;i++) {
-		struct shrmap_slot *s = &SSM->h[i];
+		struct shrmap_slot *s = &SSM.h[i];
 		getslot(s, &tmp);
 		len += tmp.len;
 		if (tmp.len > total.len) {
@@ -441,6 +438,6 @@ luaS_shrinfo(lua_State *L) {
 	lua_pushinteger(L, len);
 	lua_pushinteger(L, total.size);
 	lua_pushinteger(L, total.len);
-	lua_pushinteger(L, SSM->n);
+	lua_pushinteger(L, SSM.n);
 	return 4;
 }
