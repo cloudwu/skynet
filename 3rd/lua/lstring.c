@@ -239,7 +239,7 @@ Udata *luaS_newudata (lua_State *L, size_t s) {
 #include "atomic.h"
 #include <stdlib.h>
 
-#define SHRSTR_SLOT 0x10000
+#define SHRSTR_SLOT 0x20000
 #define HASH_NODE(h) ((h) % SHRSTR_SLOT)
 
 struct shrmap_slot {
