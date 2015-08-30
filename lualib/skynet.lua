@@ -186,8 +186,7 @@ function suspend(co, result, command, param, size)
 			error(debug.traceback(co))
 		end
 		local f = param
-		local response
-		response = function(ok, ...)
+		local function response(ok, ...)
 			if ok == "TEST" then
 				if dead_service[co_address] then
 					release_watching(co_address)
