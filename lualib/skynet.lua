@@ -186,10 +186,12 @@ function suspend(co, result, command, param, size)
 			error(debug.traceback(co))
 		end
 		local f = param
-		local function response(ok, ...)
+		local response
+		response = function(ok, ...)
 			if ok == "TEST" then
 				if dead_service[co_address] then
 					release_watching(co_address)
+					unresponse[response] = nil
 					f = false
 					return false
 				else
@@ -224,7 +226,7 @@ function suspend(co, result, command, param, size)
 			return ret
 		end
 		watching_service[co_address] = watching_service[co_address] + 1
-		session_response[co] = response
+		session_response[co] = true
 		unresponse[response] = true
 		return suspend(co, coroutine.resume(co, response))
 	elseif command == "EXIT" then
