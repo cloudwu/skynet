@@ -123,6 +123,7 @@ function CMD.monitor(name, obj)
 	if n > pool_count[name].threshold then
 		n = n - check_watch(v.watch)
 		pool_count[name].threshold = n * 2
+		pool_count[name].n = n
 	end
 
 	table.insert(v.watch, skynet.response())
