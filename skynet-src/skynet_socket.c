@@ -36,7 +36,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	size_t sz = sizeof(*sm);
 	if (padding) {
 		if (result->data) {
-			sz += strlen(result->data);
+			sz += (strlen(result->data) + 1);
 		} else {
 			result->data = "";
 		}
