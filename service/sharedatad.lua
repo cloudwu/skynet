@@ -118,13 +118,12 @@ function CMD.monitor(name, obj)
 		return v.obj
 	end
 
-	local n = pool_count[name].n
-	pool_count[name].n = n + 1
+	local n = pool_count[name].n + 1
 	if n > pool_count[name].threshold then
 		n = n - check_watch(v.watch)
 		pool_count[name].threshold = n * 2
-		pool_count[name].n = n
 	end
+	pool_count[name].n = n
 
 	table.insert(v.watch, skynet.response())
 
