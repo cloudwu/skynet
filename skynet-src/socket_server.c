@@ -408,6 +408,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 
 	status = getaddrinfo( request->host, port, &ai_hints, &ai_list );
 	if ( status != 0 ) {
+		result->data = (void *)gai_strerror(status);
 		goto _failed;
 	}
 	int sock= -1;
@@ -428,12 +429,14 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 	}
 
 	if (sock < 0) {
+		result->data = strerror(errno);
 		goto _failed;
 	}
 
 	ns = new_fd(ss, id, sock, PROTOCOL_TCP, request->opaque, true);
 	if (ns == NULL) {
 		close(sock);
+		result->data = "reach skynet socket number limit";
 		goto _failed;
 	}
 
@@ -762,7 +765,7 @@ _failed:
 	result->opaque = request->opaque;
 	result->id = id;
 	result->ud = 0;
-	result->data = NULL;
+	result->data = "reach skynet socket number limit";
 	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
 
 	return SOCKET_ERROR;
@@ -803,7 +806,7 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 	result->ud = 0;
 	struct socket *s = new_fd(ss, id, request->fd, PROTOCOL_TCP, request->opaque, true);
 	if (s == NULL) {
-		result->data = NULL;
+		result->data = "reach skynet socket number limit";
 		return SOCKET_ERROR;
 	}
 	sp_nonblocking(request->fd);
@@ -821,11 +824,13 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	result->data = NULL;
 	struct socket *s = &ss->slot[HASH_ID(id)];
 	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
+		result->data = "invalid socket";
 		return SOCKET_ERROR;
 	}
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		if (sp_add(ss->event_fd, s->fd, s)) {
 			s->type = SOCKET_TYPE_INVALID;
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
@@ -913,7 +918,7 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 		result->opaque = s->opaque;
 		result->id = s->id;
 		result->ud = 0;
-		result->data = NULL;
+		result->data = "protocol mismatch";
 
 		return SOCKET_ERROR;
 	}
@@ -995,6 +1000,7 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_me
 		default:
 			// close when error
 			force_close(ss, s, result);
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 		return -1;
@@ -1055,6 +1061,7 @@ forward_message_udp(struct socket_server *ss, struct socket *s, struct socket_me
 		default:
 			// close when error
 			force_close(ss, s, result);
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 		return -1;
@@ -1088,6 +1095,7 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 	int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);  
 	if (code < 0 || error) {  
 		force_close(ss,s, result);
+		result->data = strerror(errno);
 		return SOCKET_ERROR;
 	} else {
 		s->type = SOCKET_TYPE_CONNECTED;
@@ -1111,14 +1119,22 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 	}
 }
 
-// return 0 when failed
+// return 0 when failed, or -1 when file limit
 static int
 report_accept(struct socket_server *ss, struct socket *s, struct socket_message *result) {
 	union sockaddr_all u;
 	socklen_t len = sizeof(u);
 	int client_fd = accept(s->fd, &u.s, &len);
 	if (client_fd < 0) {
-		return 0;
+		if (errno == EMFILE || errno == ENFILE) {
+			result->opaque = s->opaque;
+			result->id = s->id;
+			result->ud = 0;
+			result->data = strerror(errno);
+			return -1;
+		} else {
+			return 0;
+		}
 	}
 	int id = reserve_id(ss);
 	if (id < 0) {
@@ -1203,11 +1219,16 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 		switch (s->type) {
 		case SOCKET_TYPE_CONNECTING:
 			return report_connect(ss, s, result);
-		case SOCKET_TYPE_LISTEN:
-			if (report_accept(ss, s, result)) {
+		case SOCKET_TYPE_LISTEN: {
+			int ok = report_accept(ss, s, result);
+			if (ok > 0) {
 				return SOCKET_ACCEPT;
-			} 
+			} if (ok < 0 ) {
+				return SOCKET_ERROR;
+			}
+			// when ok == 0, retry
 			break;
+		}
 		case SOCKET_TYPE_INVALID:
 			fprintf(stderr, "socket-server: invalid socket\n");
 			break;

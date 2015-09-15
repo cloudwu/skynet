@@ -106,16 +106,17 @@ socket_message[4] = function(id, newid, addr)
 end
 
 -- SKYNET_SOCKET_TYPE_ERROR = 5
-socket_message[5] = function(id)
+socket_message[5] = function(id, _, err)
 	local s = socket_pool[id]
 	if s == nil then
-		skynet.error("socket: error on unknown", id)
+		skynet.error("socket: error on unknown", id, err)
 		return
 	end
-	if s.connected then
-		skynet.error("socket: error on", id)
+	if s.connected or s.connecting then
+		skynet.error("socket: error on", id, err)
 	end
 	s.connected = false
+	driver.close(id)
 
 	wakeup(s)
 end
@@ -170,6 +171,7 @@ local function connect(id, func)
 		id = id,
 		buffer = newbuffer,
 		connected = false,
+		connecting = true,
 		read_required = false,
 		co = false,
 		callback = func,
@@ -177,6 +179,7 @@ local function connect(id, func)
 	}
 	socket_pool[id] = s
 	suspend(s)
+	s.connecting = nil
 	if s.connected then
 		return id
 	else
@@ -221,7 +224,7 @@ function socket.close(id)
 		return
 	end
 	if s.connected then
-		driver.close(s.id)
+		driver.close(id)
 		-- notice: call socket.close in __gc should be carefully,
 		-- because skynet.wait never return in __gc, so driver.clear may not be called
 		if s.co then

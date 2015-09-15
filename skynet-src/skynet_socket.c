@@ -36,7 +36,11 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	size_t sz = sizeof(*sm);
 	if (padding) {
 		if (result->data) {
-			sz += strlen(result->data);
+			size_t msg_sz = strlen(result->data);
+			if (msg_sz > 128) {
+				msg_sz = 128;
+			}
+			sz += msg_sz;
 		} else {
 			result->data = "";
 		}
@@ -86,7 +90,7 @@ skynet_socket_poll() {
 		forward_message(SKYNET_SOCKET_TYPE_CONNECT, true, &result);
 		break;
 	case SOCKET_ERROR:
-		forward_message(SKYNET_SOCKET_TYPE_ERROR, false, &result);
+		forward_message(SKYNET_SOCKET_TYPE_ERROR, true, &result);
 		break;
 	case SOCKET_ACCEPT:
 		forward_message(SKYNET_SOCKET_TYPE_ACCEPT, true, &result);
