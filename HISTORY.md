@@ -1,10 +1,20 @@
+v1.0.0-alpha10 (2015-8-17)
+-----------
+* Remove the size limit of cluster RPC message.
+* Remove the size limit of local message.
+* Add cluster.query and clsuter.register.
+* Add an option of pthread mutex lock.
+* Add skynet.core.intcommand to optimize skynet.sleep etc.
+* Fix a memory leak bug in lua shared proto.
+* snax.msgserver use string instead of lightuserdata/size.
+* Remove some unused api in netpack.
+* Raise error when skynet.send to 0.
+
 v1.0.0-alpha9 (2015-8-10)
 -----------
 * Improve lua serialization , support pairs metamethod.
 * Bugfix : sproto (See commits log of sproto)
 * Add user log service support (In config)
-* Remove the size limit of cluster RPC message.
-* Remove the size limit of local message.
 * Other minor bugfix (See commits log)
 
 v1.0.0-alpha8 (2015-6-29)

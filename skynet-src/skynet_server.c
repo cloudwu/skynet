@@ -674,7 +674,9 @@ int
 skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
 	if ((sz & MESSAGE_TYPE_MASK) != sz) {
 		skynet_error(context, "The message to %x is too large", destination);
-		skynet_free(data);
+		if (type & PTYPE_TAG_DONTCOPY) {
+			skynet_free(data);
+		}
 		return -1;
 	}
 	_filter_args(context, type, &session, (void **)&data, &sz);
