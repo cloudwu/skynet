@@ -48,7 +48,6 @@ function gateserver.start(handler)
 	function CMD.close()
 		assert(socket)
 		socketdriver.close(socket)
-		socket = nil
 	end
 
 	local MSG = {}
@@ -106,6 +105,8 @@ function gateserver.start(handler)
 				handler.disconnect(fd)
 			end
 			close_fd(fd)
+		else
+			socket = nil
 		end
 	end
 
