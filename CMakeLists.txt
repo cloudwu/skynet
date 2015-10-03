@@ -5,6 +5,10 @@ find_package(Threads)
 
 add_definitions(-DNOUSE_JEMALLOC)
 
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "TinyCC")
+message(STATUS "using pthread lock")
+add_definitions(-DUSE_PTHREAD_LOCK)
+endif()
 
 include_directories(./3rd/lua)
 include_directories(skynet-src)
