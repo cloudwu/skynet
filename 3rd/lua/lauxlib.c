@@ -25,6 +25,7 @@
 
 #include "lauxlib.h"
 
+#include "spinlock.h"
 
 /*
 ** {======================================================
@@ -972,15 +973,15 @@ LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver, size_t sz) {
 
 // use clonefunction
 
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
+#define LOCK(q) spinlock_lock(&(q)->lock);
+#define UNLOCK(q) spinlock_unlock(&(q)->lock);
 
 struct codecache {
-	int lock;
+	struct spinlock lock;
 	lua_State *L;
 };
 
-static struct codecache CC = { 0 , NULL };
+static struct codecache CC;
 
 static void
 clearcache() {
@@ -994,7 +995,7 @@ clearcache() {
 
 static void
 init() {
-	CC.lock = 0;
+	spinlock_init(&CC.lock);
 	CC.L = luaL_newstate();
 }
 
