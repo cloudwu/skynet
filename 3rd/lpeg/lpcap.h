@@ -1,5 +1,5 @@
 /*
-** $Id: lpcap.h,v 1.1 2013/03/21 20:25:12 roberto Exp $
+** $Id: lpcap.h,v 1.2 2015/02/27 17:13:17 roberto Exp $
 */
 
 #if !defined(lpcap_h)
@@ -18,7 +18,7 @@ typedef enum CapKind {
 
 typedef struct Capture {
   const char *s;  /* subject position */
-  short idx;  /* extra info about capture (group name, arg index, etc.) */
+  unsigned short idx;  /* extra info (group name, arg index, etc.) */
   byte kind;  /* kind of capture */
   byte siz;  /* size of full capture + 1 (0 = not a full capture) */
 } Capture;

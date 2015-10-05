@@ -10,7 +10,7 @@
 </head>
 <body>
 
-<!-- $Id: lpeg.html,v 1.72 2014/12/12 17:11:35 roberto Exp $ -->
+<!-- $Id: lpeg.html,v 1.75 2015/09/28 17:17:41 roberto Exp $ -->
 
 <div id="container">
 	
@@ -22,7 +22,7 @@
   </div>
   <div id="product_name"><big><strong>LPeg</strong></big></div>
   <div id="product_description">
-     Parsing Expression Grammars For Lua, version 0.12
+     Parsing Expression Grammars For Lua, version 1.0
   </div>
 </div> <!-- id="product" -->
 
@@ -195,13 +195,16 @@ Returns a string with the running version of LPeg.
 
 <h3><a name="f-setstack"></a><code>lpeg.setmaxstack (max)</code></h3>
 <p>
-Sets the maximum size for the backtrack stack used by LPeg to
+Sets a limit for the size of the backtrack stack used by LPeg to
 track calls and choices.
+(The default limit is 400.)
 Most well-written patterns need little backtrack levels and
-therefore you seldom need to change this maximum;
-but a few useful patterns may need more space.
-Before changing this maximum you should try to rewrite your
+therefore you seldom need to change this limit;
+before changing it you should try to rewrite your
 pattern to avoid the need for extra space.
+Nevertheless, a few useful patterns may overflow.
+Also, with recursive grammars,
+subjects with deep recursion may also need larger limits.
 </p>
 
 
@@ -682,7 +685,8 @@ argument given in the call to <code>lpeg.match</code>.
 Creates a <em>back capture</em>.
 This pattern matches the empty string and
 produces the values produced by the <em>most recent</em>
-<a href="#cap-g">group capture</a> named <code>name</code>.
+<a href="#cap-g">group capture</a> named <code>name</code>
+(where <code>name</code> can be any Lua value).
 </p>
 
 <p>
@@ -762,7 +766,8 @@ Creates a <em>group capture</em>.
 It groups all values returned by <code>patt</code>
 into a single capture.
 The group may be anonymous (if no name is given)
-or named with the given name.
+or named with the given name
+(which can be any non-nil Lua value).
 </p>
 
 <p>
@@ -1375,13 +1380,13 @@ and the new term for each repetition.
 <h2><a name="download"></a>Download</h2>
 
 <p>LPeg 
-<a href="http://www.inf.puc-rio.br/~roberto/lpeg/lpeg-0.12.1.tar.gz">source code</a>.</p>
+<a href="http://www.inf.puc-rio.br/~roberto/lpeg/lpeg-1.0.0.tar.gz">source code</a>.</p>
 
 
 <h2><a name="license">License</a></h2>
 
 <p>
-Copyright &copy; 2014 Lua.org, PUC-Rio.
+Copyright &copy; 2007-2015 Lua.org, PUC-Rio.
 </p>
 <p>
 Permission is hereby granted, free of charge,
@@ -1419,7 +1424,7 @@ THE SOFTWARE.
 
 <div id="about">
 <p><small>
-$Id: lpeg.html,v 1.72 2014/12/12 17:11:35 roberto Exp $
+$Id: lpeg.html,v 1.75 2015/09/28 17:17:41 roberto Exp $
 </small></p>
 </div> <!-- id="about" -->
 
