@@ -335,13 +335,12 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	if (parm == NULL)
 		return 1;
 	int max = 0;
-	int buffer = 0;
 	int sz = strlen(parm)+1;
 	char watchdog[sz];
 	char binding[sz];
 	int client_tag = 0;
 	char header;
-	int n = sscanf(parm, "%c %s %s %d %d %d",&header,watchdog, binding,&client_tag , &max,&buffer);
+	int n = sscanf(parm, "%c %s %s %d %d %d", &header, watchdog, binding, &client_tag, &max);
 	if (n<4) {
 		skynet_error(ctx, "Invalid gate parm %s",parm);
 		return 1;
