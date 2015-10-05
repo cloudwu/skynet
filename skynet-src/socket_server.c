@@ -1176,6 +1176,7 @@ clear_closed_event(struct socket_server *ss, struct socket_message * result, int
 			if (s) {
 				if (s->type == SOCKET_TYPE_INVALID && s->id == id) {
 					e->s = NULL;
+					break;
 				}
 			}
 		}
@@ -1245,21 +1246,19 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 						return SOCKET_UDP;
 					}
 				}
-				if (e->write) {
+				if (e->write && type != SOCKET_CLOSE && type != SOCKET_ERROR) {
 					// Try to dispatch write message next step if write flag set.
 					e->read = false;
 					--ss->event_index;
 				}
 				if (type == -1)
-					break;
-				clear_closed_event(ss, result, type);
+					break;				
 				return type;
 			}
 			if (e->write) {
 				int type = send_buffer(ss, s, result);
 				if (type == -1)
 					break;
-				clear_closed_event(ss, result, type);
 				return type;
 			}
 			break;
