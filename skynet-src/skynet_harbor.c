@@ -1,6 +1,8 @@
 #include "skynet.h"
 #include "skynet_harbor.h"
 #include "skynet_server.h"
+#include "skynet_mq.h"
+#include "skynet_handle.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -11,27 +13,10 @@ static unsigned int HARBOR = ~0;
 
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
-	int type = rmsg->sz >> HANDLE_REMOTE_SHIFT;
-	rmsg->sz &= HANDLE_MASK;
+	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
+	rmsg->sz &= MESSAGE_TYPE_MASK;
 	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR && REMOTE);
 	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg) , source, type , session);
-}
-
-void 
-skynet_harbor_register(struct remote_name *rname) {
-	if (REMOTE == NULL)
-		return;
-	int i;
-	int number = 1;
-	for (i=0;i<GLOBALNAME_LENGTH;i++) {
-		char c = rname->name[i];
-		if (!(c >= '0' && c <='9')) {
-			number = 0;
-			break;
-		}
-	}
-	assert(number == 0);
-	skynet_context_send(REMOTE, rname, sizeof(*rname), 0, PTYPE_SYSTEM , 0);
 }
 
 int 
@@ -48,5 +33,17 @@ skynet_harbor_init(int harbor) {
 
 void
 skynet_harbor_start(void *ctx) {
+	// the HARBOR must be reserved to ensure the pointer is valid.
+	// It will be released at last by calling skynet_harbor_exit
+	skynet_context_reserve(ctx);
 	REMOTE = ctx;
+}
+
+void
+skynet_harbor_exit() {
+	struct skynet_context * ctx = REMOTE;
+	REMOTE= NULL;
+	if (ctx) {
+		skynet_context_release(ctx);
+	}
 }

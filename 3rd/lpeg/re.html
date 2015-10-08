@@ -1,0 +1,498 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head>
+    <title>LPeg.re - Regex syntax for LPEG</title>
+    <link rel="stylesheet"
+          href="http://www.inf.puc-rio.br/~roberto/lpeg/doc.css"
+          type="text/css"/>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+</head>
+<body>
+
+<!-- $Id: re.html,v 1.23 2015/09/28 17:17:41 roberto Exp $ -->
+
+<div id="container">
+	
+<div id="product">
+  <div id="product_logo">
+    <a href="http://www.inf.puc-rio.br/~roberto/lpeg/">
+    <img alt="LPeg logo" src="lpeg-128.gif"/>
+    </a>
+  </div>
+  <div id="product_name"><big><strong>LPeg.re</strong></big></div>
+  <div id="product_description">
+     Regex syntax for LPEG
+  </div>
+</div> <!-- id="product" -->
+
+<div id="main">
+	
+<div id="navigation">
+<h1>re</h1>
+
+<ul>
+  <li><a href="#basic">Basic Constructions</a></li>
+  <li><a href="#func">Functions</a></li>
+  <li><a href="#ex">Some Examples</a></li>
+  <li><a href="#license">License</a></li>
+  </ul>
+  </li>
+</ul>
+</div> <!-- id="navigation" -->
+
+<div id="content">
+
+<h2><a name="basic"></a>The <code>re</code> Module</h2>
+
+<p>
+The <code>re</code> module
+(provided by file <code>re.lua</code> in the distribution)
+supports a somewhat conventional regex syntax
+for pattern usage within <a href="lpeg.html">LPeg</a>.
+</p>
+
+<p>
+The next table summarizes <code>re</code>'s syntax.
+A <code>p</code> represents an arbitrary pattern;
+<code>num</code> represents a number (<code>[0-9]+</code>);
+<code>name</code> represents an identifier
+(<code>[a-zA-Z][a-zA-Z0-9_]*</code>).
+Constructions are listed in order of decreasing precedence.
+<table border="1">
+<tbody><tr><td><b>Syntax</b></td><td><b>Description</b></td></tr>
+<tr><td><code>( p )</code></td> <td>grouping</td></tr>
+<tr><td><code>'string'</code></td> <td>literal string</td></tr>
+<tr><td><code>"string"</code></td> <td>literal string</td></tr>
+<tr><td><code>[class]</code></td> <td>character class</td></tr>
+<tr><td><code>.</code></td> <td>any character</td></tr>
+<tr><td><code>%name</code></td>
+  <td>pattern <code>defs[name]</code> or a pre-defined pattern</td></tr>
+<tr><td><code>name</code></td><td>non terminal</td></tr>
+<tr><td><code>&lt;name&gt;</code></td><td>non terminal</td></tr>
+<tr><td><code>{}</code></td> <td>position capture</td></tr>
+<tr><td><code>{ p }</code></td> <td>simple capture</td></tr>
+<tr><td><code>{: p :}</code></td> <td>anonymous group capture</td></tr>
+<tr><td><code>{:name: p :}</code></td> <td>named group capture</td></tr>
+<tr><td><code>{~ p ~}</code></td> <td>substitution capture</td></tr>
+<tr><td><code>{| p |}</code></td> <td>table capture</td></tr>
+<tr><td><code>=name</code></td> <td>back reference
+</td></tr>
+<tr><td><code>p ?</code></td> <td>optional match</td></tr>
+<tr><td><code>p *</code></td> <td>zero or more repetitions</td></tr>
+<tr><td><code>p +</code></td> <td>one or more repetitions</td></tr>
+<tr><td><code>p^num</code></td> <td>exactly <code>n</code> repetitions</td></tr>
+<tr><td><code>p^+num</code></td>
+      <td>at least <code>n</code> repetitions</td></tr>
+<tr><td><code>p^-num</code></td>
+      <td>at most <code>n</code> repetitions</td></tr>
+<tr><td><code>p -&gt; 'string'</code></td> <td>string capture</td></tr>
+<tr><td><code>p -&gt; "string"</code></td> <td>string capture</td></tr>
+<tr><td><code>p -&gt; num</code></td> <td>numbered capture</td></tr>
+<tr><td><code>p -&gt; name</code></td> <td>function/query/string capture
+equivalent to <code>p / defs[name]</code></td></tr>
+<tr><td><code>p =&gt; name</code></td> <td>match-time capture
+equivalent to <code>lpeg.Cmt(p, defs[name])</code></td></tr>
+<tr><td><code>& p</code></td> <td>and predicate</td></tr>
+<tr><td><code>! p</code></td> <td>not predicate</td></tr>
+<tr><td><code>p1 p2</code></td> <td>concatenation</td></tr>
+<tr><td><code>p1 / p2</code></td> <td>ordered choice</td></tr>
+<tr><td>(<code>name &lt;- p</code>)<sup>+</sup></td> <td>grammar</td></tr>
+</tbody></table>
+<p>
+Any space appearing in a syntax description can be
+replaced by zero or more space characters and Lua-style comments
+(<code>--</code> until end of line).
+</p>
+
+<p>
+Character classes define sets of characters.
+An initial <code>^</code> complements the resulting set.
+A range <em>x</em><code>-</code><em>y</em> includes in the set
+all characters with codes between the codes of <em>x</em> and <em>y</em>.
+A pre-defined class <code>%</code><em>name</em> includes all
+characters of that class.
+A simple character includes itself in the set.
+The only special characters inside a class are <code>^</code>
+(special only if it is the first character);
+<code>]</code>
+(can be included in the set as the first character,
+after the optional <code>^</code>);
+<code>%</code> (special only if followed by a letter);
+and <code>-</code>
+(can be included in the set as the first or the last character).
+</p>
+
+<p>
+Currently the pre-defined classes are similar to those from the
+Lua's string library
+(<code>%a</code> for letters,
+<code>%A</code> for non letters, etc.).
+There is also a class <code>%nl</code>
+containing only the newline character,
+which is particularly handy for grammars written inside long strings,
+as long strings do not interpret escape sequences like <code>\n</code>.
+</p>
+
+
+<h2><a name="func">Functions</a></h2>
+
+<h3><code>re.compile (string, [, defs])</code></h3>
+<p>
+Compiles the given string and
+returns an equivalent LPeg pattern.
+The given string may define either an expression or a grammar.
+The optional <code>defs</code> table provides extra Lua values
+to be used by the pattern.
+</p>
+
+<h3><code>re.find (subject, pattern [, init])</code></h3>
+<p>
+Searches the given pattern in the given subject.
+If it finds a match,
+returns the index where this occurrence starts and
+the index where it ends.
+Otherwise, returns nil.
+</p>
+
+<p>
+An optional numeric argument <code>init</code> makes the search
+starts at that position in the subject string.
+As usual in Lua libraries,
+a negative value counts from the end.
+</p>
+
+<h3><code>re.gsub (subject, pattern, replacement)</code></h3>
+<p>
+Does a <em>global substitution</em>,
+replacing all occurrences of <code>pattern</code>
+in the given <code>subject</code> by <code>replacement</code>.
+
+<h3><code>re.match (subject, pattern)</code></h3>
+<p>
+Matches the given pattern against the given subject,
+returning all captures.
+</p>
+
+<h3><code>re.updatelocale ()</code></h3>
+<p>
+Updates the pre-defined character classes to the current locale.
+</p>
+
+
+<h2><a name="ex">Some Examples</a></h2>
+
+<h3>A complete simple program</h3>
+<p>
+The next code shows a simple complete Lua program using
+the <code>re</code> module:
+</p>
+<pre class="example">
+local re = require"re"
+
+-- find the position of the first numeral in a string
+print(re.find("the number 423 is odd", "[0-9]+"))  --&gt; 12    14
+
+-- returns all words in a string
+print(re.match("the number 423 is odd", "({%a+} / .)*"))
+--&gt; the    number    is    odd
+
+-- returns the first numeral in a string
+print(re.match("the number 423 is odd", "s <- {%d+} / . s"))
+--&gt; 423
+
+print(re.gsub("hello World", "[aeiou]", "."))
+--&gt; h.ll. W.rld
+</pre>
+
+
+<h3>Balanced parentheses</h3>
+<p>
+The following call will produce the same pattern produced by the
+Lua expression in the
+<a href="lpeg.html#balanced">balanced parentheses</a> example:
+</p>
+<pre class="example">
+b = re.compile[[  balanced &lt;- "(" ([^()] / balanced)* ")"  ]]
+</pre>
+
+<h3>String reversal</h3>
+<p>
+The next example reverses a string:
+</p>
+<pre class="example">
+rev = re.compile[[ R &lt;- (!.) -&gt; '' / ({.} R) -&gt; '%2%1']]
+print(rev:match"0123456789")   --&gt; 9876543210
+</pre>
+
+<h3>CSV decoder</h3>
+<p>
+The next example replicates the <a href="lpeg.html#CSV">CSV decoder</a>:
+</p>
+<pre class="example">
+record = re.compile[[
+  record &lt;- {| field (',' field)* |} (%nl / !.)
+  field &lt;- escaped / nonescaped
+  nonescaped &lt;- { [^,"%nl]* }
+  escaped &lt;- '"' {~ ([^"] / '""' -&gt; '"')* ~} '"'
+]]
+</pre>
+
+<h3>Lua's long strings</h3>
+<p>
+The next example matches Lua long strings:
+</p>
+<pre class="example">
+c = re.compile([[
+  longstring &lt;- ('[' {:eq: '='* :} '[' close)
+  close &lt;- ']' =eq ']' / . close
+]])
+
+print(c:match'[==[]]===]]]]==]===[]')   --&gt; 17
+</pre>
+
+<h3>Abstract Syntax Trees</h3>
+<p>
+This example shows a simple way to build an
+abstract syntax tree (AST) for a given grammar.
+To keep our example simple,
+let us consider the following grammar
+for lists of names:
+</p>
+<pre class="example">
+p = re.compile[[
+      listname &lt;- (name s)*
+      name &lt;- [a-z][a-z]*
+      s &lt;- %s*
+]]
+</pre>
+<p>
+Now, we will add captures to build a corresponding AST.
+As a first step, the pattern will build a table to
+represent each non terminal;
+terminals will be represented by their corresponding strings:
+</p>
+<pre class="example">
+c = re.compile[[
+      listname &lt;- {| (name s)* |}
+      name &lt;- {| {[a-z][a-z]*} |}
+      s &lt;- %s*
+]]
+</pre>
+<p>
+Now, a match against <code>"hi hello bye"</code>
+results in the table
+<code>{{"hi"}, {"hello"}, {"bye"}}</code>.
+</p>
+<p>
+For such a simple grammar,
+this AST is more than enough;
+actually, the tables around each single name
+are already overkilling.
+More complex grammars,
+however, may need some more structure.
+Specifically,
+it would be useful if each table had
+a <code>tag</code> field telling what non terminal
+that table represents.
+We can add such a tag using
+<a href="lpeg.html#cap-g">named group captures</a>:
+</p>
+<pre class="example">
+x = re.compile[[
+      listname <- {| {:tag: '' -> 'list':} (name s)* |}
+      name <- {| {:tag: '' -> 'id':} {[a-z][a-z]*} |}
+      s <- ' '*
+]]
+</pre>
+<p>
+With these group captures,
+a match against <code>"hi hello bye"</code>
+results in the following table:
+</p>
+<pre class="example">
+{tag="list",
+  {tag="id", "hi"},
+  {tag="id", "hello"},
+  {tag="id", "bye"}
+}
+</pre>
+
+
+<h3>Indented blocks</h3>
+<p>
+This example breaks indented blocks into tables,
+respecting the indentation:
+</p>
+<pre class="example">
+p = re.compile[[
+  block &lt;- {| {:ident:' '*:} line
+           ((=ident !' ' line) / &(=ident ' ') block)* |}
+  line &lt;- {[^%nl]*} %nl
+]]
+</pre>
+<p>
+As an example,
+consider the following text:
+</p>
+<pre class="example">
+t = p:match[[
+first line
+  subline 1
+  subline 2
+second line
+third line
+  subline 3.1
+    subline 3.1.1
+  subline 3.2
+]]
+</pre>
+<p>
+The resulting table <code>t</code> will be like this:
+</p>
+<pre class="example">
+   {'first line'; {'subline 1'; 'subline 2'; ident = '  '};
+    'second line';
+    'third line'; { 'subline 3.1'; {'subline 3.1.1'; ident = '    '};
+                    'subline 3.2'; ident = '  '};
+    ident = ''}
+</pre>
+
+<h3>Macro expander</h3>
+<p>
+This example implements a simple macro expander.
+Macros must be defined as part of the pattern,
+following some simple rules:
+</p>
+<pre class="example">
+p = re.compile[[
+      text &lt;- {~ item* ~}
+      item &lt;- macro / [^()] / '(' item* ')'
+      arg &lt;- ' '* {~ (!',' item)* ~}
+      args &lt;- '(' arg (',' arg)* ')'
+      -- now we define some macros
+      macro &lt;- ('apply' args) -&gt; '%1(%2)'
+             / ('add' args) -&gt; '%1 + %2'
+             / ('mul' args) -&gt; '%1 * %2'
+]]
+
+print(p:match"add(mul(a,b), apply(f,x))")   --&gt; a * b + f(x)
+</pre>
+<p>
+A <code>text</code> is a sequence of items,
+wherein we apply a substitution capture to expand any macros.
+An <code>item</code> is either a macro,
+any character different from parentheses,
+or a parenthesized expression.
+A macro argument (<code>arg</code>) is a sequence
+of items different from a comma.
+(Note that a comma may appear inside an item,
+e.g., inside a parenthesized expression.)
+Again we do a substitution capture to expand any macro
+in the argument before expanding the outer macro.
+<code>args</code> is a list of arguments separated by commas.
+Finally we define the macros.
+Each macro is a string substitution;
+it replaces the macro name and its arguments by its corresponding string,
+with each <code>%</code><em>n</em> replaced by the <em>n</em>-th argument.
+</p>
+
+<h3>Patterns</h3>
+<p>
+This example shows the complete syntax
+of patterns accepted by <code>re</code>.
+</p>
+<pre class="example">
+p = [=[
+
+pattern         &lt;- exp !.
+exp             &lt;- S (alternative / grammar)
+
+alternative     &lt;- seq ('/' S seq)*
+seq             &lt;- prefix*
+prefix          &lt;- '&amp;' S prefix / '!' S prefix / suffix
+suffix          &lt;- primary S (([+*?]
+                            / '^' [+-]? num
+                            / '-&gt;' S (string / '{}' / name)
+                            / '=&gt;' S name) S)*
+
+primary         &lt;- '(' exp ')' / string / class / defined
+                 / '{:' (name ':')? exp ':}'
+                 / '=' name
+                 / '{}'
+                 / '{~' exp '~}'
+                 / '{' exp '}'
+                 / '.'
+                 / name S !arrow
+                 / '&lt;' name '&gt;'          -- old-style non terminals
+
+grammar         &lt;- definition+
+definition      &lt;- name S arrow exp
+
+class           &lt;- '[' '^'? item (!']' item)* ']'
+item            &lt;- defined / range / .
+range           &lt;- . '-' [^]]
+
+S               &lt;- (%s / '--' [^%nl]*)*   -- spaces and comments
+name            &lt;- [A-Za-z][A-Za-z0-9_]*
+arrow           &lt;- '&lt;-'
+num             &lt;- [0-9]+
+string          &lt;- '"' [^"]* '"' / "'" [^']* "'"
+defined         &lt;- '%' name
+
+]=]
+
+print(re.match(p, p))   -- a self description must match itself
+</pre>
+
+
+
+<h2><a name="license">License</a></h2>
+
+<p>
+Copyright &copy; 2008-2015 Lua.org, PUC-Rio.
+</p>
+<p>
+Permission is hereby granted, free of charge,
+to any person obtaining a copy of this software and
+associated documentation files (the "Software"),
+to deal in the Software without restriction,
+including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software,
+and to permit persons to whom the Software is
+furnished to do so,
+subject to the following conditions:
+</p>
+
+<p>
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions of the Software.
+</p>
+
+<p>
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+</p>
+
+</div> <!-- id="content" -->
+
+</div> <!-- id="main" -->
+
+<div id="about">
+<p><small>
+$Id: re.html,v 1.23 2015/09/28 17:17:41 roberto Exp $
+</small></p>
+</div> <!-- id="about" -->
+
+</div> <!-- id="container" -->
+
+</body>
+</html> 

@@ -1,35 +1,48 @@
 local skynet = require "skynet"
+local harbor = require "skynet.harbor"
+require "skynet.manager"	-- import skynet.launch, ...
+local memory = require "memory"
 
 skynet.start(function()
-	assert(skynet.launch("logger", skynet.getenv "logger"))
+	local sharestring = tonumber(skynet.getenv "sharestring")
+	memory.ssexpand(sharestring or 4096)
 
 	local standalone = skynet.getenv "standalone"
+
+	local launcher = assert(skynet.launch("snlua","launcher"))
+	skynet.name(".launcher", launcher)
+
 	local harbor_id = tonumber(skynet.getenv "harbor")
 	if harbor_id == 0 then
 		assert(standalone ==  nil)
 		standalone = true
 		skynet.setenv("standalone", "true")
-		assert(skynet.launch("dummy"))
-	else
-		local master_addr = skynet.getenv "master"
 
+		local ok, slave = pcall(skynet.newservice, "cdummy")
+		if not ok then
+			skynet.abort()
+		end
+		skynet.name(".cslave", slave)
+
+	else
 		if standalone then
-			assert(skynet.launch("master", master_addr))
+			if not pcall(skynet.newservice,"cmaster") then
+				skynet.abort()
+			end
 		end
 
-		local local_addr = skynet.getenv "address"
-
-		assert(skynet.launch("harbor",master_addr, local_addr, harbor_id))
+		local ok, slave = pcall(skynet.newservice, "cslave")
+		if not ok then
+			skynet.abort()
+		end
+		skynet.name(".cslave", slave)
 	end
-
-	local launcher = assert(skynet.launch("snlua","launcher"))
-	skynet.name(".launcher", launcher)
 
 	if standalone then
-		local datacenter = assert(skynet.newservice "datacenterd")
+		local datacenter = skynet.newservice "datacenterd"
 		skynet.name("DATACENTER", datacenter)
 	end
-	assert(skynet.newservice "service_mgr")
-	assert(skynet.newservice(skynet.getenv "start" or "main"))
+	skynet.newservice "service_mgr"
+	pcall(skynet.newservice,skynet.getenv "start" or "main")
 	skynet.exit()
 end)

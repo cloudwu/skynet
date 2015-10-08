@@ -135,7 +135,7 @@ _ctrl(struct gate * g, const void * msg, int sz) {
 		skynet_socket_start(ctx, g->listen_id);
 		return;
 	}
-    if (memcmp(command, "close", i) == 0) {
+	if (memcmp(command, "close", i) == 0) {
 		if (g->listen_id >= 0) {
 			skynet_socket_close(ctx, g->listen_id);
 			g->listen_id = -1;
@@ -262,6 +262,9 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 			skynet_socket_start(ctx, message->ud);
 		}
 		break;
+	case SKYNET_SOCKET_TYPE_WARNING:
+		skynet_error(ctx, "fd (%d) send buffer (%d)K", message->id, message->ud);
+		break;
 	}
 }
 
@@ -292,7 +295,6 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 		}
 	}
 	case PTYPE_SOCKET:
-		assert(source == 0);
 		// recv socket message from skynet_socket
 		dispatch_socket_message(g, msg, (int)(sz-sizeof(struct skynet_socket_message)));
 		break;
@@ -333,13 +335,12 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	if (parm == NULL)
 		return 1;
 	int max = 0;
-	int buffer = 0;
 	int sz = strlen(parm)+1;
 	char watchdog[sz];
 	char binding[sz];
 	int client_tag = 0;
 	char header;
-	int n = sscanf(parm, "%c %s %s %d %d %d",&header,watchdog, binding,&client_tag , &max,&buffer);
+	int n = sscanf(parm, "%c %s %s %d %d %d", &header, watchdog, binding, &client_tag, &max);
 	if (n<4) {
 		skynet_error(ctx, "Invalid gate parm %s",parm);
 		return 1;

@@ -2,7 +2,7 @@ local skynet = require "skynet"
 local snax = require "snax"
 
 skynet.start(function()
-	local ps = snax.uniqueservice ("pingserver", "hello world")
+	local ps = snax.newservice ("pingserver", "hello world")
 	print(ps.req.ping("foobar"))
 	print(ps.post.hello())
 	print(pcall(ps.req.error))
@@ -31,6 +31,6 @@ end
 		print(string.format("%s\tcount:%d time:%f", name, v.count, v.time))
 	end
 
-	print(snax.kill(ps,"exit"))
+	print(ps.post.exit("exit")) -- == snax.kill(ps, "exit")
 	skynet.exit()
 end)

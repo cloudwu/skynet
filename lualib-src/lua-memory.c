@@ -2,11 +2,12 @@
 #include <lauxlib.h>
 
 #include "malloc_hook.h"
+#include "luashrtbl.h"
 
 static int
 ltotal(lua_State *L) {
 	size_t t = malloc_used_memory();
-	lua_pushunsigned(L, t);
+	lua_pushinteger(L, (lua_Integer)t);
 
 	return 1;
 }
@@ -14,7 +15,7 @@ ltotal(lua_State *L) {
 static int
 lblock(lua_State *L) {
 	size_t t = malloc_memory_block();
-	lua_pushunsigned(L, t);
+	lua_pushinteger(L, (lua_Integer)t);
 
 	return 1;
 }
@@ -33,6 +34,13 @@ ldump(lua_State *L) {
 	return 0;
 }
 
+static int
+lexpandshrtbl(lua_State *L) {
+	int n = luaL_checkinteger(L, 1);
+	luaS_expandshr(n);
+	return 0;
+}
+
 int
 luaopen_memory(lua_State *L) {
 	luaL_checkversion(L);
@@ -42,6 +50,9 @@ luaopen_memory(lua_State *L) {
 		{ "block", lblock },
 		{ "dumpinfo", ldumpinfo },
 		{ "dump", ldump },
+		{ "info", dump_mem_lua },
+		{ "ssinfo", luaS_shrinfo },
+		{ "ssexpand", lexpandshrtbl },
 		{ NULL, NULL },
 	};
 

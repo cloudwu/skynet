@@ -11,6 +11,10 @@ struct skynet_message {
 	size_t sz;
 };
 
+// type is encoding in skynet_message.sz high 8bit
+#define MESSAGE_TYPE_MASK (SIZE_MAX >> 8)
+#define MESSAGE_TYPE_SHIFT ((sizeof(size_t)-1) * 8)
+
 struct message_queue;
 
 void skynet_globalmq_push(struct message_queue * queue);
@@ -30,6 +34,7 @@ void skynet_mq_push(struct message_queue *q, struct skynet_message *message);
 
 // return the length of message queue, for debug
 int skynet_mq_length(struct message_queue *q);
+int skynet_mq_overload(struct message_queue *q);
 
 void skynet_mq_init();
 

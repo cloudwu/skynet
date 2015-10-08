@@ -10,5 +10,9 @@ function datacenter.set(...)
 	return skynet.call("DATACENTER", "lua", "UPDATE", ...)
 end
 
+function datacenter.wait(...)
+	return skynet.call("DATACENTER", "lua", "WAIT", ...)
+end
+
 return datacenter
 

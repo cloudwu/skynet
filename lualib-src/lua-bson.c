@@ -8,24 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-
-#if defined(_WIN32) || defined(_WIN64)
-
-#include <winsock2.h>
-
-static void	
-init_winsock() {
-	WSADATA wsaData;
-	WSAStartup(MAKEWORD(2,2), &wsaData);
-}
-
-#else
-
-static void	
-init_winsock() {
-}
-
-#endif
+#include "atomic.h"
 
 #define DEFAULT_CAP 64
 #define MAX_NUMBER 1024
@@ -261,22 +244,26 @@ append_key(struct bson *bs, int type, const char *key, size_t sz) {
 	write_string(bs, key, sz);
 }
 
+static inline int
+is_32bit(int64_t v) {
+	return v >= INT32_MIN && v <= INT32_MAX;
+}
+
 static void
 append_number(struct bson *bs, lua_State *L, const char *key, size_t sz) {
-	int64_t i = lua_tointeger(L, -1);
-	lua_Number d = lua_tonumber(L,-1);
-	if (i != d) {
-		append_key(bs, BSON_REAL, key, sz);
-		write_double(bs, d);
-	} else {
-		int si = i >> 31;
-		if (si == 0 || si == -1) {
+	if (lua_isinteger(L, -1)) {
+		int64_t i = lua_tointeger(L, -1);
+		if (is_32bit(i)) {
 			append_key(bs, BSON_INT32, key, sz);
 			write_int32(bs, i);
 		} else {
 			append_key(bs, BSON_INT64, key, sz);
 			write_int64(bs, i);
 		}
+	} else {
+		lua_Number d = lua_tonumber(L,-1);
+		append_key(bs, BSON_REAL, key, sz);
+		write_double(bs, d);
 	}
 }
 
@@ -433,7 +420,7 @@ pack_dict(lua_State *L, struct bson *b, bool isarray) {
 				luaL_error(L, "Invalid array key type : %s", lua_typename(L, kt));
 				return;
 			}
-			sz = bson_numstr(numberkey, lua_tounsigned(L,-2)-1);
+			sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
 			key = numberkey;
 
 			append_one(b, L, key, sz);
@@ -775,8 +762,7 @@ lreplace(lua_State *L) {
 		return luaL_error(L, "call makeindex first");
 	}
 	lua_pushvalue(L,2);
-	lua_rawget(L, -2);
-	if (!lua_isnumber(L,-1)) {
+	if (lua_rawget(L, -2) != LUA_TNUMBER) {
 		return luaL_error(L, "Can't replace key : %s", lua_tostring(L,2));
 	}
 	int id = lua_tointeger(L, -1);
@@ -797,20 +783,18 @@ lreplace(lua_State *L) {
 		replace_object(L, type, &b);
 		break;
 	case BSON_INT32: {
-		double d = luaL_checknumber(L,3);
-		int32_t i = lua_tointeger(L,3);
-		if ((int32_t)d != i) {
-			luaL_error(L, "%f must be a 32bit integer ", d);
+		if (!lua_isinteger(L, 3)) {
+			luaL_error(L, "%f must be a 32bit integer ", lua_tonumber(L, 3));
 		}
+		int32_t i = lua_tointeger(L,3);
 		write_int32(&b, i);
 		break;
 	}
 	case BSON_INT64: {
-		double d = luaL_checknumber(L,3);
-		lua_Integer i = lua_tointeger(L,3);
-		if ((lua_Integer)d != i) {
-			luaL_error(L, "%f must be a 64bit integer ", d);
+		if (!lua_isinteger(L, 3)) {
+			luaL_error(L, "%f must be a 64bit integer ", lua_tonumber(L, 3));
 		}
+		int64_t i = lua_tointeger(L,3);
 		write_int64(&b, i);
 		break;
 	}
@@ -912,7 +896,7 @@ ltimestamp(lua_State *L) {
 		luaL_addlstring(&b, (const char *)&inc, sizeof(inc));
 		++inc;
 	} else {
-		uint32_t i = lua_tounsigned(L,2);
+		uint32_t i = (uint32_t)lua_tointeger(L,2);
 		luaL_addlstring(&b, (const char *)&i, sizeof(i));
 	}
 	luaL_addlstring(&b, (const char *)&d, sizeof(d));
@@ -996,8 +980,8 @@ lsubtype(lua_State *L, int subtype, const uint8_t * buf, size_t sz) {
 		}
 		const uint32_t * ts = (const uint32_t *)buf;
 		lua_pushvalue(L, lua_upvalueindex(8));
-		lua_pushunsigned(L, ts[1]);
-		lua_pushunsigned(L, ts[0]);
+		lua_pushinteger(L, (lua_Integer)ts[1]);
+		lua_pushinteger(L, (lua_Integer)ts[0]);
 		return 3;
 	}
 	case BSON_REGEX: {
@@ -1083,7 +1067,7 @@ typeclosure(lua_State *L) {
 		"string",	// 5
 		"binary",	// 6
 		"objectid",	// 7
-		"timestamp",// 8
+		"timestamp",    // 8
 		"date",		// 9
 		"regex",	// 10
 		"minkey",	// 11
@@ -1103,7 +1087,10 @@ static uint32_t oid_counter;
 
 static void
 init_oid_header() {
-	init_winsock();
+	if (oid_counter) {
+		// already init
+		return;
+	}
 	pid_t pid = getpid();
 	uint32_t h = 0;
 	char hostname[256];
@@ -1119,8 +1106,12 @@ init_oid_header() {
 	oid_header[2] = (h>>16) & 0xff;
 	oid_header[3] = pid & 0xff;
 	oid_header[4] = (pid >> 8) & 0xff;
-
-	oid_counter = h ^ time(NULL) ^ (uintptr_t)&h;
+	
+	uint32_t c = h ^ time(NULL) ^ (uintptr_t)&h;
+	if (c == 0) {
+		c = 1;
+	}
+	oid_counter = c;
 }
 
 static inline int
@@ -1149,15 +1140,17 @@ lobjectid(lua_State *L) {
 		}
 	} else {
 		time_t ti = time(NULL);
+		// old_counter is a static var, use atom inc.
+		uint32_t id = ATOM_FINC(&oid_counter);
+
 		oid[2] = (ti>>24) & 0xff;
 		oid[3] = (ti>>16) & 0xff;
 		oid[4] = (ti>>8) & 0xff;
 		oid[5] = ti & 0xff;
 		memcpy(oid+6 , oid_header, 5);
-		oid[11] = (oid_counter>>16) & 0xff; 
-		oid[12] = (oid_counter>>8) & 0xff; 
-		oid[13] = oid_counter & 0xff; 
-		++oid_counter;
+		oid[11] = (id>>16) & 0xff; 
+		oid[12] = (id>>8) & 0xff; 
+		oid[13] = id & 0xff;
 	}
 	lua_pushlstring( L, (const char *)oid, 14);
 
@@ -1180,7 +1173,6 @@ luaopen_bson(lua_State *L) {
 		{ "timestamp", ltimestamp  },
 		{ "regex", lregex },
 		{ "binary", lbinary },
-		{ "regex", lregex },
 		{ "objectid", lobjectid },
 		{ "decode", ldecode },
 		{ NULL,  NULL },
