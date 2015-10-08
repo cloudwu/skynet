@@ -58,6 +58,15 @@ local function querytype(self, typename)
 	return v
 end
 
+function sproto:exist_type(typename)
+	local v = self.__tcache[typename]
+	if not v then
+		return core.querytype(self.__cobj, typename) ~= nil
+	else
+		return true
+	end
+end
+
 function sproto:encode(typename, tbl)
 	local st = querytype(self, typename)
 	return core.encode(st, tbl)
@@ -97,6 +106,15 @@ local function queryproto(self, pname)
 	end
 
 	return v
+end
+
+function sproto:exist_proto(pname)
+	local v = self.__pcache[pname]
+	if not v then
+		return core.protocol(self.__cobj, pname) ~= nil
+	else
+		return true
+	end
 end
 
 function sproto:request_encode(protoname, tbl)
