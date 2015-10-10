@@ -2,6 +2,7 @@
 
 #include "socket_server.h"
 #include "socket_poll.h"
+#include "atomic.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -237,13 +238,13 @@ static int
 reserve_id(struct socket_server *ss) {
 	int i;
 	for (i=0;i<MAX_SOCKET;i++) {
-		int id = __sync_add_and_fetch(&(ss->alloc_id), 1);
+		int id = ATOM_INC(&(ss->alloc_id));
 		if (id < 0) {
-			id = __sync_and_and_fetch(&(ss->alloc_id), 0x7fffffff);
+			id = ATOM_AND(&(ss->alloc_id), 0x7fffffff);
 		}
 		struct socket *s = &ss->slot[HASH_ID(id)];
 		if (s->type == SOCKET_TYPE_INVALID) {
-			if (__sync_bool_compare_and_swap(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
+			if (ATOM_CAS(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
 				s->id = id;
 				s->fd = -1;
 				return id;
@@ -407,6 +408,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 
 	status = getaddrinfo( request->host, port, &ai_hints, &ai_list );
 	if ( status != 0 ) {
+		result->data = (void *)gai_strerror(status);
 		goto _failed;
 	}
 	int sock= -1;
@@ -427,12 +429,14 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 	}
 
 	if (sock < 0) {
+		result->data = strerror(errno);
 		goto _failed;
 	}
 
 	ns = new_fd(ss, id, sock, PROTOCOL_TCP, request->opaque, true);
 	if (ns == NULL) {
 		close(sock);
+		result->data = "reach skynet socket number limit";
 		goto _failed;
 	}
 
@@ -687,7 +691,11 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		so.free_func(request->buffer);
 		return -1;
 	}
-	assert(s->type != SOCKET_TYPE_PLISTEN && s->type != SOCKET_TYPE_LISTEN);
+	if (s->type == SOCKET_TYPE_PLISTEN || s->type == SOCKET_TYPE_LISTEN) {
+		fprintf(stderr, "socket-server: write to listen fd %d.\n", id);
+		so.free_func(request->buffer);
+		return -1;
+	}
 	if (send_buffer_empty(s) && s->type == SOCKET_TYPE_CONNECTED) {
 		if (s->protocol == PROTOCOL_TCP) {
 			int n = write(s->fd, so.buffer, so.sz);
@@ -700,6 +708,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 				default:
 					fprintf(stderr, "socket-server: write to %d (fd=%d) error :%s.\n",id,s->fd,strerror(errno));
 					force_close(ss,s,result);
+					so.free_func(request->buffer);
 					return SOCKET_CLOSE;
 				}
 			}
@@ -756,7 +765,7 @@ _failed:
 	result->opaque = request->opaque;
 	result->id = id;
 	result->ud = 0;
-	result->data = NULL;
+	result->data = "reach skynet socket number limit";
 	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
 
 	return SOCKET_ERROR;
@@ -797,7 +806,7 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 	result->ud = 0;
 	struct socket *s = new_fd(ss, id, request->fd, PROTOCOL_TCP, request->opaque, true);
 	if (s == NULL) {
-		result->data = NULL;
+		result->data = "reach skynet socket number limit";
 		return SOCKET_ERROR;
 	}
 	sp_nonblocking(request->fd);
@@ -815,11 +824,13 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	result->data = NULL;
 	struct socket *s = &ss->slot[HASH_ID(id)];
 	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
+		result->data = "invalid socket";
 		return SOCKET_ERROR;
 	}
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		if (sp_add(ss->event_fd, s->fd, s)) {
 			s->type = SOCKET_TYPE_INVALID;
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
@@ -907,7 +918,7 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 		result->opaque = s->opaque;
 		result->id = s->id;
 		result->ud = 0;
-		result->data = NULL;
+		result->data = "protocol mismatch";
 
 		return SOCKET_ERROR;
 	}
@@ -989,6 +1000,7 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_me
 		default:
 			// close when error
 			force_close(ss, s, result);
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 		return -1;
@@ -1049,6 +1061,7 @@ forward_message_udp(struct socket_server *ss, struct socket *s, struct socket_me
 		default:
 			// close when error
 			force_close(ss, s, result);
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 		return -1;
@@ -1082,6 +1095,7 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 	int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);  
 	if (code < 0 || error) {  
 		force_close(ss,s, result);
+		result->data = strerror(errno);
 		return SOCKET_ERROR;
 	} else {
 		s->type = SOCKET_TYPE_CONNECTED;
@@ -1105,14 +1119,22 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 	}
 }
 
-// return 0 when failed
+// return 0 when failed, or -1 when file limit
 static int
 report_accept(struct socket_server *ss, struct socket *s, struct socket_message *result) {
 	union sockaddr_all u;
 	socklen_t len = sizeof(u);
 	int client_fd = accept(s->fd, &u.s, &len);
 	if (client_fd < 0) {
-		return 0;
+		if (errno == EMFILE || errno == ENFILE) {
+			result->opaque = s->opaque;
+			result->id = s->id;
+			result->ud = 0;
+			result->data = strerror(errno);
+			return -1;
+		} else {
+			return 0;
+		}
 	}
 	int id = reserve_id(ss);
 	if (id < 0) {
@@ -1154,6 +1176,7 @@ clear_closed_event(struct socket_server *ss, struct socket_message * result, int
 			if (s) {
 				if (s->type == SOCKET_TYPE_INVALID && s->id == id) {
 					e->s = NULL;
+					break;
 				}
 			}
 		}
@@ -1197,11 +1220,16 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 		switch (s->type) {
 		case SOCKET_TYPE_CONNECTING:
 			return report_connect(ss, s, result);
-		case SOCKET_TYPE_LISTEN:
-			if (report_accept(ss, s, result)) {
+		case SOCKET_TYPE_LISTEN: {
+			int ok = report_accept(ss, s, result);
+			if (ok > 0) {
 				return SOCKET_ACCEPT;
-			} 
+			} if (ok < 0 ) {
+				return SOCKET_ERROR;
+			}
+			// when ok == 0, retry
 			break;
+		}
 		case SOCKET_TYPE_INVALID:
 			fprintf(stderr, "socket-server: invalid socket\n");
 			break;
@@ -1218,21 +1246,19 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 						return SOCKET_UDP;
 					}
 				}
-				if (e->write) {
+				if (e->write && type != SOCKET_CLOSE && type != SOCKET_ERROR) {
 					// Try to dispatch write message next step if write flag set.
 					e->read = false;
 					--ss->event_index;
 				}
 				if (type == -1)
-					break;
-				clear_closed_event(ss, result, type);
+					break;				
 				return type;
 			}
 			if (e->write) {
 				int type = send_buffer(ss, s, result);
 				if (type == -1)
 					break;
-				clear_closed_event(ss, result, type);
 				return type;
 			}
 			break;
@@ -1260,7 +1286,7 @@ send_request(struct socket_server *ss, struct request_package *request, char typ
 static int
 open_request(struct socket_server *ss, struct request_package *req, uintptr_t opaque, const char *addr, int port) {
 	int len = strlen(addr);
-	if (len + sizeof(req->u.open) > 256) {
+	if (len + sizeof(req->u.open) >= 256) {
 		fprintf(stderr, "socket-server : Invalid addr %s.\n",addr);
 		return -1;
 	}
@@ -1286,11 +1312,19 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 	return request.u.open.id;
 }
 
+static void
+free_buffer(struct socket_server *ss, const void * buffer, int sz) {
+	struct send_object so;
+	send_object_init(ss, &so, (void *)buffer, sz);
+	so.free_func((void *)buffer);
+}
+
 // return -1 when error
 int64_t 
 socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz) {
 	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
+		free_buffer(ss, buffer, sz);
 		return -1;
 	}
 
@@ -1307,6 +1341,7 @@ void
 socket_server_send_lowpriority(struct socket_server *ss, int id, const void * buffer, int sz) {
 	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
+		free_buffer(ss, buffer, sz);
 		return;
 	}
 
@@ -1489,6 +1524,7 @@ int64_t
 socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp_address *addr, const void *buffer, int sz) {
 	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
+		free_buffer(ss, buffer, sz);
 		return -1;
 	}
 
@@ -1507,6 +1543,7 @@ socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp
 		addrsz = 1+2+16;	// 1 type, 2 port, 16 ipv6
 		break;
 	default:
+		free_buffer(ss, buffer, sz);
 		return -1;
 	}
 

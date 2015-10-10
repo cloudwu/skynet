@@ -1,5 +1,5 @@
 /*
-** $Id: luac.c,v 1.72 2015/01/06 03:09:13 lhf Exp $
+** $Id: luac.c,v 1.75 2015/03/12 01:58:27 lhf Exp $
 ** Lua compiler (saves bytecodes to files; also lists bytecodes)
 ** See Copyright Notice in lua.h
 */
@@ -21,6 +21,7 @@
 #include "lobject.h"
 #include "lstate.h"
 #include "lundump.h"
+#include "lstring.h"
 
 static void PrintFunction(const Proto* f, int full);
 #define luaU_print	PrintFunction
@@ -195,6 +196,7 @@ int main(int argc, char* argv[])
  int i=doargs(argc,argv);
  argc-=i; argv+=i;
  if (argc<=0) usage("no input files given");
+ luaS_initshr();
  L=luaL_newstate();
  if (L==NULL) fatal("cannot create state: not enough memory");
  lua_pushcfunction(L,&pmain);
@@ -206,7 +208,7 @@ int main(int argc, char* argv[])
 }
 
 /*
-** $Id: print.c,v 1.76 2015/01/05 16:12:50 lhf Exp $
+** $Id: luac.c,v 1.75 2015/03/12 01:58:27 lhf Exp $
 ** print bytecodes
 ** See Copyright Notice in lua.h
 */
@@ -226,7 +228,7 @@ int main(int argc, char* argv[])
 static void PrintString(const TString* ts)
 {
  const char* s=getstr(ts);
- size_t i,n=ts->len;
+ size_t i,n=tsslen(ts);
  printf("%c",'"');
  for (i=0; i<n; i++)
  {
@@ -287,9 +289,8 @@ static void PrintConstant(const Proto* f, int i)
 
 static void PrintCode(const Proto* f)
 {
- const SharedProto *sp = f->sp;
- const Instruction* code=sp->code;
- int pc,n=sp->sizecode;
+ const Instruction* code=f->sp->code;
+ int pc,n=f->sp->sizecode;
  for (pc=0; pc<n; pc++)
  {
   Instruction i=code[pc];

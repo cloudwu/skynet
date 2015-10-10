@@ -1,5 +1,5 @@
 /*
-** $Id: llimits.h,v 1.125 2014/12/19 13:30:23 roberto Exp $
+** $Id: llimits.h,v 1.135 2015/06/09 14:21:00 roberto Exp $
 ** Limits, basic types, and some other 'installation-dependent' definitions
 ** See Copyright Notice in lua.h
 */
@@ -52,11 +52,11 @@ typedef unsigned char lu_byte;
 
 
 /*
-** conversion of pointer to integer:
+** conversion of pointer to unsigned integer:
 ** this is for hashing only; there is no problem if the integer
 ** cannot hold the whole pointer value
 */
-#define point2int(p)	((unsigned int)((size_t)(p) & UINT_MAX))
+#define point2uint(p)	((unsigned int)((size_t)(p) & UINT_MAX))
 
 
 
@@ -88,22 +88,20 @@ typedef LUAI_UACINT l_uacInt;
 /*
 ** assertion for checking API calls
 */
-#if defined(LUA_USE_APICHECK)
-#include <assert.h>
-#define luai_apicheck(e)	assert(e)
-#else
-#define luai_apicheck(e)	lua_assert(e)
+#if !defined(luai_apicheck)
+#define luai_apicheck(l,e)	lua_assert(e)
 #endif
 
+#define api_check(l,e,msg)	luai_apicheck(l,(e) && msg)
 
-#define api_check(e,msg)	luai_apicheck((e) && msg)
 
-
+/* macro to avoid warnings about unused variables */
 #if !defined(UNUSED)
-#define UNUSED(x)	((void)(x))	/* to avoid warnings */
+#define UNUSED(x)	((void)(x))
 #endif
 
 
+/* type casts (a macro highlights casts in the code) */
 #define cast(t, exp)	((t)(exp))
 
 #define cast_void(i)	cast(void, (i))
@@ -149,11 +147,6 @@ typedef LUAI_UACINT l_uacInt;
 #define LUAI_MAXCCALLS		200
 #endif
 
-/*
-** maximum number of upvalues in a closure (both C and Lua). (Value
-** must fit in an unsigned char.)
-*/
-#define MAXUPVAL	UCHAR_MAX
 
 
 /*
@@ -168,10 +161,33 @@ typedef unsigned long Instruction;
 
 
 
+/*
+** Maximum length for short strings, that is, strings that are
+** internalized. (Cannot be smaller than reserved words or tags for
+** metamethods, as these strings must be internalized;
+** #("function") = 8, #("__newindex") = 10.)
+*/
+#if !defined(LUAI_MAXSHORTLEN)
+#define LUAI_MAXSHORTLEN	40
+#endif
 
-/* minimum size for the string table (must be power of 2) */
+
+/*
+** Initial size for the string table (must be power of 2).
+** The Lua core alone registers ~50 strings (reserved words +
+** metaevent keys + a few others). Libraries would typically add
+** a few dozens more.
+*/
 #if !defined(MINSTRTABSIZE)
-#define MINSTRTABSIZE	64	/* minimum size for "predefined" strings */
+#define MINSTRTABSIZE	128
+#endif
+
+
+/*
+** Size of cache for strings in the API (better be a prime)
+*/
+#if !defined(STRCACHE_SIZE)
+#define STRCACHE_SIZE		127
 #endif
 
 
@@ -181,11 +197,19 @@ typedef unsigned long Instruction;
 #endif
 
 
+/*
+** macros that are executed whenether program enters the Lua core
+** ('lua_lock') and leaves the core ('lua_unlock')
+*/
 #if !defined(lua_lock)
 #define lua_lock(L)	((void) 0)
 #define lua_unlock(L)	((void) 0)
 #endif
 
+/*
+** macro executed during Lua functions at points where the
+** function can yield.
+*/
 #if !defined(luai_threadyield)
 #define luai_threadyield(L)	{lua_unlock(L); lua_lock(L);}
 #endif
@@ -219,6 +243,53 @@ typedef unsigned long Instruction;
 #if !defined(luai_userstateyield)
 #define luai_userstateyield(L,n)	((void)L)
 #endif
+
+
+
+/*
+** The luai_num* macros define the primitive operations over numbers.
+*/
+
+/* floor division (defined as 'floor(a/b)') */
+#if !defined(luai_numidiv)
+#define luai_numidiv(L,a,b)     ((void)L, l_floor(luai_numdiv(L,a,b)))
+#endif
+
+/* float division */
+#if !defined(luai_numdiv)
+#define luai_numdiv(L,a,b)      ((a)/(b))
+#endif
+
+/*
+** modulo: defined as 'a - floor(a/b)*b'; this definition gives NaN when
+** 'b' is huge, but the result should be 'a'. 'fmod' gives the result of
+** 'a - trunc(a/b)*b', and therefore must be corrected when 'trunc(a/b)
+** ~= floor(a/b)'. That happens when the division has a non-integer
+** negative result, which is equivalent to the test below.
+*/
+#if !defined(luai_nummod)
+#define luai_nummod(L,a,b,m)  \
+  { (m) = l_mathop(fmod)(a,b); if ((m)*(b) < 0) (m) += (b); }
+#endif
+
+/* exponentiation */
+#if !defined(luai_numpow)
+#define luai_numpow(L,a,b)      ((void)L, l_mathop(pow)(a,b))
+#endif
+
+/* the others are quite standard operations */
+#if !defined(luai_numadd)
+#define luai_numadd(L,a,b)      ((a)+(b))
+#define luai_numsub(L,a,b)      ((a)-(b))
+#define luai_nummul(L,a,b)      ((a)*(b))
+#define luai_numunm(L,a)        (-(a))
+#define luai_numeq(a,b)         ((a)==(b))
+#define luai_numlt(a,b)         ((a)<(b))
+#define luai_numle(a,b)         ((a)<=(b))
+#define luai_numisnan(a)        (!luai_numeq((a), (a)))
+#endif
+
+
 
 
 

@@ -88,10 +88,10 @@ local function verify_domain_name(name)
 	if #name > MAX_DOMAIN_LEN then
 		return false
 	end
-	if not name:match("^[%l%d-%.]+$") then
+	if not name:match("^[_%l%d%-%.]+$") then
 		return false
 	end
-	for w in name:gmatch("([%w-]+)%.?") do
+	for w in name:gmatch("([_%w%-]+)%.?") do
 		if #w > MAX_LABEL_LEN then
 			return false
 		end
@@ -113,7 +113,7 @@ end
 
 local function pack_question(name, qtype, qclass)
 	local labels = {}
-	for w in name:gmatch("([%w-]+)%.?") do
+	for w in name:gmatch("([_%w%-]+)%.?") do
 		table.insert(labels, string.pack("s1",w))
 	end
 	table.insert(labels, '\0')
@@ -282,7 +282,7 @@ function dns.resolve(name, ipv6)
 		qdcount = 1,
 	}
 	local req = pack_header(question_header) .. pack_question(name, qtype, QCLASS.IN)
-	assert(dns_server, "Call dns.server fist")
+	assert(dns_server, "Call dns.server first")
 	socket.write(dns_server, req)
 	return suspend(question_header.tid, name, qtype)
 end

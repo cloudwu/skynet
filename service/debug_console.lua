@@ -3,6 +3,7 @@ local codecache = require "skynet.codecache"
 local core = require "skynet.core"
 local socket = require "socket"
 local snax = require "snax"
+local memory = require "memory"
 
 local port = tonumber(...)
 local COMMAND = {}
@@ -130,6 +131,8 @@ function COMMAND.help()
 		log = "launch a new lua service with log",
 		debug = "debug address : debug a lua service",
 		signal = "signal address sig",
+		cmem = "Show C memory info",
+		shrtbl = "Show shared short string table info",
 	}
 end
 
@@ -171,7 +174,7 @@ end
 
 local function adjust_address(address)
 	if address:sub(1,1) ~= ":" then
-		address = tonumber("0x" .. address) | (skynet.harbor(skynet.self()) << 24)
+		address = assert(tonumber("0x" .. address), "Need an address") | (skynet.harbor(skynet.self()) << 24)
 	end
 	return address
 end
@@ -228,6 +231,7 @@ function COMMAND.debug(address, fd)
 	skynet.fork(function()
 		repeat
 			local cmdline = socket.readline(fd, "\n")
+            cmdline = cmdline:gsub("(.*)\r$", "%1")
 			if not cmdline then
 				skynet.send(agent, "lua", "cmd", "cont")
 				break
@@ -257,3 +261,19 @@ function COMMAND.signal(address, sig)
 		core.command("SIGNAL", address)
 	end
 end
+
+function COMMAND.cmem()
+	local info = memory.info()
+	local tmp = {}
+	for k,v in pairs(info) do
+		tmp[skynet.address(k)] = v
+	end
+	return tmp
+end
+
+function COMMAND.shrtbl()
+	local n, total, longest, space = memory.ssinfo()
+	return { n = n, total = total, longest = longest, space = space }
+end
+
+

@@ -70,7 +70,7 @@ Config for server.start:
 	conf.login_handler(uid, secret) -> subid : the function when a new user login, alloc a subid for it. (may call by login server)
 	conf.logout_handler(uid, subid) : the functon when a user logout. (may call by agent)
 	conf.kick_handler(uid, subid) : the functon when a user logout. (may call by login server)
-	conf.request_handler(username, session, msg, sz) : the function when recv a new request.
+	conf.request_handler(username, session, msg) : the function when recv a new request.
 	conf.register_handler(servername) : call when gate open
 	conf.disconnect_handler(username) : call when a connection disconnect (afk)
 ]]
@@ -234,10 +234,10 @@ function server.start(conf)
 		end
 	end
 
-	local function do_request(fd, msg, sz)
+	local function do_request(fd, message)
 		local u = assert(connection[fd], "invalid fd")
-		local msg_sz = sz - 4
-		local session = netpack.tostring(msg, sz, msg_sz)
+		local session = string.unpack(">I4", message, -4)
+		message = message:sub(1,-5)
 		local p = u.response[session]
 		if p then
 			-- session can be reuse in the same connection
@@ -256,21 +256,20 @@ function server.start(conf)
 		if p == nil then
 			p = { fd }
 			u.response[session] = p
-			local ok, result = pcall(conf.request_handler, u.username, msg, msg_sz)
-			result = result or ""
+			local ok, result = pcall(conf.request_handler, u.username, message)
 			-- NOTICE: YIELD here, socket may close.
+			result = result or ""
 			if not ok then
 				skynet.error(result)
-				result = "\0" .. session
+				result = string.pack(">BI4", 0, session)
 			else
-				result = result .. '\1' .. session
+				result = result .. string.pack(">BI4", 1, session)
 			end
 
-			p[2] = netpack.pack_string(result)
+			p[2] = string.pack(">s2",result)
 			p[3] = u.version
 			p[4] = u.index
 		else
-			netpack.tostring(msg, sz) -- request before, so free msg
 			-- update version/index, change return fd.
 			-- resend response.
 			p[1] = fd
@@ -292,10 +291,11 @@ function server.start(conf)
 	end
 
 	local function request(fd, msg, sz)
-		local ok, err = pcall(do_request, fd, msg, sz)
+		local message = netpack.tostring(msg, sz)
+		local ok, err = pcall(do_request, fd, message)
 		-- not atomic, may yield
 		if not ok then
-			skynet.error(string.format("Invalid package %s : %s", err, netpack.tostring(msg, sz)))
+			skynet.error(string.format("Invalid package %s : %s", err, message))
 			if connection[fd] then
 				gateserver.closeclient(fd)
 			end

@@ -127,6 +127,7 @@ Proto *luaF_newproto (lua_State *L, SharedProto *sp) {
   return f;
 }
 
+
 static void freesharedproto (lua_State *L, SharedProto *f) {
   if (f == NULL || G(L) != f->l_G)
     return;
@@ -136,7 +137,6 @@ static void freesharedproto (lua_State *L, SharedProto *f) {
   luaM_freearray(L, f->upvalues, f->sizeupvalues);
   luaM_free(L, f);
 }
-
 
 void luaF_freeproto (lua_State *L, Proto *f) {
   luaM_freearray(L, f->p, f->sp->sizep);

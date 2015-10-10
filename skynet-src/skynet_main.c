@@ -3,6 +3,7 @@
 #include "skynet_imp.h"
 #include "skynet_env.h"
 #include "skynet_server.h"
+#include "luashrtbl.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,6 +106,8 @@ main(int argc, char *argv[]) {
 			"usage: skynet configfilename\n");
 		return 1;
 	}
+
+	luaS_initshr();
 	skynet_globalinit();
 	skynet_env_init();
 
@@ -133,11 +136,13 @@ main(int argc, char *argv[]) {
 	config.bootstrap = optstring("bootstrap","snlua bootstrap");
 	config.daemon = optstring("daemon", NULL);
 	config.logger = optstring("logger", NULL);
+	config.logservice = optstring("logservice", "logger");
 
 	lua_close(L);
 
 	skynet_start(&config);
 	skynet_globalexit();
+	luaS_exitshr();
 
 	return 0;
 }

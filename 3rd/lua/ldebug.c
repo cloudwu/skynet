@@ -1,5 +1,5 @@
 /*
-** $Id: ldebug.c,v 2.110 2015/01/02 12:52:22 roberto Exp $
+** $Id: ldebug.c,v 2.115 2015/05/22 17:45:56 roberto Exp $
 ** Debug Interface
 ** See Copyright Notice in lua.h
 */
@@ -32,6 +32,10 @@
 
 
 #define noLuaClosure(f)		((f) == NULL || (f)->c.tt == LUA_TCCL)
+
+
+/* Active Lua function (given call info) */
+#define ci_func(ci)		(clLvalue((ci)->func))
 
 
 static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name);
@@ -122,7 +126,7 @@ static const char *upvalname (Proto *p, int uv) {
 
 static const char *findvararg (CallInfo *ci, int n, StkId *pos) {
   int nparams = clLvalue(ci->func)->p->sp->numparams;
-  if (n >= ci->u.l.base - ci->func - nparams)
+  if (n >= cast_int(ci->u.l.base - ci->func) - nparams)
     return NULL;  /* no such vararg */
   else {
     *pos = ci->func + nparams + n;
@@ -168,7 +172,7 @@ LUA_API const char *lua_getlocal (lua_State *L, const lua_Debug *ar, int n) {
       name = luaF_getlocalname(clLvalue(L->top - 1)->p, n, 0);
   }
   else {  /* active function; get information through 'ar' */
-    StkId pos = 0;  /* to avoid warnings */
+    StkId pos = NULL;  /* to avoid warnings */
     name = findlocal(L, ar->i_ci, n, &pos);
     if (name) {
       setobj2s(L, L->top, pos);
@@ -182,7 +186,7 @@ LUA_API const char *lua_getlocal (lua_State *L, const lua_Debug *ar, int n) {
 
 
 LUA_API const char *lua_setlocal (lua_State *L, const lua_Debug *ar, int n) {
-  StkId pos = 0;  /* to avoid warnings */
+  StkId pos = NULL;  /* to avoid warnings */
   const char *name;
   lua_lock(L);
   swapextra(L);
@@ -295,7 +299,7 @@ LUA_API int lua_getinfo (lua_State *L, const char *what, lua_Debug *ar) {
   if (*what == '>') {
     ci = NULL;
     func = L->top - 1;
-    api_check(ttisfunction(func), "function expected");
+    api_check(L, ttisfunction(func), "function expected");
     what++;  /* skip the '>' */
     L->top--;  /* pop function */
   }
@@ -595,19 +599,16 @@ l_noret luaG_ordererror (lua_State *L, const TValue *p1, const TValue *p2) {
 }
 
 
-static void addinfo (lua_State *L, const char *msg) {
-  CallInfo *ci = L->ci;
-  if (isLua(ci)) {  /* is Lua code? */
-    char buff[LUA_IDSIZE];  /* add file:line information */
-    int line = currentline(ci);
-    TString *src = ci_func(ci)->p->sp->source;
-    if (src)
-      luaO_chunkid(buff, getstr(src), LUA_IDSIZE);
-    else {  /* no source available; use "?" instead */
-      buff[0] = '?'; buff[1] = '\0';
-    }
-    luaO_pushfstring(L, "%s:%d: %s", buff, line, msg);
+/* add src:line information to 'msg' */
+const char *luaG_addinfo (lua_State *L, const char *msg, TString *src,
+                                        int line) {
+  char buff[LUA_IDSIZE];
+  if (src)
+    luaO_chunkid(buff, getstr(src), LUA_IDSIZE);
+  else {  /* no source available; use "?" instead */
+    buff[0] = '?'; buff[1] = '\0';
   }
+  return luaO_pushfstring(L, "%s:%d: %s", buff, line, msg);
 }
 
 
@@ -624,10 +625,14 @@ l_noret luaG_errormsg (lua_State *L) {
 
 
 l_noret luaG_runerror (lua_State *L, const char *fmt, ...) {
+  CallInfo *ci = L->ci;
+  const char *msg;
   va_list argp;
   va_start(argp, fmt);
-  addinfo(L, luaO_pushvfstring(L, fmt, argp));
+  msg = luaO_pushvfstring(L, fmt, argp);  /* format message */
   va_end(argp);
+  if (isLua(ci))  /* if Lua function, add source:line information */
+    luaG_addinfo(L, msg, ci_func(ci)->p->sp->source, currentline(ci));
   luaG_errormsg(L);
 }
 

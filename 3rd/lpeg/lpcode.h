@@ -1,5 +1,5 @@
 /*
-** $Id: lpcode.h,v 1.6 2013/11/28 14:56:02 roberto Exp $
+** $Id: lpcode.h,v 1.7 2015/06/12 18:24:45 roberto Exp $
 */
 
 #if !defined(lpcode_h)
@@ -24,7 +24,15 @@ int sizei (const Instruction *i);
 #define PEnullable      0
 #define PEnofail        1
 
+/*
+** nofail(t) implies that 't' cannot fail with any input
+*/
 #define nofail(t)	checkaux(t, PEnofail)
+
+/*
+** (not nullable(t)) implies 't' cannot match without consuming
+** something
+*/
 #define nullable(t)	checkaux(t, PEnullable)
 
 #define fixedlen(t)     fixedlenx(t, 0, 0)

@@ -43,6 +43,7 @@ end
 
 function init( ... )
 	print ("ping server start:", ...)
+	snax.enablecluster()	-- enable cluster call
 	-- init queue
 	lock = queue()
 end

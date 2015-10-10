@@ -44,6 +44,10 @@ LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
 // lua_isinteger is lua 5.3 api
 #define lua_isinteger lua_isnumber
 
+// work around , use push & lua_gettable may be better
+#define lua_geti lua_rawgeti
+#define lua_seti lua_rawseti
+
 #endif
 
 static int
@@ -139,7 +143,7 @@ encode(const struct sproto_arg *args) {
 			lua_insert(L, -2);
 			lua_replace(L, self->iter_index);
 		} else {
-			lua_rawgeti(L, self->array_index, args->index);
+			lua_geti(L, self->array_index, args->index);
 		}
 	} else {
 		lua_getfield(L, self->tbl_index, args->tagname);
@@ -350,7 +354,7 @@ decode(const struct sproto_arg *args) {
 				luaL_error(L, "Can't find main index (tag=%d) in [%s]", args->mainindex, args->tagname);
 			}
 			lua_pushvalue(L, sub.result_index);
-			lua_rawset(L, self->array_index);
+			lua_settable(L, self->array_index);
 			lua_settop(L, sub.result_index-1);
 			return 0;
 		} else {
@@ -367,7 +371,7 @@ decode(const struct sproto_arg *args) {
 		luaL_error(L, "Invalid type");
 	}
 	if (args->index > 0) {
-		lua_rawseti(L, self->array_index, args->index);
+		lua_seti(L, self->array_index, args->index);
 	} else {
 		if (self->mainindex_tag == args->tagid) {
 			// This tag is marked, save the value to key_index
@@ -483,10 +487,10 @@ lunpack(lua_State *L) {
 		return luaL_error(L, "Invalid unpack stream");
 	if (r > osz) {
 		output = expand_buffer(L, osz, r);
+		r = sproto_unpack(buffer, sz, output, r);
+		if (r < 0)
+			return luaL_error(L, "Invalid unpack stream");
 	}
-	r = sproto_unpack(buffer, sz, output, r);
-	if (r < 0)
-		return luaL_error(L, "Invalid unpack stream");
 	lua_pushlstring(L, output, r);
 	return 1;
 }
@@ -608,8 +612,8 @@ encode_default(const struct sproto_arg *args) {
 static int
 ldefault(lua_State *L) {
 	int ret;
-	// 32 is enough for dummy buffer, because ldefault encode nothing but the header.
-	char dummy[32];
+	// 64 is always enough for dummy buffer, except the type has many fields ( > 27).
+	char dummy[64];
 	struct sproto_type * st = lua_touserdata(L, 1);
 	if (st == NULL) {
 		return luaL_argerror(L, 1, "Need a sproto_type object");
@@ -617,7 +621,18 @@ ldefault(lua_State *L) {
 	lua_newtable(L);
 	ret = sproto_encode(st, dummy, sizeof(dummy), encode_default, L);
 	if (ret<0) {
-		return luaL_error(L, "dummy buffer (%d) is too small", (int)sizeof(dummy));
+		// try again
+		int sz = sizeof(dummy) * 2;
+		void * tmp = lua_newuserdata(L, sz);
+		lua_insert(L, -2);
+		for (;;) {
+			ret = sproto_encode(st, tmp, sz, encode_default, L);
+			if (ret >= 0)
+				break;
+			sz *= 2;
+			tmp = lua_newuserdata(L, sz);
+			lua_replace(L, -3);
+		}
 	}
 	return 1;
 }

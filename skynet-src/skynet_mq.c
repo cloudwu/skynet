@@ -1,6 +1,7 @@
 #include "skynet.h"
 #include "skynet_mq.h"
 #include "skynet_handle.h"
+#include "spinlock.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,11 +19,11 @@
 #define MQ_OVERLOAD 1024
 
 struct message_queue {
+	struct spinlock lock;
 	uint32_t handle;
 	int cap;
 	int head;
 	int tail;
-	int lock;
 	int release;
 	int in_global;
 	int overload;
@@ -34,19 +35,16 @@ struct message_queue {
 struct global_queue {
 	struct message_queue *head;
 	struct message_queue *tail;
-	int lock;
+	struct spinlock lock;
 };
 
 static struct global_queue *Q = NULL;
-
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
 void 
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
-	LOCK(q)
+	SPIN_LOCK(q)
 	assert(queue->next == NULL);
 	if(q->tail) {
 		q->tail->next = queue;
@@ -54,14 +52,14 @@ skynet_globalmq_push(struct message_queue * queue) {
 	} else {
 		q->head = q->tail = queue;
 	}
-	UNLOCK(q)
+	SPIN_UNLOCK(q)
 }
 
 struct message_queue * 
 skynet_globalmq_pop() {
 	struct global_queue *q = Q;
 
-	LOCK(q)
+	SPIN_LOCK(q)
 	struct message_queue *mq = q->head;
 	if(mq) {
 		q->head = mq->next;
@@ -71,7 +69,7 @@ skynet_globalmq_pop() {
 		}
 		mq->next = NULL;
 	}
-	UNLOCK(q)
+	SPIN_UNLOCK(q)
 
 	return mq;
 }
@@ -83,7 +81,7 @@ skynet_mq_create(uint32_t handle) {
 	q->cap = DEFAULT_QUEUE_SIZE;
 	q->head = 0;
 	q->tail = 0;
-	q->lock = 0;
+	SPIN_INIT(q)
 	// When the queue is create (always between service create and service init) ,
 	// set in_global flag to avoid push it to global queue .
 	// If the service init success, skynet_context_new will call skynet_mq_force_push to push it to global queue.
@@ -100,6 +98,7 @@ skynet_mq_create(uint32_t handle) {
 static void 
 _release(struct message_queue *q) {
 	assert(q->next == NULL);
+	SPIN_DESTROY(q)
 	skynet_free(q->queue);
 	skynet_free(q);
 }
@@ -113,11 +112,11 @@ int
 skynet_mq_length(struct message_queue *q) {
 	int head, tail,cap;
 
-	LOCK(q)
+	SPIN_LOCK(q)
 	head = q->head;
 	tail = q->tail;
 	cap = q->cap;
-	UNLOCK(q)
+	SPIN_UNLOCK(q)
 	
 	if (head <= tail) {
 		return tail - head;
@@ -138,7 +137,7 @@ skynet_mq_overload(struct message_queue *q) {
 int
 skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 	int ret = 1;
-	LOCK(q)
+	SPIN_LOCK(q)
 
 	if (q->head != q->tail) {
 		*message = q->queue[q->head++];
@@ -167,7 +166,7 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 		q->in_global = 0;
 	}
 	
-	UNLOCK(q)
+	SPIN_UNLOCK(q)
 
 	return ret;
 }
@@ -190,7 +189,7 @@ expand_queue(struct message_queue *q) {
 void 
 skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	assert(message);
-	LOCK(q)
+	SPIN_LOCK(q)
 
 	q->queue[q->tail] = *message;
 	if (++ q->tail >= q->cap) {
@@ -206,25 +205,26 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 		skynet_globalmq_push(q);
 	}
 	
-	UNLOCK(q)
+	SPIN_UNLOCK(q)
 }
 
 void 
 skynet_mq_init() {
 	struct global_queue *q = skynet_malloc(sizeof(*q));
 	memset(q,0,sizeof(*q));
+	SPIN_INIT(q);
 	Q=q;
 }
 
 void 
 skynet_mq_mark_release(struct message_queue *q) {
-	LOCK(q)
+	SPIN_LOCK(q)
 	assert(q->release == 0);
 	q->release = 1;
 	if (q->in_global != MQ_IN_GLOBAL) {
 		skynet_globalmq_push(q);
 	}
-	UNLOCK(q)
+	SPIN_UNLOCK(q)
 }
 
 static void
@@ -238,13 +238,13 @@ _drop_queue(struct message_queue *q, message_drop drop_func, void *ud) {
 
 void 
 skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud) {
-	LOCK(q)
+	SPIN_LOCK(q)
 	
 	if (q->release) {
-		UNLOCK(q)
+		SPIN_UNLOCK(q)
 		_drop_queue(q, drop_func, ud);
 	} else {
 		skynet_globalmq_push(q);
-		UNLOCK(q)
+		SPIN_UNLOCK(q)
 	}
 }

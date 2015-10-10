@@ -1,5 +1,5 @@
 /*
-** $Id: lutf8lib.c,v 1.13 2014/11/02 19:19:04 roberto Exp $
+** $Id: lutf8lib.c,v 1.15 2015/03/28 19:16:55 roberto Exp $
 ** Standard library for UTF-8 manipulation
 ** See Copyright Notice in lua.h
 */
@@ -11,6 +11,7 @@
 
 
 #include <assert.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -37,7 +38,7 @@ static lua_Integer u_posrelat (lua_Integer pos, size_t len) {
 ** Decode one UTF-8 sequence, returning NULL if byte sequence is invalid.
 */
 static const char *utf8_decode (const char *o, int *val) {
-  static unsigned int limits[] = {0xFF, 0x7F, 0x7FF, 0xFFFF};
+  static const unsigned int limits[] = {0xFF, 0x7F, 0x7FF, 0xFFFF};
   const unsigned char *s = (const unsigned char *)o;
   unsigned int c = s[0];
   unsigned int res = 0;  /* final result */
@@ -106,9 +107,9 @@ static int codepoint (lua_State *L) {
   luaL_argcheck(L, posi >= 1, 2, "out of range");
   luaL_argcheck(L, pose <= (lua_Integer)len, 3, "out of range");
   if (posi > pose) return 0;  /* empty interval; return no values */
-  n = (int)(pose -  posi + 1);
-  if (posi + n <= pose)  /* (lua_Integer -> int) overflow? */
+  if (pose - posi >= INT_MAX)  /* (lua_Integer -> int) overflow? */
     return luaL_error(L, "string slice too long");
+  n = (int)(pose -  posi) + 1;
   luaL_checkstack(L, n, "string slice too long");
   n = 0;
   se = s + pose;
@@ -234,7 +235,7 @@ static int iter_codes (lua_State *L) {
 #define UTF8PATT	"[\0-\x7F\xC2-\xF4][\x80-\xBF]*"
 
 
-static struct luaL_Reg funcs[] = {
+static const luaL_Reg funcs[] = {
   {"offset", byteoffset},
   {"codepoint", codepoint},
   {"char", utfchar},
@@ -248,7 +249,7 @@ static struct luaL_Reg funcs[] = {
 
 LUAMOD_API int luaopen_utf8 (lua_State *L) {
   luaL_newlib(L, funcs);
-  lua_pushliteral(L, UTF8PATT);
+  lua_pushlstring(L, UTF8PATT, sizeof(UTF8PATT)/sizeof(char) - 1);
   lua_setfield(L, -2, "charpattern");
   return 1;
 }

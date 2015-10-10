@@ -19,6 +19,7 @@
 #define TYPE_ERROR 3
 #define TYPE_OPEN 4
 #define TYPE_CLOSE 5
+#define TYPE_WARNING 6
 
 /*
 	Each package is uint16 + data , uint16 (serialized in big-endian) is the number of bytes comprising the data .
@@ -48,6 +49,7 @@ struct queue {
 static void
 clear_list(struct uncomplete * uc) {
 	while (uc) {
+		skynet_free(uc->pack.buffer);
 		void * tmp = uc;
 		uc = uc->next;
 		skynet_free(tmp);
@@ -210,6 +212,16 @@ push_more(lua_State *L, int fd, uint8_t *buffer, int size) {
 	}
 }
 
+static void
+close_uncomplete(lua_State *L, int fd) {
+	struct queue *q = lua_touserdata(L,1);
+	struct uncomplete * uc = find_uncomplete(q, fd);
+	if (uc) {
+		skynet_free(uc->pack.buffer);
+		skynet_free(uc);
+	}
+}
+
 static int
 filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 	struct queue *q = lua_touserdata(L,1);
@@ -343,6 +355,8 @@ lfilter(lua_State *L) {
 		// ignore listen fd connect
 		return 1;
 	case SKYNET_SOCKET_TYPE_CLOSE:
+		// no more data in fd (message->id)
+		close_uncomplete(L, message->id);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_CLOSE));
 		lua_pushinteger(L, message->id);
 		return 3;
@@ -353,9 +367,16 @@ lfilter(lua_State *L) {
 		pushstring(L, buffer, size);
 		return 4;
 	case SKYNET_SOCKET_TYPE_ERROR:
+		// no more data in fd (message->id)
+		close_uncomplete(L, message->id);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
 		lua_pushinteger(L, message->id);
 		pushstring(L, buffer, size);
+		return 4;
+	case SKYNET_SOCKET_TYPE_WARNING:
+		lua_pushvalue(L, lua_upvalueindex(TYPE_WARNING));
+		lua_pushinteger(L, message->id);
+		lua_pushinteger(L, message->ud);
 		return 4;
 	default:
 		// never get here
@@ -429,76 +450,14 @@ lpack(lua_State *L) {
 }
 
 static int
-lpack_string(lua_State *L) {
-	uint8_t tmp[SMALLSTRING+2];
-	size_t len;
-	uint8_t *buffer;
-	const char * ptr = tolstring(L, &len, 1);
-	if (len > 0x10000) {
-		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
-	}
-
-	if (len <= SMALLSTRING) {
-		buffer = tmp;
-	} else {
-		buffer = lua_newuserdata(L, len + 2);
-	}
-
-	write_size(buffer, len);
-	memcpy(buffer+2, ptr, len);
-	lua_pushlstring(L, (const char *)buffer, len+2);
-
-	return 1;
-}
-
-static int
-lpack_padding(lua_State *L) {
-	uint8_t tmp[SMALLSTRING+2];
-	size_t content_sz;
-	uint8_t *buffer;
-	const char * ptr = tolstring(L, &content_sz, 2);
-	size_t cookie_sz = 0;
-	const char * cookie = luaL_checklstring(L,1,&cookie_sz);
-	size_t len = cookie_sz + content_sz;
-
-	if (len > 0x10000) {
-		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
-	}
-
-	if (len <= SMALLSTRING) {
-		buffer = tmp;
-	} else {
-		buffer = lua_newuserdata(L, len + 2);
-	}
-
-	write_size(buffer, len);
-	memcpy(buffer+2, ptr, content_sz);
-	memcpy(buffer+2+content_sz, cookie, cookie_sz);
-	lua_pushlstring(L, (const char *)buffer, len+2);
-
-	return 1;
-}
-
-static int
 ltostring(lua_State *L) {
 	void * ptr = lua_touserdata(L, 1);
 	int size = luaL_checkinteger(L, 2);
 	if (ptr == NULL) {
 		lua_pushliteral(L, "");
 	} else {
-		if (lua_isnumber(L, 3)) {
-			int offset = lua_tointeger(L, 3);
-			if (offset < 0) {
-				return luaL_error(L, "Invalid offset %d", offset);
-			}
-			if (offset > size) {
-				offset = size;
-			}
-			lua_pushlstring(L, (const char *)ptr + offset, size-offset);
-		} else {
-			lua_pushlstring(L, (const char *)ptr, size);
-			skynet_free(ptr);
-		}
+		lua_pushlstring(L, (const char *)ptr, size);
+		skynet_free(ptr);
 	}
 	return 1;
 }
@@ -509,8 +468,6 @@ luaopen_netpack(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "pop", lpop },
 		{ "pack", lpack },
-		{ "pack_string", lpack_string },
-		{ "pack_padding", lpack_padding },
 		{ "clear", lclear },
 		{ "tostring", ltostring },
 		{ NULL, NULL },
@@ -523,8 +480,9 @@ luaopen_netpack(lua_State *L) {
 	lua_pushliteral(L, "error");
 	lua_pushliteral(L, "open");
 	lua_pushliteral(L, "close");
+	lua_pushliteral(L, "warning");
 
-	lua_pushcclosure(L, lfilter, 5);
+	lua_pushcclosure(L, lfilter, 6);
 	lua_setfield(L, -2, "filter");
 
 	return 1;

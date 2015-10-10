@@ -17,7 +17,8 @@ function server.login_handler(uid, secret)
 	end
 
 	internal_id = internal_id + 1
-	local username = msgserver.username(uid, internal_id, servername)
+	local id = internal_id	-- don't use internal_id directly
+	local username = msgserver.username(uid, id, servername)
 
 	-- you can use a pool to alloc new agent
 	local agent = skynet.newservice "msgagent"
@@ -25,11 +26,11 @@ function server.login_handler(uid, secret)
 		username = username,
 		agent = agent,
 		uid = uid,
-		subid = internal_id,
+		subid = id,
 	}
 
 	-- trash subid (no used)
-	skynet.call(agent, "lua", "login", uid, internal_id, secret)
+	skynet.call(agent, "lua", "login", uid, id, secret)
 
 	users[uid] = u
 	username_map[username] = u
@@ -37,7 +38,7 @@ function server.login_handler(uid, secret)
 	msgserver.login(username, secret)
 
 	-- you should return unique subid
-	return internal_id
+	return id
 end
 
 -- call by agent
@@ -73,9 +74,9 @@ function server.disconnect_handler(username)
 end
 
 -- call by self (when recv a request from client)
-function server.request_handler(username, msg, sz)
+function server.request_handler(username, msg)
 	local u = username_map[username]
-	return skynet.tostring(skynet.rawcall(u.agent, "client", msg, sz))
+	return skynet.tostring(skynet.rawcall(u.agent, "client", msg))
 end
 
 -- call by self (when gate open)

@@ -81,15 +81,27 @@ local function dispatch_by_session(self)
 	local response = self.__response
 	-- response() return session
 	while self.__sock do
-		local ok , session, result_ok, result_data = pcall(response, self.__sock)
+		local ok , session, result_ok, result_data, padding = pcall(response, self.__sock)
 		if ok and session then
 			local co = self.__thread[session]
-			self.__thread[session] = nil
 			if co then
-				self.__result[co] = result_ok
-				self.__result_data[co] = result_data
-				skynet.wakeup(co)
+				if padding and result_ok then
+					-- If padding is true, append result_data to a table (self.__result_data[co])
+					local result = self.__result_data[co] or {}
+					self.__result_data[co] = result
+					table.insert(result, result_data)
+				else
+					self.__thread[session] = nil
+					self.__result[co] = result_ok
+					if result_ok and self.__result_data[co] then
+						table.insert(self.__result_data[co], result_data)
+					else
+						self.__result_data[co] = result_data
+					end
+					skynet.wakeup(co)
+				end
 			else
+				self.__thread[session] = nil
 				skynet.error("socket: unknown session :", session)
 			end
 		else
@@ -127,11 +139,23 @@ local function dispatch_by_order(self)
 				wakeup_all(self)
 			end
 		else
-			local ok, result_ok, result_data = pcall(func, self.__sock)
+			local ok, result_ok, result_data, padding = pcall(func, self.__sock)
 			if ok then
-				self.__result[co] = result_ok
-				self.__result_data[co] = result_data
-				skynet.wakeup(co)
+				if padding and result_ok then
+					-- if padding is true, wait for next result_data
+					-- self.__result_data[co] is a table
+					local result = self.__result_data[co] or {}
+					self.__result_data[co] = result
+					table.insert(result, result_data)
+				else
+					self.__result[co] = result_ok
+					if result_ok and self.__result_data[co] then
+						table.insert(self.__result_data[co], result_data)
+					else
+						self.__result_data[co] = result_data
+					end
+					skynet.wakeup(co)
+				end
 			else
 				close_channel_socket(self)
 				local errmsg
@@ -303,20 +327,38 @@ local function wait_for_response(self, response)
 	self.__result_data[co] = nil
 
 	if result == socket_error then
-		error(socket_error)
+		if result_data then
+			error(result_data)
+		else
+			error(socket_error)
+		end
 	else
 		assert(result, result_data)
 		return result_data
 	end
 end
 
-function channel:request(request, response)
-	assert(block_connect(self, true))	-- connect once
+local socket_write = socket.write
+local socket_lwrite = socket.lwrite
 
-	if not socket.write(self.__sock[1], request) then
-		close_channel_socket(self)
-		wakeup_all(self)
-		error(socket_error)
+function channel:request(request, response, padding)
+	assert(block_connect(self, true))	-- connect once
+	local fd = self.__sock[1]
+
+	if padding then
+		-- padding may be a table, to support multi part request
+		-- multi part request use low priority socket write
+		-- socket_lwrite returns nothing
+		socket_lwrite(fd , request)
+		for _,v in ipairs(padding) do
+			socket_lwrite(fd, v)
+		end
+	else
+		if not socket_write(fd , request) then
+			close_channel_socket(self)
+			wakeup_all(self)
+			error(socket_error)
+		end
 	end
 
 	if response == nil then

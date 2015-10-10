@@ -1,5 +1,5 @@
 /*
-** $Id: lvm.h,v 2.34 2014/08/01 17:24:02 roberto Exp $
+** $Id: lvm.h,v 2.35 2015/02/20 14:27:53 roberto Exp $
 ** Lua virtual machine
 ** See Copyright Notice in lua.h
 */
@@ -27,11 +27,21 @@
 #endif
 
 
+/*
+** You can define LUA_FLOORN2I if you want to convert floats to integers
+** by flooring them (instead of raising an error if they are not
+** integral values)
+*/
+#if !defined(LUA_FLOORN2I)
+#define LUA_FLOORN2I		0
+#endif
+
+
 #define tonumber(o,n) \
 	(ttisfloat(o) ? (*(n) = fltvalue(o), 1) : luaV_tonumber_(o,n))
 
 #define tointeger(o,i) \
-	(ttisinteger(o) ? (*(i) = ivalue(o), 1) : luaV_tointeger_(o,i))
+    (ttisinteger(o) ? (*(i) = ivalue(o), 1) : luaV_tointeger(o,i,LUA_FLOORN2I))
 
 #define intop(op,v1,v2) l_castU2S(l_castS2U(v1) op l_castS2U(v2))
 
@@ -42,7 +52,7 @@ LUAI_FUNC int luaV_equalobj (lua_State *L, const TValue *t1, const TValue *t2);
 LUAI_FUNC int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r);
 LUAI_FUNC int luaV_lessequal (lua_State *L, const TValue *l, const TValue *r);
 LUAI_FUNC int luaV_tonumber_ (const TValue *obj, lua_Number *n);
-LUAI_FUNC int luaV_tointeger_ (const TValue *obj, lua_Integer *p);
+LUAI_FUNC int luaV_tointeger (const TValue *obj, lua_Integer *p, int mode);
 LUAI_FUNC void luaV_gettable (lua_State *L, const TValue *t, TValue *key,
                                             StkId val);
 LUAI_FUNC void luaV_settable (lua_State *L, const TValue *t, TValue *key,

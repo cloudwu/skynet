@@ -9,6 +9,7 @@ struct skynet_context;
 #define SKYNET_SOCKET_TYPE_ACCEPT 4
 #define SKYNET_SOCKET_TYPE_ERROR 5
 #define SKYNET_SOCKET_TYPE_UDP 6
+#define SKYNET_SOCKET_TYPE_WARNING 7
 
 struct skynet_socket_message {
 	int type;

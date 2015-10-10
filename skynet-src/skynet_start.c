@@ -8,6 +8,7 @@
 #include "skynet_monitor.h"
 #include "skynet_socket.h"
 #include "skynet_daemon.h"
+#include "skynet_harbor.h"
 
 #include <pthread.h>
 #include <unistd.h>
@@ -22,6 +23,7 @@ struct monitor {
 	pthread_cond_t cond;
 	pthread_mutex_t mutex;
 	int sleep;
+	int quit;
 };
 
 struct worker_parm {
@@ -49,7 +51,7 @@ wakeup(struct monitor *m, int busy) {
 }
 
 static void *
-_socket(void *p) {
+thread_socket(void *p) {
 	struct monitor * m = p;
 	skynet_initthread(THREAD_SOCKET);
 	for (;;) {
@@ -79,7 +81,7 @@ free_monitor(struct monitor *m) {
 }
 
 static void *
-_monitor(void *p) {
+thread_monitor(void *p) {
 	struct monitor * m = p;
 	int i;
 	int n = m->count;
@@ -99,7 +101,7 @@ _monitor(void *p) {
 }
 
 static void *
-_timer(void *p) {
+thread_timer(void *p) {
 	struct monitor * m = p;
 	skynet_initthread(THREAD_TIMER);
 	for (;;) {
@@ -111,12 +113,15 @@ _timer(void *p) {
 	// wakeup socket thread
 	skynet_socket_exit();
 	// wakeup all worker thread
+	pthread_mutex_lock(&m->mutex);
+	m->quit = 1;
 	pthread_cond_broadcast(&m->cond);
+	pthread_mutex_unlock(&m->mutex);
 	return NULL;
 }
 
 static void *
-_worker(void *p) {
+thread_worker(void *p) {
 	struct worker_parm *wp = p;
 	int id = wp->id;
 	int weight = wp->weight;
@@ -124,28 +129,28 @@ _worker(void *p) {
 	struct skynet_monitor *sm = m->m[id];
 	skynet_initthread(THREAD_WORKER);
 	struct message_queue * q = NULL;
-	for (;;) {
+	while (!m->quit) {
 		q = skynet_context_message_dispatch(sm, q, weight);
 		if (q == NULL) {
 			if (pthread_mutex_lock(&m->mutex) == 0) {
 				++ m->sleep;
 				// "spurious wakeup" is harmless,
 				// because skynet_context_message_dispatch() can be call at any time.
-				pthread_cond_wait(&m->cond, &m->mutex);
+				if (!m->quit)
+					pthread_cond_wait(&m->cond, &m->mutex);
 				-- m->sleep;
 				if (pthread_mutex_unlock(&m->mutex)) {
 					fprintf(stderr, "unlock mutex error");
 					exit(1);
 				}
 			}
-		} 
-		CHECK_ABORT
+		}
 	}
 	return NULL;
 }
 
 static void
-_start(int thread) {
+start(int thread) {
 	pthread_t pid[thread+3];
 
 	struct monitor *m = skynet_malloc(sizeof(*m));
@@ -167,9 +172,9 @@ _start(int thread) {
 		exit(1);
 	}
 
-	create_thread(&pid[0], _monitor, m);
-	create_thread(&pid[1], _timer, m);
-	create_thread(&pid[2], _socket, m);
+	create_thread(&pid[0], thread_monitor, m);
+	create_thread(&pid[1], thread_timer, m);
+	create_thread(&pid[2], thread_socket, m);
 
 	static int weight[] = { 
 		-1, -1, -1, -1, 0, 0, 0, 0,
@@ -185,7 +190,7 @@ _start(int thread) {
 		} else {
 			wp[i].weight = 0;
 		}
-		create_thread(&pid[i+3], _worker, &wp[i]);
+		create_thread(&pid[i+3], thread_worker, &wp[i]);
 	}
 
 	for (i=0;i<thread+3;i++) {
@@ -223,15 +228,15 @@ skynet_start(struct skynet_config * config) {
 	skynet_timer_init();
 	skynet_socket_init();
 
-	struct skynet_context *ctx = skynet_context_new("logger", config->logger);
+	struct skynet_context *ctx = skynet_context_new(config->logservice, config->logger);
 	if (ctx == NULL) {
-		fprintf(stderr, "Can't launch logger service\n");
+		fprintf(stderr, "Can't launch %s service\n", config->logservice);
 		exit(1);
 	}
 
 	bootstrap(ctx, config->bootstrap);
 
-	_start(config->thread);
+	start(config->thread);
 
 	// harbor_exit may call socket send, so it should exit before socket_free
 	skynet_harbor_exit();

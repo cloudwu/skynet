@@ -1,5 +1,5 @@
 /*
-** $Id: lvm.c,v 2.232 2014/12/27 20:30:38 roberto Exp $
+** $Id: lvm.c,v 2.245 2015/06/09 15:53:35 roberto Exp $
 ** Lua virtual machine
 ** See Copyright Notice in lua.h
 */
@@ -9,8 +9,9 @@
 
 #include "lprefix.h"
 
-
+#include <float.h>
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,18 +31,37 @@
 #include "lvm.h"
 
 
-/*
-** You can define LUA_FLOORN2I if you want to convert floats to integers
-** by flooring them (instead of raising an error if they are not
-** integral values)
-*/
-#if !defined(LUA_FLOORN2I)
-#define LUA_FLOORN2I		0
-#endif
-
-
 /* limit for table tag-method chains (to avoid loops) */
 #define MAXTAGLOOP	2000
+
+
+
+/*
+** 'l_intfitsf' checks whether a given integer can be converted to a
+** float without rounding. Used in comparisons. Left undefined if
+** all integers fit in a float precisely.
+*/
+#if !defined(l_intfitsf)
+
+/* number of bits in the mantissa of a float */
+#define NBM		(l_mathlim(MANT_DIG))
+
+/*
+** Check whether some integers may not fit in a float, that is, whether
+** (maxinteger >> NBM) > 0 (that implies (1 << NBM) <= maxinteger).
+** (The shifts are done in parts to avoid shifting by more than the size
+** of an integer. In a worst case, NBM == 113 for long double and
+** sizeof(integer) == 32.)
+*/
+#if ((((LUA_MAXINTEGER >> (NBM / 4)) >> (NBM / 4)) >> (NBM / 4)) \
+	>> (NBM - (3 * (NBM / 4))))  >  0
+
+#define l_intfitsf(i)  \
+  (-((lua_Integer)1 << NBM) <= (i) && (i) <= ((lua_Integer)1 << NBM))
+
+#endif
+
+#endif
 
 /* Add by skynet */
 lua_State * skynet_sig_L = NULL;
@@ -56,24 +76,6 @@ lua_checksig_(lua_State *L) {
 }
 
 /*
-** Similar to 'tonumber', but does not attempt to convert strings and
-** ensure correct precision (no extra bits). Used in comparisons.
-*/
-static int tofloat (const TValue *obj, lua_Number *n) {
-  if (ttisfloat(obj)) *n = fltvalue(obj);
-  else if (ttisinteger(obj)) {
-    volatile lua_Number x = cast_num(ivalue(obj));  /* avoid extra precision */
-    *n = x;
-  }
-  else {
-    *n = 0;  /* to avoid warnings */
-    return 0;
-  }
-  return 1;
-}
-
-
-/*
 ** Try to convert a value to a float. The float case is already handled
 ** by the macro 'tonumber'.
 */
@@ -84,7 +86,7 @@ int luaV_tonumber_ (const TValue *obj, lua_Number *n) {
     return 1;
   }
   else if (cvt2num(obj) &&  /* string convertible to number? */
-            luaO_str2num(svalue(obj), &v) == tsvalue(obj)->len + 1) {
+            luaO_str2num(svalue(obj), &v) == vslen(obj) + 1) {
     *n = nvalue(&v);  /* convert result of 'luaO_str2num' to a float */
     return 1;
   }
@@ -99,7 +101,7 @@ int luaV_tonumber_ (const TValue *obj, lua_Number *n) {
 ** mode == 1: takes the floor of the number
 ** mode == 2: takes the ceil of the number
 */
-static int tointeger_aux (const TValue *obj, lua_Integer *p, int mode) {
+int luaV_tointeger (const TValue *obj, lua_Integer *p, int mode) {
   TValue v;
  again:
   if (ttisfloat(obj)) {
@@ -117,19 +119,11 @@ static int tointeger_aux (const TValue *obj, lua_Integer *p, int mode) {
     return 1;
   }
   else if (cvt2num(obj) &&
-            luaO_str2num(svalue(obj), &v) == tsvalue(obj)->len + 1) {
+            luaO_str2num(svalue(obj), &v) == vslen(obj) + 1) {
     obj = &v;
     goto again;  /* convert result from 'luaO_str2num' to an integer */
   }
   return 0;  /* conversion failed */
-}
-
-
-/*
-** try to convert a value to an integer
-*/
-int luaV_tointeger_ (const TValue *obj, lua_Integer *p) {
-  return tointeger_aux(obj, p, LUA_FLOORN2I);
 }
 
 
@@ -151,11 +145,11 @@ int luaV_tointeger_ (const TValue *obj, lua_Integer *p) {
 static int forlimit (const TValue *obj, lua_Integer *p, lua_Integer step,
                      int *stopnow) {
   *stopnow = 0;  /* usually, let loops run */
-  if (!tointeger_aux(obj, p, (step < 0 ? 2 : 1))) {  /* not fit in integer? */
+  if (!luaV_tointeger(obj, p, (step < 0 ? 2 : 1))) {  /* not fit in integer? */
     lua_Number n;  /* try to convert to float */
     if (!tonumber(obj, &n)) /* cannot convert to float? */
       return 0;  /* not a number */
-    if (n > 0) {  /* if true, float is larger than max integer */
+    if (luai_numlt(0, n)) {  /* if true, float is larger than max integer */
       *p = LUA_MAXINTEGER;
       if (step < 0) *stopnow = 1;
     }
@@ -250,9 +244,9 @@ void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
 */
 static int l_strcmp (const TString *ls, const TString *rs) {
   const char *l = getstr(ls);
-  size_t ll = ls->len;
+  size_t ll = tsslen(ls);
   const char *r = getstr(rs);
-  size_t lr = rs->len;
+  size_t lr = tsslen(rs);
   for (;;) {  /* for each segment */
     int temp = strcoll(l, r);
     if (temp != 0)  /* not equal? */
@@ -272,15 +266,102 @@ static int l_strcmp (const TString *ls, const TString *rs) {
 
 
 /*
+** Check whether integer 'i' is less than float 'f'. If 'i' has an
+** exact representation as a float ('l_intfitsf'), compare numbers as
+** floats. Otherwise, if 'f' is outside the range for integers, result
+** is trivial. Otherwise, compare them as integers. (When 'i' has no
+** float representation, either 'f' is "far away" from 'i' or 'f' has
+** no precision left for a fractional part; either way, how 'f' is
+** truncated is irrelevant.) When 'f' is NaN, comparisons must result
+** in false.
+*/
+static int LTintfloat (lua_Integer i, lua_Number f) {
+#if defined(l_intfitsf)
+  if (!l_intfitsf(i)) {
+    if (f >= -cast_num(LUA_MININTEGER))  /* -minint == maxint + 1 */
+      return 1;  /* f >= maxint + 1 > i */
+    else if (f > cast_num(LUA_MININTEGER))  /* minint < f <= maxint ? */
+      return (i < cast(lua_Integer, f));  /* compare them as integers */
+    else  /* f <= minint <= i (or 'f' is NaN)  -->  not(i < f) */
+      return 0;
+  }
+#endif
+  return luai_numlt(cast_num(i), f);  /* compare them as floats */
+}
+
+
+/*
+** Check whether integer 'i' is less than or equal to float 'f'.
+** See comments on previous function.
+*/
+static int LEintfloat (lua_Integer i, lua_Number f) {
+#if defined(l_intfitsf)
+  if (!l_intfitsf(i)) {
+    if (f >= -cast_num(LUA_MININTEGER))  /* -minint == maxint + 1 */
+      return 1;  /* f >= maxint + 1 > i */
+    else if (f >= cast_num(LUA_MININTEGER))  /* minint <= f <= maxint ? */
+      return (i <= cast(lua_Integer, f));  /* compare them as integers */
+    else  /* f < minint <= i (or 'f' is NaN)  -->  not(i <= f) */
+      return 0;
+  }
+#endif
+  return luai_numle(cast_num(i), f);  /* compare them as floats */
+}
+
+
+/*
+** Return 'l < r', for numbers.
+*/
+static int LTnum (const TValue *l, const TValue *r) {
+  if (ttisinteger(l)) {
+    lua_Integer li = ivalue(l);
+    if (ttisinteger(r))
+      return li < ivalue(r);  /* both are integers */
+    else  /* 'l' is int and 'r' is float */
+      return LTintfloat(li, fltvalue(r));  /* l < r ? */
+  }
+  else {
+    lua_Number lf = fltvalue(l);  /* 'l' must be float */
+    if (ttisfloat(r))
+      return luai_numlt(lf, fltvalue(r));  /* both are float */
+    else if (luai_numisnan(lf))  /* 'r' is int and 'l' is float */
+      return 0;  /* NaN < i is always false */
+    else  /* without NaN, (l < r)  <-->  not(r <= l) */
+      return !LEintfloat(ivalue(r), lf);  /* not (r <= l) ? */
+  }
+}
+
+
+/*
+** Return 'l <= r', for numbers.
+*/
+static int LEnum (const TValue *l, const TValue *r) {
+  if (ttisinteger(l)) {
+    lua_Integer li = ivalue(l);
+    if (ttisinteger(r))
+      return li <= ivalue(r);  /* both are integers */
+    else  /* 'l' is int and 'r' is float */
+      return LEintfloat(li, fltvalue(r));  /* l <= r ? */
+  }
+  else {
+    lua_Number lf = fltvalue(l);  /* 'l' must be float */
+    if (ttisfloat(r))
+      return luai_numle(lf, fltvalue(r));  /* both are float */
+    else if (luai_numisnan(lf))  /* 'r' is int and 'l' is float */
+      return 0;  /*  NaN <= i is always false */
+    else  /* without NaN, (l <= r)  <-->  not(r < l) */
+      return !LTintfloat(ivalue(r), lf);  /* not (r < l) ? */
+  }
+}
+
+
+/*
 ** Main operation less than; return 'l < r'.
 */
 int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r) {
   int res;
-  lua_Number nl, nr;
-  if (ttisinteger(l) && ttisinteger(r))  /* both operands are integers? */
-    return (ivalue(l) < ivalue(r));
-  else if (tofloat(l, &nl) && tofloat(r, &nr))  /* both are numbers? */
-    return luai_numlt(nl, nr);
+  if (ttisnumber(l) && ttisnumber(r))  /* both operands are numbers? */
+    return LTnum(l, r);
   else if (ttisstring(l) && ttisstring(r))  /* both are strings? */
     return l_strcmp(tsvalue(l), tsvalue(r)) < 0;
   else if ((res = luaT_callorderTM(L, l, r, TM_LT)) < 0)  /* no metamethod? */
@@ -290,18 +371,20 @@ int luaV_lessthan (lua_State *L, const TValue *l, const TValue *r) {
 
 
 /*
-** Main operation less than or equal to; return 'l <= r'.
+** Main operation less than or equal to; return 'l <= r'. If it needs
+** a metamethod and there is no '__le', try '__lt', based on
+** l <= r iff !(r < l) (assuming a total order). If the metamethod
+** yields during this substitution, the continuation has to know
+** about it (to negate the result of r<l); bit CIST_LEQ in the call
+** status keeps that information.
 */
 int luaV_lessequal (lua_State *L, const TValue *l, const TValue *r) {
   int res;
-  lua_Number nl, nr;
-  if (ttisinteger(l) && ttisinteger(r))  /* both operands are integers? */
-    return (ivalue(l) <= ivalue(r));
-  else if (tofloat(l, &nl) && tofloat(r, &nr))  /* both are numbers? */
-    return luai_numle(nl, nr);
+  if (ttisnumber(l) && ttisnumber(r))  /* both operands are numbers? */
+    return LEnum(l, r);
   else if (ttisstring(l) && ttisstring(r))  /* both are strings? */
     return l_strcmp(tsvalue(l), tsvalue(r)) <= 0;
-  else if ((res = luaT_callorderTM(L, l, r, TM_LE)) >= 0)  /* first try 'le' */
+  else if ((res = luaT_callorderTM(L, l, r, TM_LE)) >= 0)  /* try 'le' */
     return res;
   else {  /* try 'lt': */
     L->ci->callstatus |= CIST_LEQ;  /* mark it is doing 'lt' for 'le' */
@@ -314,9 +397,8 @@ int luaV_lessequal (lua_State *L, const TValue *l, const TValue *r) {
 }
 
 
-
 /*
-** Main operation for equality of Lua values; return 't1 == t2'. 
+** Main operation for equality of Lua values; return 't1 == t2'.
 ** L == NULL means raw equality (no metamethods)
 */
 int luaV_equalobj (lua_State *L, const TValue *t1, const TValue *t2) {
@@ -325,10 +407,8 @@ int luaV_equalobj (lua_State *L, const TValue *t1, const TValue *t2) {
     if (ttnov(t1) != ttnov(t2) || ttnov(t1) != LUA_TNUMBER)
       return 0;  /* only numbers can be equal with different variants */
     else {  /* two numbers with different variants */
-      lua_Number n1, n2;  /* compare them as floats */
-      lua_assert(ttisnumber(t1) && ttisnumber(t2));
-      cast_void(tofloat(t1, &n1)); cast_void(tofloat(t2, &n2));
-      return luai_numeq(n1, n2);
+      lua_Integer i1, i2;  /* compare them as integers */
+      return (tointeger(t1, &i1) && tointeger(t2, &i2) && i1 == i2);
     }
   }
   /* values have same type and same variant */
@@ -371,6 +451,8 @@ int luaV_equalobj (lua_State *L, const TValue *t1, const TValue *t2) {
 #define tostring(L,o)  \
 	(ttisstring(o) || (cvt2str(o) && (luaO_tostring(L, o), 1)))
 
+#define isemptystr(o)	(ttisshrstring(o) && tsvalue(o)->shrlen == 0)
+
 /*
 ** Main operation for concatenation: concat 'total' values in the stack,
 ** from 'L->top - total' up to 'L->top - 1'.
@@ -382,19 +464,19 @@ void luaV_concat (lua_State *L, int total) {
     int n = 2;  /* number of elements handled in this pass (at least 2) */
     if (!(ttisstring(top-2) || cvt2str(top-2)) || !tostring(L, top-1))
       luaT_trybinTM(L, top-2, top-1, top-2, TM_CONCAT);
-    else if (tsvalue(top-1)->len == 0)  /* second operand is empty? */
+    else if (isemptystr(top - 1))  /* second operand is empty? */
       cast_void(tostring(L, top - 2));  /* result is first operand */
-    else if (ttisstring(top-2) && tsvalue(top-2)->len == 0) {
+    else if (isemptystr(top - 2)) {  /* first operand is an empty string? */
       setobjs2s(L, top - 2, top - 1);  /* result is second op. */
     }
     else {
       /* at least two non-empty string values; get as many as possible */
-      size_t tl = tsvalue(top-1)->len;
+      size_t tl = vslen(top - 1);
       char *buffer;
       int i;
       /* collect total length */
       for (i = 1; i < total && tostring(L, top-i-1); i++) {
-        size_t l = tsvalue(top-i-1)->len;
+        size_t l = vslen(top - i - 1);
         if (l >= (MAX_SIZE/sizeof(char)) - tl)
           luaG_runerror(L, "string length overflow");
         tl += l;
@@ -403,7 +485,7 @@ void luaV_concat (lua_State *L, int total) {
       tl = 0;
       n = i;
       do {  /* copy all strings to buffer */
-        size_t l = tsvalue(top-i)->len;
+        size_t l = vslen(top - i);
         memcpy(buffer+tl, svalue(top-i), l * sizeof(char));
         tl += l;
       } while (--i > 0);
@@ -420,7 +502,7 @@ void luaV_concat (lua_State *L, int total) {
 */
 void luaV_objlen (lua_State *L, StkId ra, const TValue *rb) {
   const TValue *tm;
-  switch (ttnov(rb)) {
+  switch (ttype(rb)) {
     case LUA_TTABLE: {
       Table *h = hvalue(rb);
       tm = fasttm(L, h->metatable, TM_LEN);
@@ -428,8 +510,12 @@ void luaV_objlen (lua_State *L, StkId ra, const TValue *rb) {
       setivalue(ra, luaH_getn(h));  /* else primitive len */
       return;
     }
-    case LUA_TSTRING: {
-      setivalue(ra, tsvalue(rb)->len);
+    case LUA_TSHRSTR: {
+      setivalue(ra, tsvalue(rb)->shrlen);
+      return;
+    }
+    case LUA_TLNGSTR: {
+      setivalue(ra, tsvalue(rb)->u.lnglen);
       return;
     }
     default: {  /* try metamethod */
@@ -465,7 +551,7 @@ lua_Integer luaV_div (lua_State *L, lua_Integer m, lua_Integer n) {
 
 
 /*
-** Integer modulus; return 'm % n'. (Assume that C '%' with 
+** Integer modulus; return 'm % n'. (Assume that C '%' with
 ** negative operands follows C99 behavior. See previous comment
 ** about luaV_div.)
 */
@@ -624,7 +710,7 @@ void luaV_finishOp (lua_State *L) {
 ** some macros for common tasks in 'luaV_execute'
 */
 
-#if !defined luai_runtimecheck
+#if !defined(luai_runtimecheck)
 #define luai_runtimecheck(L, c)		/* void */
 #endif
 
@@ -760,7 +846,7 @@ void luaV_execute (lua_State *L) {
         Protect(luaV_gettable(L, rb, RKC(i), ra));
         vmbreak;
       }
-      vmcase(OP_ADD) { 
+      vmcase(OP_ADD) {
         TValue *rb = RKB(i);
         TValue *rc = RKC(i);
         lua_Number nb; lua_Number nc;
@@ -945,7 +1031,7 @@ void luaV_execute (lua_State *L) {
         L->top = base + c + 1;  /* mark the end of concat operands */
         Protect(luaV_concat(L, c - b + 1));
         ra = RA(i);  /* 'luav_concat' may invoke TMs and move the stack */
-        rb = b + base;
+        rb = base + b;
         setobjs2s(L, ra, rb);
         checkGC(L, (ra >= rb ? ra + 1 : rb));
         L->top = ci->top;  /* restore top */
@@ -1051,9 +1137,8 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_RETURN) {
         int b = GETARG_B(i);
-        if (b != 0) L->top = ra+b-1;
         if (cl->p->sp->sizep > 0) luaF_close(L, base);
-        b = luaD_poscall(L, ra);
+        b = luaD_poscall(L, ra, (b != 0 ? b - 1 : L->top - ra));
         if (!(ci->callstatus & CIST_REENTRY))  /* 'ci' still the called one */
           return;  /* external invocation: return */
         else {  /* invocation via reentry: continue execution */
@@ -1071,7 +1156,7 @@ void luaV_execute (lua_State *L) {
           lua_Integer limit = ivalue(ra + 1);
           if ((0 < step) ? (idx <= limit) : (limit <= idx)) {
             ci->u.l.savedpc += GETARG_sBx(i);  /* jump back */
-            setivalue(ra, idx);  /* update internal index... */
+            chgivalue(ra, idx);  /* update internal index... */
             setivalue(ra + 3, idx);  /* ...and external index */
           }
         }
@@ -1082,7 +1167,7 @@ void luaV_execute (lua_State *L) {
           if (luai_numlt(0, step) ? luai_numle(idx, limit)
                                   : luai_numle(limit, idx)) {
             ci->u.l.savedpc += GETARG_sBx(i);  /* jump back */
-            setfltvalue(ra, idx);  /* update internal index... */
+            chgfltvalue(ra, idx);  /* update internal index... */
             setfltvalue(ra + 3, idx);  /* ...and external index */
           }
         }
