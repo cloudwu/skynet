@@ -34,6 +34,7 @@ spinlock_unlock(struct spinlock *lock) {
 
 static inline void
 spinlock_destroy(struct spinlock *lock) {
+	(void) lock;
 }
 
 #else

@@ -972,29 +972,28 @@ LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver, size_t sz) {
 
 // use clonefunction
 
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
+#include "spinlock.h"
 
 struct codecache {
-	int lock;
+	struct spinlock lock;
 	lua_State *L;
 };
 
-static struct codecache CC = { 0 , NULL };
+static struct codecache CC;
 
 static void
 clearcache() {
 	if (CC.L == NULL)
 		return;
-	LOCK(&CC)
+	SPIN_LOCK(&CC)
 		lua_close(CC.L);
 		CC.L = luaL_newstate();
-	UNLOCK(&CC)
+	SPIN_UNLOCK(&CC)
 }
 
 static void
 init() {
-	CC.lock = 0;
+	SPIN_INIT(&CC);
 	CC.L = luaL_newstate();
 }
 
@@ -1002,13 +1001,13 @@ static const void *
 load(const char *key) {
   if (CC.L == NULL)
     return NULL;
-  LOCK(&CC)
+  SPIN_LOCK(&CC)
     lua_State *L = CC.L;
     lua_pushstring(L, key);
     lua_rawget(L, LUA_REGISTRYINDEX);
     const void * result = lua_touserdata(L, -1);
     lua_pop(L, 1);
-  UNLOCK(&CC)
+  SPIN_UNLOCK(&CC)
 
   return result;
 }
@@ -1018,7 +1017,7 @@ save(const char *key, const void * proto) {
   lua_State *L;
   const void * result = NULL;
 
-  LOCK(&CC)
+  SPIN_LOCK(&CC)
     if (CC.L == NULL) {
       init();
       L = CC.L;
@@ -1036,7 +1035,7 @@ save(const char *key, const void * proto) {
         lua_pop(L,2);
       }
     }
-  UNLOCK(&CC)
+  SPIN_UNLOCK(&CC)
   return result;
 }
 
