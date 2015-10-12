@@ -1040,12 +1040,61 @@ save(const char *key, const void * proto) {
   return result;
 }
 
+#define CACHE_OFF 0
+#define CACHE_EXIST 1
+#define CACHE_ON 2
+
+static int cache_key = 0;
+
+static int cache_level(lua_State *L) {
+	int t = lua_rawgetp(L, LUA_REGISTRYINDEX, &cache_key);
+	int r = lua_tointeger(L, -1);
+	lua_pop(L,1);
+	if (t == LUA_TNUMBER) {
+		return r;
+	}
+	return CACHE_ON;
+}
+
+static int cache_mode(lua_State *L) {
+	static const char * lst[] = {
+		"OFF",
+		"EXIST",
+		"ON",
+		NULL,
+	};
+	if (lua_isnoneornil(L,1)) {
+		int t = lua_rawgetp(L, LUA_REGISTRYINDEX, &cache_key);
+		int r = lua_tointeger(L, -1);
+		if (t == LUA_TNUMBER) {
+			if (r < 0  || r >= CACHE_ON) {
+				r = CACHE_ON;
+			}
+		} else {
+			r = CACHE_ON;
+		}
+		lua_pushstring(L, lst[r]);
+		return 1;
+	}
+	int t = luaL_checkoption(L, 1, "OFF" , lst);
+	lua_pushinteger(L, t);
+	lua_rawsetp(L, LUA_REGISTRYINDEX, &cache_key);
+	return 0;
+}
+
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
+  int level = cache_level(L);
+  if (level == CACHE_OFF) {
+    return luaL_loadfilex_(L, filename, mode);
+  }
   const void * proto = load(filename);
   if (proto) {
     lua_clonefunction(L, proto);
     return LUA_OK;
+  }
+  if (level == CACHE_EXIST) {
+    return luaL_loadfilex_(L, filename, mode);
   }
   lua_State * eL = luaL_newstate();
   if (eL == NULL) {
@@ -1083,6 +1132,7 @@ cache_clear(lua_State *L) {
 LUAMOD_API int luaopen_cache(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "clear", cache_clear },
+		{ "mode", cache_mode },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);
