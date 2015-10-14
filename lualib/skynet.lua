@@ -275,10 +275,10 @@ function skynet.yield()
 	return skynet.sleep(0)
 end
 
-function skynet.wait()
+function skynet.wait(co)
 	local session = c.genid()
 	local ret, msg = coroutine_yield("SLEEP", session)
-	local co = coroutine.running()
+	co = co or coroutine.running()
 	sleep_session[co] = nil
 	session_id_coroutine[session] = nil
 end

@@ -115,8 +115,17 @@ local function dispatch_by_session(self)
 	end
 end
 
+local wait_response
+
 local function pop_response(self)
-	return table.remove(self.__request, 1), table.remove(self.__thread, 1)
+	while true do
+		local func,co = table.remove(self.__request, 1), table.remove(self.__thread, 1)
+		if func then
+			return func, co
+		end
+		wait_response = coroutine.running()
+		skynet.wait(wait_response)
+	end
 end
 
 local function push_response(self, response, co)
@@ -127,46 +136,43 @@ local function push_response(self, response, co)
 		-- response is a function, push it to __request
 		table.insert(self.__request, response)
 		table.insert(self.__thread, co)
+		if wait_response then
+			skynet.wakeup(wait_response)
+			wait_response = nil
+		end
 	end
 end
 
 local function dispatch_by_order(self)
 	while self.__sock do
 		local func, co = pop_response(self)
-		if func == nil then
-			if not socket.block(self.__sock[1]) then
-				close_channel_socket(self)
-				wakeup_all(self)
+		local ok, result_ok, result_data, padding = pcall(func, self.__sock)
+		if ok then
+			if padding and result_ok then
+				-- if padding is true, wait for next result_data
+				-- self.__result_data[co] is a table
+				local result = self.__result_data[co] or {}
+				self.__result_data[co] = result
+				table.insert(result, result_data)
+			else
+				self.__result[co] = result_ok
+				if result_ok and self.__result_data[co] then
+					table.insert(self.__result_data[co], result_data)
+				else
+					self.__result_data[co] = result_data
+				end
+				skynet.wakeup(co)
 			end
 		else
-			local ok, result_ok, result_data, padding = pcall(func, self.__sock)
-			if ok then
-				if padding and result_ok then
-					-- if padding is true, wait for next result_data
-					-- self.__result_data[co] is a table
-					local result = self.__result_data[co] or {}
-					self.__result_data[co] = result
-					table.insert(result, result_data)
-				else
-					self.__result[co] = result_ok
-					if result_ok and self.__result_data[co] then
-						table.insert(self.__result_data[co], result_data)
-					else
-						self.__result_data[co] = result_data
-					end
-					skynet.wakeup(co)
-				end
-			else
-				close_channel_socket(self)
-				local errmsg
-				if result_ok ~= socket_error then
-					errmsg = result_ok
-				end
-				self.__result[co] = socket_error
-				self.__result_data[co] = errmsg
-				skynet.wakeup(co)
-				wakeup_all(self, errmsg)
+			close_channel_socket(self)
+			local errmsg
+			if result_ok ~= socket_error then
+				errmsg = result_ok
 			end
+			self.__result[co] = socket_error
+			self.__result_data[co] = errmsg
+			skynet.wakeup(co)
+			wakeup_all(self, errmsg)
 		end
 	end
 end
@@ -288,7 +294,7 @@ local function block_connect(self, once)
 		-- connecting in other coroutine
 		local co = coroutine.running()
 		table.insert(self.__connecting, co)
-		skynet.wait()
+		skynet.wait(co)
 	else
 		self.__connecting[1] = true
 		try_connect(self, once)
@@ -319,7 +325,7 @@ end
 local function wait_for_response(self, response)
 	local co = coroutine.running()
 	push_response(self, response, co)
-	skynet.wait()
+	skynet.wait(co)
 
 	local result = self.__result[co]
 	self.__result[co] = nil
