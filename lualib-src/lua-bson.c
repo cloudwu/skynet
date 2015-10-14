@@ -408,6 +408,7 @@ bson_numstr( char *str, unsigned int i ) {
 
 static void
 pack_dict(lua_State *L, struct bson *b, bool isarray) {
+	luaL_checkstack(L, 16, NULL);	// reserve enough stack space to pack table
 	int length = reserve_length(b);
 	lua_pushnil(L);
 	while(lua_next(L,-2) != 0) {
@@ -495,6 +496,7 @@ make_object(lua_State *L, int type, const void * ptr, size_t len) {
 
 static void
 unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
+	luaL_checkstack(L, 16, NULL);	// reserve enough stack space to unpack table
 	int sz = read_int32(L, br);
 	const void * bytes = read_bytes(L, br, sz-5);
 	struct bson_reader t = { bytes, sz-5 };
