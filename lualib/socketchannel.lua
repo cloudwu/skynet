@@ -115,16 +115,14 @@ local function dispatch_by_session(self)
 	end
 end
 
-local wait_response
-
 local function pop_response(self)
 	while true do
 		local func,co = table.remove(self.__request, 1), table.remove(self.__thread, 1)
 		if func then
 			return func, co
 		end
-		wait_response = coroutine.running()
-		skynet.wait(wait_response)
+		self.wait_response = coroutine.running()
+		skynet.wait(self.wait_response)
 	end
 end
 
@@ -136,9 +134,9 @@ local function push_response(self, response, co)
 		-- response is a function, push it to __request
 		table.insert(self.__request, response)
 		table.insert(self.__thread, co)
-		if wait_response then
-			skynet.wakeup(wait_response)
-			wait_response = nil
+		if self.wait_response then
+			skynet.wakeup(self.wait_response)
+			self.wait_response = nil
 		end
 	end
 end
