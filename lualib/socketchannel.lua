@@ -121,8 +121,8 @@ local function pop_response(self)
 		if func then
 			return func, co
 		end
-		self.wait_response = coroutine.running()
-		skynet.wait(self.wait_response)
+		self.__wait_response = coroutine.running()
+		skynet.wait(self.__wait_response)
 	end
 end
 
@@ -134,9 +134,9 @@ local function push_response(self, response, co)
 		-- response is a function, push it to __request
 		table.insert(self.__request, response)
 		table.insert(self.__thread, co)
-		if self.wait_response then
-			skynet.wakeup(self.wait_response)
-			self.wait_response = nil
+		if self.__wait_response then
+			skynet.wakeup(self.__wait_response)
+			self.__wait_response = nil
 		end
 	end
 end
