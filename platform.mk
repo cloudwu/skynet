@@ -1,5 +1,16 @@
 PLAT ?= none
 PLATS = linux freebsd macosx
+# detect platform
+uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+ifeq ($(uname_S),Darwin)
+    PLAT := macosx
+endif
+ifeq ($(uname_S),Linux)
+    PLAT := linux
+endif
+ifeq ($(uname_S),FreeBSD)
+    PLAT := freebsd
+endif
 
 CC ?= gcc
 
