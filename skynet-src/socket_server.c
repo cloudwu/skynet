@@ -1403,6 +1403,9 @@ do_bind(const char *host, int port, int protocol, int *family) {
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
 		goto _failed;
 	}
+	if (fcntl(fd, F_SETFD, FD_CLOEXEC)) {
+		goto _failed;
+	}
 	status = bind(fd, (struct sockaddr *)ai_list->ai_addr, ai_list->ai_addrlen);
 	if (status != 0)
 		goto _failed;
