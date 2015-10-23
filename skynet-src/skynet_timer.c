@@ -208,7 +208,7 @@ timer_create_timer() {
 
 int
 skynet_timeout(uint32_t handle, int time, int session) {
-	if (time == 0) {
+	if (time <= 0) {
 		struct skynet_message message;
 		message.source = 0;
 		message.session = session;

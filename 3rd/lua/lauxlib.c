@@ -972,29 +972,28 @@ LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver, size_t sz) {
 
 // use clonefunction
 
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
+#include "spinlock.h"
 
 struct codecache {
-	int lock;
+	struct spinlock lock;
 	lua_State *L;
 };
 
-static struct codecache CC = { 0 , NULL };
+static struct codecache CC;
 
 static void
 clearcache() {
 	if (CC.L == NULL)
 		return;
-	LOCK(&CC)
+	SPIN_LOCK(&CC)
 		lua_close(CC.L);
 		CC.L = luaL_newstate();
-	UNLOCK(&CC)
+	SPIN_UNLOCK(&CC)
 }
 
 static void
 init() {
-	CC.lock = 0;
+	SPIN_INIT(&CC);
 	CC.L = luaL_newstate();
 }
 
@@ -1002,13 +1001,13 @@ static const void *
 load(const char *key) {
   if (CC.L == NULL)
     return NULL;
-  LOCK(&CC)
+  SPIN_LOCK(&CC)
     lua_State *L = CC.L;
     lua_pushstring(L, key);
     lua_rawget(L, LUA_REGISTRYINDEX);
     const void * result = lua_touserdata(L, -1);
     lua_pop(L, 1);
-  UNLOCK(&CC)
+  SPIN_UNLOCK(&CC)
 
   return result;
 }
@@ -1018,7 +1017,7 @@ save(const char *key, const void * proto) {
   lua_State *L;
   const void * result = NULL;
 
-  LOCK(&CC)
+  SPIN_LOCK(&CC)
     if (CC.L == NULL) {
       init();
       L = CC.L;
@@ -1036,16 +1035,65 @@ save(const char *key, const void * proto) {
         lua_pop(L,2);
       }
     }
-  UNLOCK(&CC)
+  SPIN_UNLOCK(&CC)
   return result;
+}
+
+#define CACHE_OFF 0
+#define CACHE_EXIST 1
+#define CACHE_ON 2
+
+static int cache_key = 0;
+
+static int cache_level(lua_State *L) {
+	int t = lua_rawgetp(L, LUA_REGISTRYINDEX, &cache_key);
+	int r = lua_tointeger(L, -1);
+	lua_pop(L,1);
+	if (t == LUA_TNUMBER) {
+		return r;
+	}
+	return CACHE_ON;
+}
+
+static int cache_mode(lua_State *L) {
+	static const char * lst[] = {
+		"OFF",
+		"EXIST",
+		"ON",
+		NULL,
+	};
+	if (lua_isnoneornil(L,1)) {
+		int t = lua_rawgetp(L, LUA_REGISTRYINDEX, &cache_key);
+		int r = lua_tointeger(L, -1);
+		if (t == LUA_TNUMBER) {
+			if (r < 0  || r >= CACHE_ON) {
+				r = CACHE_ON;
+			}
+		} else {
+			r = CACHE_ON;
+		}
+		lua_pushstring(L, lst[r]);
+		return 1;
+	}
+	int t = luaL_checkoption(L, 1, "OFF" , lst);
+	lua_pushinteger(L, t);
+	lua_rawsetp(L, LUA_REGISTRYINDEX, &cache_key);
+	return 0;
 }
 
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
+  int level = cache_level(L);
+  if (level == CACHE_OFF) {
+    return luaL_loadfilex_(L, filename, mode);
+  }
   const void * proto = load(filename);
   if (proto) {
     lua_clonefunction(L, proto);
     return LUA_OK;
+  }
+  if (level == CACHE_EXIST) {
+    return luaL_loadfilex_(L, filename, mode);
   }
   lua_State * eL = luaL_newstate();
   if (eL == NULL) {
@@ -1083,6 +1131,7 @@ cache_clear(lua_State *L) {
 LUAMOD_API int luaopen_cache(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "clear", cache_clear },
+		{ "mode", cache_mode },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);

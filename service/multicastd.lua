@@ -67,7 +67,7 @@ end
 -- for remote node, call remote_publish. (call mc.unpack and skynet.tostring to convert message pointer to string)
 local function publish(c , source, pack, size)
 	local group = channel[c]
-	if group == nil then
+	if group == nil or next(group) == nil then
 		-- dead channel, delete the pack. mc.bind returns the pointer in pack
 		local pack = mc.bind(pack, 1)
 		mc.close(pack)

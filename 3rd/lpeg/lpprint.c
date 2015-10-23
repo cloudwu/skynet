@@ -1,5 +1,5 @@
 /*
-** $Id: lpprint.c,v 1.7 2013/04/12 16:29:49 roberto Exp $
+** $Id: lpprint.c,v 1.9 2015/06/15 16:09:57 roberto Exp $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -52,7 +52,7 @@ static void printjmp (const Instruction *op, const Instruction *p) {
 }
 
 
-static void printinst (const Instruction *op, const Instruction *p) {
+void printinst (const Instruction *op, const Instruction *p) {
   const char *const names[] = {
     "any", "char", "set",
     "testany", "testchar", "testset",
@@ -221,10 +221,10 @@ void printtree (TTree *tree, int ident) {
 
 void printktable (lua_State *L, int idx) {
   int n, i;
-  lua_getfenv(L, idx);
+  lua_getuservalue(L, idx);
   if (lua_isnil(L, -1))  /* no ktable? */
     return;
-  n = lua_objlen(L, -1);
+  n = lua_rawlen(L, -1);
   printf("[");
   for (i = 1; i <= n; i++) {
     printf("%d = ", i);

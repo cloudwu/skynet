@@ -24,7 +24,7 @@ JEMALLOC_INC := 3rd/jemalloc/include/jemalloc
 
 all : jemalloc
 	
-.PHONY : jemalloc
+.PHONY : jemalloc update3rd
 
 MALLOC_STATICLIB := $(JEMALLOC_STATICLIB)
 
@@ -38,6 +38,9 @@ $(JEMALLOC_STATICLIB) : 3rd/jemalloc/Makefile
 	cd 3rd/jemalloc && ./autogen.sh --with-jemalloc-prefix=je_ --disable-valgrind
 
 jemalloc : $(MALLOC_STATICLIB)
+
+update3rd :
+	rm -rf 3rd/jemalloc && git submodule update --init
 
 # skynet
 

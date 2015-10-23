@@ -30,7 +30,7 @@ end
 local function suspend(s)
 	assert(not s.co)
 	s.co = coroutine.running()
-	skynet.wait()
+	skynet.wait(s.co)
 	-- wakeup closing corouting every time suspend,
 	-- because socket.close() will wait last socket buffer operation before clear the buffer.
 	if s.closing then
@@ -232,7 +232,7 @@ function socket.close(id)
 			-- wait reading coroutine read the buffer.
 			assert(not s.closing)
 			s.closing = coroutine.running()
-			skynet.wait()
+			skynet.wait(s.closing)
 		else
 			suspend(s)
 		end
@@ -361,7 +361,7 @@ function socket.lock(id)
 	else
 		local co = coroutine.running()
 		table.insert(lock_set, co)
-		skynet.wait()
+		skynet.wait(co)
 	end
 end
 
