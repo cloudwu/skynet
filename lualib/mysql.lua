@@ -418,7 +418,7 @@ local function _recv_auth_resp(self)
 end
 
 
-local function _mysql_login(self,user,password,database,cb)
+local function _mysql_login(self,user,password,database,on_connect)
 
     return function(sockchannel)
           local packet, typ, err =   sockchannel:response( _recv_decode_packet_resp(self) )
@@ -491,8 +491,8 @@ local function _mysql_login(self,user,password,database,cb)
 
         local authpacket=_compose_packet(self,req,packet_len)
         sockchannel:request(authpacket,_recv_auth_resp(self))
-	if cb then
-		cb(self)
+	if on_connect then
+		on_connect(self)
 	end
     end
 end
@@ -629,7 +629,7 @@ local function _query_resp(self)
     end
 end
 
-function _M.connect(opts, cb)
+function _M.connect(opts)
 
     local self = setmetatable( {}, mt)
 
@@ -648,7 +648,7 @@ function _M.connect(opts, cb)
     local channel = socketchannel.channel {
         host = opts.host,
         port = opts.port or 3306,
-        auth = _mysql_login(self,user,password,database,cb),
+        auth = _mysql_login(self,user,password,database,opts.on_connect),
     }
     self.sockchannel = channel
     -- try connect first only once
