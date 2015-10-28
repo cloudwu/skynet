@@ -608,11 +608,15 @@ local function init_all()
 	end
 end
 
+local function ret(f, ...)
+	f()
+	return ...
+end
+
 local function init_template(start)
 	init_all()
 	init_func = {}
-	start()
-	init_all()
+	return ret(init_all, start())
 end
 
 function skynet.pcall(start)
