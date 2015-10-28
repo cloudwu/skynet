@@ -112,8 +112,10 @@ socket_message[5] = function(id, _, err)
 		skynet.error("socket: error on unknown", id, err)
 		return
 	end
-	if s.connected or s.connecting then
+	if s.connected then
 		skynet.error("socket: error on", id, err)
+	elseif s.connecting then
+		s.connecting = err
 	end
 	s.connected = false
 	driver.close(id)
@@ -179,11 +181,13 @@ local function connect(id, func)
 	}
 	socket_pool[id] = s
 	suspend(s)
+	local err = s.connecting
 	s.connecting = nil
 	if s.connected then
 		return id
 	else
 		socket_pool[id] = nil
+		return nil, err
 	end
 end
 

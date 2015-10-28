@@ -1095,7 +1095,10 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 	int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);  
 	if (code < 0 || error) {  
 		force_close(ss,s, result);
-		result->data = strerror(errno);
+		if (code >= 0)
+			result->data = strerror(error);
+		else
+			result->data = strerror(errno);
 		return SOCKET_ERROR;
 	} else {
 		s->type = SOCKET_TYPE_CONNECTED;

@@ -209,11 +209,11 @@ local function connect_once(self)
 		return false
 	end
 	assert(not self.__sock and not self.__authcoroutine)
-	local fd = socket.open(self.__host, self.__port)
+	local fd,err = socket.open(self.__host, self.__port)
 	if not fd then
 		fd = connect_backup(self)
 		if not fd then
-			return false
+			return false, err
 		end
 	end
 	if self.__nodelay then
@@ -247,13 +247,16 @@ end
 local function try_connect(self , once)
 	local t = 0
 	while not self.__closed do
-		if connect_once(self) then
+		local ok, err = connect_once(self)
+		if ok then
 			if not once then
 				skynet.error("socket: connect to", self.__host, self.__port)
 			end
-			return true
+			return
 		elseif once then
-			return false
+			return err
+		else
+			skynet.error("socket: connect", err)
 		end
 		if t > 1000 then
 			skynet.error("socket: try to reconnect", self.__host, self.__port)
@@ -287,6 +290,7 @@ local function block_connect(self, once)
 	if r ~= nil then
 		return r
 	end
+	local err
 
 	if #self.__connecting > 0 then
 		-- connecting in other coroutine
@@ -295,7 +299,7 @@ local function block_connect(self, once)
 		skynet.wait(co)
 	else
 		self.__connecting[1] = true
-		try_connect(self, once)
+		err = try_connect(self, once)
 		self.__connecting[1] = nil
 		for i=2, #self.__connecting do
 			local co = self.__connecting[i]
@@ -306,7 +310,7 @@ local function block_connect(self, once)
 
 	r = check_connection(self)
 	if r == nil then
-		error(string.format("Connect to %s:%d failed", self.__host, self.__port))
+		error(string.format("Connect to %s:%d failed (%s)", self.__host, self.__port, err))
 	else
 		return r
 	end
