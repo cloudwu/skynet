@@ -70,20 +70,22 @@ local function test3( db)
 end
 skynet.start(function()
 
-	local db=mysql.connect{
+	local function on_connect(db)
+		db:query("set charset utf8");
+	end
+	local db=mysql.connect({
 		host="127.0.0.1",
 		port=3306,
 		database="skynet",
 		user="root",
 		password="1",
-		max_packet_size = 1024 * 1024
-	}
+		max_packet_size = 1024 * 1024,
+		on_connect = on_connect
+	})
 	if not db then
 		print("failed to connect")
 	end
 	print("testmysql success to connect to mysql server")
-
-	db:query("set names utf8")
 
 	local res = db:query("drop table if exists cats")
 	res = db:query("create table cats "
