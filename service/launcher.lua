@@ -40,13 +40,19 @@ function command.STAT()
 	return list
 end
 
-function command.STOP()
-	for k,v in pairs(need_clean_services) do
-		skynet.call(k, "lua", "STOP")
+-- check need clean services is clean ok
+local function check_clean_ok()
+	for k, v in pairs(need_clean_services) do
+		if v then
+			return false
+		end
 	end
+
+	return true
 end
 
-function command.CLEAN_OK()
+-- when need clean services clean ok, stop server
+local function stop_server()
 	-- kill all server
 	for k,v in pairs(services) do
 		skynet.kill(k)
@@ -54,6 +60,26 @@ function command.CLEAN_OK()
 	end
 	core.command("STOPSERVER", "STOP SERVER BY COMMAND")
 	--skynet.exit()
+end
+
+function command.STOP()
+	if check_clean_ok() then
+		-- empty need_clean_services
+		stop_server()
+	else
+		for k,v in pairs(need_clean_services) do
+			skynet.call(k, "lua", "STOP", k)
+		end
+	end
+end
+
+function command.CLEAN_OK(service_inst)
+	if need_clean_services[service_inst] ~= nil then
+		need_clean_services[service_inst] = nil
+	end
+	if check_clean_ok() then
+		stop_server()
+	end
 end
 
 function command.KILL(_, handle)
