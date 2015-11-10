@@ -1,3 +1,22 @@
+v1.0.0-beta (2015-11-10)
+-----------
+* Improve and fix bug for sproto
+* Add global short string pool for lua vm
+* Add code cache mode
+* Add a callback for mysql auth
+* Add hmac_md5
+* Sharedata support filename as a string
+* Fix a bug in socket.httpc
+* Fix a lua stack overflow bug in lua bson
+* Fix a socketchannel bug may block the data steam
+* Avoid dead loop when sending message to the service exiting
+* Fix memory leak in netpack
+* Improve DH key exchange implement
+* Minor fix for socket
+* Minor fix for multicast
+* Update jemalloc to 4.0.4
+* Update lpeg to 1.0.0
+
 v1.0.0-alpha10 (2015-8-17)
 -----------
 * Remove the size limit of cluster RPC message.
