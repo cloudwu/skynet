@@ -16,19 +16,54 @@ end
 skynet.start(function()
 	local db = redis.connect(conf)
 
-	local ret = db:pipeline {
-		{"hincrby", "hello", 1, 1},
-		{"del", "hello"},
-		{"hincrby", "hello", 3, 1},
-		{"hgetall", "hello"},
-	}
+	db.pipelining = function (self, block)
+		local ops = {}
 
-	print(ret[1].out)
-	print(ret[2].out)
-	print(ret[3].out)
+		block(setmetatable({}, {
+			__index = function (_, name)
+				return function (_, ...)
+					table.insert(ops, {name, ...})
+				end
+			end
+		}))
 
-	for k, v in pairs(read_table(ret[4].out)) do
-		print(k, v)
+		return self:pipeline(ops)
+	end
+
+	do
+		print("test function")
+		local ret = db:pipelining(function (red)
+			red:hincrby("hello", 1, 1)
+			red:del("hello")
+			red:hmset("hello", 1, 1, 2, 2, 3, 3)
+			red:hgetall("hello")
+		end)
+
+		print(ret[1].out)
+		print(ret[2].out)
+		print(ret[3].out)
+
+		for k, v in pairs(read_table(ret[4].out)) do
+			print(k, v)
+		end
+	end
+
+	do
+		print("test table")
+		local ret = db:pipeline {
+			{"hincrby", "hello", 1, 1},
+			{"del", "hello"},
+			{"hmset", "hello", 1, 1, 2, 2, 3, 3},
+			{"hgetall", "hello"},
+		}
+
+		print(ret[1].out)
+		print(ret[2].out)
+		print(ret[3].out)
+
+		for k, v in pairs(read_table(ret[4].out)) do
+			print(k, v)
+		end
 	end
 
 	db:disconnect()

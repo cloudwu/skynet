@@ -163,14 +163,14 @@ function command:sismember(key, value)
 end
 
 function command:pipeline(ops)
-	assert(#ops > 0, "pipeline is null")
+	assert(ops and #ops > 0, "pipeline is null")
 
 	local fd = self[1]
 
 	local cmds = {}
 	for _, cmd in ipairs(ops) do
 		assert(#cmd >= 2, "pipeline error, the params length is less than 2")
-		table.insert(cmds, compose_message(string.upper(cmd[1]), {cmd[2], cmd[3], cmd[4]}))
+		table.insert(cmds, compose_message(string.upper(table.remove(cmd, 1)), cmd))
 	end
 
 	return fd:request(table.concat(cmds, "\r\n"), function (fd)
