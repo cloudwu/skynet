@@ -435,7 +435,7 @@ static int
 lpack(lua_State *L) {
 	size_t len;
 	const char * ptr = tolstring(L, &len, 1);
-	if (len > 0x10000) {
+	if (len >= 0x10000) {
 		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
 	}
 
