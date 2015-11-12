@@ -4,6 +4,7 @@ local socketchannel = require "socketchannel"
 
 local table = table
 local string = string
+local assert = assert
 
 local redis = {}
 local command = {}
@@ -159,6 +160,27 @@ end
 function command:sismember(key, value)
 	local fd = self[1]
 	return fd:request(compose_message ("SISMEMBER", {key, value}), read_boolean)
+end
+
+function command:pipeline(ops)
+	assert(#ops > 0, "pipeline is null")
+
+	local fd = self[1]
+
+	local cmds = {}
+	for _, cmd in ipairs(ops) do
+		assert(#cmd >= 2, "pipeline error, the params length is less than 2")
+		table.insert(cmds, compose_message(string.upper(cmd[1]), {cmd[2], cmd[3], cmd[4]}))
+	end
+
+	return fd:request(table.concat(cmds, "\r\n"), function (fd)
+		local result = {}
+		for i=1, #ops do
+			local ok, out = read_response(fd)
+			table.insert(result, {ok = ok, out = out})
+		end
+		return true, result
+	end)
 end
 
 --- watch mode
