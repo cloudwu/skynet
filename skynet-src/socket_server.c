@@ -337,7 +337,9 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 		sp_del(ss->event_fd, s->fd);
 	}
 	if (s->type != SOCKET_TYPE_BIND) {
-		close(s->fd);
+		if (close(s->fd) < 0) {
+			perror("close socket:");
+		}
 	}
 	s->type = SOCKET_TYPE_INVALID;
 }
