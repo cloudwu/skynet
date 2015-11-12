@@ -25,6 +25,10 @@ static mem_data mem_stats[SLOT_SIZE];
 
 #include "jemalloc.h"
 
+// for skynet_lalloc use
+#define raw_realloc je_realloc
+#define raw_free je_free
+
 static ssize_t*
 get_allocated_field(uint32_t handle) {
 	int h = (int)(handle & (SLOT_SIZE - 1));
@@ -165,6 +169,10 @@ skynet_calloc(size_t nmemb,size_t size) {
 
 #else
 
+// for skynet_lalloc use
+#define raw_realloc realloc
+#define raw_free free
+
 void 
 memory_info_dump(void) {
 	skynet_error(NULL, "No jemalloc");
@@ -220,10 +228,10 @@ skynet_strdup(const char *str) {
 void * 
 skynet_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
 	if (nsize == 0) {
-		skynet_free(ptr);
+		raw_free(ptr);
 		return NULL;
 	} else {
-		return skynet_realloc(ptr, nsize);
+		return raw_realloc(ptr, nsize);
 	}
 }
 
