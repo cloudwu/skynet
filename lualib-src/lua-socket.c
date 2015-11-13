@@ -484,18 +484,65 @@ llisten(lua_State *L) {
 	return 1;
 }
 
+static size_t
+count_size(lua_State *L, int index) {
+	size_t tlen = 0;
+	int i;
+	for (i=1;lua_geti(L, index, i) != LUA_TNIL; ++i) {
+		size_t len;
+		luaL_checklstring(L, -1, &len);
+		tlen += len;
+		lua_pop(L,1);
+	}
+	lua_pop(L,1);
+	return tlen;
+}
+
+static void
+concat_table(lua_State *L, int index, void *buffer, size_t tlen) {
+	char *ptr = buffer;
+	int i;
+	for (i=1;lua_geti(L, index, i) != LUA_TNIL; ++i) {
+		size_t len;
+		const char * str = lua_tolstring(L, -1, &len);
+		if (str == NULL || tlen < len) {
+			break;
+		}
+		memcpy(ptr, str, len);
+		ptr += len;
+		tlen -= len;
+		lua_pop(L,1);
+	}
+	if (tlen != 0) {
+		skynet_free(buffer);
+		luaL_error(L, "Invalid strings table");
+	}
+	lua_pop(L,1);
+}
+
 static void *
 get_buffer(lua_State *L, int index, int *sz) {
 	void *buffer;
-	if (lua_isuserdata(L,index)) {
+	switch(lua_type(L, index)) {
+		const char * str;
+		size_t len;
+	case LUA_TUSERDATA:
 		buffer = lua_touserdata(L,index);
 		*sz = luaL_checkinteger(L,index+1);
-	} else {
-		size_t len = 0;
-		const char * str =  luaL_checklstring(L, index, &len);
+		break;
+	case LUA_TTABLE:
+		// concat the table as a string
+		len = count_size(L, index);
+		buffer = skynet_malloc(len);
+		concat_table(L, index, buffer, len);
+		*sz = (int)len;
+		break;
+	default:
+		str =  luaL_checklstring(L, index, &len);
 		buffer = skynet_malloc(len);
 		memcpy(buffer, str, len);
 		*sz = (int)len;
+		break;
 	}
 	return buffer;
 }
