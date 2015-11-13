@@ -97,41 +97,48 @@ function command:disconnect()
 end
 
 -- msg could be any type of value
-local function pack_value(lines, v)
-	if v == nil then
-		return
-	end
 
-	v = tostring(v)
+local header_cache = setmetatable({}, {
+	__mode = "kv",
+	__index = function(t,k)
+		local s = "\r\n$" .. k .. "\r\n"
+		t[k] = s
+		return s
+	end})
 
-	table.insert(lines,"$"..#v)
-	table.insert(lines,v)
-end
+local command_cache = setmetatable({}, {
+	__mode = "kv",
+	__index = function(t,cmd)
+		local s = "\r\n$"..#cmd.."\r\n"..cmd:upper()
+		t[cmd] = s
+		return s
+	end})
 
 local function compose_message(cmd, msg)
-	local len = 1
 	local t = type(msg)
+	local lines = {}
 
 	if t == "table" then
-		len = len + #msg
-	elseif t ~= nil then
-		len = len + 1
-	end
-
-	local lines = {"*" .. len}
-	pack_value(lines, cmd)
-
-	if t == "table" then
+		lines[1] = "*" .. (#msg+1)
+		lines[2] = command_cache[cmd]
+		local idx = 3
 		for _,v in ipairs(msg) do
-			pack_value(lines, v)
+			v= tostring(v)
+			lines[idx] = header_cache[#v]
+			lines[idx+1] = v
+			idx = idx + 2
 		end
+		lines[idx] = "\r\n"
 	else
-		pack_value(lines, msg)
+		msg = tostring(msg)
+		lines[1] = "*2"
+		lines[2] = command_cache[cmd]
+		lines[3] = header_cache[#msg]
+		lines[4] = msg
+		lines[5] = "\r\n"
 	end
-	table.insert(lines, "")
 
-	local chunk =  table.concat(lines,"\r\n")
-	return chunk
+	return lines
 end
 
 setmetatable(command, { __index = function(t,k)
@@ -162,25 +169,46 @@ function command:sismember(key, value)
 	return fd:request(compose_message ("SISMEMBER", {key, value}), read_boolean)
 end
 
-function command:pipeline(ops)
+local function compose_table(lines, msg)
+	local tinsert = table.insert
+	tinsert(lines, "*" .. #msg)
+	for _,v in ipairs(msg) do
+		v = tostring(v)
+		tinsert(lines,header_cache[#v])
+		tinsert(lines,v)
+	end
+	tinsert(lines, "\r\n")
+	return lines
+end
+
+function command:pipeline(ops,resp)
 	assert(ops and #ops > 0, "pipeline is null")
 
 	local fd = self[1]
 
 	local cmds = {}
 	for _, cmd in ipairs(ops) do
-		assert(#cmd >= 2, "pipeline error, the params length is less than 2")
-		table.insert(cmds, compose_message(string.upper(table.remove(cmd, 1)), cmd))
+		compose_table(cmds, cmd)
 	end
 
-	return fd:request(table.concat(cmds, "\r\n"), function (fd)
-		local result = {}
-		for i=1, #ops do
-			local ok, out = read_response(fd)
-			table.insert(result, {ok = ok, out = out})
-		end
-		return true, result
-	end)
+	if resp then
+		return fd:request(cmds, function (fd)
+			for i=1, #ops do
+				local ok, out = read_response(fd)
+				table.insert(resp, {ok = ok, out = out})
+			end
+			return true, resp
+		end)
+	else
+		return fd:request(cmds, function (fd)
+			local ok, out
+			for i=1, #ops do
+				ok, out = read_response(fd)
+			end
+			-- return last response
+			return ok,out
+		end)
+	end
 end
 
 --- watch mode
