@@ -98,28 +98,37 @@ end
 
 -- msg could be any type of value
 
-local header_cache = setmetatable({}, {
-	__mode = "kv",
-	__index = function(t,k)
+local function make_cache(f)
+	return setmetatable({}, {
+		__mode = "kv",
+		__index = f,
+	})
+end
+
+local header_cache = make_cache(function(t,k)
 		local s = "\r\n$" .. k .. "\r\n"
 		t[k] = s
 		return s
-	end})
+	end)
 
-local command_cache = setmetatable({}, {
-	__mode = "kv",
-	__index = function(t,cmd)
+local command_cache = make_cache(function(t,cmd)
 		local s = "\r\n$"..#cmd.."\r\n"..cmd:upper()
 		t[cmd] = s
 		return s
-	end})
+	end)
+
+local count_cache = make_cache(function(t,k)
+		local s = "*" .. k
+		t[k] = s
+		return s
+	end)
 
 local function compose_message(cmd, msg)
 	local t = type(msg)
 	local lines = {}
 
 	if t == "table" then
-		lines[1] = "*" .. (#msg+1)
+		lines[1] = count_cache[#msg+1]
 		lines[2] = command_cache[cmd]
 		local idx = 3
 		for _,v in ipairs(msg) do
@@ -171,7 +180,7 @@ end
 
 local function compose_table(lines, msg)
 	local tinsert = table.insert
-	tinsert(lines, "*" .. #msg)
+	tinsert(lines, count_cache[#msg])
 	for _,v in ipairs(msg) do
 		v = tostring(v)
 		tinsert(lines,header_cache[#v])
