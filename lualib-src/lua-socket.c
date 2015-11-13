@@ -527,6 +527,7 @@ get_buffer(lua_State *L, int index, int *sz) {
 		const char * str;
 		size_t len;
 	case LUA_TUSERDATA:
+	case LUA_TLIGHTUSERDATA:
 		buffer = lua_touserdata(L,index);
 		*sz = luaL_checkinteger(L,index+1);
 		break;
