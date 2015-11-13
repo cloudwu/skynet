@@ -9,6 +9,7 @@ struct skynet_context;
 #define SKYNET_SOCKET_TYPE_ACCEPT 4
 #define SKYNET_SOCKET_TYPE_ERROR 5
 #define SKYNET_SOCKET_TYPE_UDP 6
+#define SKYNET_SOCKET_TYPE_WARNING 7
 
 struct skynet_socket_message {
 	int type;
@@ -28,6 +29,7 @@ int skynet_socket_listen(struct skynet_context *ctx, const char *host, int port,
 int skynet_socket_connect(struct skynet_context *ctx, const char *host, int port);
 int skynet_socket_bind(struct skynet_context *ctx, int fd);
 void skynet_socket_close(struct skynet_context *ctx, int id);
+void skynet_socket_shutdown(struct skynet_context *ctx, int id);
 void skynet_socket_start(struct skynet_context *ctx, int id);
 void skynet_socket_nodelay(struct skynet_context *ctx, int id);
 

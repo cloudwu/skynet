@@ -1,5 +1,5 @@
 /*
-** $Id: lpprint.h,v 1.1 2013/03/21 20:25:12 roberto Exp $
+** $Id: lpprint.h,v 1.2 2015/06/12 18:18:08 roberto Exp $
 */
 
 
@@ -18,6 +18,7 @@ void printtree (TTree *tree, int ident);
 void printktable (lua_State *L, int idx);
 void printcharset (const byte *st);
 void printcaplist (Capture *cap, Capture *limit);
+void printinst (const Instruction *op, const Instruction *p);
 
 #else
 

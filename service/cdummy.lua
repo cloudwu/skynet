@@ -4,6 +4,7 @@ require "skynet.manager"	-- import skynet.launch, ...
 local globalname = {}
 local queryname = {}
 local harbor = {}
+local harbor_service
 
 skynet.register_protocol {
 	name = "harbor",

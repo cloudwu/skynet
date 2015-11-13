@@ -462,6 +462,14 @@ lclose(lua_State *L) {
 }
 
 static int
+lshutdown(lua_State *L) {
+	int id = luaL_checkinteger(L,1);
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	skynet_socket_shutdown(ctx, id);
+	return 0;
+}
+
+static int
 llisten(lua_State *L) {
 	const char * host = luaL_checkstring(L,1);
 	int port = luaL_checkinteger(L,2);
@@ -639,6 +647,7 @@ luaopen_socketdriver(lua_State *L) {
 	luaL_Reg l2[] = {
 		{ "connect", lconnect },
 		{ "close", lclose },
+		{ "shutdown", lshutdown },
 		{ "listen", llisten },
 		{ "send", lsend },
 		{ "lsend", lsendlow },

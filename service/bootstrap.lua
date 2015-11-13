@@ -1,8 +1,12 @@
 local skynet = require "skynet"
 local harbor = require "skynet.harbor"
 require "skynet.manager"	-- import skynet.launch, ...
+local memory = require "memory"
 
 skynet.start(function()
+	local sharestring = tonumber(skynet.getenv "sharestring")
+	memory.ssexpand(sharestring or 4096)
+
 	local standalone = skynet.getenv "standalone"
 
 	local launcher = assert(skynet.launch("snlua","launcher"))

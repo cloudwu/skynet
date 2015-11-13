@@ -30,7 +30,7 @@ end
 local function suspend(s)
 	assert(not s.co)
 	s.co = coroutine.running()
-	skynet.wait()
+	skynet.wait(s.co)
 	-- wakeup closing corouting every time suspend,
 	-- because socket.close() will wait last socket buffer operation before clear the buffer.
 	if s.closing then
@@ -106,16 +106,19 @@ socket_message[4] = function(id, newid, addr)
 end
 
 -- SKYNET_SOCKET_TYPE_ERROR = 5
-socket_message[5] = function(id)
+socket_message[5] = function(id, _, err)
 	local s = socket_pool[id]
 	if s == nil then
-		skynet.error("socket: error on unknown", id)
+		skynet.error("socket: error on unknown", id, err)
 		return
 	end
 	if s.connected then
-		skynet.error("socket: error on", id)
+		skynet.error("socket: error on", id, err)
+	elseif s.connecting then
+		s.connecting = err
 	end
 	s.connected = false
+	driver.shutdown(id)
 
 	wakeup(s)
 end
@@ -131,6 +134,25 @@ socket_message[6] = function(id, size, data, address)
 	local str = skynet.tostring(data, size)
 	skynet_core.trash(data, size)
 	s.callback(str, address)
+end
+
+local function default_warning(id, size)
+	local s = socket_pool[id]
+		local last = s.warningsize or 0
+		if last + 64 < size then	-- if size increase 64K
+			s.warningsize = size
+			skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id))
+		end
+		s.warningsize = size
+end
+
+-- SKYNET_SOCKET_TYPE_WARNING
+socket_message[7] = function(id, size)
+	local s = socket_pool[id]
+	if s then
+		local warning = s.warning or default_warning
+		warning(id, size)
+	end
 end
 
 skynet.register_protocol {
@@ -151,6 +173,7 @@ local function connect(id, func)
 		id = id,
 		buffer = newbuffer,
 		connected = false,
+		connecting = true,
 		read_required = false,
 		co = false,
 		callback = func,
@@ -158,10 +181,13 @@ local function connect(id, func)
 	}
 	socket_pool[id] = s
 	suspend(s)
+	local err = s.connecting
+	s.connecting = nil
 	if s.connected then
 		return id
 	else
 		socket_pool[id] = nil
+		return nil, err
 	end
 end
 
@@ -184,16 +210,20 @@ function socket.start(id, func)
 	return connect(id, func)
 end
 
-function socket.shutdown(id)
+local function close_fd(id, func)
 	local s = socket_pool[id]
 	if s then
 		if s.buffer then
 			driver.clear(s.buffer,buffer_pool)
 		end
 		if s.connected then
-			driver.close(id)
+			func(id)
 		end
 	end
+end
+
+function socket.shutdown(id)
+	close_fd(id, driver.shutdown)
 end
 
 function socket.close(id)
@@ -202,21 +232,21 @@ function socket.close(id)
 		return
 	end
 	if s.connected then
-		driver.close(s.id)
+		driver.close(id)
 		-- notice: call socket.close in __gc should be carefully,
 		-- because skynet.wait never return in __gc, so driver.clear may not be called
 		if s.co then
-			-- reading this socket on another coroutine, so don't shutdown (clear the buffer) immediatel
+			-- reading this socket on another coroutine, so don't shutdown (clear the buffer) immediately
 			-- wait reading coroutine read the buffer.
 			assert(not s.closing)
 			s.closing = coroutine.running()
-			skynet.wait()
+			skynet.wait(s.closing)
 		else
 			suspend(s)
 		end
 		s.connected = false
 	end
-	socket.shutdown(id)
+	close_fd(id)	-- clear the buffer (already close fd)
 	assert(s.lock_set == nil or next(s.lock_set) == nil)
 	socket_pool[id] = nil
 end
@@ -339,7 +369,7 @@ function socket.lock(id)
 	else
 		local co = coroutine.running()
 		table.insert(lock_set, co)
-		skynet.wait()
+		skynet.wait(co)
 	end
 end
 
@@ -403,5 +433,11 @@ end
 
 socket.sendto = assert(driver.udp_send)
 socket.udp_address = assert(driver.udp_address)
+
+function socket.warning(id, callback)
+	local obj = socket_pool[id]
+	assert(obj)
+	obj.warning = callback
+end
 
 return socket

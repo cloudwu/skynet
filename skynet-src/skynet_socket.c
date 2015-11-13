@@ -33,10 +33,14 @@ skynet_socket_free() {
 static void
 forward_message(int type, bool padding, struct socket_message * result) {
 	struct skynet_socket_message *sm;
-	int sz = sizeof(*sm);
+	size_t sz = sizeof(*sm);
 	if (padding) {
 		if (result->data) {
-			sz += strlen(result->data);
+			size_t msg_sz = strlen(result->data);
+			if (msg_sz > 128) {
+				msg_sz = 128;
+			}
+			sz += msg_sz;
 		} else {
 			result->data = "";
 		}
@@ -56,7 +60,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	message.source = 0;
 	message.session = 0;
 	message.data = sm;
-	message.sz = sz | PTYPE_SOCKET << HANDLE_REMOTE_SHIFT;
+	message.sz = sz | ((size_t)PTYPE_SOCKET << MESSAGE_TYPE_SHIFT);
 	
 	if (skynet_context_push((uint32_t)result->opaque, &message)) {
 		// todo: report somewhere to close socket
@@ -86,7 +90,7 @@ skynet_socket_poll() {
 		forward_message(SKYNET_SOCKET_TYPE_CONNECT, true, &result);
 		break;
 	case SOCKET_ERROR:
-		forward_message(SKYNET_SOCKET_TYPE_ERROR, false, &result);
+		forward_message(SKYNET_SOCKET_TYPE_ERROR, true, &result);
 		break;
 	case SOCKET_ACCEPT:
 		forward_message(SKYNET_SOCKET_TYPE_ACCEPT, true, &result);
@@ -109,10 +113,13 @@ check_wsz(struct skynet_context *ctx, int id, void *buffer, int64_t wsz) {
 	if (wsz < 0) {
 		return -1;
 	} else if (wsz > 1024 * 1024) {
-		int kb4 = wsz / 1024 / 4;
-		if (kb4 % 256 == 0) {
-			skynet_error(ctx, "%d Mb bytes on socket %d need to send out", (int)(wsz / (1024 * 1024)), id);
-		}
+		struct skynet_socket_message tmp;
+		tmp.type = SKYNET_SOCKET_TYPE_WARNING;
+		tmp.id = id;
+		tmp.ud = (int)(wsz / 1024);
+		tmp.buffer = NULL;
+		skynet_send(ctx, 0, skynet_context_handle(ctx), PTYPE_SOCKET, 0 , &tmp, sizeof(tmp));
+//		skynet_error(ctx, "%d Mb bytes on socket %d need to send out", (int)(wsz / (1024 * 1024)), id);
 	}
 	return 0;
 }
@@ -150,6 +157,12 @@ void
 skynet_socket_close(struct skynet_context *ctx, int id) {
 	uint32_t source = skynet_context_handle(ctx);
 	socket_server_close(SOCKET_SERVER, source, id);
+}
+
+void 
+skynet_socket_shutdown(struct skynet_context *ctx, int id) {
+	uint32_t source = skynet_context_handle(ctx);
+	socket_server_shutdown(SOCKET_SERVER, source, id);
 }
 
 void 

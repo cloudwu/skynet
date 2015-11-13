@@ -49,7 +49,6 @@ end
 
 local function launch_slave(auth_handler)
 	local function auth(fd, addr)
-		fd = assert(tonumber(fd))
 		skynet.error(string.format("connect from %s (fd = %d)", addr, fd))
 		socket.start(fd)
 
@@ -84,11 +83,11 @@ local function launch_slave(auth_handler)
 
 		local ok, server, uid =  pcall(auth_handler,token)
 
-		socket.abandon(fd)
 		return ok, server, uid, secret
 	end
 
-	local function ret_pack(ok, err, ...)
+	local function ret_pack(fd, ok, err, ...)
+		socket.abandon(fd)
 		if ok then
 			skynet.ret(skynet.pack(err, ...))
 		else
@@ -100,8 +99,12 @@ local function launch_slave(auth_handler)
 		end
 	end
 
-	skynet.dispatch("lua", function(_,_,...)
-		ret_pack(pcall(auth, ...))
+	skynet.dispatch("lua", function(_,_,fd,...)
+		if type(fd) ~= "number" then
+			skynet.ret(skynet.pack(false, "invalid fd type"))
+		else
+			ret_pack(fd,pcall(auth, fd, ...))
+		end
 	end)
 end
 

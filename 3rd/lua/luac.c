@@ -21,6 +21,7 @@
 #include "lobject.h"
 #include "lstate.h"
 #include "lundump.h"
+#include "lstring.h"
 
 static void PrintFunction(const Proto* f, int full);
 #define luaU_print	PrintFunction
@@ -195,6 +196,7 @@ int main(int argc, char* argv[])
  int i=doargs(argc,argv);
  argc-=i; argv+=i;
  if (argc<=0) usage("no input files given");
+ luaS_initshr();
  L=luaL_newstate();
  if (L==NULL) fatal("cannot create state: not enough memory");
  lua_pushcfunction(L,&pmain);

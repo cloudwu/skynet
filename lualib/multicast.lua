@@ -8,7 +8,9 @@ local dispatch = setmetatable({} , {__mode = "kv" })
 local chan = {}
 local chan_meta = {
 	__index = chan,
-	__gc = unsubscribe,
+	__gc = function(self)
+		self:unsubscribe()
+	end,
 	__tostring = function (self)
 		return string.format("[Multicast:%x]",self.channel)
 	end,

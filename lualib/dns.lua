@@ -265,7 +265,7 @@ local function suspend(tid, name, qtype)
 		co = coroutine.running(),
 	}
 	request_pool[tid] = req
-	skynet.wait()
+	skynet.wait(req.co)
 	local answers = request_pool[tid].answers
 	request_pool[tid] = nil
 	assert(answers, "no ip")

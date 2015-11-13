@@ -74,9 +74,9 @@ function server.disconnect_handler(username)
 end
 
 -- call by self (when recv a request from client)
-function server.request_handler(username, msg, sz)
+function server.request_handler(username, msg)
 	local u = username_map[username]
-	return skynet.tostring(skynet.rawcall(u.agent, "client", msg, sz))
+	return skynet.tostring(skynet.rawcall(u.agent, "client", msg))
 end
 
 -- call by self (when gate open)

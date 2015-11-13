@@ -33,6 +33,16 @@ function cluster.snax(node, name, address)
 	return snax.bind(handle, name)
 end
 
+function cluster.register(name, addr)
+	assert(type(name) == "string")
+	assert(addr == nil or type(addr) == "number")
+	return skynet.call(clusterd, "lua", "register", name, addr)
+end
+
+function cluster.query(node, name)
+	return skynet.call(clusterd, "lua", "req", node, 0, skynet.pack(name))
+end
+
 skynet.init(function()
 	clusterd = skynet.uniqueservice("clusterd")
 end)

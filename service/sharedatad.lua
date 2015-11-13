@@ -1,6 +1,8 @@
 local skynet = require "skynet"
 local sharedata = require "sharedata.corelib"
 local table = table
+local cache = require "skynet.codecache"
+cache.mode "OFF"	-- turn off codecache, because CMD.new may load data file
 
 local NORET = {}
 local pool = {}
@@ -43,9 +45,17 @@ function CMD.new(name, t)
 		value = t
 	elseif dt == "string" then
 		value = setmetatable({}, env_mt)
-		local f = load(t, "=" .. name, "t", value)
-		assert(skynet.pcall(f))
+		local f
+		if t:sub(1,1) == "@" then
+			f = assert(loadfile(t:sub(2),"bt",value))
+		else
+			f = assert(load(t, "=" .. name, "bt", value))
+		end
+		local _, ret = assert(skynet.pcall(f))
 		setmetatable(value, nil)
+		if type(ret) == "table" then
+			value = ret
+		end
 	elseif dt == "nil" then
 		value = {}
 	else
@@ -118,12 +128,12 @@ function CMD.monitor(name, obj)
 		return v.obj
 	end
 
-	local n = pool_count[name].n
-	pool_count[name].n = n + 1
+	local n = pool_count[name].n + 1
 	if n > pool_count[name].threshold then
 		n = n - check_watch(v.watch)
 		pool_count[name].threshold = n * 2
 	end
+	pool_count[name].n = n
 
 	table.insert(v.watch, skynet.response())
 

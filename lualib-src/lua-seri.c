@@ -266,8 +266,10 @@ wb_table_metapairs(lua_State *L, struct write_block *wb, int index, int depth) {
 		lua_copy(L, -5, -3);
 		lua_call(L, 2, 2);
 		int type = lua_type(L, -2);
-		if (type == LUA_TNIL)
+		if (type == LUA_TNIL) {
+			lua_pop(L, 4);
 			break;
+		}
 		pack_one(L, wb, -2, depth);
 		pack_one(L, wb, -1, depth);
 		lua_pop(L, 1);
