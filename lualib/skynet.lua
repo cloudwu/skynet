@@ -311,7 +311,7 @@ function skynet.starttime()
 end
 
 function skynet.time()
-	return skynet.now()/100 + starttime or skynet.starttime()
+	return skynet.now()/100 + (starttime or skynet.starttime())
 end
 
 function skynet.exit()
