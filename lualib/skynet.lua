@@ -299,16 +299,19 @@ function skynet.localname(name)
 	end
 end
 
-function skynet.now()
-	return c.intcommand("NOW")
-end
+skynet.now = c.now
+
+local starttime
 
 function skynet.starttime()
-	return c.intcommand("STARTTIME")
+	if not starttime then
+		starttime = c.intcommand("STARTTIME")
+	end
+	return starttime
 end
 
 function skynet.time()
-	return skynet.now()/100 + skynet.starttime()	-- get now first would be better
+	return skynet.now()/100 + starttime or skynet.starttime()
 end
 
 function skynet.exit()
