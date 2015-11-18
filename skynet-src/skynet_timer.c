@@ -247,15 +247,8 @@ static uint64_t
 gettime() {
 	uint64_t t;
 #if !defined(__APPLE__)
-
-#ifdef CLOCK_MONOTONIC_RAW
-#define CLOCK_TIMER CLOCK_MONOTONIC_RAW
-#else
-#define CLOCK_TIMER CLOCK_MONOTONIC
-#endif
-
 	struct timespec ti;
-	clock_gettime(CLOCK_TIMER, &ti);
+	clock_gettime(CLOCK_MONOTONIC, &ti);
 	t = (uint64_t)ti.tv_sec * 100;
 	t += ti.tv_nsec / 10000000;
 #else
