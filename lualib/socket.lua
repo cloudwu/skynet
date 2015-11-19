@@ -179,6 +179,7 @@ local function connect(id, func)
 		callback = func,
 		protocol = "TCP",
 	}
+	assert(not socket_pool[id], "socket is not closed")
 	socket_pool[id] = s
 	suspend(s)
 	local err = s.connecting
@@ -404,6 +405,7 @@ end
 local udp_socket = {}
 
 local function create_udp_object(id, cb)
+	assert(not socket_pool[id], "socket is not closed")
 	socket_pool[id] = {
 		id = id,
 		connected = true,
