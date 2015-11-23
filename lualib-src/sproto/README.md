@@ -238,6 +238,8 @@ Notice: If the tag is not declared in schema, the decoder will simply ignore the
 .Data {
 	numbers 0 : *integer
 	bools 1 : *boolean
+	number 2 : integer
+	bignumber 3 : integer
 }
 ```
 
@@ -345,6 +347,25 @@ data {
 00 (false)
 01 (true)
 00 (false)
+```
+
+Example 6:
+```
+data {
+    number = 100000,
+    bignumber = -1000000000,
+}
+
+03 00 (fn = 3)
+03 00 (skip id 0/1)
+00 00 (id = 2, value in data part)
+00 00 (id = 3, value in data part)
+
+04 00 00 00 (sizeof number, data part)
+A0 86 01 00 (100000, 32bit integer)
+
+08 00 00 00 (sizeof bignumber, data part)
+00 1C F4 AB FD FF FF FF (-10000000000, 64bit integer)
 ```
 
 0 Packing
