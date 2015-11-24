@@ -1,46 +1,31 @@
 local skynet = require "skynet"
+local snax   = require "snax"
 local socket = require "socket"
 
-local function readline(sep)
-	while true do
-		local line = socket.readline(sep)
-		if line then
-			return line
-		end
-		coroutine.yield()
+local function split_cmdline(cmdline)
+	local split = {}
+	for i in string.gmatch(cmdline, "%S+") do
+		table.insert(split,i)
 	end
+	return split
 end
 
-local function split_package()
+local function console_main_loop()
+	local stdin = socket.stdin()
+	socket.lock(stdin)
 	while true do
-		local cmd = readline "\n"
-		if cmd ~= "" then
-			skynet.send(skynet.self(), "text", cmd)
+		local cmdline = socket.readline(stdin, "\n")
+		local split = split_cmdline(cmdline)
+		local command = split[1]
+		if command == "snax" then
+			pcall(snax.newservice, select(2, table.unpack(split)))
+		elseif cmdline ~= "" then
+			pcall(skynet.newservice, cmdline)
 		end
 	end
+	socket.unlock(stdin)
 end
-
-local split_co = coroutine.create(split_package)
-
-skynet.register_protocol {
-	name = "client",
-	id = 3,
-	pack = function(...) return ... end,
-	unpack = function(msg,sz)
-		assert(msg , "Stdin closed")
-		socket.push(msg,sz)
-		assert(coroutine.resume(split_co))
-	end,
-	dispatch = function () end
-}
-
 
 skynet.start(function()
-	skynet.dispatch("text", function (session, address, cmd)
-		local handle = skynet.newservice(cmd)
-		if handle == nil then
-			print("Launch error:",cmd)
-		end
-	end)
-	socket.stdin()
+	skynet.fork(console_main_loop)
 end)

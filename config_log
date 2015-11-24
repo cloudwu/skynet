@@ -1,8 +1,0 @@
-thread = 8
-mqueue = 256
-cpath = "./service/?.so"
-logger = nil
-harbor = 2
-address = "127.0.0.1:2526"
-master = "127.0.0.1:2012"
-start = "main_log"

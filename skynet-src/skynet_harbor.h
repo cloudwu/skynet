@@ -7,10 +7,6 @@
 #define GLOBALNAME_LENGTH 16
 #define REMOTE_MAX 256
 
-// reserve high 8 bits for remote id
-#define HANDLE_MASK 0xffffff
-#define HANDLE_REMOTE_SHIFT 24
-
 struct remote_name {
 	char name[GLOBALNAME_LENGTH];
 	uint32_t handle;
@@ -23,9 +19,9 @@ struct remote_message {
 };
 
 void skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session);
-void skynet_harbor_register(struct remote_name *rname);
 int skynet_harbor_message_isremote(uint32_t handle);
 void skynet_harbor_init(int harbor);
-int skynet_harbor_start(const char * master, const char *local);
+void skynet_harbor_start(void * ctx);
+void skynet_harbor_exit();
 
 #endif

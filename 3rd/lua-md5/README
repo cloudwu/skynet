@@ -1,0 +1,12 @@
+MD5 - Cryptographic Library for Lua
+Copyright 2003 PUC-Rio
+http://www.keplerproject.org/md5
+
+MD5 offers basic cryptographic facilities for Lua 5.1: a hash (digest)
+function, a pair crypt/decrypt based on MD5 and CFB, and a pair crypt/decrypt based
+on DES with 56-bit keys.
+
+MD5 current version is 1.1.2.
+
+This version is copy from https://github.com/keplerproject/md5
+
