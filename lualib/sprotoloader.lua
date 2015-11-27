@@ -4,12 +4,13 @@ local sproto = require "sproto"
 
 local loader = {}
 
-function loader.register(filename, index)
+function loader.register(filename, index, isbin)
 	local f = assert(io.open(filename), "Can't open sproto file")
 	local data = f:read "a"
 	f:close()
-	local sp = core.newproto(parser.parse(data))
-	core.saveproto(sp, index)
+
+	local bin = isbin and data or parser.parse(data)
+	loader.save(bin, index)
 end
 
 function loader.save(bin, index)
@@ -24,4 +25,3 @@ function loader.load(index)
 end
 
 return loader
-
