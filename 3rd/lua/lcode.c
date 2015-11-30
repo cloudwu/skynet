@@ -1,5 +1,5 @@
 /*
-** $Id: lcode.c,v 2.101 2015/04/29 18:24:11 roberto Exp $
+** $Id: lcode.c,v 2.103 2015/11/19 19:16:22 roberto Exp $
 ** Code generator for Lua
 ** See Copyright Notice in lua.h
 */
@@ -37,7 +37,7 @@
 
 
 static int tonumeral(expdesc *e, TValue *v) {
-  if (e->t != NO_JUMP || e->f != NO_JUMP)
+  if (hasjumps(e))
     return 0;  /* not a numeral */
   switch (e->k) {
     case VKINT:
@@ -816,7 +816,7 @@ static void codeexpval (FuncState *fs, OpCode op,
       freeexp(fs, e1);
     }
     e1->u.info = luaK_codeABC(fs, op, 0, o1, o2);  /* generate opcode */
-    e1->k = VRELOCABLE;  /* all those operations are relocable */
+    e1->k = VRELOCABLE;  /* all those operations are relocatable */
     luaK_fixline(fs, line);
   }
 }
