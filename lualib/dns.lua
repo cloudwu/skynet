@@ -276,6 +276,7 @@ function dns.server(server, port)
 				break
 			end
 		end
+		f:close()
 		assert(server, "Can't get nameserver")
 	end
 	dns_server = socket.udp(function(str, from)
