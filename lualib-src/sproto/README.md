@@ -340,8 +340,8 @@ data {
 }
 
 02 00 (fn = 2)
-01 00 (skip id)
-00 00 (id = 2, value in data part)
+01 00 (skip id = 0)
+00 00 (id = 1, value in data part)
 
 03 00 00 00 (sizeof bools)
 00 (false)
@@ -353,11 +353,11 @@ Example 6:
 ```
 data {
     number = 100000,
-    bignumber = -1000000000,
+    bignumber = -10000000000,
 }
 
 03 00 (fn = 3)
-03 00 (skip id 0/1)
+03 00 (skip id = 1)
 00 00 (id = 2, value in data part)
 00 00 (id = 3, value in data part)
 
@@ -384,7 +384,7 @@ unpacked (hex):  08 00 00 00 03 00 02 00   19 00 00 00 aa 01 00 00
 packed (hex):  51 08 03 02   31 19 aa 01
 ```
 
-Tag 0xff is treated specially. A number N is following the 0xff tag. N means (N+1)*8 bytes should be copied directly. 
+Tag 0xff is treated specially. A number N is following the 0xff tag. N means (N+1)\*8 bytes should be copied directly. 
 The bytes may or may not contain zeros. Because of this rule, the worst-case space overhead of packing is 2 bytes per 2 KiB of input.
 
 For example:
