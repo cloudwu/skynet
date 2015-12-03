@@ -18,15 +18,17 @@ function skynet.queue()
 		current_thread = thread
 
 		ref = ref + 1
-		local ok, err = xpcall(f, traceback, ...)
+		local result = table.pack(xpcall(f, traceback, ...))
 		ref = ref - 1
 		if ref == 0 then
-			current_thread = table.remove(thread_queue,1)
+			current_thread = table.remove(thread_queue, 1)
 			if current_thread then
 				skynet.wakeup(current_thread)
 			end
 		end
-		assert(ok,err)
+    		local ok = table.remove(result, 1)
+    		assert(ok, result[1])
+    		return table.unpack(result)
 	end
 end
 
