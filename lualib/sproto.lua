@@ -42,7 +42,7 @@ function sproto:host( packagename )
 	packagename = packagename or  "package"
 	local obj = {
 		__proto = self,
-		__package = core.querytype(self.__cobj, packagename),
+		__package = assert(core.querytype(self.__cobj, packagename), "type package not found"),
 		__session = {},
 	}
 	return setmetatable(obj, host_mt)
@@ -51,7 +51,7 @@ end
 local function querytype(self, typename)
 	local v = self.__tcache[typename]
 	if not v then
-		v = core.querytype(self.__cobj, typename)
+		v = assert(core.querytype(self.__cobj, typename), "type not found")
 		self.__tcache[typename] = v
 	end
 

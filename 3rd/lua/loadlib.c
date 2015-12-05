@@ -1,5 +1,5 @@
 /*
-** $Id: loadlib.c,v 1.126 2015/02/16 13:14:33 roberto Exp $
+** $Id: loadlib.c,v 1.127 2015/11/23 11:30:45 roberto Exp $
 ** Dynamic library loader for Lua
 ** See Copyright Notice in lua.h
 **
@@ -732,7 +732,7 @@ static void createsearcherstable (lua_State *L) {
   int i;
   /* create 'searchers' table */
   lua_createtable(L, sizeof(searchers)/sizeof(searchers[0]) - 1, 0);
-  /* fill it with pre-defined searchers */
+  /* fill it with predefined searchers */
   for (i=0; searchers[i] != NULL; i++) {
     lua_pushvalue(L, -2);  /* set 'package' as upvalue for all searchers */
     lua_pushcclosure(L, searchers[i], 1);
