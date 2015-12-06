@@ -173,7 +173,7 @@ local function launch_master(conf)
 			if err ~= socket_error then
 				skynet.error(string.format("invalid client (fd = %d) error = %s", fd, err))
 			end
-			socket.start(fd)
+			pcall(socket.start, fd)
 		end
 		socket.close(fd)
 	end)
