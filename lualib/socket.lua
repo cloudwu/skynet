@@ -227,6 +227,11 @@ function socket.shutdown(id)
 	close_fd(id, driver.shutdown)
 end
 
+function socket.close_fd(id)
+	assert(socket_pool[id] == nil,"Use socket.close instead")
+	driver.close(id)
+end
+
 function socket.close(id)
 	local s = socket_pool[id]
 	if s == nil then
