@@ -106,9 +106,9 @@ local function launch_slave(auth_handler)
 	skynet.dispatch("lua", function(_,_,...)
 		local ok, msg, len = pcall(auth_fd, ...)
 		if ok then
-			return skynet.ret(msg,len)
+			skynet.ret(msg,len)
 		else
-			return skynet.ret(skynet.pack(false, msg))
+			skynet.ret(skynet.pack(false, msg))
 		end
 	end)
 end
