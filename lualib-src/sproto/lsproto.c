@@ -97,8 +97,7 @@ lquerytype(lua_State *L) {
 		lua_pushlightuserdata(L, st);
 		return 1;
 	}
-
-	return luaL_error(L, "type %s not found", type_name);
+	return 0;
 }
 
 struct encode_ud {

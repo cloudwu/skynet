@@ -841,10 +841,12 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 		result->data = "start";
 		return SOCKET_OPEN;
 	} else if (s->type == SOCKET_TYPE_CONNECTED) {
+		// todo: maybe we should send a message SOCKET_TRANSFER to s->opaque
 		s->opaque = request->opaque;
 		result->data = "transfer";
 		return SOCKET_OPEN;
 	}
+	// if s->type == SOCKET_TYPE_HALFCLOSE , SOCKET_CLOSE message will send later
 	return -1;
 }
 
