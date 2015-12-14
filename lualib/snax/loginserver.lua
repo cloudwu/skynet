@@ -49,9 +49,6 @@ end
 
 local function launch_slave(auth_handler)
 	local function auth(fd, addr)
-		skynet.error(string.format("connect from %s (fd = %d)", addr, fd))
-		socket.start(fd)
-
 		-- set socket buffer limit (8K)
 		-- If the attacker send large package, close the socket
 		socket.limit(fd, 8192)
@@ -86,24 +83,32 @@ local function launch_slave(auth_handler)
 		return ok, server, uid, secret
 	end
 
-	local function ret_pack(fd, ok, err, ...)
-		socket.abandon(fd)
+	local function ret_pack(ok, err, ...)
 		if ok then
-			skynet.ret(skynet.pack(err, ...))
+			return skynet.pack(err, ...)
 		else
 			if err == socket_error then
-				skynet.ret(skynet.pack(nil, "socket error"))
+				return skynet.pack(nil, "socket error")
 			else
-				skynet.ret(skynet.pack(false, err))
+				return skynet.pack(false, err)
 			end
 		end
 	end
 
-	skynet.dispatch("lua", function(_,_,fd,...)
-		if type(fd) ~= "number" then
-			skynet.ret(skynet.pack(false, "invalid fd type"))
+	local function auth_fd(fd, addr)
+		skynet.error(string.format("connect from %s (fd = %d)", addr, fd))
+		socket.start(fd)	-- may raise error here
+		local msg, len = ret_pack(pcall(auth, fd, addr))
+		socket.abandon(fd)	-- never raise error here
+		return msg, len
+	end
+
+	skynet.dispatch("lua", function(_,_,...)
+		local ok, msg, len = pcall(auth_fd, ...)
+		if ok then
+			skynet.ret(msg,len)
 		else
-			ret_pack(fd,pcall(auth, fd, ...))
+			skynet.ret(skynet.pack(false, msg))
 		end
 	end)
 end
@@ -113,7 +118,7 @@ local user_login = {}
 local function accept(conf, s, fd, addr)
 	-- call slave auth
 	local ok, server, uid, secret = skynet.call(s, "lua",  fd, addr)
-	socket.start(fd)
+	-- slave will accept(start) fd, so we can write to fd later
 
 	if not ok then
 		if ok ~= nil then
@@ -173,9 +178,8 @@ local function launch_master(conf)
 			if err ~= socket_error then
 				skynet.error(string.format("invalid client (fd = %d) error = %s", fd, err))
 			end
-			socket.start(fd)
 		end
-		socket.close(fd)
+		socket.close_fd(fd)	-- We haven't call socket.start, so use socket.close_fd rather than socket.close.
 	end)
 end
 
