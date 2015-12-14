@@ -206,7 +206,7 @@ void
 dump_c_mem() {
 	int i;
 	size_t total = 0;
-	skynet_error(NULL, "dump all service mem:");
+	skynet_error(NULL, "dump all service c mem:");
 	for(i=0; i<SLOT_SIZE; i++) {
 		mem_data* data = &mem_stats[i];
 		if(data->handle != 0 && data->allocated != 0) {
@@ -214,7 +214,7 @@ dump_c_mem() {
 			skynet_error(NULL, "0x%x -> %zdkb", data->handle, data->allocated >> 10);
 		}
 	}
-	skynet_error(NULL, "+total: %zdkb",total >> 10);
+	skynet_error(NULL, "+total c mem: %zdkb",total >> 10);
 }
 
 char *
