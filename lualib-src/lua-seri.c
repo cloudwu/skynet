@@ -572,7 +572,7 @@ _luaseri_unpack(lua_State *L) {
 		return luaL_error(L, "deserialize null pointer");
 	}
 
-	lua_settop(L,0);
+	lua_settop(L,1);
 	struct read_block rb;
 	rball_init(&rb, buffer, len);
 
@@ -591,7 +591,7 @@ _luaseri_unpack(lua_State *L) {
 
 	// Need not free buffer
 
-	return lua_gettop(L);
+	return lua_gettop(L) - 1;
 }
 
 int
