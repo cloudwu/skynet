@@ -158,10 +158,11 @@ A schema text can be self-described by the sproto schema language.
 .type {
     .field {
         name 0 : string
-        type 1 : string
-        id 2 : integer
-        array 3 : boolean
-        key 4 : integer	# optional tag for map
+        buildin	1 : integer
+        type 2 : integer
+        tag 3 : integer
+        array 4	: boolean
+        key 5 : integer # If key exists, array must be true, and it's a map.
     }
     name 0 : string
     fields 1 : *field
@@ -169,9 +170,9 @@ A schema text can be self-described by the sproto schema language.
 
 .protocol {
     name 0 : string
-    id 1 : integer
-    request 2 : string
-    response 3 : string
+    tag 1 : integer
+    request 2 : integer # index
+    response 3 : integer # index
 }
 
 .group {
