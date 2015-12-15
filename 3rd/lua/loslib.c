@@ -1,5 +1,5 @@
 /*
-** $Id: loslib.c,v 1.57 2015/04/10 17:41:04 roberto Exp $
+** $Id: loslib.c,v 1.60 2015/11/19 19:16:22 roberto Exp $
 ** Standard Operating System library
 ** See Copyright Notice in lua.h
 */
@@ -54,7 +54,12 @@
 */
 #define l_timet			lua_Integer
 #define l_pushtime(L,t)		lua_pushinteger(L,(lua_Integer)(t))
-#define l_checktime(L,a)	((time_t)luaL_checkinteger(L,a))
+
+static time_t l_checktime (lua_State *L, int arg) {
+  lua_Integer t = luaL_checkinteger(L, arg);
+  luaL_argcheck(L, (time_t)t == t, arg, "time out-of-bounds");
+  return (time_t)t;
+}
 
 #endif				/* } */
 
@@ -198,17 +203,29 @@ static int getboolfield (lua_State *L, const char *key) {
 }
 
 
-static int getfield (lua_State *L, const char *key, int d) {
-  int res, isnum;
-  lua_getfield(L, -1, key);
-  res = (int)lua_tointegerx(L, -1, &isnum);
-  if (!isnum) {
-    if (d < 0)
+/* maximum value for date fields (to avoid arithmetic overflows with 'int') */
+#if !defined(L_MAXDATEFIELD)
+#define L_MAXDATEFIELD	(INT_MAX / 2)
+#endif
+
+static int getfield (lua_State *L, const char *key, int d, int delta) {
+  int isnum;
+  int t = lua_getfield(L, -1, key);
+  lua_Integer res = lua_tointegerx(L, -1, &isnum);
+  if (!isnum) {  /* field is not a number? */
+    if (t != LUA_TNIL)  /* some other value? */
+      return luaL_error(L, "field '%s' not an integer", key);
+    else if (d < 0)  /* absent field; no default? */
       return luaL_error(L, "field '%s' missing in date table", key);
     res = d;
   }
+  else {
+    if (!(-L_MAXDATEFIELD <= res && res <= L_MAXDATEFIELD))
+      return luaL_error(L, "field '%s' out-of-bounds", key);
+    res -= delta;
+  }
   lua_pop(L, 1);
-  return res;
+  return (int)res;
 }
 
 
@@ -236,6 +253,10 @@ static const char *checkoption (lua_State *L, const char *conv, char *buff) {
 }
 
 
+/* maximum size for an individual 'strftime' item */
+#define SIZETIMEFMT	250
+
+
 static int os_date (lua_State *L) {
   const char *s = luaL_optstring(L, 1, "%c");
   time_t t = luaL_opt(L, l_checktime, 2, time(NULL));
@@ -247,8 +268,8 @@ static int os_date (lua_State *L) {
   else
     stm = l_localtime(&t, &tmr);
   if (stm == NULL)  /* invalid date? */
-    lua_pushnil(L);
-  else if (strcmp(s, "*t") == 0) {
+    luaL_error(L, "time result cannot be represented in this installation");
+  if (strcmp(s, "*t") == 0) {
     lua_createtable(L, 0, 9);  /* 9 = number of fields */
     setfield(L, "sec", stm->tm_sec);
     setfield(L, "min", stm->tm_min);
@@ -266,14 +287,14 @@ static int os_date (lua_State *L) {
     cc[0] = '%';
     luaL_buffinit(L, &b);
     while (*s) {
-      if (*s != '%')  /* no conversion specifier? */
+      if (*s != '%')  /* not a conversion specifier? */
         luaL_addchar(&b, *s++);
       else {
         size_t reslen;
-        char buff[200];  /* should be big enough for any conversion result */
+        char *buff = luaL_prepbuffsize(&b, SIZETIMEFMT);
         s = checkoption(L, s + 1, cc);
-        reslen = strftime(buff, sizeof(buff), cc, stm);
-        luaL_addlstring(&b, buff, reslen);
+        reslen = strftime(buff, SIZETIMEFMT, cc, stm);
+        luaL_addsize(&b, reslen);
       }
     }
     luaL_pushresult(&b);
@@ -290,21 +311,18 @@ static int os_time (lua_State *L) {
     struct tm ts;
     luaL_checktype(L, 1, LUA_TTABLE);
     lua_settop(L, 1);  /* make sure table is at the top */
-    ts.tm_sec = getfield(L, "sec", 0);
-    ts.tm_min = getfield(L, "min", 0);
-    ts.tm_hour = getfield(L, "hour", 12);
-    ts.tm_mday = getfield(L, "day", -1);
-    ts.tm_mon = getfield(L, "month", -1) - 1;
-    ts.tm_year = getfield(L, "year", -1) - 1900;
+    ts.tm_sec = getfield(L, "sec", 0, 0);
+    ts.tm_min = getfield(L, "min", 0, 0);
+    ts.tm_hour = getfield(L, "hour", 12, 0);
+    ts.tm_mday = getfield(L, "day", -1, 0);
+    ts.tm_mon = getfield(L, "month", -1, 1);
+    ts.tm_year = getfield(L, "year", -1, 1900);
     ts.tm_isdst = getboolfield(L, "isdst");
     t = mktime(&ts);
   }
-  if (t != (time_t)(l_timet)t)
-    luaL_error(L, "time result cannot be represented in this Lua installation");
-  else if (t == (time_t)(-1))
-    lua_pushnil(L);
-  else
-    l_pushtime(L, t);
+  if (t != (time_t)(l_timet)t || t == (time_t)(-1))
+    luaL_error(L, "time result cannot be represented in this installation");
+  l_pushtime(L, t);
   return 1;
 }
 

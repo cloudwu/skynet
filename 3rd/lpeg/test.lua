@@ -1,6 +1,6 @@
-#!/usr/bin/env lua5.1
+#!/usr/bin/env lua
 
--- $Id: test.lua,v 1.105 2014/12/12 17:00:39 roberto Exp $
+-- $Id: test.lua,v 1.109 2015/09/28 17:01:25 roberto Exp $
 
 -- require"strict"    -- just to be pedantic
 
@@ -15,9 +15,6 @@ local a, b, c, d, e, f, g, p, t
 local unpack = rawget(table, "unpack") or unpack
 local loadstring = rawget(_G, "loadstring") or load
 
-
--- most tests here do not need much stack space
-m.setmaxstack(5)
 
 local any = m.P(1)
 local space = m.S" \t\n"^0
@@ -291,6 +288,13 @@ assert(m.match(m.P"ab"^-1 - "c", "abcd") == 3)
 
 p = ('Aa' * ('Bb' * ('Cc' * m.P'Dd'^0)^0)^0)^-1
 assert(p:match("AaBbCcDdBbCcDdDdDdBb") == 21)
+
+
+-- bug in 0.12.2
+-- p = { ('ab' ('c' 'ef'?)*)? }
+p = m.C(('ab' * ('c' * m.P'ef'^-1)^0)^-1)
+s = "abcefccefc"
+assert(s == p:match(s))
  
 
 pi = "3.14159 26535 89793 23846 26433 83279 50288 41971 69399 37510"
@@ -352,6 +356,11 @@ checkeq(t, {hi = 10, ho = 20})
 t = p:match'abc'
 checkeq(t, {hi = 10, ho = 20, 'a', 'b', 'c'})
 
+-- non-string group names
+p = m.Ct(m.Cg(1, print) * m.Cg(1, 23.5) * m.Cg(1, io))
+t = p:match('abcdefghij')
+assert(t[print] == 'a' and t[23.5] == 'b' and t[io] == 'c')
+
 
 -- test for error messages
 local function checkerr (msg, f, ...)
@@ -386,6 +395,25 @@ checkerr("rule 'a' may be left recursive", m.match, p, "a")
 
 p = m.P { (m.P {m.P'abc'} + 'ayz') * m.V'y'; y = m.P'x' }
 assert(p:match('abcx') == 5 and p:match('ayzx') == 5 and not p:match'abc')
+
+
+do
+  -- large dynamic Cc
+  local lim = 2^16 - 1
+  local c = 0
+  local function seq (n) 
+    if n == 1 then c = c + 1; return m.Cc(c)
+    else
+      local m = math.floor(n / 2)
+      return seq(m) * seq(n - m)
+    end
+  end
+  p = m.Ct(seq(lim))
+  t = p:match('')
+  assert(t[lim] == lim)
+  checkerr("too many", function () p = p / print end)
+  checkerr("too many", seq, lim + 1)
+end
 
 
 -- tests for non-pattern as arguments to pattern functions
@@ -575,9 +603,9 @@ assert(not p:match(string.rep("011", 10001)))
 -- this grammar does need backtracking info.
 local lim = 10000
 p = m.P{ '0' * m.V(1) + '0' }
-checkerr("too many pending", m.match, p, string.rep("0", lim))
+checkerr("stack overflow", m.match, p, string.rep("0", lim))
 m.setmaxstack(2*lim)
-checkerr("too many pending", m.match, p, string.rep("0", lim))
+checkerr("stack overflow", m.match, p, string.rep("0", lim))
 m.setmaxstack(2*lim + 4)
 assert(m.match(p, string.rep("0", lim)) == lim + 1)
 
@@ -586,7 +614,7 @@ p = m.P{ ('a' * m.V(1))^0 * 'b' + 'c' }
 m.setmaxstack(200)
 assert(p:match(string.rep('a', 180) .. 'c' .. string.rep('b', 180)) == 362)
 
-m.setmaxstack(5)   -- restore original limit
+m.setmaxstack(100)   -- restore low limit
 
 -- tests for optional start position
 assert(m.match("a", "abc", 1))
@@ -717,6 +745,10 @@ checkeq(t, {1, 1, "a", "b", "c"})
 t = {m.match(m.Cc(nil,nil,4) * m.Cc(nil,3) * m.Cc(nil, nil) / g / g, "")}
 t1 = {1,1,nil,nil,4,nil,3,nil,nil}
 for i=1,10 do assert(t[i] == t1[i]) end
+
+-- bug in 0.12.2: ktable with only nil could be eliminated when joining
+-- with a pattern without ktable
+assert((m.P"aaa" * m.Cc(nil)):match"aaa" == nil)
 
 t = {m.match((m.C(1) / function (x) return x, x.."x" end)^0, "abc")}
 checkeq(t, {"a", "ax", "b", "bx", "c", "cx"})
@@ -924,6 +956,13 @@ checkerr("back reference 'b' not found", m.match, m.Cg(1, 'a') * m.Cb('b'), 'a')
 p = m.Cg(m.C(1) * m.C(1), "k") * m.Ct(m.Cb("k"))
 t = p:match("ab")
 checkeq(t, {"a", "b"})
+
+p = m.P(true)
+for i = 1, 10 do p = p * m.Cg(1, i) end
+for i = 1, 10 do
+  local p = p * m.Cb(i)
+  assert(p:match('abcdefghij') == string.sub('abcdefghij', i, i))
+end
 
 
 t = {}

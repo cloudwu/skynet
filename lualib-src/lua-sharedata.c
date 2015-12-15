@@ -36,8 +36,6 @@ struct node {
 	uint8_t nocolliding;	// 0 means colliding slot
 };
 
-struct table;
-
 struct state {
 	int dirty;
 	int ref;

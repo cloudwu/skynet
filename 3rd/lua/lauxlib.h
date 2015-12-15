@@ -1,5 +1,5 @@
 /*
-** $Id: lauxlib.h,v 1.128 2014/10/29 16:11:17 roberto Exp $
+** $Id: lauxlib.h,v 1.129 2015/11/23 11:29:43 roberto Exp $
 ** Auxiliary functions for building Lua libraries
 ** See Copyright Notice in lua.h
 */
@@ -65,7 +65,7 @@ LUALIB_API int (luaL_checkoption) (lua_State *L, int arg, const char *def,
 LUALIB_API int (luaL_fileresult) (lua_State *L, int stat, const char *fname);
 LUALIB_API int (luaL_execresult) (lua_State *L, int stat);
 
-/* pre-defined references */
+/* predefined references */
 #define LUA_NOREF       (-2)
 #define LUA_REFNIL      (-1)
 

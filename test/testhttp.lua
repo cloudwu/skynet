@@ -3,6 +3,7 @@ local httpc = require "http.httpc"
 local dns = require "dns"
 
 skynet.start(function()
+	httpc.dns()	-- set dns server
 	print("GET baidu.com")
 	local respheader = {}
 	local status, body = httpc.get("baidu.com", "/", respheader)

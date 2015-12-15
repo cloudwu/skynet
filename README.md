@@ -28,13 +28,13 @@ Run these in different console
 
 ## About Lua
 
-Skynet now use a modify version of lua 5.3.1 (http://www.lua.org/ftp/lua-5.3.1.tar.gz) .
+Skynet now use a modify version of lua 5.3.2 ( http://www.lua.org/ftp/lua-5.3.2.tar.gz ) .
 
 For detail : http://lua-users.org/lists/lua-l/2014-03/msg00489.html
 
 You can also use the other official Lua version , edit the makefile by yourself .
 
-## How To (in Chinese)
+## How To Use (Sorry, Only in Chinese now)
 
 * Read Wiki https://github.com/cloudwu/skynet/wiki
 * The FAQ in wiki https://github.com/cloudwu/skynet/wiki/FAQ

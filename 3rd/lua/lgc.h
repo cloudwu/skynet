@@ -1,5 +1,5 @@
 /*
-** $Id: lgc.h,v 2.86 2014/10/25 11:50:46 roberto Exp $
+** $Id: lgc.h,v 2.90 2015/10/21 18:15:15 roberto Exp $
 ** Garbage Collector
 ** See Copyright Notice in lua.h
 */
@@ -101,26 +101,35 @@
 #define luaC_white(g)	cast(lu_byte, (g)->currentwhite & WHITEBITS)
 
 
-#define luaC_condGC(L,c) \
-	{if (G(L)->GCdebt > 0) {c;}; condchangemem(L);}
-#define luaC_checkGC(L)		luaC_condGC(L, luaC_step(L);)
+/*
+** Does one step of collection when debt becomes positive. 'pre'/'pos'
+** allows some adjustments to be done only when needed. macro
+** 'condchangemem' is used only for heavy tests (forcing a full
+** GC cycle on every opportunity)
+*/
+#define luaC_condGC(L,pre,pos) \
+	{ if (G(L)->GCdebt > 0) { pre; luaC_step(L); pos;}; \
+	  condchangemem(L,pre,pos); }
+
+/* more often than not, 'pre'/'pos' are empty */
+#define luaC_checkGC(L)		luaC_condGC(L,,)
 
 
-#define luaC_barrier(L,p,v) {  \
-	if (iscollectable(v) && isblack(p) && iswhite(gcvalue(v)))  \
-	luaC_barrier_(L,obj2gco(p),gcvalue(v)); }
+#define luaC_barrier(L,p,v) (  \
+	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ?  \
+	luaC_barrier_(L,obj2gco(p),gcvalue(v)) : cast_void(0))
 
-#define luaC_barrierback(L,p,v) {  \
-	if (iscollectable(v) && isblack(p) && iswhite(gcvalue(v)))  \
-	luaC_barrierback_(L,p); }
+#define luaC_barrierback(L,p,v) (  \
+	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ? \
+	luaC_barrierback_(L,p) : cast_void(0))
 
-#define luaC_objbarrier(L,p,o) {  \
-	if (isblack(p) && iswhite(o)) \
-		luaC_barrier_(L,obj2gco(p),obj2gco(o)); }
+#define luaC_objbarrier(L,p,o) (  \
+	(isblack(p) && iswhite(o)) ? \
+	luaC_barrier_(L,obj2gco(p),obj2gco(o)) : cast_void(0))
 
-#define luaC_upvalbarrier(L,uv) \
-  { if (iscollectable((uv)->v) && !upisopen(uv)) \
-         luaC_upvalbarrier_(L,uv); }
+#define luaC_upvalbarrier(L,uv) ( \
+	(iscollectable((uv)->v) && !upisopen(uv)) ? \
+         luaC_upvalbarrier_(L,uv) : cast_void(0))
 
 LUAI_FUNC void luaC_fix (lua_State *L, GCObject *o);
 LUAI_FUNC void luaC_freeallobjects (lua_State *L);
