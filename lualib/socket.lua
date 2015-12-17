@@ -253,7 +253,7 @@ function socket.close(id)
 		s.connected = false
 	end
 	close_fd(id)	-- clear the buffer (already close fd)
-	assert(s.lock_set == nil or next(s.lock_set) == nil)
+	assert(s.lock == nil or next(s.lock) == nil)
 	socket_pool[id] = nil
 end
 
