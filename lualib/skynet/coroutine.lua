@@ -80,6 +80,19 @@ end
 
 end -- end of skynetco.resume
 
+function skynetco.status(co)
+	local status = coroutine.status(co)
+	if status == "suspended" then
+		if skynet_coroutines[co] == false then
+			return "blocked"
+		else
+			return "suspended"
+		end
+	else
+		return status
+	end
+end
+
 function skynetco.yield(...)
 	return coroutine_yield("USER", ...)
 end
