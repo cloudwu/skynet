@@ -832,7 +832,7 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	}
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		if (sp_add(ss->event_fd, s->fd, s)) {
-			s->type = SOCKET_TYPE_INVALID;
+			force_close(ss, s, result);
 			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
