@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <lua.h>
+#include <stdio.h>
 
 #include "malloc_hook.h"
 #include "skynet.h"
@@ -247,4 +248,25 @@ dump_mem_lua(lua_State *L) {
 		}
 	}
 	return 1;
+}
+
+size_t
+malloc_current_memory(void) {
+	uint32_t handle = skynet_current_handle();
+	int i;
+	for(i=0; i<SLOT_SIZE; i++) {
+		mem_data* data = &mem_stats[i];
+		if(data->handle == (uint32_t)handle && data->allocated != 0) {
+			return (size_t) data->allocated;
+		}
+	}
+	return 0;
+}
+
+void
+skynet_debug_memory(const char *info) {
+	// for debug use
+	uint32_t handle = skynet_current_handle();
+	size_t mem = malloc_current_memory();
+	fprintf(stderr, "[:%08x] %s %p\n", handle, info, (void *)mem);
 }
