@@ -5,6 +5,7 @@ local coroutine = coroutine
 local coroutine_resume = coroutine.resume
 local coroutine_yield = coroutine.yield
 local coroutine_status = coroutine.status
+local coroutine_running = coroutine.running
 
 local select = select
 local skynetco = {}
@@ -23,30 +24,25 @@ function skynetco.create(f)
 	return co
 end
 
-function skynetco.isskynetcoroutine(co)
-	co = co or coroutine.running()
-	return skynet_coroutines[co] ~= nil
-end
-
 do -- begin skynetco.resume
 
 	local profile = require "profile"
-	-- skynet use profile.resume/yield instead of coroutine.resume/yield
-	-- read skynet.lua for detail
-	local skynet_resume = profile.resume
-	local skynet_yield = profile.yield
+	-- skynet use profile.resume_co/yield_co instead of coroutine.resume/yield
+
+	local skynet_resume = profile.resume_co
+	local skynet_yield = profile.yield_co
 
 	local function unlock(co, ...)
 		skynet_coroutines[co] = true
 		return ...
 	end
 
-	local function skynet_yielding(co, ...)
+	local function skynet_yielding(co, from, ...)
 		skynet_coroutines[co] = false
-		return unlock(co, skynet_resume(co, skynet_yield(...)))
+		return unlock(co, skynet_resume(co, from, skynet_yield(from, ...)))
 	end
 
-	local function resume(co, ok, ...)
+	local function resume(co, from, ok, ...)
 		if not ok then
 			return ok, ...
 		elseif coroutine_status(co) == "dead" then
@@ -57,9 +53,12 @@ do -- begin skynetco.resume
 			return true, select(2, ...)
 		else
 			-- blocked in skynet framework, so raise the yielding message
-			return resume(co, skynet_yielding(co, ...))
+			return resume(co, from, skynet_yielding(co, from, ...))
 		end
 	end
+
+	-- record the root of coroutine caller (It should be a skynet thread)
+	local coroutine_caller = setmetatable({} , { __mode = "kv" })
 
 function skynetco.resume(co, ...)
 	local co_status = skynet_coroutines[co]
@@ -75,7 +74,19 @@ function skynetco.resume(co, ...)
 			return false, "cannot resume none skynet coroutine"
 		end
 	end
-	return resume(co, coroutine_resume(co, ...))
+	local from = coroutine_running()
+	local caller = coroutine_caller[from] or from
+	coroutine_caller[co] = caller
+	return resume(co, caller, coroutine_resume(co, ...))
+end
+
+function skynetco.thread(co)
+	co = co or coroutine_running()
+	if skynet_coroutines[co] ~= nil then
+		return coroutine_caller[co] , false
+	else
+		return co, true
+	end
 end
 
 end -- end of skynetco.resume
