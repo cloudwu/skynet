@@ -460,7 +460,7 @@ function skynet.fork(func,...)
 	return co
 end
 
-local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
+local function raw_dispatch_message(prototype, msg, sz, session, source)
 	-- skynet.PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
 		local co = session_id_coroutine[session]
@@ -493,7 +493,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
-			suspend(co, coroutine_resume(co, session,source, p.unpack(msg,sz, ...)))
+			suspend(co, coroutine_resume(co, session,source, p.unpack(msg,sz)))
 		else
 			unknown_request(session, source, msg, sz, proto[prototype].name)
 		end
