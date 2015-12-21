@@ -1,5 +1,5 @@
 /*
-** $Id: lobject.c,v 2.104 2015/04/11 18:30:08 roberto Exp $
+** $Id: lobject.c,v 2.108 2015/11/02 16:09:30 roberto Exp $
 ** Some generic functions over Lua objects
 ** See Copyright Notice in lua.h
 */
@@ -55,9 +55,7 @@ int luaO_int2fb (unsigned int x) {
 
 /* converts back */
 int luaO_fb2int (int x) {
-  int e = (x >> 3) & 0x1f;
-  if (e == 0) return x;
-  else return ((x & 7) + 8) << (e - 1);
+  return (x < 8) ? x : ((x & 7) + 8) << ((x >> 3) - 1);
 }
 
 
@@ -333,9 +331,9 @@ void luaO_tostring (lua_State *L, StkId obj) {
   size_t len;
   lua_assert(ttisnumber(obj));
   if (ttisinteger(obj))
-    len = lua_integer2str(buff, ivalue(obj));
+    len = lua_integer2str(buff, sizeof(buff), ivalue(obj));
   else {
-    len = lua_number2str(buff, fltvalue(obj));
+    len = lua_number2str(buff, sizeof(buff), fltvalue(obj));
 #if !defined(LUA_COMPAT_FLOATSTRING)
     if (buff[strspn(buff, "-0123456789")] == '\0') {  /* looks like an int? */
       buff[len++] = lua_getlocaledecpoint();
@@ -348,7 +346,8 @@ void luaO_tostring (lua_State *L, StkId obj) {
 
 
 static void pushstr (lua_State *L, const char *str, size_t l) {
-  setsvalue2s(L, L->top++, luaS_newlstr(L, str, l));
+  setsvalue2s(L, L->top, luaS_newlstr(L, str, l));
+  luaD_inctop(L);
 }
 
 
@@ -359,7 +358,6 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
   for (;;) {
     const char *e = strchr(fmt, '%');
     if (e == NULL) break;
-    luaD_checkstack(L, 2);  /* fmt + item */
     pushstr(L, fmt, e - fmt);
     switch (*(e+1)) {
       case 's': {
@@ -377,23 +375,23 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
         break;
       }
       case 'd': {
-        setivalue(L->top++, va_arg(argp, int));
-        luaO_tostring(L, L->top - 1);
-        break;
+        setivalue(L->top, va_arg(argp, int));
+        goto top2str;
       }
       case 'I': {
-        setivalue(L->top++, cast(lua_Integer, va_arg(argp, l_uacInt)));
-        luaO_tostring(L, L->top - 1);
-        break;
+        setivalue(L->top, cast(lua_Integer, va_arg(argp, l_uacInt)));
+        goto top2str;
       }
       case 'f': {
-        setfltvalue(L->top++, cast_num(va_arg(argp, l_uacNumber)));
+        setfltvalue(L->top, cast_num(va_arg(argp, l_uacNumber)));
+      top2str:
+        luaD_inctop(L);
         luaO_tostring(L, L->top - 1);
         break;
       }
       case 'p': {
         char buff[4*sizeof(void *) + 8]; /* should be enough space for a '%p' */
-        int l = sprintf(buff, "%p", va_arg(argp, void *));
+        int l = l_sprintf(buff, sizeof(buff), "%p", va_arg(argp, void *));
         pushstr(L, buff, l);
         break;
       }

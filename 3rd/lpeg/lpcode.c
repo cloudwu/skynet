@@ -1,5 +1,5 @@
 /*
-** $Id: lpcode.c,v 1.21 2014/12/12 17:01:29 roberto Exp $
+** $Id: lpcode.c,v 1.23 2015/06/12 18:36:47 roberto Exp $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -431,11 +431,11 @@ typedef struct CompileState {
 
 
 /*
-** code generation is recursive; 'opt' indicates that the code is
-** being generated under a 'IChoice' operator jumping to its end
-** (that is, the match is "optional").
-** 'tt' points to a previous test protecting this code. 'fl' is
-** the follow set of the pattern.
+** code generation is recursive; 'opt' indicates that the code is being
+** generated as the last thing inside an optional pattern (so, if that
+** code is optional too, it can reuse the 'IChoice' already in place for
+** the outer pattern). 'tt' points to a previous test protecting this
+** code (or NOINST). 'fl' is the follow set of the pattern.
 */
 static void codegen (CompileState *compst, TTree *tree, int opt, int tt,
                      const Charset *fl);
@@ -638,13 +638,13 @@ static void codebehind (CompileState *compst, TTree *tree) {
 
 /*
 ** Choice; optimizations:
-** - when p1 is headfail
-** - when first(p1) and first(p2) are disjoint; than
+** - when p1 is headfail or
+** when first(p1) and first(p2) are disjoint, than
 ** a character not in first(p1) cannot go to p1, and a character
 ** in first(p1) cannot go to p2 (at it is not in first(p2)).
 ** (The optimization is not valid if p1 accepts the empty string,
 ** as then there is no character at all...)
-** - when p2 is empty and opt is true; a IPartialCommit can resuse
+** - when p2 is empty and opt is true; a IPartialCommit can reuse
 ** the Choice already active in the stack.
 */
 static void codechoice (CompileState *compst, TTree *p1, TTree *p2, int opt,
@@ -671,7 +671,7 @@ static void codechoice (CompileState *compst, TTree *p1, TTree *p2, int opt,
   }
   else {
     /* <p1 / p2> == 
-        test(fail(p1)) -> L1; choice L1; <p1>; commit L2; L1: <p2>; L2: */
+        test(first(p1)) -> L1; choice L1; <p1>; commit L2; L1: <p2>; L2: */
     int pcommit;
     int test = codetestset(compst, &cs1, e1);
     int pchoice = addoffsetinst(compst, IChoice);
@@ -759,7 +759,7 @@ static void coderep (CompileState *compst, TTree *tree, int opt,
       /* L1: test (fail(p1)) -> L2; <p>; jmp L1; L2: */
       int jmp;
       int test = codetestset(compst, &st, 0);
-      codegen(compst, tree, opt, test, fullset);
+      codegen(compst, tree, 0, test, fullset);
       jmp = addoffsetinst(compst, IJmp);
       jumptohere(compst, test);
       jumptothere(compst, jmp, test);

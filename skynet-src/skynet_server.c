@@ -430,13 +430,6 @@ cmd_name(struct skynet_context * context, const char * param) {
 }
 
 static const char *
-cmd_now(struct skynet_context * context, const char * param) {
-	uint32_t ti = skynet_gettime();
-	sprintf(context->result,"%u",ti);
-	return context->result;
-}
-
-static const char *
 cmd_exit(struct skynet_context * context, const char * param) {
 	handle_exit(context, 0);
 	return NULL;
@@ -507,7 +500,7 @@ cmd_setenv(struct skynet_context * context, const char * param) {
 
 static const char *
 cmd_starttime(struct skynet_context * context, const char * param) {
-	uint32_t sec = skynet_gettime_fixsec();
+	uint32_t sec = skynet_starttime();
 	sprintf(context->result,"%u",sec);
 	return context->result;
 }
@@ -619,7 +612,6 @@ static struct command_func cmd_funcs[] = {
 	{ "REG", cmd_reg },
 	{ "QUERY", cmd_query },
 	{ "NAME", cmd_name },
-	{ "NOW", cmd_now },
 	{ "EXIT", cmd_exit },
 	{ "KILL", cmd_kill },
 	{ "LAUNCH", cmd_launch },

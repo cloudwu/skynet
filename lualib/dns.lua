@@ -71,6 +71,7 @@ local MAX_DOMAIN_LEN = 1024
 local MAX_LABEL_LEN = 63
 local MAX_PACKET_LEN = 2048
 local DNS_HEADER_LEN = 12
+local TIMEOUT = 30 * 100	-- 30 seconds
 
 local QTYPE = {
 	A = 1,
@@ -82,7 +83,17 @@ local QCLASS = {
 	IN = 1,
 }
 
+local weak = {__mode = "kv"}
+local CACHE = {}
+
 local dns = {}
+
+function dns.flush()
+	CACHE[QTYPE.A] = setmetatable({},weak)
+	CACHE[QTYPE.AAAA] = setmetatable({},weak)
+end
+
+dns.flush()
 
 local function verify_domain_name(name)
 	if #name > MAX_DOMAIN_LEN then
@@ -206,33 +217,51 @@ local function resolve(content)
 	-- verify answer
 	assert(answer_header.qdcount == 1, "malformed packet")
 
-	local resp = request_pool[answer_header.tid]
-	if not resp then
-		skynet.error("Recv an invalid tid when dns query")
-		return
-	end
-
 	local question,left = unpack_question(content, left)
-	if question.name ~= resp.name then
-		skynet.error("Recv an invalid name when dns query")
-		return
-	end
 
 	local ttl
 	local answer
-	local answers = {}
+	local answers_ipv4
+	local answers_ipv6
+
 	for i=1, answer_header.ancount do
 		answer, left = unpack_answer(content, left)
-		-- only extract qtype address
-		if answer.atype == resp.qtype then
-			local ip = unpack_rdata(resp.qtype, answer.rdata)
+		local answers
+		if answer.atype == QTYPE.A then
+			answers_ipv4 = answers_ipv4 or {}
+			answers = answers_ipv4
+		elseif answer.atype == QTYPE.AAAA then
+			answers_ipv6 = answers_ipv6 or {}
+			answers = answers_ipv6
+		end
+		if answers then
+			local ip = unpack_rdata(answer.atype, answer.rdata)
 			ttl = ttl and math.min(ttl, answer.ttl) or answer.ttl
 			answers[#answers+1] = ip
 		end
 	end
 
-	if #answers > 0 then
-		resp.answers = answers
+	if answers_ipv4 then
+		CACHE[QTYPE.A][question.name] = { answers = answers_ipv4, ttl = skynet.now() + ttl * 100 }
+	end
+
+	if answers_ipv6 then
+		CACHE[QTYPE.AAAA][question.name] = { answers = answers_ipv6, ttl = skynet.now() + ttl * 100 }
+	end
+
+	local resp = request_pool[answer_header.tid]
+	if not resp then
+		-- the resp may be timeout
+		return
+	end
+
+	if question.name ~= resp.name then
+		skynet.error("Recv an invalid name when dns query")
+	end
+
+	local r = CACHE[resp.qtype][resp.name]
+	if r then
+		resp.answers = r.answers
 	end
 
 	skynet.wakeup(resp.co)
@@ -247,6 +276,7 @@ function dns.server(server, port)
 				break
 			end
 		end
+		f:close()
 		assert(server, "Can't get nameserver")
 	end
 	dns_server = socket.udp(function(str, from)
@@ -256,26 +286,54 @@ function dns.server(server, port)
 	return server
 end
 
+local function lookup_cache(name, qtype, ignorettl)
+	local result = CACHE[qtype][name]
+	if result then
+		if ignorettl or (result.ttl > skynet.now()) then
+			return result.answers
+		end
+	end
+end
+
 local function suspend(tid, name, qtype)
 	local req = {
 		name = name,
 		tid = tid,
 		qtype = qtype,
-		time = skynet.now(),	-- for timeout
 		co = coroutine.running(),
 	}
 	request_pool[tid] = req
-	skynet.wait()
-	local answers = request_pool[tid].answers
+	skynet.fork(function()
+		skynet.sleep(TIMEOUT)
+		local req = request_pool[tid]
+		if req then
+			-- cancel tid
+			skynet.error(string.format("DNS query %s timeout", name))
+			request_pool[tid] = nil
+			skynet.wakeup(req.co)
+		end
+	end)
+	skynet.wait(req.co)
+	local answers = req.answers
 	request_pool[tid] = nil
-	assert(answers, "no ip")
-	return answers[1], answers
+	if not req.answers then
+		local answers = lookup_cache(name, qtype, true)
+		if answers then
+			return answers[1], answers
+		end
+		error "timeout or no answer"
+	end
+	return req.answers[1], req.answers
 end
 
 function dns.resolve(name, ipv6)
 	local qtype = ipv6 and QTYPE.AAAA or QTYPE.A
 	local name = name:lower()
 	assert(verify_domain_name(name) , "illegal name")
+	local answers = lookup_cache(name, qtype)
+	if answers then
+		return answers[1], answers
+	end
 	local question_header = {
 		tid = gen_tid(),
 		flags = 0x100, -- flags: 00000001 00000000, set RD

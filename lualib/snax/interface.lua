@@ -59,8 +59,6 @@ return function (name , G, loader)
 		end
 	end
 
-	setmetatable(G,	{ __index = env , __newindex = init_system })
-
 	local pattern
 
 	do
@@ -85,9 +83,10 @@ return function (name , G, loader)
 		end
 	end
 
-	mainfunc()
-
+	setmetatable(G,	{ __index = env , __newindex = init_system })
+	local ok, err = pcall(mainfunc)
 	setmetatable(G, nil)
+	assert(ok,err)
 
 	for k,v in pairs(temp_global) do
 		G[k] = v
