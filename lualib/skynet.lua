@@ -8,8 +8,8 @@ local pcall = pcall
 
 local profile = require "profile"
 
-coroutine.resume = profile.resume
-coroutine.yield = profile.yield
+local coroutine_resume = profile.resume
+local coroutine_yield = profile.yield
 
 local proto = {}
 local skynet = {
@@ -69,7 +69,7 @@ local function dispatch_error_queue()
 	if session then
 		local co = session_id_coroutine[session]
 		session_id_coroutine[session] = nil
-		return suspend(co, coroutine.resume(co, false))
+		return suspend(co, coroutine_resume(co, false))
 	end
 end
 
@@ -96,7 +96,6 @@ end
 -- coroutine reuse
 
 local coroutine_pool = {}
-local coroutine_yield = coroutine.yield
 
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
@@ -111,7 +110,7 @@ local function co_create(f)
 			end
 		end)
 	else
-		coroutine.resume(co, f)
+		coroutine_resume(co, f)
 	end
 	return co
 end
@@ -123,7 +122,7 @@ local function dispatch_wakeup()
 		local session = sleep_session[co]
 		if session then
 			session_id_coroutine[session] = "BREAK"
-			return suspend(co, coroutine.resume(co, false, "BREAK"))
+			return suspend(co, coroutine_resume(co, false, "BREAK"))
 		end
 	end
 end
@@ -178,7 +177,7 @@ function suspend(co, result, command, param, size)
 			c.trash(param, size)
 			ret = false
 		end
-		return suspend(co, coroutine.resume(co, ret))
+		return suspend(co, coroutine_resume(co, ret))
 	elseif command == "RESPONSE" then
 		local co_session = session_coroutine_id[co]
 		local co_address = session_coroutine_address[co]
@@ -227,7 +226,7 @@ function suspend(co, result, command, param, size)
 		watching_service[co_address] = watching_service[co_address] + 1
 		session_response[co] = true
 		unresponse[response] = true
-		return suspend(co, coroutine.resume(co, response))
+		return suspend(co, coroutine_resume(co, response))
 	elseif command == "EXIT" then
 		-- coroutine exit
 		local address = session_coroutine_address[co]
@@ -238,6 +237,9 @@ function suspend(co, result, command, param, size)
 	elseif command == "QUIT" then
 		-- service exit
 		return
+	elseif command == "USER" then
+		-- See skynet.coutine for detail
+		error("Call skynet.coroutine.yield out of skynet.coroutine.resume\n" .. debug.traceback(co))
 	elseif command == nil then
 		-- debug trace
 		return
@@ -458,7 +460,7 @@ function skynet.fork(func,...)
 	return co
 end
 
-local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
+local function raw_dispatch_message(prototype, msg, sz, session, source)
 	-- skynet.PTYPE_RESPONSE = 1, read skynet.h
 	if prototype == 1 then
 		local co = session_id_coroutine[session]
@@ -468,7 +470,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			unknown_response(session, source, msg, sz)
 		else
 			session_id_coroutine[session] = nil
-			suspend(co, coroutine.resume(co, true, msg, sz))
+			suspend(co, coroutine_resume(co, true, msg, sz))
 		end
 	else
 		local p = proto[prototype]
@@ -491,7 +493,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
-			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
+			suspend(co, coroutine_resume(co, session,source, p.unpack(msg,sz)))
 		else
 			unknown_request(session, source, msg, sz, proto[prototype].name)
 		end
@@ -506,7 +508,7 @@ function skynet.dispatch_message(...)
 			break
 		end
 		fork_queue[key] = nil
-		local fork_succ, fork_err = pcall(suspend,co,coroutine.resume(co))
+		local fork_succ, fork_err = pcall(suspend,co,coroutine_resume(co))
 		if not fork_succ then
 			if succ then
 				succ = false
