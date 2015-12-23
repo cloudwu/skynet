@@ -81,6 +81,10 @@ local function exit_thread(self)
 	local co = coroutine.running()
 	if self.__dispatch_thread == co then
 		self.__dispatch_thread = nil
+		local connecting = self.__connecting_thread
+		if connecting then
+			skynet.wakeup(connecting)
+		end
 	end
 end
 
@@ -332,6 +336,14 @@ end
 
 function channel:connect(once)
 	if self.__closed then
+		if self.__dispatch_thread then
+			-- closing, wait
+			assert(self.__connecting_thread == nil, "already connecting")
+			local co = coroutine.running()
+			self.__connecting_thread = co
+			skynet.wait(co)
+			self.__connecting_thread = nil
+		end
 		self.__closed = false
 	end
 
