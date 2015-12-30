@@ -1,5 +1,5 @@
 /*
-** $Id: ldebug.c,v 2.115 2015/05/22 17:45:56 roberto Exp $
+** $Id: ldebug.c,v 2.117 2015/11/02 18:48:07 roberto Exp $
 ** Debug Interface
 ** See Copyright Notice in lua.h
 */
@@ -618,7 +618,7 @@ l_noret luaG_errormsg (lua_State *L) {
     setobjs2s(L, L->top, L->top - 1);  /* move argument */
     setobjs2s(L, L->top - 1, errfunc);  /* push function */
     L->top++;  /* assume EXTRA_STACK */
-    luaD_call(L, L->top - 2, 1, 0);  /* call it */
+    luaD_callnoyield(L, L->top - 2, 1);  /* call it */
   }
   luaD_throw(L, LUA_ERRRUN);
 }
@@ -640,9 +640,11 @@ l_noret luaG_runerror (lua_State *L, const char *fmt, ...) {
 void luaG_traceexec (lua_State *L) {
   CallInfo *ci = L->ci;
   lu_byte mask = L->hookmask;
-  int counthook = ((mask & LUA_MASKCOUNT) && L->hookcount == 0);
+  int counthook = (--L->hookcount == 0 && (mask & LUA_MASKCOUNT));
   if (counthook)
     resethookcount(L);  /* reset count */
+  else if (!(mask & LUA_MASKLINE))
+    return;  /* no line hook and count != 0; nothing to be done */
   if (ci->callstatus & CIST_HOOKYIELD) {  /* called hook last time? */
     ci->callstatus &= ~CIST_HOOKYIELD;  /* erase mark */
     return;  /* do not call hook again (VM yielded, so it did not move) */

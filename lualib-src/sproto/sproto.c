@@ -682,6 +682,7 @@ encode_object(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int si
 	if (args->type == SPROTO_TSTRING) {
 		--sz;	// the length of null string is 1
 	}
+	assert(sz <= size-SIZEOF_LENGTH);	// verify buffer overflow
 	return fill_size(data, sz);
 }
 

@@ -326,6 +326,13 @@ ltrash(lua_State *L) {
 	return 0;
 }
 
+static int
+lnow(lua_State *L) {
+	uint64_t ti = skynet_now();
+	lua_pushinteger(L, ti);
+	return 1;
+}
+
 int
 luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
@@ -344,6 +351,7 @@ luaopen_skynet_core(lua_State *L) {
 		{ "packstring", lpackstring },
 		{ "trash" , ltrash },
 		{ "callback", _callback },
+		{ "now", lnow },
 		{ NULL, NULL },
 	};
 

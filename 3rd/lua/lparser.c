@@ -1,5 +1,5 @@
 /*
-** $Id: lparser.c,v 2.147 2014/12/27 20:31:43 roberto Exp $
+** $Id: lparser.c,v 2.149 2015/11/02 16:09:30 roberto Exp $
 ** Lua Parser
 ** See Copyright Notice in lua.h
 */
@@ -763,7 +763,7 @@ static void parlist (LexState *ls) {
         }
         case TK_DOTS: {  /* param -> '...' */
           luaX_next(ls);
-          f->is_vararg = 1;
+          f->is_vararg = 2;  /* declared vararg */
           break;
         }
         default: luaX_syntaxerror(ls, "<name> or '...' expected");
@@ -959,6 +959,7 @@ static void simpleexp (LexState *ls, expdesc *v) {
       FuncState *fs = ls->fs;
       check_condition(ls, fs->f->sp->is_vararg,
                       "cannot use '...' outside a vararg function");
+      fs->f->sp->is_vararg = 1;  /* function actually uses vararg */
       init_exp(v, VVARARG, luaK_codeABC(fs, OP_VARARG, 0, 1, 0));
       break;
     }
@@ -1613,7 +1614,7 @@ static void mainfunc (LexState *ls, FuncState *fs) {
   BlockCnt bl;
   expdesc v;
   open_func(ls, fs, &bl);
-  fs->f->sp->is_vararg = 1;  /* main function is always vararg */
+  fs->f->sp->is_vararg = 2;  /* main function is always declared vararg */
   init_exp(&v, VLOCAL, 0);  /* create and... */
   newupvalue(fs, ls->envn, &v);  /* ...set environment upvalue */
   luaX_next(ls);  /* read first token */
@@ -1629,10 +1630,10 @@ LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
   FuncState funcstate;
   LClosure *cl = luaF_newLclosure(L, 1);  /* create main closure */
   setclLvalue(L, L->top, cl);  /* anchor it (to avoid being collected) */
-  incr_top(L);
+  luaD_inctop(L);
   lexstate.h = luaH_new(L);  /* create table for scanner */
   sethvalue(L, L->top, lexstate.h);  /* anchor it */
-  incr_top(L);
+  luaD_inctop(L);
   funcstate.f = cl->p = luaF_newproto(L, NULL);
   funcstate.f->sp->source = luaS_new(L, name);  /* create and anchor TString */
   lua_assert(iswhite(funcstate.f));  /* do not need barrier here */

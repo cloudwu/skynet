@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <lua.h>
+#include <stdio.h>
 
 #include "malloc_hook.h"
 #include "skynet.h"
@@ -24,6 +25,10 @@ static mem_data mem_stats[SLOT_SIZE];
 #ifndef NOUSE_JEMALLOC
 
 #include "jemalloc.h"
+
+// for skynet_lalloc use
+#define raw_realloc je_realloc
+#define raw_free je_free
 
 static ssize_t*
 get_allocated_field(uint32_t handle) {
@@ -165,6 +170,10 @@ skynet_calloc(size_t nmemb,size_t size) {
 
 #else
 
+// for skynet_lalloc use
+#define raw_realloc realloc
+#define raw_free free
+
 void 
 memory_info_dump(void) {
 	skynet_error(NULL, "No jemalloc");
@@ -220,10 +229,10 @@ skynet_strdup(const char *str) {
 void * 
 skynet_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
 	if (nsize == 0) {
-		skynet_free(ptr);
+		raw_free(ptr);
 		return NULL;
 	} else {
-		return skynet_realloc(ptr, nsize);
+		return raw_realloc(ptr, nsize);
 	}
 }
 
@@ -239,4 +248,25 @@ dump_mem_lua(lua_State *L) {
 		}
 	}
 	return 1;
+}
+
+size_t
+malloc_current_memory(void) {
+	uint32_t handle = skynet_current_handle();
+	int i;
+	for(i=0; i<SLOT_SIZE; i++) {
+		mem_data* data = &mem_stats[i];
+		if(data->handle == (uint32_t)handle && data->allocated != 0) {
+			return (size_t) data->allocated;
+		}
+	}
+	return 0;
+}
+
+void
+skynet_debug_memory(const char *info) {
+	// for debug use
+	uint32_t handle = skynet_current_handle();
+	size_t mem = malloc_current_memory();
+	fprintf(stderr, "[:%08x] %s %p\n", handle, info, (void *)mem);
 }
