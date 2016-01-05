@@ -227,10 +227,11 @@ function host:dispatch(...)
 end
 
 function host:attach(sp)
-	return function(name, args, session)
+	return function(name, args, session, ud)
 		local proto = queryproto(sp, name)
 		header_tmp.type = proto.tag
 		header_tmp.session = session
+		header_tmp.ud = ud
 		local header = core.encode(self.__package, header_tmp)
 
 		if session then
