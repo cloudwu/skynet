@@ -1,3 +1,16 @@
+v1.0.0-rc (2015-12-28)
+-----------
+* Update to lua 5.3.2
+* Add skynet.coroutine lib
+* Add new debug api to show c memory used
+* httpc can use async dns query
+* Redis driver support pipeline
+* socket.send support string table, and rewrite redis driver
+* socket.shutdown would abandon unsend buffer
+* Improve some sproto api
+* c memory doesn't count the memory allocated by lua vm
+* some other bugfix (In multicast, socketchannel, etc)
+
 v1.0.0-beta (2015-11-10)
 -----------
 * Improve and fix bug for sproto
