@@ -72,7 +72,8 @@ local function request(fd, method, host, url, recvheader, header, content)
 				body = body .. padding
 			end
 		else
-			body = nil
+			-- no content-length, read all
+			body = body .. socket.readall(fd)
 		end
 	end
 

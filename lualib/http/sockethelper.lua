@@ -19,6 +19,8 @@ function sockethelper.readfunc(fd)
 	end
 end
 
+sockethelper.readall = socket.readall
+
 function sockethelper.writefunc(fd)
 	return function(content)
 		local ok = writebytes(fd, content)
