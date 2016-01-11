@@ -419,8 +419,11 @@ luaS_clonestring(lua_State *L, TString *ts) {
   result = query_ptr(ts);
   if (result)
     return result;
-  // ts is not in SSM, so recalc hash, and add it to SSM
   h = luaS_hash(str, l, 0);
+  result = query_string(h, str, l);
+  if (result)
+    return result;
+  // ts is not in SSM, so recalc hash, and add it to SSM
   return add_string(h, str, l);
 }
 
