@@ -150,7 +150,7 @@ function command.socket(source, subcmd, fd, msg)
 			end
 		else
 			if type(addr) == "string" then
-				addr = register_name[addr]
+				addr = register_name[addr] or addr
 			end
 			ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
 		end
