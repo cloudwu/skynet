@@ -346,8 +346,14 @@ dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
 	struct harbor_msg_queue * queue = node->queue;
 	uint32_t handle = node->value;
 	int harbor_id = handle >> HANDLE_REMOTE_SHIFT;
-	assert(harbor_id != 0);
 	struct skynet_context * context = h->ctx;
+	if (harbor_id == 0) {
+		char tmp [GLOBALNAME_LENGTH+1];
+		memcpy(tmp, node->key, GLOBALNAME_LENGTH);
+		tmp[GLOBALNAME_LENGTH] = '\0';
+		skynet_error(context, "Invalid name (%s) handle :%08x",tmp,handle);
+		return;
+	}
 	struct slave *s = &h->s[harbor_id];
 	int fd = s->fd;
 	if (fd == 0) {
