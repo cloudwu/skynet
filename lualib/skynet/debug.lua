@@ -1,6 +1,4 @@
-local io = io
 local table = table
-local debug = debug
 
 return function (skynet, export)
 
