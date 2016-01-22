@@ -244,7 +244,9 @@ local function hook_dispatch(dispatcher, resp, fd, channel)
 	func = replace_upvalue(dispatcher, HOOK_FUNC, hook)
 	if func then
 		local function idle()
-			skynet.timeout(10,idle)	-- idle every 0.1s
+			if raw_dispatcher then
+			    skynet.timeout(10,idle)	-- idle every 0.1s
+			end
 		end
 		skynet.timeout(0, idle)
 	end
