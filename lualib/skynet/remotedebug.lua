@@ -140,9 +140,12 @@ end
 local function watch_proto(protoname, cond)
 	local proto = assert(replace_upvalue(skynet.register_protocol, "proto"), "Can't find proto table")
 	local p = proto[protoname]
-	local dispatch = p.dispatch_origin or p.dispatch
-	if p == nil or dispatch == nil then
+	if p == nil then
 		return "No " .. protoname
+	end
+	local dispatch = p.dispatch_origin or p.dispatch
+	if dispatch == nil then
+		return "No dispatch"
 	end
 	p.dispatch_origin = dispatch
 	p.dispatch = function(...)
