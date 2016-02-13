@@ -885,7 +885,12 @@ int lhmac_sha1(lua_State *L);
 int
 luaopen_crypt(lua_State *L) {
 	luaL_checkversion(L);
-	srandom(time(NULL));
+	static int init = 0;
+	if (!init) {
+		// Don't need call srandom more than once.
+		init = 1 ;
+		srandom(time(NULL));
+	}
 	luaL_Reg l[] = {
 		{ "hashkey", lhashkey },
 		{ "randomkey", lrandomkey },
