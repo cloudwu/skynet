@@ -469,7 +469,7 @@ lpack(lua_State *L) {
 	size_t sz=0;
 	const void * buffer = getbuffer(L, 1, &sz);
 	// the worst-case space overhead of packing is 2 bytes per 2 KiB of input (256 words = 2KiB).
-	size_t maxsz = (sz + 2047) / 2048 * 2 + sz;
+	size_t maxsz = (sz + 2047) / 2048 * 2 + sz + 2;
 	void * output = lua_touserdata(L, lua_upvalueindex(1));
 	int bytes;
 	int osz = lua_tointeger(L, lua_upvalueindex(2));

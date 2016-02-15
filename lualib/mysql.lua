@@ -125,19 +125,6 @@ local function _compose_packet(self, req, size)
     return packet
 end
 
-
-local function _send_packet(self, req, size)
-    local sock = self.sock
-
-    self.packet_no = self.packet_no + 1
-
-
-    local packet = _set_byte3(size) .. strchar(self.packet_no) .. req
-
-    return socket.write(self.sock,packet)
-end
-
-
 local function _recv_packet(self,sock)
 
 
