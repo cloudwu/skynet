@@ -607,6 +607,10 @@ local function _query_resp(self)
         while err =="again" do
             res, err, errno, sqlstate = read_result(self,sock)
             if not res then
+                mulitresultset.badresult = true
+                mulitresultset.err = err
+                mulitresultset.errno = errno
+                mulitresultset.sqlstate = sqlstate
                 return true, mulitresultset
             end
             mulitresultset[i]=res
