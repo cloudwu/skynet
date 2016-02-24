@@ -13,17 +13,21 @@
 void 
 skynet_error(struct skynet_context * context, const char *msg, ...) {
 	static uint32_t logger = 0;
+	va_list ap;
+	
 	if (logger == 0) {
 		logger = skynet_handle_findname("logger");
 	}
 	if (logger == 0) {
+		va_start(ap,msg);
+		vfprintf(stderr, msg, ap);
+		va_end(ap);
+		fprintf(stderr, "\n");
 		return;
 	}
 
 	char tmp[LOG_MESSAGE_SIZE];
 	char *data = NULL;
-
-	va_list ap;
 
 	va_start(ap,msg);
 	int len = vsnprintf(tmp, LOG_MESSAGE_SIZE, msg, ap);
