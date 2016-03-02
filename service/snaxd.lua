@@ -26,14 +26,6 @@ end
 
 local traceback = debug.traceback
 
-local function do_func(f, msg)
-	return xpcall(f, traceback, table.unpack(msg))
-end
-
-local function dispatch(f, ...)
-	return skynet.pack(f(...))
-end
-
 local function return_f(f, ...)
 	return skynet.ret(skynet.pack(f(...)))
 end

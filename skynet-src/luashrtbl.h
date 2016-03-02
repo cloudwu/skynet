@@ -9,7 +9,7 @@
 static inline int luaS_shrinfo(lua_State *L) { return 0; }
 static inline void luaS_initshr() {}
 static inline void luaS_exitshr() {}
-static inline void luaS_expandshr(int n);
+static inline void luaS_expandshr(int n) {}
 
 #endif
 

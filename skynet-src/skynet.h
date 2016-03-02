@@ -38,5 +38,7 @@ typedef int (*skynet_cb)(struct skynet_context * context, void *ud, int type, in
 void skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb);
 
 uint32_t skynet_current_handle(void);
+uint64_t skynet_now(void);
+void skynet_debug_memory(const char *info);	// for debug use, output current service memory to stderr
 
 #endif
