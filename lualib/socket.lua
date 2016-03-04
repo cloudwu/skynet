@@ -30,7 +30,7 @@ end
 local function suspend(s)
 	assert(not s.co)
 	s.co = coroutine.running()
-	skynet.wait()
+	skynet.wait(s.co)
 	-- wakeup closing corouting every time suspend,
 	-- because socket.close() will wait last socket buffer operation before clear the buffer.
 	if s.closing then
@@ -112,11 +112,13 @@ socket_message[5] = function(id, _, err)
 		skynet.error("socket: error on unknown", id, err)
 		return
 	end
-	if s.connected or s.connecting then
+	if s.connected then
 		skynet.error("socket: error on", id, err)
+	elseif s.connecting then
+		s.connecting = err
 	end
 	s.connected = false
-	driver.close(id)
+	driver.shutdown(id)
 
 	wakeup(s)
 end
@@ -177,13 +179,16 @@ local function connect(id, func)
 		callback = func,
 		protocol = "TCP",
 	}
+	assert(not socket_pool[id], "socket is not closed")
 	socket_pool[id] = s
 	suspend(s)
+	local err = s.connecting
 	s.connecting = nil
 	if s.connected then
 		return id
 	else
 		socket_pool[id] = nil
+		return nil, err
 	end
 end
 
@@ -206,16 +211,25 @@ function socket.start(id, func)
 	return connect(id, func)
 end
 
-function socket.shutdown(id)
+local function close_fd(id, func)
 	local s = socket_pool[id]
 	if s then
 		if s.buffer then
 			driver.clear(s.buffer,buffer_pool)
 		end
 		if s.connected then
-			driver.close(id)
+			func(id)
 		end
 	end
+end
+
+function socket.shutdown(id)
+	close_fd(id, driver.shutdown)
+end
+
+function socket.close_fd(id)
+	assert(socket_pool[id] == nil,"Use socket.close instead")
+	driver.close(id)
 end
 
 function socket.close(id)
@@ -228,18 +242,18 @@ function socket.close(id)
 		-- notice: call socket.close in __gc should be carefully,
 		-- because skynet.wait never return in __gc, so driver.clear may not be called
 		if s.co then
-			-- reading this socket on another coroutine, so don't shutdown (clear the buffer) immediatel
+			-- reading this socket on another coroutine, so don't shutdown (clear the buffer) immediately
 			-- wait reading coroutine read the buffer.
 			assert(not s.closing)
 			s.closing = coroutine.running()
-			skynet.wait()
+			skynet.wait(s.closing)
 		else
 			suspend(s)
 		end
 		s.connected = false
 	end
-	socket.shutdown(id)
-	assert(s.lock_set == nil or next(s.lock_set) == nil)
+	close_fd(id)	-- clear the buffer (already close fd)
+	assert(s.lock == nil or next(s.lock) == nil)
 	socket_pool[id] = nil
 end
 
@@ -361,7 +375,7 @@ function socket.lock(id)
 	else
 		local co = coroutine.running()
 		table.insert(lock_set, co)
-		skynet.wait()
+		skynet.wait(co)
 	end
 end
 
@@ -396,6 +410,7 @@ end
 local udp_socket = {}
 
 local function create_udp_object(id, cb)
+	assert(not socket_pool[id], "socket is not closed")
 	socket_pool[id] = {
 		id = id,
 		connected = true,

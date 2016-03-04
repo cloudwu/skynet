@@ -68,14 +68,25 @@ local function wakeup_all(self, errmsg)
 		for i = 1, #self.__thread do
 			local co = self.__thread[i]
 			self.__thread[i] = nil
-			self.__result[co] = socket_error
-			self.__result_data[co] = errmsg
-			skynet.wakeup(co)
+			if co then	-- ignore the close signal
+				self.__result[co] = socket_error
+				self.__result_data[co] = errmsg
+				skynet.wakeup(co)
+			end
 		end
 	end
 end
 
-
+local function exit_thread(self)
+	local co = coroutine.running()
+	if self.__dispatch_thread == co then
+		self.__dispatch_thread = nil
+		local connecting = self.__connecting_thread
+		if connecting then
+			skynet.wakeup(connecting)
+		end
+	end
+end
 
 local function dispatch_by_session(self)
 	local response = self.__response
@@ -113,10 +124,18 @@ local function dispatch_by_session(self)
 			wakeup_all(self, errormsg)
 		end
 	end
+	exit_thread(self)
 end
 
 local function pop_response(self)
-	return table.remove(self.__request, 1), table.remove(self.__thread, 1)
+	while true do
+		local func,co = table.remove(self.__request, 1), table.remove(self.__thread, 1)
+		if func then
+			return func, co
+		end
+		self.__wait_response = coroutine.running()
+		skynet.wait(self.__wait_response)
+	end
 end
 
 local function push_response(self, response, co)
@@ -127,48 +146,51 @@ local function push_response(self, response, co)
 		-- response is a function, push it to __request
 		table.insert(self.__request, response)
 		table.insert(self.__thread, co)
+		if self.__wait_response then
+			skynet.wakeup(self.__wait_response)
+			self.__wait_response = nil
+		end
 	end
 end
 
 local function dispatch_by_order(self)
 	while self.__sock do
 		local func, co = pop_response(self)
-		if func == nil then
-			if not socket.block(self.__sock[1]) then
-				close_channel_socket(self)
-				wakeup_all(self)
+		if not co then
+			-- close signal
+			wakeup_all(self, errmsg)
+			break
+		end
+		local ok, result_ok, result_data, padding = pcall(func, self.__sock)
+		if ok then
+			if padding and result_ok then
+				-- if padding is true, wait for next result_data
+				-- self.__result_data[co] is a table
+				local result = self.__result_data[co] or {}
+				self.__result_data[co] = result
+				table.insert(result, result_data)
+			else
+				self.__result[co] = result_ok
+				if result_ok and self.__result_data[co] then
+					table.insert(self.__result_data[co], result_data)
+				else
+					self.__result_data[co] = result_data
+				end
+				skynet.wakeup(co)
 			end
 		else
-			local ok, result_ok, result_data, padding = pcall(func, self.__sock)
-			if ok then
-				if padding and result_ok then
-					-- if padding is true, wait for next result_data
-					-- self.__result_data[co] is a table
-					local result = self.__result_data[co] or {}
-					self.__result_data[co] = result
-					table.insert(result, result_data)
-				else
-					self.__result[co] = result_ok
-					if result_ok and self.__result_data[co] then
-						table.insert(self.__result_data[co], result_data)
-					else
-						self.__result_data[co] = result_data
-					end
-					skynet.wakeup(co)
-				end
-			else
-				close_channel_socket(self)
-				local errmsg
-				if result_ok ~= socket_error then
-					errmsg = result_ok
-				end
-				self.__result[co] = socket_error
-				self.__result_data[co] = errmsg
-				skynet.wakeup(co)
-				wakeup_all(self, errmsg)
+			close_channel_socket(self)
+			local errmsg
+			if result_ok ~= socket_error then
+				errmsg = result_ok
 			end
+			self.__result[co] = socket_error
+			self.__result_data[co] = errmsg
+			skynet.wakeup(co)
+			wakeup_all(self, errmsg)
 		end
 	end
+	exit_thread(self)
 end
 
 local function dispatch_function(self)
@@ -205,11 +227,11 @@ local function connect_once(self)
 		return false
 	end
 	assert(not self.__sock and not self.__authcoroutine)
-	local fd = socket.open(self.__host, self.__port)
+	local fd,err = socket.open(self.__host, self.__port)
 	if not fd then
 		fd = connect_backup(self)
 		if not fd then
-			return false
+			return false, err
 		end
 	end
 	if self.__nodelay then
@@ -217,7 +239,7 @@ local function connect_once(self)
 	end
 
 	self.__sock = setmetatable( {fd} , channel_socket_meta )
-	skynet.fork(dispatch_function(self), self)
+	self.__dispatch_thread = skynet.fork(dispatch_function(self), self)
 
 	if self.__auth then
 		self.__authcoroutine = coroutine.running()
@@ -243,13 +265,16 @@ end
 local function try_connect(self , once)
 	local t = 0
 	while not self.__closed do
-		if connect_once(self) then
+		local ok, err = connect_once(self)
+		if ok then
 			if not once then
 				skynet.error("socket: connect to", self.__host, self.__port)
 			end
-			return true
+			return
 		elseif once then
-			return false
+			return err
+		else
+			skynet.error("socket: connect", err)
 		end
 		if t > 1000 then
 			skynet.error("socket: try to reconnect", self.__host, self.__port)
@@ -283,15 +308,16 @@ local function block_connect(self, once)
 	if r ~= nil then
 		return r
 	end
+	local err
 
 	if #self.__connecting > 0 then
 		-- connecting in other coroutine
 		local co = coroutine.running()
 		table.insert(self.__connecting, co)
-		skynet.wait()
+		skynet.wait(co)
 	else
 		self.__connecting[1] = true
-		try_connect(self, once)
+		err = try_connect(self, once)
 		self.__connecting[1] = nil
 		for i=2, #self.__connecting do
 			local co = self.__connecting[i]
@@ -302,7 +328,7 @@ local function block_connect(self, once)
 
 	r = check_connection(self)
 	if r == nil then
-		error(string.format("Connect to %s:%d failed", self.__host, self.__port))
+		error(string.format("Connect to %s:%d failed (%s)", self.__host, self.__port, err))
 	else
 		return r
 	end
@@ -310,6 +336,14 @@ end
 
 function channel:connect(once)
 	if self.__closed then
+		if self.__dispatch_thread then
+			-- closing, wait
+			assert(self.__connecting_thread == nil, "already connecting")
+			local co = coroutine.running()
+			self.__connecting_thread = co
+			skynet.wait(co)
+			self.__connecting_thread = nil
+		end
 		self.__closed = false
 	end
 
@@ -319,7 +353,7 @@ end
 local function wait_for_response(self, response)
 	local co = coroutine.running()
 	push_response(self, response, co)
-	skynet.wait()
+	skynet.wait(co)
 
 	local result = self.__result[co]
 	self.__result[co] = nil
@@ -377,8 +411,13 @@ end
 
 function channel:close()
 	if not self.__closed then
+		local thread = self.__dispatch_thread
 		self.__closed = true
 		close_channel_socket(self)
+		if not self.__response and self.__dispatch_thread == thread and thread then
+			-- dispatch by order, send close signal to dispatch thread
+			push_response(self, true, false)	-- (true, false) is close signal
+		end
 	end
 end
 

@@ -1,6 +1,7 @@
 local socket = require "http.sockethelper"
 local url = require "http.url"
 local internal = require "http.internal"
+local dns = require "dns"
 local string = string
 local table = table
 
@@ -22,8 +23,9 @@ local function request(fd, method, host, url, recvheader, header, content)
 	end
 
 	if content then
-		local data = string.format("%s %s HTTP/1.1\r\n%scontent-length:%d\r\n\r\n%s", method, url, header_content, #content, content)
+		local data = string.format("%s %s HTTP/1.1\r\n%scontent-length:%d\r\n\r\n", method, url, header_content, #content)
 		write(data)
+		write(content)
 	else
 		local request_header = string.format("%s %s HTTP/1.1\r\n%scontent-length:0\r\n\r\n", method, url, header_content)
 		write(request_header)
@@ -70,11 +72,19 @@ local function request(fd, method, host, url, recvheader, header, content)
 				body = body .. padding
 			end
 		else
-			body = nil
+			-- no content-length, read all
+			body = body .. socket.readall(fd)
 		end
 	end
 
 	return code, body
+end
+
+local async_dns
+
+function httpc.dns(server,port)
+	async_dns = true
+	dns.server(server,port)
 end
 
 function httpc.request(method, host, url, recvheader, header, content)
@@ -83,6 +93,9 @@ function httpc.request(method, host, url, recvheader, header, content)
 		port = 80
 	else
 		port = tonumber(port)
+	end
+	if async_dns and not hostname:match(".*%d+$") then
+		hostname = dns.resolve(hostname)
 	end
 	local fd = socket.connect(hostname, port)
 	local ok , statuscode, body = pcall(request, fd,method, host, url, recvheader, header, content)
