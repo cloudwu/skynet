@@ -48,6 +48,15 @@ function CMD.close(fd)
 	close_agent(fd)
 end
 
+function CMD.login(fd,numid)
+	if(agent[fd] == nil)then
+		return 0
+	else
+		agent[fd].numid = numid
+		return 1
+	end
+end
+
 skynet.start(function()
 	skynet.dispatch("lua", function(session, source, cmd, subcmd, ...)
 		if cmd == "socket" then

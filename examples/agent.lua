@@ -19,6 +19,12 @@ function REQUEST.register(tab)
 	return { result = r}
 end
 
+function REQUEST.login(tab)
+	print("login account =" .. tab.account .. ";pwd=" .. tab.pwd)
+	local r = skynet.call("MYSQL","lua","login",tab.account,tab.pwd)
+	print("agent get login result" .. r)
+end
+
 function REQUEST:get()
 	print("get", self.what)
 	local r = skynet.call("SIMPLEDB", "lua", "get", self.what)
