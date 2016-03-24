@@ -688,6 +688,7 @@ typedef struct GMatchState {
 static int gmatch_aux (lua_State *L) {
   GMatchState *gm = (GMatchState *)lua_touserdata(L, lua_upvalueindex(3));
   const char *src;
+  gm->ms.L = L;
   for (src = gm->src; src <= gm->ms.src_end; src++) {
     const char *e;
     reprepstate(&gm->ms);
