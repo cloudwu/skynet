@@ -1,6 +1,6 @@
 ## Build
 
-For linux, install autoconf first for jemalloc
+For Linux, install autoconf first for jemalloc:
 
 ```
 git clone https://github.com/cloudwu/skynet.git
@@ -8,18 +8,18 @@ cd skynet
 make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd now
 ```
 
-Or you can :
+Or you can:
 
 ```
 export PLAT=linux
 make
 ```
 
-For freeBSD , use gmake instead of make .
+For FreeBSD , use gmake instead of make.
 
 ## Test
 
-Run these in different console
+Run these in different consoles:
 
 ```
 ./skynet examples/config	# Launch first skynet node  (Gate server) and a skynet-master (see config for standalone option)
@@ -28,11 +28,11 @@ Run these in different console
 
 ## About Lua
 
-Skynet now use a modify version of lua 5.3.2 ( http://www.lua.org/ftp/lua-5.3.2.tar.gz ) .
+Skynet now uses a modified version of lua 5.3.2 ( http://www.lua.org/ftp/lua-5.3.2.tar.gz ) .
 
-For detail : http://lua-users.org/lists/lua-l/2014-03/msg00489.html
+For details: http://lua-users.org/lists/lua-l/2014-03/msg00489.html
 
-You can also use the other official Lua version , edit the makefile by yourself .
+You can also use other official Lua versions, just edit the Makefile by yourself.
 
 ## How To Use (Sorry, Only in Chinese now)
 
