@@ -12,20 +12,20 @@
 #define MAX_SLOT_SIZE 0x40000000
 
 struct handle_name {
-	char * name;
+	char * name;                     // 对应handle的名字，如果你在lua用skynent.register
 	uint32_t handle;
 };
 
 struct handle_storage {
-	struct rwlock lock;
+	struct rwlock lock;             // rwlock，就是读写锁分离，一般来说只有写的时候才会阻止主线程，而读是不会的
 
-	uint32_t harbor;
-	uint32_t handle_index;
-	int slot_size;
-	struct skynet_context ** slot;
+	uint32_t harbor;                // 本节点地址
+	uint32_t handle_index;          
+	int slot_size;                  // slot的大小，用来遍历的
+	struct skynet_context ** slot;  // 一维数组，可不是二位
 	
-	int name_cap;
-	int name_count;
+	int name_cap;                   // 对应skynet_context,用两个来做一一对应
+	int name_count;                 // 一维数组
 	struct handle_name *name;
 };
 
@@ -37,12 +37,14 @@ skynet_handle_register(struct skynet_context *ctx) {
 
 	rwlock_wlock(&s->lock);
 	
+	// 看看这个算法，是怎么生成一个handle，并且要让handle能快速找到skynet_context
+	// 这里使用了一个hash，hash函数int hash = handle & (s->slot_size-1);
 	for (;;) {
 		int i;
 		for (i=0;i<s->slot_size;i++) {
-			uint32_t handle = (i+s->handle_index) & HANDLE_MASK;
-			int hash = handle & (s->slot_size-1);
-			if (s->slot[hash] == NULL) {
+			uint32_t handle = (i+s->handle_index) & HANDLE_MASK;  // handle_mask 0xffffff 24bit, 3byte
+			int hash = handle & (s->slot_size-1);                 // 这两句代码组成一个hash函数，那么hash值就应该在s->slot_size里面
+			if (s->slot[hash] == NULL) {                          // 如果不等于空，那么hash冲突，怎么解决冲突的，
 				s->slot[hash] = ctx;
 				s->handle_index = handle + 1;
 
@@ -52,7 +54,7 @@ skynet_handle_register(struct skynet_context *ctx) {
 				return handle;
 			}
 		}
-		assert((s->slot_size*2 - 1) <= HANDLE_MASK);
+		assert((s->slot_size*2 - 1) <= HANDLE_MASK);              // 如果上面都不能简历一个handle，那么容量不够
 		struct skynet_context ** new_slot = skynet_malloc(s->slot_size * 2 * sizeof(struct skynet_context *));
 		memset(new_slot, 0, s->slot_size * 2 * sizeof(struct skynet_context *));
 		for (i=0;i<s->slot_size;i++) {

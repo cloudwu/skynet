@@ -40,24 +40,24 @@
 #endif
 
 struct skynet_context {
-	void * instance;
-	struct skynet_module * mod;
-	void * cb_ud;
-	skynet_cb cb;
-	struct message_queue *queue;
-	FILE * logfile;
-	char result[32];
-	uint32_t handle;
-	int session_id;
-	int ref;
-	bool init;
-	bool endless;
+	void * instance;              // 自定义结构,自定义一个服务，那么里面自定义的结构
+	struct skynet_module * mod;   // 对应的skynet_module
+	void * cb_ud;                 // skynet_context_new中不会初始化，mq,handle,skynet_module都不会初始这个值
+	skynet_cb cb;                 // 这就是分发的时候的回掉函数，没有初始化加入
+	struct message_queue *queue;  // skynet_context_new 创建，并且只要handle
+	FILE * logfile;               // 日志文件不知道
+	char result[32];              // 不知道用来干啥
+	uint32_t handle;              // 对应的handle
+	int session_id;               // 这个是用来产生此service的session的
+	int ref;                      // 应用计数，需要原子性
+	bool init;                    // 标记初始化
+	bool endless;                 // 标记，不知道用来干啥
 
 	CHECKCALLING_DECL
 };
 
 struct skynet_node {
-	int total;
+	int total;                   // 监听着所有节点
 	int init;
 	uint32_t monitor_exit;
 	pthread_key_t handle_key;
@@ -65,11 +65,13 @@ struct skynet_node {
 
 static struct skynet_node G_NODE;
 
+// 此函数主要用来查询已经有多少个service了
 int 
 skynet_context_total() {
 	return G_NODE.total;
 }
 
+// 下面这两个函数不对外
 static void
 context_inc() {
 	ATOM_INC(&G_NODE.total);
@@ -116,36 +118,42 @@ drop_message(struct skynet_message *msg, void *ud) {
 	skynet_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
 }
 
+// 此函数主要初始化三个，skynet_context, skynet_module, handle
 struct skynet_context * 
 skynet_context_new(const char * name, const char *param) {
+	// 看到没有，当我们在lua调用一个skynet.newservice(name)，而这时先创建一个skynet_module
 	struct skynet_module * mod = skynet_module_query(name);
 
+	// 如果这个name没有找到相应的模块，那么只能返回为空了。返回到上层去处理
 	if (mod == NULL)
 		return NULL;
-
+	// 调用你自己写的create函数，返回你自定义的数据结构的实例
 	void *inst = skynet_module_instance_create(mod);
+
+	// 如果是空，那么你实现的模块肯定是有问题的
 	if (inst == NULL)
 		return NULL;
 	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
-	CHECKCALLING_INIT(ctx)
+	CHECKCALLING_INIT(ctx)  // 这里CHECKCALLING，会就初始化一个spinlock
 
 	ctx->mod = mod;
-	ctx->instance = inst;
-	ctx->ref = 2;
+	ctx->instance = inst;   // 这个instance尽然会存你自定义的，那么skynet_module里的那个module会用来存什么
+	ctx->ref = 2;           // 应有计数直接赋值为2
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
-	ctx->session_id = 0;
-	ctx->logfile = NULL;
+	ctx->session_id = 0;    // 发送消息的时候就是用这个session来填充
+	ctx->logfile = NULL;    // 没有日志文件
 
-	ctx->init = false;
-	ctx->endless = false;
+	ctx->init = false;      // 不知道用来干什么
+	ctx->endless = false;   // 不知道用来干什么
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
 	ctx->handle = 0;	
-	ctx->handle = skynet_handle_register(ctx);
-	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
+	ctx->handle = skynet_handle_register(ctx);  // 生成handle，就是地址
+	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);  // 生成一个service的对列
 	// init function maybe use ctx->handle, so it must init at last
 	context_inc();
 
+	// 初始化模块，加锁，r = 0 是成功，如果不是就是失败，你自定义模块的时候要注意
 	CHECKCALLING_BEGIN(ctx)
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
 	CHECKCALLING_END(ctx)
@@ -170,6 +178,7 @@ skynet_context_new(const char * name, const char *param) {
 	}
 }
 
+// 此函数的作用就是通过ctx->session_id这个值加一产生
 int
 skynet_context_newsession(struct skynet_context *ctx) {
 	// session always be a positive number
@@ -222,7 +231,7 @@ skynet_context_push(uint32_t handle, struct skynet_message *message) {
 		return -1;
 	}
 	skynet_mq_push(ctx->queue, message);
-	skynet_context_release(ctx);
+	skynet_context_release(ctx);          // 这里的内存管理还没有看懂
 
 	return 0;
 }

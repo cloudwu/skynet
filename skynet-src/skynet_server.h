@@ -8,7 +8,10 @@ struct skynet_context;
 struct skynet_message;
 struct skynet_monitor;
 
-struct skynet_context * skynet_context_new(const char * name, const char * parm);
+// 这个函数
+// 应该说一个每个skynet_context就是我们理解的一个service，每个skynet_context还对应着一个skynet_module
+// 这里的name参数就是文件名，对应这个那个.so文件
+struct skynet_context * skynet_context_new(const char * name, const char * parm);  
 void skynet_context_grab(struct skynet_context *);
 void skynet_context_reserve(struct skynet_context *ctx);
 struct skynet_context * skynet_context_release(struct skynet_context *);

@@ -13,9 +13,9 @@
 #define MAX_MODULE_TYPE 32
 
 struct modules {
-	int count;
-	struct spinlock lock;
-	const char * path;
+	int count;                                  // 当前模块数，也就是服务器数（这样说还是不正确，因为说的服务应该指的skynet_context生成的个数。
+	struct spinlock lock;                       // 用来锁插入模块操作
+	const char * path;                          // 此路径是相对与skynet的路径，接和路径就能用dlopen打开
 	struct skynet_module m[MAX_MODULE_TYPE];
 };
 

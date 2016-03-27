@@ -18,12 +18,12 @@
 #include <string.h>
 
 struct monitor {
-	int count;
-	struct skynet_monitor ** m;
-	pthread_cond_t cond;
-	pthread_mutex_t mutex;
-	int sleep;
-	int quit;
+	int count;                   // 多少一个skynet_monitor
+	struct skynet_monitor ** m;  // 每个线程对应着一个skynet_monitor
+	pthread_cond_t cond;         // 条件锁
+	pthread_mutex_t mutex;       // 互斥锁
+	int sleep;                   // 此变量主要
+	int quit;                    // 退出进程标记
 };
 
 struct worker_parm {
@@ -32,6 +32,7 @@ struct worker_parm {
 	int weight;
 };
 
+// 判断skynet_context_total()主要
 #define CHECK_ABORT if (skynet_context_total()==0) break;
 
 static void
@@ -52,7 +53,7 @@ wakeup(struct monitor *m, int busy) {
 
 static void *
 thread_socket(void *p) {
-	struct monitor * m = p;
+	struct monitor * m = p;                      // 传过来是moniter,有什么用
 	skynet_initthread(THREAD_SOCKET);
 	for (;;) {
 		int r = skynet_socket_poll();
@@ -151,17 +152,18 @@ thread_worker(void *p) {
 
 static void
 start(int thread) {
+	// 为什么要多加三个
 	pthread_t pid[thread+3];
 
-	struct monitor *m = skynet_malloc(sizeof(*m));
+	struct monitor *m = skynet_malloc(sizeof(*m)); // 创建一个monitor
 	memset(m, 0, sizeof(*m));
-	m->count = thread;
-	m->sleep = 0;
+	m->count = thread;                             // 一个线程一个skynet_monitor,而不是每个service
+	m->sleep = 0;                                  // 次标记主要用来干嘛
 
 	m->m = skynet_malloc(thread * sizeof(struct skynet_monitor *));
 	int i;
 	for (i=0;i<thread;i++) {
-		m->m[i] = skynet_monitor_new();
+		m->m[i] = skynet_monitor_new();            // 初始化每个skynet
 	}
 	if (pthread_mutex_init(&m->mutex, NULL)) {
 		fprintf(stderr, "Init mutex error");
@@ -172,6 +174,7 @@ start(int thread) {
 		exit(1);
 	}
 
+	// 多余的三个线程用来分别创建这个三个线程
 	create_thread(&pid[0], thread_monitor, m);
 	create_thread(&pid[1], thread_timer, m);
 	create_thread(&pid[2], thread_socket, m);
@@ -186,18 +189,18 @@ start(int thread) {
 		wp[i].m = m;
 		wp[i].id = i;
 		if (i < sizeof(weight)/sizeof(weight[0])) {
-			wp[i].weight= weight[i];
+			wp[i].weight= weight[i];                       // 怎么分配weight
 		} else {
 			wp[i].weight = 0;
 		}
-		create_thread(&pid[i+3], thread_worker, &wp[i]);
+		create_thread(&pid[i+3], thread_worker, &wp[i]);  // 常见好这些工作线程就会开始工作。
 	}
 
 	for (i=0;i<thread+3;i++) {
-		pthread_join(pid[i], NULL); 
+		pthread_join(pid[i], NULL);                       // 这里会把主线程阻塞，也就是说，主线程不会执行下面的代码了。
 	}
 
-	free_monitor(m);
+	free_monitor(m);                                      // 程序结束，释放monitor
 }
 
 static void
