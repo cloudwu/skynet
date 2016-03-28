@@ -36,7 +36,7 @@ struct timer_node {
 };
 
 struct link_list {                 
-	struct timer_node head;
+	struct timer_node head;         // 所以这个头并不是一个节点，没有数据，只是一个头，用来找到真正有数据需要加入的
 	struct timer_node *tail;
 };
 
@@ -75,7 +75,7 @@ add_node(struct timer *T,struct timer_node *node) {
 	uint32_t current_time=T->time;
 	
 	// 怎么加入这个节点很复杂
-	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {  // 如果在256以内
+	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {  // 如果在255以内
 		link(&T->near[time&TIME_NEAR_MASK],node);
 	} else {
 		int i;
@@ -137,6 +137,9 @@ timer_shift(struct timer *T) {
 	}
 }
 
+/*
+ * @breif用来分发所有skynet_node
+*/
 static inline void
 dispatch_list(struct timer_node *current) {
 	do {
@@ -151,16 +154,16 @@ dispatch_list(struct timer_node *current) {
 		
 		struct timer_node * temp = current;
 		current=current->next;
-		skynet_free(temp);	
+		skynet_free(temp);	                       // 这才是释放内存
 	} while (current);
 }
 
 static inline void
 timer_execute(struct timer *T) {
-	int idx = T->time & TIME_NEAR_MASK;
+	int idx = T->time & TIME_NEAR_MASK;       // 255
 	
 	while (T->near[idx].head.next) {
-		struct timer_node *current = link_clear(&T->near[idx]);
+		struct timer_node *current = link_clear(&T->near[idx]);   // 把head所有timer_node取出来，全部执行
 		SPIN_UNLOCK(T);
 		// dispatch_list don't need lock T
 		dispatch_list(current);
@@ -172,8 +175,9 @@ static void
 timer_update(struct timer *T) {
 	SPIN_LOCK(T);
 
+	// 这里真没有看懂
 	// try to dispatch timeout 0 (rare condition)
-	timer_execute(T);
+	timer_execute(T);                         
 
 	// shift time first, and then dispatch timer message
 	timer_shift(T);            // T->time == 0
@@ -208,21 +212,26 @@ timer_create_timer() {
 	return r;
 }
 
+/*
+ @breif 准备要加入一个倒计时的那个skynet_context对应的handle
+ @param time 倒计时  多少TI = 0.01s
+ @param session 生成的会话id
+*/
 int
 skynet_timeout(uint32_t handle, int time, int session) {
 	if (time <= 0) {
-		// 如果<=0,那么调用此函数的久不用阻塞，那么是怎么发消息到这个线程的。
+		// 如果<=0
 		struct skynet_message message;
 		message.source = 0;
 		message.session = session;
 		message.data = NULL;
-		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
+		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;  // sz = 0,高8bit用来存储消息类型
 
-		if (skynet_context_push(handle, &message)) {
+		if (skynet_context_push(handle, &message)) {                // 加入到消息队列，这个倒计时已经结束
 			return -1;
 		}
 	} else {
-		struct timer_event event;
+		struct timer_event event;                                   // 加入timer里面
 		event.handle = handle;
 		event.session = session;
 		timer_add(TI, &event, sizeof(event), time);
