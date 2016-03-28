@@ -1,4 +1,4 @@
-#include "skynet.h"
+ï»¿#include "skynet.h"
 
 #include "skynet_timer.h"
 #include "skynet_mq.h"
@@ -26,13 +26,13 @@ typedef void (*timer_execute_func)(void *ud,void *arg);
 #define TIME_LEVEL_MASK (TIME_LEVEL-1)       // 0x
 
 struct timer_event {
-	uint32_t handle;                 // ÕâÊÇÒ»¸öÖ¸Õë£¬Ö¸Ïòtimer_node
-	int session;                     // 
+	uint32_t handle;                 // æ¥è‡ªä¸åŒserviceçš„handle
+	int session;                     // æ¥è‡ªä¸åŒçš„session
 };
 
 struct timer_node {
-	struct timer_node *next;         // µ¥Á´±í
-	uint32_t expire;
+	struct timer_node *next;         // å•é“¾è¡¨
+	uint32_t expire;                 // å€’è®¡çš„æ—¶é—´ç‚¹ï¼Œä¸æœåŠ¡å™¨å¯åŠ¨æœ‰å…³
 };
 
 struct link_list {                 
@@ -41,19 +41,20 @@ struct link_list {
 };
 
 struct timer {
-	struct link_list near[TIME_NEAR];
-	struct link_list t[4][TIME_LEVEL];
+	struct link_list near[TIME_NEAR];     // å­˜å‚¨æœ€è¿‘çš„256çš„æ—¶åˆ»
+	struct link_list t[4][TIME_LEVEL];    // 
 	struct spinlock lock;
-	uint32_t time;                        // 
-	uint32_t starttime;                   // ´Ë±äÁ¿´æµÄÊÇs£¬¸ÕºÃÊÇ000s
-	uint64_t current;                     // ´Ë±äÁ¿´æµÄ¶àÉÙTI£¬¶àÉÙTI
-	uint64_t current_point;               // ÓÃÀ´¼ÆËã¹ıÁË¶àÉÙTIµÄ
+	uint32_t time;                        // æ­¤å˜é‡æ˜¯ç”¨æ¥çœŸæ­£è®¡ç®—èµ°çš„æ—¶é—´TIï¼ˆ0.01s)
+	uint32_t starttime;                   // æ­¤å˜é‡å­˜çš„æ˜¯sï¼Œåˆšå¥½æ˜¯000s
+	uint64_t current;                     // æ­¤å˜é‡å­˜çš„å¤šå°‘TIï¼Œå¤šå°‘TI
+	uint64_t current_point;               // ç”¨æ¥è®¡ç®—è¿‡äº†å¤šå°‘TIçš„
 };
 
 static struct timer * TI = NULL;
 
+// è¿™ä¸ªå‡½æ•°å¹¶ä¸æ˜¯åˆ é™¤æ•°æ®ï¼Œè€Œæ˜¯é‡ç½®ä¸€ä¸ªé—®é¢˜
 static inline struct timer_node *
-link_clear(struct link_list *list) {                   // ÖĞ¼ätimer_nodeÔõÃ´É¾³ıµôµÄ
+link_clear(struct link_list *list) {                   // ä¸­é—´timer_nodeæ€ä¹ˆåˆ é™¤æ‰çš„
 	struct timer_node * ret = list->head.next;
 	list->head.next = 0;
 	list->tail = &(list->head);
@@ -62,7 +63,7 @@ link_clear(struct link_list *list) {                   // ÖĞ¼ätimer_nodeÔõÃ´É¾³ı
 }
 
 static inline void
-link(struct link_list *list,struct timer_node *node) { // Ìí¼ÓÒ»¸ötimer_node
+link(struct link_list *list,struct timer_node *node) { // æ·»åŠ ä¸€ä¸ªtimer_node
 	list->tail->next = node;
 	list->tail = node;
 	node->next=0;
@@ -73,14 +74,14 @@ add_node(struct timer *T,struct timer_node *node) {
 	uint32_t time=node->expire;
 	uint32_t current_time=T->time;
 	
-	// ÔõÃ´¼ÓÈëÕâ¸ö½ÚµãºÜ¸´ÔÓ
-	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {  // Èç¹ûÔÚ256ÒÔÄÚ
+	// æ€ä¹ˆåŠ å…¥è¿™ä¸ªèŠ‚ç‚¹å¾ˆå¤æ‚
+	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {  // å¦‚æœåœ¨256ä»¥å†…
 		link(&T->near[time&TIME_NEAR_MASK],node);
 	} else {
 		int i;
 		uint32_t mask=TIME_NEAR << TIME_LEVEL_SHIFT;
 		for (i=0;i<3;i++) {
-			if ((time|(mask-1))==(current_time|(mask-1))) {
+			if ((time|(mask-1))==(current_time|(mask-1))) {     // æ€ä¹ˆè¦è¿™ä¹ˆè®¾è®¡
 				break;
 			}
 			mask <<= TIME_LEVEL_SHIFT;
@@ -97,7 +98,7 @@ timer_add(struct timer *T,void *arg,size_t sz,int time) {
 
 	SPIN_LOCK(T);
 
-		node->expire=time+T->time;   // expire¾ÍÊÇÄÇ¸öµ¹¼ÆÊ±£¬ÄÇÃ´updatetimeÊÇÔõÃ´¸üĞÂÕâ¸öT->timeµÄ
+		node->expire=time+T->time;   // expireå°±æ˜¯é‚£ä¸ªå€’è®¡æ—¶ï¼Œé‚£ä¹ˆupdatetimeæ˜¯æ€ä¹ˆæ›´æ–°è¿™ä¸ªT->timeçš„
 		add_node(T,node);
 
 	SPIN_UNLOCK(T);
@@ -116,7 +117,7 @@ move_list(struct timer *T, int level, int idx) {
 static void
 timer_shift(struct timer *T) {
 	int mask = TIME_NEAR;
-	uint32_t ct = ++T->time;                   // Õâ¸öÖµÊÇÓÃÀ´¸ÉÂïµÄ
+	uint32_t ct = ++T->time;                   // è¿™ä¸ªå€¼æ˜¯ç”¨æ¥å¹²å˜›çš„
 	if (ct == 0) {
 		move_list(T, 3, 0);
 	} else {
@@ -182,7 +183,7 @@ timer_update(struct timer *T) {
 	SPIN_UNLOCK(T);
 }
 
-// ´´½¨Ò»¸ötimer
+// åˆ›å»ºä¸€ä¸ªtimer
 static struct timer *
 timer_create_timer() {
 	struct timer *r=(struct timer *)skynet_malloc(sizeof(struct timer));
@@ -190,12 +191,12 @@ timer_create_timer() {
 
 	int i,j;
 
-	for (i=0;i<TIME_NEAR;i++) {               // ÎªÊ²Ã´»¹Òª·ÖÅä256¸öÁ´±í
+	for (i=0;i<TIME_NEAR;i++) {               // ä¸ºä»€ä¹ˆè¿˜è¦åˆ†é…256ä¸ªé“¾è¡¨
 		link_clear(&r->near[i]);
 	}
 
 	for (i=0;i<4;i++) {
-		for (j=0;j<TIME_LEVEL;j++) {          // 64¸öÁ´±íÓÖÓĞÊ²Ã´ÓÃ
+		for (j=0;j<TIME_LEVEL;j++) {          // 64ä¸ªé“¾è¡¨åˆæœ‰ä»€ä¹ˆç”¨
 			link_clear(&r->t[i][j]);
 		}
 	}
@@ -210,7 +211,7 @@ timer_create_timer() {
 int
 skynet_timeout(uint32_t handle, int time, int session) {
 	if (time <= 0) {
-		// Èç¹û<=0,ÄÇÃ´µ÷ÓÃ´Ëº¯ÊıµÄ¾Ã²»ÓÃ×èÈû£¬ÄÇÃ´ÊÇÔõÃ´·¢ÏûÏ¢µ½Õâ¸öÏß³ÌµÄ¡£
+		// å¦‚æœ<=0,é‚£ä¹ˆè°ƒç”¨æ­¤å‡½æ•°çš„ä¹…ä¸ç”¨é˜»å¡ï¼Œé‚£ä¹ˆæ˜¯æ€ä¹ˆå‘æ¶ˆæ¯åˆ°è¿™ä¸ªçº¿ç¨‹çš„ã€‚
 		struct skynet_message message;
 		message.source = 0;
 		message.session = session;
@@ -270,9 +271,9 @@ skynet_updatetime(void) {
 		skynet_error(NULL, "time diff error: change from %lld to %lld", cp, TI->current_point);
 		TI->current_point = cp;
 	} else if (cp != TI->current_point) {
-		uint32_t diff = (uint32_t)(cp - TI->current_point);  // ¹ıÁË¶àÉÙTI
-		TI->current_point = cp;                              // µ±Ç°cp
-		TI->current += diff;                                 // Ìí¼Ó¶àÉÙTI
+		uint32_t diff = (uint32_t)(cp - TI->current_point);  // è¿‡äº†å¤šå°‘TI
+		TI->current_point = cp;                              // å½“å‰cp
+		TI->current += diff;                                 // æ·»åŠ å¤šå°‘TI
 		int i;
 		for (i=0;i<diff;i++) {
 			timer_update(TI);
@@ -294,8 +295,8 @@ void
 skynet_timer_init(void) {
 	TI = timer_create_timer();
 	uint32_t current = 0;
-	systime(&TI->starttime, &current);             // Èç¹ûÄã¿´ÁËÕâ¸ösystime»¹Ã»ÓĞÃ÷°×ÎªÊ²Ã´Õâ¸öº¯Êı»áÕâÃ´Ğ´
+	systime(&TI->starttime, &current);             // å¦‚æœä½ çœ‹äº†è¿™ä¸ªsystimeè¿˜æ²¡æœ‰æ˜ç™½ä¸ºä»€ä¹ˆè¿™ä¸ªå‡½æ•°ä¼šè¿™ä¹ˆå†™
 	TI->current = current;
-	TI->current_point = gettime();                 // Ti ÓÃ
+	TI->current_point = gettime();                 // Ti ç”¨
 }
 

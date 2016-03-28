@@ -224,14 +224,21 @@ skynet_context_release(struct skynet_context *ctx) {
 	return ctx;
 }
 
+
+/*
+ * @breif 发送消息
+ * @param handle目的地的handle
+ * @param message具体消息，skynet_message申明在skynet_mq.h
+ */
 int
 skynet_context_push(uint32_t handle, struct skynet_message *message) {
-	struct skynet_context * ctx = skynet_handle_grab(handle);
+	// 获取到目的地的ctx
+	struct skynet_context * ctx = skynet_handle_grab(handle); // 引用计数+1
 	if (ctx == NULL) {
 		return -1;
 	}
 	skynet_mq_push(ctx->queue, message);
-	skynet_context_release(ctx);          // 这里的内存管理还没有看懂
+	skynet_context_release(ctx);                              // 应用计数-1
 
 	return 0;
 }
@@ -265,7 +272,7 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	if (ctx->logfile) {
 		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
 	}
-	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
+	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {                // 非常重要的的
 		skynet_free(msg->data);
 	} 
 	CHECKCALLING_END(ctx)
@@ -281,16 +288,22 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 	}
 }
 
+/*
+ *@breif分发当前服务的，就是去去哪个服务的消息队列，每个线程都去抢
+ *@param sm 当前线程对应的
+ *@parma q 空
+ *@weight 当前线程
+ */
 struct message_queue * 
 skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
 	if (q == NULL) {
-		q = skynet_globalmq_pop();
+		q = skynet_globalmq_pop();  //当前线程去抢出一个service的message_queue
 		if (q==NULL)
 			return NULL;
 	}
 
 	uint32_t handle = skynet_mq_handle(q);
-
+	// 获取当前线程的ctx
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
 		struct drop_t d = { handle };
@@ -302,7 +315,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 	struct skynet_message msg;
 
 	for (i=0;i<n;i++) {
-		if (skynet_mq_pop(q,&msg)) {
+		if (skynet_mq_pop(q,&msg)) {    
 			skynet_context_release(ctx);
 			return skynet_globalmq_pop();
 		} else if (i==0 && weight >= 0) {
@@ -314,12 +327,12 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 			skynet_error(ctx, "May overload, message queue length = %d", overload);
 		}
 
-		skynet_monitor_trigger(sm, msg.source , handle);
+		skynet_monitor_trigger(sm, msg.source , handle);      // 把sm-version+1
 
 		if (ctx->cb == NULL) {
 			skynet_free(msg.data);
 		} else {
-			dispatch_message(ctx, &msg);
+			dispatch_message(ctx, &msg);                     // 真正执行请求消息
 		}
 
 		skynet_monitor_trigger(sm, 0,0);

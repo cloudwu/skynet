@@ -1,12 +1,12 @@
-#ifndef SKYNET_TIMER_H
+ï»¿#ifndef SKYNET_TIMER_H
 #define SKYNET_TIMER_H
 
 #include <stdint.h>
 
-int skynet_timeout(uint32_t handle, int time, int session);  // ×¢²á
-void skynet_updatetime(void);      // ²»¶Ï¸üĞÂ
-uint32_t skynet_starttime(void);   // Ö»ÊÇÓÃÀ´²é
+int skynet_timeout(uint32_t handle, int time, int session);  // æ³¨å†Œ
+void skynet_updatetime(void);      // ä¸æ–­æ›´æ–°
+uint32_t skynet_starttime(void);   // åªæ˜¯ç”¨æ¥æŸ¥
 
-void skynet_timer_init(void);  // ³õÊ¼»¯£¬³ÌĞò×î¿ªÊ¼µÄÊ±ºò
+void skynet_timer_init(void);  // åˆå§‹åŒ–ï¼Œç¨‹åºæœ€å¼€å§‹çš„æ—¶å€™
 
 #endif

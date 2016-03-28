@@ -1,4 +1,4 @@
-#include "skynet.h"
+ï»¿#include "skynet.h"
 
 #include "skynet_monitor.h"
 #include "skynet_server.h"
@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Ò»¸öskynet_monitor¶ÔÓ¦Ò»¸öÏß³Ì£¬Õâ¸öskynet_monitorÖ÷ÒªÓĞÊ²Ã´×÷ÓÃ
+// ä¸€ä¸ªskynet_monitorå¯¹åº”ä¸€ä¸ªçº¿ç¨‹ï¼Œè¿™ä¸ªskynet_monitorä¸»è¦æœ‰ä»€ä¹ˆä½œç”¨
 struct skynet_monitor {
 	int version;
 	int check_version;
@@ -25,15 +25,15 @@ skynet_monitor_new() {
 
 void 
 skynet_monitor_delete(struct skynet_monitor *sm) {
-	skynet_free(sm);                                // ´Ëº¯ÊıÊÇÉêÃ÷ÔÚskynet_malloc.hÀï£¬Í¨¹ıskynet.hinclude½øÀ´
+	skynet_free(sm);                                // æ­¤å‡½æ•°æ˜¯ç”³æ˜åœ¨skynet_malloc.hé‡Œï¼Œé€šè¿‡skynet.hincludeè¿›æ¥
 }
 
-// ´Ëº¯ÊıÓĞÒ»¸öºÜÖØÒªµÄ
+// æ­¤å‡½æ•°æœ‰ä¸€ä¸ªå¾ˆé‡è¦çš„
 void 
 skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t destination) {
 	sm->source = source;
 	sm->destination = destination;
-	ATOM_INC(&sm->version);   // °Ñversion¼Ó1ÎªÁË×öÊ²Ã´
+	ATOM_INC(&sm->version);   // æŠŠversionåŠ 1ä¸ºäº†åšä»€ä¹ˆ
 }
 
 void 
