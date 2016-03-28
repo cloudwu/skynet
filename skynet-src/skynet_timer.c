@@ -23,7 +23,7 @@ typedef void (*timer_execute_func)(void *ud,void *arg);
 #define TIME_LEVEL_SHIFT 6
 #define TIME_LEVEL (1 << TIME_LEVEL_SHIFT)   // 1 * 2^6 = 64
 #define TIME_NEAR_MASK (TIME_NEAR-1)         // 0xff
-#define TIME_LEVEL_MASK (TIME_LEVEL-1)       // 0x
+#define TIME_LEVEL_MASK (TIME_LEVEL-1)       // 63
 
 struct timer_event {
 	uint32_t handle;                 // 来自不同service的handle
@@ -75,13 +75,13 @@ add_node(struct timer *T,struct timer_node *node) {
 	uint32_t current_time=T->time;
 	
 	// 怎么加入这个节点很复杂
-	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {  // 如果在255以内
+	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {  // 去掉后面8bit的不同
 		link(&T->near[time&TIME_NEAR_MASK],node);
 	} else {
-		int i;
+		int i                                                                                                                                                                                                                                                                                                                                  
 		uint32_t mask=TIME_NEAR << TIME_LEVEL_SHIFT;
 		for (i=0;i<3;i++) {
-			if ((time|(mask-1))==(current_time|(mask-1))) {     // 怎么要这么设计
+			if ((time|(mask-1))==(current_time|(mask-1))) {     // 看他们是那个等级 6 + 6 + 6 + 8， 后面都放在4里
 				break;
 			}
 			mask <<= TIME_LEVEL_SHIFT;
