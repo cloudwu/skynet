@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+// 一个skynet_monitor对应一个线程，这个skynet_monitor主要有什么作用
 struct skynet_monitor {
 	int version;
 	int check_version;
@@ -24,14 +25,15 @@ skynet_monitor_new() {
 
 void 
 skynet_monitor_delete(struct skynet_monitor *sm) {
-	skynet_free(sm);
+	skynet_free(sm);                                // 此函数是申明在skynet_malloc.h里，通过skynet.hinclude进来
 }
 
+// 此函数有一个很重要的
 void 
 skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t destination) {
 	sm->source = source;
 	sm->destination = destination;
-	ATOM_INC(&sm->version);
+	ATOM_INC(&sm->version);   // 把version加1为了做什么
 }
 
 void 

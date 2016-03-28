@@ -58,9 +58,9 @@ struct skynet_context {
 
 struct skynet_node {
 	int total;                   // 监听着所有节点
-	int init;
-	uint32_t monitor_exit;
-	pthread_key_t handle_key;
+	int init;                    // 1表明已经初始了
+	uint32_t monitor_exit;       // 这个值用来干嘛
+	pthread_key_t handle_key;    // 这是一个全局变量，可是每个线程的值又都是不一样的。用它来标记自己是什么线程
 };
 
 static struct skynet_node G_NODE;
@@ -774,7 +774,7 @@ skynet_globalinit(void) {
 		exit(1);
 	}
 	// set mainthread's key
-	skynet_initthread(THREAD_MAIN);
+	skynet_initthread(THREAD_MAIN);                        // 标记自己是主线程，记住现在这个函数还是在主线程调用的，在skynet_main.c的main函数调用的，正哥G_NODE也是在这初始化的
 }
 
 void 

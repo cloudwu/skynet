@@ -19,23 +19,23 @@
 typedef void (*timer_execute_func)(void *ud,void *arg);
 
 #define TIME_NEAR_SHIFT 8
-#define TIME_NEAR (1 << TIME_NEAR_SHIFT)
+#define TIME_NEAR (1 << TIME_NEAR_SHIFT)     // 1 * 2^8 = 256
 #define TIME_LEVEL_SHIFT 6
-#define TIME_LEVEL (1 << TIME_LEVEL_SHIFT)
-#define TIME_NEAR_MASK (TIME_NEAR-1)
-#define TIME_LEVEL_MASK (TIME_LEVEL-1)
+#define TIME_LEVEL (1 << TIME_LEVEL_SHIFT)   // 1 * 2^6 = 64
+#define TIME_NEAR_MASK (TIME_NEAR-1)         // 0xff
+#define TIME_LEVEL_MASK (TIME_LEVEL-1)       // 0x
 
 struct timer_event {
-	uint32_t handle;
-	int session;
+	uint32_t handle;                 // 这是一个指针，指向timer_node
+	int session;                     // 
 };
 
 struct timer_node {
-	struct timer_node *next;
+	struct timer_node *next;         // 单链表
 	uint32_t expire;
 };
 
-struct link_list {
+struct link_list {                 
 	struct timer_node head;
 	struct timer_node *tail;
 };
@@ -44,16 +44,16 @@ struct timer {
 	struct link_list near[TIME_NEAR];
 	struct link_list t[4][TIME_LEVEL];
 	struct spinlock lock;
-	uint32_t time;
-	uint32_t starttime;
-	uint64_t current;
-	uint64_t current_point;
+	uint32_t time;                        // 
+	uint32_t starttime;                   // 此变量存的是s，刚好是000s
+	uint64_t current;                     // 此变量存的多少TI，多少TI
+	uint64_t current_point;               // 用来计算过了多少TI的
 };
 
 static struct timer * TI = NULL;
 
 static inline struct timer_node *
-link_clear(struct link_list *list) {
+link_clear(struct link_list *list) {                   // 中间timer_node怎么删除掉的
 	struct timer_node * ret = list->head.next;
 	list->head.next = 0;
 	list->tail = &(list->head);
@@ -62,7 +62,7 @@ link_clear(struct link_list *list) {
 }
 
 static inline void
-link(struct link_list *list,struct timer_node *node) {
+link(struct link_list *list,struct timer_node *node) { // 添加一个timer_node
 	list->tail->next = node;
 	list->tail = node;
 	node->next=0;
@@ -73,7 +73,8 @@ add_node(struct timer *T,struct timer_node *node) {
 	uint32_t time=node->expire;
 	uint32_t current_time=T->time;
 	
-	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {
+	// 怎么加入这个节点很复杂
+	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {  // 如果在256以内
 		link(&T->near[time&TIME_NEAR_MASK],node);
 	} else {
 		int i;
@@ -96,7 +97,7 @@ timer_add(struct timer *T,void *arg,size_t sz,int time) {
 
 	SPIN_LOCK(T);
 
-		node->expire=time+T->time;
+		node->expire=time+T->time;   // expire就是那个倒计时，那么updatetime是怎么更新这个T->time的
 		add_node(T,node);
 
 	SPIN_UNLOCK(T);
@@ -115,7 +116,7 @@ move_list(struct timer *T, int level, int idx) {
 static void
 timer_shift(struct timer *T) {
 	int mask = TIME_NEAR;
-	uint32_t ct = ++T->time;
+	uint32_t ct = ++T->time;                   // 这个值是用来干嘛的
 	if (ct == 0) {
 		move_list(T, 3, 0);
 	} else {
@@ -174,13 +175,14 @@ timer_update(struct timer *T) {
 	timer_execute(T);
 
 	// shift time first, and then dispatch timer message
-	timer_shift(T);
+	timer_shift(T);            // T->time == 0
 
 	timer_execute(T);
 
 	SPIN_UNLOCK(T);
 }
 
+// 创建一个timer
 static struct timer *
 timer_create_timer() {
 	struct timer *r=(struct timer *)skynet_malloc(sizeof(struct timer));
@@ -188,12 +190,12 @@ timer_create_timer() {
 
 	int i,j;
 
-	for (i=0;i<TIME_NEAR;i++) {
+	for (i=0;i<TIME_NEAR;i++) {               // 为什么还要分配256个链表
 		link_clear(&r->near[i]);
 	}
 
 	for (i=0;i<4;i++) {
-		for (j=0;j<TIME_LEVEL;j++) {
+		for (j=0;j<TIME_LEVEL;j++) {          // 64个链表又有什么用
 			link_clear(&r->t[i][j]);
 		}
 	}
@@ -208,6 +210,7 @@ timer_create_timer() {
 int
 skynet_timeout(uint32_t handle, int time, int session) {
 	if (time <= 0) {
+		// 如果<=0,那么调用此函数的久不用阻塞，那么是怎么发消息到这个线程的。
 		struct skynet_message message;
 		message.source = 0;
 		message.session = session;
@@ -267,9 +270,9 @@ skynet_updatetime(void) {
 		skynet_error(NULL, "time diff error: change from %lld to %lld", cp, TI->current_point);
 		TI->current_point = cp;
 	} else if (cp != TI->current_point) {
-		uint32_t diff = (uint32_t)(cp - TI->current_point);
-		TI->current_point = cp;
-		TI->current += diff;
+		uint32_t diff = (uint32_t)(cp - TI->current_point);  // 过了多少TI
+		TI->current_point = cp;                              // 当前cp
+		TI->current += diff;                                 // 添加多少TI
 		int i;
 		for (i=0;i<diff;i++) {
 			timer_update(TI);
@@ -291,8 +294,8 @@ void
 skynet_timer_init(void) {
 	TI = timer_create_timer();
 	uint32_t current = 0;
-	systime(&TI->starttime, &current);
+	systime(&TI->starttime, &current);             // 如果你看了这个systime还没有明白为什么这个函数会这么写
 	TI->current = current;
-	TI->current_point = gettime();
+	TI->current_point = gettime();                 // Ti 用
 }
 

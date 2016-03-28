@@ -108,7 +108,10 @@ main(int argc, char *argv[]) {
 	}
 
 	luaS_initshr();
-	skynet_globalinit();
+	// 此函数会初始skynet_server.c中的G_NODE，这个函数在写，为什么实现的是初始化G_NODE，这里实现了，马上就是skynet_start,而skynet_start里面会初始所有模块，他们都会判断节点数
+	// 后来在skynet_start函数调用了skynet_context_new,我发现只要这个函数调用了，那么就能调用skynet_context_new,生成一个service.
+	// skynet_error此函数为什么能调用，logger永远作为第一个service启动，那么他的地址就是固定的，为什么，去查看skynet_handle哪里。
+	skynet_globalinit();  
 	skynet_env_init();
 
 	sigign();

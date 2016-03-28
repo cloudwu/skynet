@@ -25,6 +25,7 @@ void skynet_context_dispatchall(struct skynet_context * context);	// for skynet_
 
 void skynet_context_endless(uint32_t handle);	// for monitor
 
+// 此三个函数主要用于最开始的初始化
 void skynet_globalinit(void);
 void skynet_globalexit(void);
 void skynet_initthread(int m);

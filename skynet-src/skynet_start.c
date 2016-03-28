@@ -32,7 +32,7 @@ struct worker_parm {
 	int weight;
 };
 
-// 判断skynet_context_total()主要
+// 判断skynet_context_total()，用来跳出循环，
 #define CHECK_ABORT if (skynet_context_total()==0) break;
 
 static void
@@ -43,6 +43,7 @@ create_thread(pthread_t *thread, void *(*start_routine) (void *), void *arg) {
 	}
 }
 
+// 睡了的线程数如果大于等于线程
 static void
 wakeup(struct monitor *m, int busy) {
 	if (m->sleep >= m->count - busy) {
@@ -54,9 +55,9 @@ wakeup(struct monitor *m, int busy) {
 static void *
 thread_socket(void *p) {
 	struct monitor * m = p;                      // 传过来是moniter,有什么用
-	skynet_initthread(THREAD_SOCKET);
+	skynet_initthread(THREAD_SOCKET);            // THREAD_SOCKET 定义在skynet_imp.h
 	for (;;) {
-		int r = skynet_socket_poll();
+		int r = skynet_socket_poll();            // 这个
 		if (r==0)
 			break;
 		if (r<0) {
@@ -81,6 +82,7 @@ free_monitor(struct monitor *m) {
 	skynet_free(m);
 }
 
+// 此函数是第一个启动的线程，那么它肯定也是有用的。
 static void *
 thread_monitor(void *p) {
 	struct monitor * m = p;
@@ -88,9 +90,9 @@ thread_monitor(void *p) {
 	int n = m->count;
 	skynet_initthread(THREAD_MONITOR);
 	for (;;) {
-		CHECK_ABORT
+		CHECK_ABORT                                // 注册的服务要是都等于0了，那么也就没有什么用处了。
 		for (i=0;i<n;i++) {
-			skynet_monitor_check(m->m[i]);
+			skynet_monitor_check(m->m[i]);         // 主要用来检测每个线程是否有是循环，至于为什么能检测的到，还没有看明白
 		}
 		for (i=0;i<5;i++) {
 			CHECK_ABORT
@@ -104,9 +106,9 @@ thread_monitor(void *p) {
 static void *
 thread_timer(void *p) {
 	struct monitor * m = p;
-	skynet_initthread(THREAD_TIMER);
+	skynet_initthread(THREAD_TIMER);         // 给本线程初始那个标记
 	for (;;) {
-		skynet_updatetime();
+		skynet_updatetime();                 // 不断更新时间
 		CHECK_ABORT
 		wakeup(m,m->count-1);
 		usleep(2500);
@@ -163,7 +165,7 @@ start(int thread) {
 	m->m = skynet_malloc(thread * sizeof(struct skynet_monitor *));
 	int i;
 	for (i=0;i<thread;i++) {
-		m->m[i] = skynet_monitor_new();            // 初始化每个skynet
+		m->m[i] = skynet_monitor_new();            // 为每个skynet_monitor分配内存，并且
 	}
 	if (pthread_mutex_init(&m->mutex, NULL)) {
 		fprintf(stderr, "Init mutex error");
@@ -217,26 +219,32 @@ bootstrap(struct skynet_context * logger, const char * cmdline) {
 	}
 }
 
+// 这才是真正的起始函数
 void 
 skynet_start(struct skynet_config * config) {
-	if (config->daemon) {
+	if (config->daemon) {                      // 如果是daemon是真，那么才会有
 		if (daemon_init(config->daemon)) {
 			exit(1);
 		}
 	}
-	skynet_harbor_init(config->harbor);
-	skynet_handle_init(config->harbor);
-	skynet_mq_init();
-	skynet_module_init(config->module_path);
-	skynet_timer_init();
+
+	// 当初始了skynet_server.c G_NODE，才开始初始化下面这些
+	skynet_harbor_init(config->harbor);         // 此函数主要用来初始整个节点的harbor值，是从配置文件得来的，这是在master，slave多节点架构中，相互通信，并且你发送消息的时候判断是否是远程节点的关键
+	skynet_handle_init(config->harbor);         // 怎么为每个service创建一个handle（32bit),因为harbor占高字节（8bit）
+	skynet_mq_init();                           // 初始全球队列，如果你去看global_queue这个结构，会发现这个队列的实现
+	skynet_module_init(config->module_path);    // 初始模块，传入模块的路径，就是那个cservice啦
+	skynet_timer_init();                        // 初始struct timer这个结构体，那些变量主要作用什么
 	skynet_socket_init();
 
+	// 最先创建的service就是logger
+	// 为什么这时就能启动一个服务
 	struct skynet_context *ctx = skynet_context_new(config->logservice, config->logger);
 	if (ctx == NULL) {
 		fprintf(stderr, "Can't launch %s service\n", config->logservice);
 		exit(1);
 	}
 
+	// 用来输入启动服务的
 	bootstrap(ctx, config->bootstrap);
 
 	start(config->thread);
