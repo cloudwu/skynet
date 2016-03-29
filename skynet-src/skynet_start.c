@@ -244,8 +244,8 @@ skynet_start(struct skynet_config * config) {
 		exit(1);
 	}
 
-	// 用来输入启动服务的
-	bootstrap(ctx, config->bootstrap);
+	// 这里是启动服务snlua bootstrap
+	bootstrap(ctx, config->bootstrap);                   
 
 	start(config->thread);
 
