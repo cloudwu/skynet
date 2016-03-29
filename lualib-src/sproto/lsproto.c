@@ -532,6 +532,9 @@ lprotocol(lua_State *L) {
 		lua_pushstring(L, name);
 	} else {
 		const char * name = lua_tostring(L, 2);
+		if (name == NULL) {
+			return luaL_argerror(L, 2, "Should be number or string");
+		}
 		tag = sproto_prototag(sp, name);
 		if (tag < 0)
 			return 0;
