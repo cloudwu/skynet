@@ -87,7 +87,7 @@ struct socket {
 
 struct socket_server {
 	int recvctrl_fd;
-	int sendctrl_fd;
+	int sendctrl_fd;                        // 发送消息
 	int checkctrl;                          // 这他妈干啥的
 	poll_fd event_fd;                       // 这是poll_fd
 	int alloc_id;
@@ -1281,6 +1281,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 	}
 }
 
+// 所有都通过ss->sendctrl_fd发送命令
 static void
 send_request(struct socket_server *ss, struct request_package *request, char type, int len) {
 	request->header[6] = (uint8_t)type;
@@ -1337,7 +1338,7 @@ free_buffer(struct socket_server *ss, const void * buffer, int sz) {
 // return -1 when error
 int64_t 
 socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz) {
-	struct socket * s = &ss->slot[HASH_ID(id)];
+	struct socket * s = &ss->slot[HASH_ID(id)];                     // 此socket对应节点的socket。
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		free_buffer(ss, buffer, sz);
 		return -1;
