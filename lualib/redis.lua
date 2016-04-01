@@ -54,11 +54,10 @@ redcmd[42] = function(fd, data)	-- '*'
 	local noerr = true
 	for i = 1,n do
 		local ok, v = read_response(fd)
-		if ok then
-			bulk[i] = v
-		else
+		if not ok then
 			noerr = false
 		end
+		bulk[i] = v
 	end
 	return noerr, bulk
 end
