@@ -210,13 +210,13 @@ Each integer number must be serialized in little-endian format.
 The sproto message must be a user defined type struct, and a struct is encoded in three parts. The header, the field part, and the data part. 
 The tag and small integer or boolean will be encoded in field part, and others are in data part.
 
-All the fields must be encoded in ascending order (by tag). The tags of fields can be discontinuous, if a field is nil. (default value in lua), don't encode it in message.
+All the fields must be encoded in ascending order (by tag, base 0). The tags of fields can be discontinuous, if a field is nil. (default value in lua), don't encode it in message.
 
 The header is a 16bit integer. It is the number of fields.
 
 Each field in field part is a 16bit integer (n). If n is zero, that means the field data is encoded in data part ;
 
-If n is even (and not zero), the value of this field is n/2-1 ;
+If n is even (and not zero), the value of this field is n/2-1 , and the tag increases 1;
 
 If n is odd, that means the tags is not continuous, and we should add current tag by (n+1)/2 .
 
