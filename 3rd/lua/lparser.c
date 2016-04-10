@@ -1229,7 +1229,7 @@ static void labelstat (LexState *ls, TString *label, int line) {
   checkrepeated(fs, ll, label);  /* check for repeated labels */
   checknext(ls, TK_DBCOLON);  /* skip double colon */
   /* create new entry for this label */
-  l = newlabelentry(ls, ll, label, line, fs->pc);
+  l = newlabelentry(ls, ll, label, line, luaK_getlabel(fs));
   skipnoopstat(ls);  /* skip other no-op statements */
   if (block_follow(ls, 0)) {  /* label is last no-op statement in the block? */
     /* assume that locals are already out of scope */
@@ -1597,7 +1597,7 @@ static void statement (LexState *ls) {
       break;
     }
   }
-  lua_assert(ls->fs->f->maxstacksize >= ls->fs->freereg &&
+  lua_assert(ls->fs->f->sp->maxstacksize >= ls->fs->freereg &&
              ls->fs->freereg >= ls->fs->nactvar);
   ls->fs->freereg = ls->fs->nactvar;  /* free registers */
   leavelevel(ls);

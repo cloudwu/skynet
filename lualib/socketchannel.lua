@@ -411,10 +411,10 @@ end
 
 function channel:close()
 	if not self.__closed then
-		local thread = assert(self.__dispatch_thread)
+		local thread = self.__dispatch_thread
 		self.__closed = true
 		close_channel_socket(self)
-		if not self.__response and self.__dispatch_thread == thread then
+		if not self.__response and self.__dispatch_thread == thread and thread then
 			-- dispatch by order, send close signal to dispatch thread
 			push_response(self, true, false)	-- (true, false) is close signal
 		end
