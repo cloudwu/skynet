@@ -343,12 +343,7 @@ function skynet.exit()
 end
 
 function skynet.getenv(key)
-	local ret = c.command("GETENV",key)
-	if ret == "" then
-		return
-	else
-		return ret
-	end
+	return c.command("GETENV",key)
 end
 
 function skynet.setenv(key, value)
