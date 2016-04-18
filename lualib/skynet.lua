@@ -343,7 +343,7 @@ function skynet.exit()
 end
 
 function skynet.getenv(key)
-	return c.command("GETENV",key)
+	return (c.command("GETENV",key))
 end
 
 function skynet.setenv(key, value)
