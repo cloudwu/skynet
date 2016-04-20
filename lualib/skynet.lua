@@ -668,7 +668,7 @@ end
 
 -- Inject internal debug framework
 local debug = require "skynet.debug"
-debug(skynet, {
+debug.init(skynet, {
 	dispatch = skynet.dispatch_message,
 	clear = clear_pool,
 	suspend = suspend,
