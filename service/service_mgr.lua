@@ -148,7 +148,7 @@ local function register_local()
 	end
 
 	function cmd.GQUERY(name, ...)
-		local global_name = "@" .. name
+		local global_name = "@" .. name .. '.' .. tostring(...)
 		return waitfor(global_name, skynet.call, "SERVICE", "lua", "QUERY", global_name, ...)
 	end
 
