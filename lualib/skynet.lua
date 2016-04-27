@@ -611,14 +611,14 @@ local function ret(f, ...)
 	return ...
 end
 
-local function init_template(start)
+local function init_template(start, ...)
 	init_all()
 	init_func = {}
-	return ret(init_all, start())
+	return ret(init_all, start(...))
 end
 
-function skynet.pcall(start)
-	return xpcall(init_template, debug.traceback, start)
+function skynet.pcall(start, ...)
+	return xpcall(init_template, debug.traceback, start, ...)
 end
 
 function skynet.init_service(start)

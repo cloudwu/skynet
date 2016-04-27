@@ -28,12 +28,12 @@ function sharedata.query(name)
 	return r
 end
 
-function sharedata.new(name, v)
-	skynet.call(service, "lua", "new", name, v)
+function sharedata.new(name, v, ...)
+	skynet.call(service, "lua", "new", name, v, ...)
 end
 
-function sharedata.update(name, v)
-	skynet.call(service, "lua", "update", name, v)
+function sharedata.update(name, v, ...)
+	skynet.call(service, "lua", "update", name, v, ...)
 end
 
 function sharedata.delete(name)
