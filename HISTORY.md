@@ -1,4 +1,4 @@
-v1.0.0-rc2 (2015-3-7)
+v1.0.0-rc2 (2016-3-7)
 -----------
 * Fix a bug in lua 5.3.2
 * Update sproto (fix bugs and add ud for package)
