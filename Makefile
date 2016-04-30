@@ -134,7 +134,9 @@ openssl_macosx:
 	cd 3rd/openssl && ./Configure darwin64-x86_64-cc no-shared && make
 	
 openssl_linux:
-	echo $(PLAT)
+	cd 3rd/openssl && ./config no-shared no-asm && make
+
+openssl_freebsd:
 	cd 3rd/openssl && ./config no-shared no-asm && make
 
 $(LUA_CLIB_PATH)/mongo_auth.so : lualib-src/lua-mongo_auth.c lualib-src/mongoc-b64.c | $(LUA_CLIB_PATH) openssl_$(PLAT)
