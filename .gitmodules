@@ -4,6 +4,3 @@
 [submodule "3rd/openssl"]
 	path = 3rd/openssl
 	url = https://github.com/openssl/openssl.git
-[submodule "3rd/mongoc"]
-	path = 3rd/mongoc
-	url = https://github.com/mongodb/mongo-c-driver.git
