@@ -130,11 +130,18 @@ $(LUA_CLIB_PATH)/mysqlaux.so : lualib-src/lua-mysqlaux.c | $(LUA_CLIB_PATH)
 $(LUA_CLIB_PATH)/debugchannel.so : lualib-src/lua-debugchannel.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@	
 
-$(LUA_CLIB_PATH)/mongo_auth.so : lualib-src/lua-mongo_auth.c lualib-src/mongoc-b64.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@
+openssl_macosx:
+	cd 3rd/openssl && ./Configure darwin64-x86_64-cc no-shared && make
+	
+openssl_linux:
+	cd 3rd/openssl && ./config no-shared && make
+
+$(LUA_CLIB_PATH)/mongo_auth.so : lualib-src/lua-mongo_auth.c lualib-src/mongoc-b64.c 3rd/openssl/libcrypto.a | $(LUA_CLIB_PATH) openssl_$(PLAT)
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@ -I3rd/openssl/include
 
 clean :
 	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
+	cd 3rd/openssl && $(MAKE) clean
 
 cleanall: clean
 ifneq (,$(wildcard 3rd/jemalloc/Makefile))
