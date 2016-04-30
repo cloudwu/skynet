@@ -134,14 +134,15 @@ openssl_macosx:
 	cd 3rd/openssl && ./Configure darwin64-x86_64-cc no-shared && make
 	
 openssl_linux:
-	cd 3rd/openssl && ./config no-shared && make
+	echo $(PLAT)
+	cd 3rd/openssl && ./config no-shared no-asm && make
 
-$(LUA_CLIB_PATH)/mongo_auth.so : lualib-src/lua-mongo_auth.c lualib-src/mongoc-b64.c 3rd/openssl/libcrypto.a | $(LUA_CLIB_PATH) openssl_$(PLAT)
-	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@ -I3rd/openssl/include
+$(LUA_CLIB_PATH)/mongo_auth.so : lualib-src/lua-mongo_auth.c lualib-src/mongoc-b64.c | $(LUA_CLIB_PATH) openssl_$(PLAT)
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ 3rd/openssl/libcrypto.a -o $@ -I3rd/openssl/include
 
 clean :
 	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
-	cd 3rd/openssl && $(MAKE) clean
+	$(MAKE) clean -C 3rd/openssl/
 
 cleanall: clean
 ifneq (,$(wildcard 3rd/jemalloc/Makefile))
