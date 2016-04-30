@@ -4,7 +4,7 @@ local socketchannel	= require "socketchannel"
 local skynet = require "skynet"
 local driver = require "mongo.driver"
 local md5 =	require	"md5"
-local mongo_auth = require "mongo_auth"
+local mongoa = require "mongo_auth"
 local rawget = rawget
 local assert = assert
 
@@ -187,9 +187,9 @@ end
 
 function mongo_client:auth_scram_sha1(username,password)
 	local user = string.gsub(string.gsub(username, '=', '=3D'), ',' , '=2C')
-	local nonce = mongo_auth.encode_base64(string.sub(tostring(math.random()), 3 , 14))
+	local nonce = mongoa.encode_base64(string.sub(tostring(math.random()), 3 , 14))
 	local first_bare = "n="  .. user .. ",r="  .. nonce
-	local sasl_start_payload = mongo_auth.encode_base64("n,," .. first_bare)
+	local sasl_start_payload = mongoa.encode_base64("n,," .. first_bare)
 	local r
 	
 	r = self:runCommand("saslStart",1,"autoAuthorize",1,"mechanism","SCRAM-SHA-1","payload",sasl_start_payload)
@@ -199,7 +199,7 @@ function mongo_client:auth_scram_sha1(username,password)
 	
 	local conversationId = r['conversationId']
 	local server_first = r['payload']
-	local parsed_s = mongo_auth.decode_base64(server_first)
+	local parsed_s = mongoa.decode_base64(server_first)
 	local parsed_t = {}
 	for k, v in string.gmatch(parsed_s, "(%w+)=([^,]*)") do
 		parsed_t[k] = v
@@ -214,22 +214,22 @@ function mongo_client:auth_scram_sha1(username,password)
 	end
 	local without_proof = "c=biws,r=" .. rnonce
 	local pbkdf2_key = md5.sumhexa(string.format("%s:mongo:%s",username,password))
-	local salted_pass = mongo_auth.salt_password(pbkdf2_key, mongo_auth.decode_base64(salt), iterations)
-	local client_key = mongo_auth.hmac_sha1(salted_pass, "Client Key")
-	local stored_key = mongo_auth.sha1_bin(client_key)
+	local salted_pass = mongoa.salt_password(pbkdf2_key, mongoa.decode_base64(salt), iterations)
+	local client_key = mongoa.hmac_sha1(salted_pass, "Client Key")
+	local stored_key = mongoa.sha1_bin(client_key)
 	local auth_msg = first_bare .. ',' .. parsed_s .. ',' .. without_proof
-	local client_sig = mongo_auth.hmac_sha1(stored_key, auth_msg)
-	local client_key_xor_sig = mongo_auth.xor_str(client_key, client_sig)
-	local client_proof = "p=" .. mongo_auth.encode_base64(client_key_xor_sig)
-	local client_final = mongo_auth.encode_base64(without_proof .. ',' .. client_proof)
-	local server_key = mongo_auth.hmac_sha1(salted_pass, "Server Key")
-	local server_sig = mongo_auth.encode_base64(mongo_auth.hmac_sha1(server_key, auth_msg))
+	local client_sig = mongoa.hmac_sha1(stored_key, auth_msg)
+	local client_key_xor_sig = mongoa.xor_str(client_key, client_sig)
+	local client_proof = "p=" .. mongoa.encode_base64(client_key_xor_sig)
+	local client_final = mongoa.encode_base64(without_proof .. ',' .. client_proof)
+	local server_key = mongoa.hmac_sha1(salted_pass, "Server Key")
+	local server_sig = mongoa.encode_base64(mongoa.hmac_sha1(server_key, auth_msg))
 	
 	r = self:runCommand("saslContinue",1,"conversationId",conversationId,"payload",client_final)
 	if r.ok ~= 1 then
 		return false
 	end
-	parsed_s = mongo_auth.decode_base64(r['payload'])
+	parsed_s = mongoa.decode_base64(r['payload'])
 	parsed_t = {}
 	for k, v in string.gmatch(parsed_s, "(%w+)=([^,]*)") do
 		parsed_t[k] = v
@@ -239,7 +239,7 @@ function mongo_client:auth_scram_sha1(username,password)
 		return false
 	end
 	if not r.done then
-		r = self:runCommand("saslContinue",1,"conversationId",conversationId,"payload",mongo_auth.encode_base64(""))
+		r = self:runCommand("saslContinue",1,"conversationId",conversationId,"payload","")
 		if r.ok ~= 1 then
 			return false
 		end

@@ -17,11 +17,11 @@
 
 static int
 encode_base64(lua_State *L) {
-	size_t len;
-	const char * src = luaL_checklstring(L, 1, &len);
-	char * output = lua_newuserdata(L, len*2);
+	size_t      len;
+	const char *src = luaL_checklstring(L, 1, &len);
+	char       *output = lua_newuserdata(L, len*2);
 	
-	len = mongoc_b64_ntop((uint8_t*)src, len, (uint8_t*)output, len*2);
+	len = mongoc_b64_ntop((uint8_t*)src, len, output, len*2);
 	
 	lua_pushstring(L, output);
 	
@@ -30,9 +30,9 @@ encode_base64(lua_State *L) {
 
 static int
 decode_base64(lua_State *L) {
-	const char * src = luaL_checkstring(L, 1);
-	size_t len = strlen(src);
-	char * output = lua_newuserdata(L, len);
+	const char *src = luaL_checkstring(L, 1);
+	size_t      len = strlen(src);
+	char       *output = lua_newuserdata(L, len);
 	
 	len = mongoc_b64_pton(src, (uint8_t*)output, len);
 	
@@ -47,10 +47,10 @@ decode_base64(lua_State *L) {
 
 static int
 xor_str(lua_State *L) {
-	size_t la, lb;
-	int i;
+	size_t              la, lb;
 	const unsigned char *a, *b;
-	unsigned char * output;
+	unsigned char       *output;
+	int i;
 	a = (const unsigned char*)luaL_checklstring(L, 1, &la);
 	b = (const unsigned char*)luaL_checklstring(L, 2, &lb);
 	if (la != lb) {
@@ -61,7 +61,7 @@ xor_str(lua_State *L) {
 		output[i] = a[i] ^ b[i];
 	}
 	
-	lua_pushlstring(L, output, la);
+	lua_pushlstring(L, (char*)output, la);
 	
 	return 1;
 }
@@ -70,8 +70,8 @@ static int
 hmac_sha1(lua_State *L) {
 	const char    *sec, *sts;
 	size_t        lsec, lsts;
-	size_t        md_len;
-	u_char        md[EVP_MAX_MD_SIZE];
+	size_t        md_len = EVP_MAX_MD_SIZE;
+	unsigned char md[EVP_MAX_MD_SIZE];
 	
 	if (lua_gettop(L) != 2) {
 		return luaL_error(L, "expecting 2 arguments, but got %d",lua_gettop(L));
@@ -80,7 +80,7 @@ hmac_sha1(lua_State *L) {
 	sec = luaL_checklstring(L, 1, &lsec);
 	sts = luaL_checklstring(L, 2, &lsts);
 	
-	HMAC(EVP_sha1(), (u_char*)sec, lsec, (u_char*)sts, lsts, md, &md_len);
+	HMAC(EVP_sha1(), (unsigned char*)sec, lsec, (unsigned char*)sts, lsts, md, (unsigned int*)&md_len);
 	
 	lua_pushlstring(L, (char*)md, md_len);
 	
@@ -90,9 +90,9 @@ hmac_sha1(lua_State *L) {
 static int
 sha1_bin(lua_State *L) {
 	EVP_MD_CTX * digest_ctx;
-	int rval = 0;
-	size_t len;
-	const char * str;
+	int           rval = 0;
+	size_t        len;
+	const char   *str;
 	unsigned char output[20];
 	str = luaL_checklstring(L, 1, &len);
 	
@@ -136,8 +136,12 @@ _mongoc_scram_salt_password(
 	int i, k;
 	
 	memcpy (start_key, salt, salt_len);
+	start_key[salt_len] = 0;
+	start_key[salt_len + 1] = 0;
+	start_key[salt_len + 2] = 0;
+	start_key[salt_len + 3] = 1;
 	
-	/* U1 = HMAC(input, salt + 0001) */
+	/* U1 = HMAC(password, salt + 0001) */
 	HMAC (EVP_sha1 (),
 		password, 
 		password_len, 
@@ -168,14 +172,14 @@ salt_password(lua_State *L) {
 	size_t lp, ls;
 	const char * password, *salt;
 	unsigned int iterations;
-	unsigned char * output = lua_newuserdata(L, 20);
+	unsigned char * output = lua_newuserdata(L, MONGOC_SCRAM_HASH_SIZE);
 	password = luaL_checklstring(L, 1, &lp);
 	salt = luaL_checklstring(L, 2, &ls);
 	iterations = luaL_checkinteger(L, 3);
 	
 	_mongoc_scram_salt_password(output, password, lp, (const unsigned char*)salt, ls, iterations);
 	
-	lua_pushlstring(L, (char*)output, 20);
+	lua_pushlstring(L, (char*)output, MONGOC_SCRAM_HASH_SIZE);
 	return 1;
 }
 
