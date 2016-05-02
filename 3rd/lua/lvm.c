@@ -1163,7 +1163,7 @@ void luaV_execute (lua_State *L) {
           oci->u.l.savedpc = nci->u.l.savedpc;
           oci->callstatus |= CIST_TAIL;  /* function was tail called */
           ci = L->ci = oci;  /* remove new frame */
-          lua_assert(L->top == oci->u.l.base + getproto(ofunc)->maxstacksize);
+          lua_assert(L->top == oci->u.l.base + getproto(ofunc)->sp->maxstacksize);
           goto newframe;  /* restart luaV_execute over new Lua function */
         }
         vmbreak;

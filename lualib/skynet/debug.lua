@@ -1,6 +1,5 @@
-local io = io
 local table = table
-local debug = debug
+local extern_dbgcmd = {};
 
 return function (skynet, export)
 
@@ -13,7 +12,7 @@ end
 local dbgcmd
 
 local function init_dbgcmd()
-dbgcmd = {}
+dbgcmd = extern_dbgcmd
 
 function dbgcmd.MEM()
 	local kb, bytes = collectgarbage "count"

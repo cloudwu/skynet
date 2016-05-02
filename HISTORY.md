@@ -1,3 +1,12 @@
+v1.0.0-rc2 (2015-3-7)
+-----------
+* Fix a bug in lua 5.3.2
+* Update sproto (fix bugs and add ud for package)
+* Fix a bug in http
+* Fix a bug in harbor
+* Fix a bug in socket channel
+* Enhance remote debugger
+
 v1.0.0-rc (2015-12-28)
 -----------
 * Update to lua 5.3.2

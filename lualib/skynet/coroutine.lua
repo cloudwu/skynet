@@ -10,7 +10,6 @@ local coroutine_running = coroutine.running
 local select = select
 local skynetco = {}
 
-skynetco.create = coroutine.create
 skynetco.isyieldable = coroutine.isyieldable
 skynetco.running = coroutine.running
 skynetco.status = coroutine.status
