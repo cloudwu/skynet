@@ -16,6 +16,7 @@ struct snlua {
 	struct skynet_context * ctx;
 	size_t mem;
 	size_t mem_report;
+	size_t mem_limit;
 };
 
 // LUA_CACHELIB may defined in patched lua for shared proto
@@ -57,7 +58,7 @@ traceback (lua_State *L) {
 }
 
 static void
-_report_launcher_error(struct skynet_context *ctx) {
+report_launcher_error(struct skynet_context *ctx) {
 	// sizeof "ERROR" == 5
 	skynet_sendname(ctx, 0, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
 }
@@ -72,7 +73,7 @@ optstring(struct skynet_context *ctx, const char *key, const char * str) {
 }
 
 static int
-_init(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz) {
+init_cb(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz) {
 	lua_State *L = l->L;
 	l->ctx = ctx;
 	lua_gc(L, LUA_GCSTOP, 0);
@@ -105,17 +106,23 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz)
 	int r = luaL_loadfile(L,loader);
 	if (r != LUA_OK) {
 		skynet_error(ctx, "Can't load %s : %s", loader, lua_tostring(L, -1));
-		_report_launcher_error(ctx);
+		report_launcher_error(ctx);
 		return 1;
 	}
 	lua_pushlstring(L, args, sz);
 	r = lua_pcall(L,1,0,1);
 	if (r != LUA_OK) {
 		skynet_error(ctx, "lua loader error : %s", lua_tostring(L, -1));
-		_report_launcher_error(ctx);
+		report_launcher_error(ctx);
 		return 1;
 	}
 	lua_settop(L,0);
+	if (lua_getfield(L, LUA_REGISTRYINDEX, "memlimit") == LUA_TNUMBER) {
+		size_t limit = lua_tointeger(L, -1);
+		l->mem_limit = limit;
+		skynet_error(ctx, "Set memory limit to %.2f M", (float)limit / (1024 * 1024));
+	}
+	lua_pop(L, 1);
 
 	lua_gc(L, LUA_GCRESTART, 0);
 
@@ -123,11 +130,11 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz)
 }
 
 static int
-_launch(struct skynet_context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz) {
+launch_cb(struct skynet_context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz) {
 	assert(type == 0 && session == 0);
 	struct snlua *l = ud;
 	skynet_callback(context, NULL, NULL);
-	int err = _init(l, context, msg, sz);
+	int err = init_cb(l, context, msg, sz);
 	if (err) {
 		skynet_command(context, "EXIT", NULL);
 	}
@@ -140,7 +147,7 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	int sz = strlen(args);
 	char * tmp = skynet_malloc(sz);
 	memcpy(tmp, args, sz);
-	skynet_callback(ctx, l , _launch);
+	skynet_callback(ctx, l , launch_cb);
 	const char * self = skynet_command(ctx, "REG", NULL);
 	uint32_t handle_id = strtoul(self+1, NULL, 16);
 	// it must be first message
@@ -151,9 +158,16 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 static void *
 lalloc(void * ud, void *ptr, size_t osize, size_t nsize) {
 	struct snlua *l = ud;
+	size_t mem = l->mem;
 	l->mem += nsize;
 	if (ptr)
 		l->mem -= osize;
+	if (l->mem_limit != 0 && l->mem > l->mem_limit) {
+		if (ptr == NULL || nsize > osize) {
+			l->mem = mem;
+			return NULL;
+		}
+	}
 	if (l->mem > l->mem_report) {
 		l->mem_report *= 2;
 		skynet_error(l->ctx, "Memory warning %.2f M", (float)l->mem / (1024 * 1024));
@@ -166,6 +180,7 @@ snlua_create(void) {
 	struct snlua * l = skynet_malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
 	l->mem_report = MEMORY_WARNING_REPORT;
+	l->mem_limit = 0;
 	l->L = lua_newstate(lalloc, l);
 	return l;
 }
