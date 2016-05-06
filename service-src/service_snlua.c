@@ -9,9 +9,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define MEMORY_WARNING_REPORT (1024 * 1024 * 32)
+
 struct snlua {
 	lua_State * L;
 	struct skynet_context * ctx;
+	size_t mem;
+	size_t mem_report;
 };
 
 // LUA_CACHELIB may defined in patched lua for shared proto
@@ -144,11 +148,25 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	return 0;
 }
 
+static void *
+lalloc(void * ud, void *ptr, size_t osize, size_t nsize) {
+	struct snlua *l = ud;
+	l->mem += nsize;
+	if (ptr)
+		l->mem -= osize;
+	if (l->mem > l->mem_report) {
+		l->mem_report *= 2;
+		skynet_error(l->ctx, "Memory warning %.2f M", (float)l->mem / (1024 * 1024));
+	}
+	return skynet_lalloc(ptr, osize, nsize);
+}
+
 struct snlua *
 snlua_create(void) {
 	struct snlua * l = skynet_malloc(sizeof(*l));
 	memset(l,0,sizeof(*l));
-	l->L = lua_newstate(skynet_lalloc, NULL);
+	l->mem_report = MEMORY_WARNING_REPORT;
+	l->L = lua_newstate(lalloc, l);
 	return l;
 }
 
@@ -161,8 +179,12 @@ snlua_release(struct snlua *l) {
 void
 snlua_signal(struct snlua *l, int signal) {
 	skynet_error(l->ctx, "recv a signal %d", signal);
+	if (signal == 0) {
 #ifdef lua_checksig
 	// If our lua support signal (modified lua version by skynet), trigger it.
 	skynet_sig_L = l->L;
 #endif
+	} else if (signal == 1) {
+		skynet_error(l->ctx, "Current Memory %.3fK", (float)l->mem / 1024);
+	}
 }
