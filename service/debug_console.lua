@@ -143,7 +143,11 @@ end
 function COMMAND.start(fd, ...)
 	local ok, addr = pcall(skynet.newservice, ...)
 	if ok then
-		return { [skynet.address(addr)] = ... }
+		if addr then
+			return { [skynet.address(addr)] = ... }
+		else
+			return "Exit"
+		end
 	else
 		return "Failed"
 	end
@@ -152,7 +156,11 @@ end
 function COMMAND.log(fd, ...)
 	local ok, addr = pcall(skynet.call, ".launcher", "lua", "LOGLAUNCH", "snlua", ...)
 	if ok then
-		return { [skynet.address(addr)] = ... }
+		if addr then
+			return { [skynet.address(addr)] = ... }
+		else
+			return "Failed"
+		end
 	else
 		return "Failed"
 	end
