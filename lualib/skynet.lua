@@ -656,6 +656,11 @@ function skynet.term(service)
 	return _error_dispatch(0, service)
 end
 
+function skynet.memlimit(bytes)
+	debug.getregistry().memlimit = bytes
+	skynet.memlimit = nil	-- set only once
+end
+
 local function clear_pool()
 	coroutine_pool = {}
 end

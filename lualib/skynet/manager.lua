@@ -20,10 +20,6 @@ function skynet.abort()
 	c.command("ABORT")
 end
 
-function skynet.memlimit(bytes)
-	debug.getregistry().memlimit = bytes
-end
-
 local function globalname(name, handle)
 	local c = string.sub(name,1,1)
 	assert(c ~= ':')

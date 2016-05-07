@@ -121,6 +121,8 @@ init_cb(struct snlua *l, struct skynet_context *ctx, const char * args, size_t s
 		size_t limit = lua_tointeger(L, -1);
 		l->mem_limit = limit;
 		skynet_error(ctx, "Set memory limit to %.2f M", (float)limit / (1024 * 1024));
+		lua_pushnil(L);
+		lua_setfield(L, LUA_REGISTRYINDEX, "memlimit");
 	}
 	lua_pop(L, 1);
 

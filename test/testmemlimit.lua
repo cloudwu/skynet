@@ -1,5 +1,4 @@
 local skynet = require "skynet"
-require "skynet.manager"
 
 -- set sandbox memory limit to 1M, must set here (at start, out of skynet.start)
 skynet.memlimit(1 * 1024 * 1024)
