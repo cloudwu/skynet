@@ -1,5 +1,5 @@
 /*
-** $Id: lbaselib.c,v 1.312 2015/10/29 15:21:04 roberto Exp $
+** $Id: lbaselib.c,v 1.313 2016/04/11 19:18:40 roberto Exp $
 ** Basic library
 ** See Copyright Notice in lua.h
 */
@@ -102,8 +102,8 @@ static int luaB_tonumber (lua_State *L) {
 static int luaB_error (lua_State *L) {
   int level = (int)luaL_optinteger(L, 2, 1);
   lua_settop(L, 1);
-  if (lua_isstring(L, 1) && level > 0) {  /* add extra information? */
-    luaL_where(L, level);
+  if (lua_type(L, 1) == LUA_TSTRING && level > 0) {
+    luaL_where(L, level);   /* add extra information */
     lua_pushvalue(L, 1);
     lua_concat(L, 2);
   }
@@ -251,9 +251,8 @@ static int ipairsaux (lua_State *L) {
 
 
 /*
-** This function will use either 'ipairsaux' or 'ipairsaux_raw' to
-** traverse a table, depending on whether the table has metamethods
-** that can affect the traversal.
+** 'ipairs' function. Returns 'ipairsaux', given "table", 0.
+** (The given "table" may not be a table.)
 */
 static int luaB_ipairs (lua_State *L) {
 #if defined(LUA_COMPAT_IPAIRS)

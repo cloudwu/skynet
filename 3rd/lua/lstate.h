@@ -1,5 +1,5 @@
 /*
-** $Id: lstate.h,v 2.128 2015/11/13 12:16:51 roberto Exp $
+** $Id: lstate.h,v 2.130 2015/12/16 16:39:38 roberto Exp $
 ** Global State
 ** See Copyright Notice in lua.h
 */
@@ -32,6 +32,15 @@
 
 struct lua_longjmp;  /* defined in ldo.c */
 
+
+/*
+** Atomic type (relative to signals) to better ensure that 'lua_sethook' 
+** is thread safe
+*/
+#if !defined(l_signalT)
+#include <signal.h>
+#define l_signalT	sig_atomic_t
+#endif
 
 
 /* extra stack space to handle TM calls and some other extras */
@@ -162,14 +171,14 @@ struct lua_State {
   struct lua_State *twups;  /* list of threads with open upvalues */
   struct lua_longjmp *errorJmp;  /* current error recover point */
   CallInfo base_ci;  /* CallInfo for first level (C calling Lua) */
-  lua_Hook hook;
+  volatile lua_Hook hook;
   ptrdiff_t errfunc;  /* current error handling function (stack index) */
   int stacksize;
   int basehookcount;
   int hookcount;
   unsigned short nny;  /* number of non-yieldable calls in stack */
   unsigned short nCcalls;  /* number of nested C calls */
-  lu_byte hookmask;
+  l_signalT hookmask;
   lu_byte allowhook;
 };
 

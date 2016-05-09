@@ -1,5 +1,5 @@
 /*
-** $Id: lvm.h,v 2.39 2015/09/09 13:44:07 roberto Exp $
+** $Id: lvm.h,v 2.40 2016/01/05 16:07:21 roberto Exp $
 ** Lua virtual machine
 ** See Copyright Notice in lua.h
 */
@@ -49,25 +49,24 @@
 
 
 /*
-** fast track for 'gettable': 1 means 'aux' points to resulted value;
-** 0 means 'aux' is metamethod (if 't' is a table) or NULL. 'f' is
-** the raw get function to use.
+** fast track for 'gettable': if 't' is a table and 't[k]' is not nil,
+** return 1 with 'slot' pointing to 't[k]' (final result).  Otherwise,
+** return 0 (meaning it will have to check metamethod) with 'slot'
+** pointing to a nil 't[k]' (if 't' is a table) or NULL (otherwise).
+** 'f' is the raw get function to use.
 */
-#define luaV_fastget(L,t,k,aux,f) \
+#define luaV_fastget(L,t,k,slot,f) \
   (!ttistable(t)  \
-   ? (aux = NULL, 0)  /* not a table; 'aux' is NULL and result is 0 */  \
-   : (aux = f(hvalue(t), k),  /* else, do raw access */  \
-      !ttisnil(aux) ? 1  /* result not nil? 'aux' has it */  \
-      : (aux = fasttm(L, hvalue(t)->metatable, TM_INDEX),  /* get metamethod */\
-         aux != NULL  ? 0  /* has metamethod? must call it */  \
-         : (aux = luaO_nilobject, 1))))  /* else, final result is nil */
+   ? (slot = NULL, 0)  /* not a table; 'slot' is NULL and result is 0 */  \
+   : (slot = f(hvalue(t), k),  /* else, do raw access */  \
+      !ttisnil(slot)))  /* result not nil? */
 
 /*
 ** standard implementation for 'gettable'
 */
-#define luaV_gettable(L,t,k,v) { const TValue *aux; \
-  if (luaV_fastget(L,t,k,aux,luaH_get)) { setobj2s(L, v, aux); } \
-  else luaV_finishget(L,t,k,v,aux); }
+#define luaV_gettable(L,t,k,v) { const TValue *slot; \
+  if (luaV_fastget(L,t,k,slot,luaH_get)) { setobj2s(L, v, slot); } \
+  else luaV_finishget(L,t,k,v,slot); }
 
 
 /*
@@ -100,9 +99,9 @@ LUAI_FUNC int luaV_lessequal (lua_State *L, const TValue *l, const TValue *r);
 LUAI_FUNC int luaV_tonumber_ (const TValue *obj, lua_Number *n);
 LUAI_FUNC int luaV_tointeger (const TValue *obj, lua_Integer *p, int mode);
 LUAI_FUNC void luaV_finishget (lua_State *L, const TValue *t, TValue *key,
-                               StkId val, const TValue *tm);
+                               StkId val, const TValue *slot);
 LUAI_FUNC void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
-                               StkId val, const TValue *oldval);
+                               StkId val, const TValue *slot);
 LUAI_FUNC void luaV_finishOp (lua_State *L);
 LUAI_FUNC void luaV_execute (lua_State *L);
 LUAI_FUNC void luaV_concat (lua_State *L, int total);
