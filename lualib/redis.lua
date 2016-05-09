@@ -63,6 +63,7 @@ redcmd[42] = function(fd, data)	-- '*'
 end
 
 -------------------
+local compose_message
 
 local function redis_login(auth, db)
 	if auth == nil and db == nil then
@@ -70,10 +71,10 @@ local function redis_login(auth, db)
 	end
 	return function(so)
 		if auth then
-			so:request("AUTH "..auth.."\r\n", read_response)
+			so:request(compose_message("AUTH", auth), read_response)
 		end
 		if db then
-			so:request("SELECT "..db.."\r\n", read_response)
+			so:request(compose_message("SELECT", db), read_response)
 		end
 	end
 end
@@ -122,7 +123,7 @@ local count_cache = make_cache(function(t,k)
 		return s
 	end)
 
-local function compose_message(cmd, msg)
+function compose_message(cmd, msg)
 	local t = type(msg)
 	local lines = {}
 
@@ -233,7 +234,7 @@ local watchmeta = {
 local function watch_login(obj, auth)
 	return function(so)
 		if auth then
-			so:request("AUTH "..auth.."\r\n", read_response)
+			so:request(compose_message("AUTH", auth), read_response)
 		end
 		for k in pairs(obj.__psubscribe) do
 			so:request(compose_message ("PSUBSCRIBE", k))
