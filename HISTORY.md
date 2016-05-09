@@ -1,3 +1,16 @@
+v1.0.0-rc3 (2016-5-9)
+-----------
+* Update jemalloc 4.1.1
+* Update lua 5.3.3 rc1
+* Update sproto to support encoding empty table
+* Make skynet.init stable (keep order)
+* skynet.getenv can return empty string
+* Add lua VM memory warning
+* lua VM support memory limit
+* skynet.pcall suport varargs
+* Bugfix : Global name query
+* Bugfix : snax.queryglobal
+
 v1.0.0-rc2 (2016-3-7)
 -----------
 * Fix a bug in lua 5.3.2
