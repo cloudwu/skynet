@@ -63,33 +63,6 @@ redcmd[42] = function(fd, data)	-- '*'
 end
 
 -------------------
-local compose_message
-
-local function redis_login(auth, db)
-	if auth == nil and db == nil then
-		return
-	end
-	return function(so)
-		if auth then
-			so:request(compose_message("AUTH", auth), read_response)
-		end
-		if db then
-			so:request(compose_message("SELECT", db), read_response)
-		end
-	end
-end
-
-function redis.connect(db_conf)
-	local channel = socketchannel.channel {
-		host = db_conf.host,
-		port = db_conf.port or 6379,
-		auth = redis_login(db_conf.auth, db_conf.db),
-		nodelay = true,
-	}
-	-- try connect first only once
-	channel:connect(true)
-	return setmetatable( { channel }, meta )
-end
 
 function command:disconnect()
 	self[1]:close()
@@ -123,7 +96,7 @@ local count_cache = make_cache(function(t,k)
 		return s
 	end)
 
-function compose_message(cmd, msg)
+local function compose_message(cmd, msg)
 	local t = type(msg)
 	local lines = {}
 
@@ -148,6 +121,32 @@ function compose_message(cmd, msg)
 	end
 
 	return lines
+end
+
+local function redis_login(auth, db)
+	if auth == nil and db == nil then
+		return
+	end
+	return function(so)
+		if auth then
+			so:request(compose_message("AUTH", auth), read_response)
+		end
+		if db then
+			so:request(compose_message("SELECT", db), read_response)
+		end
+	end
+end
+
+function redis.connect(db_conf)
+	local channel = socketchannel.channel {
+		host = db_conf.host,
+		port = db_conf.port or 6379,
+		auth = redis_login(db_conf.auth, db_conf.db),
+		nodelay = true,
+	}
+	-- try connect first only once
+	channel:connect(true)
+	return setmetatable( { channel }, meta )
 end
 
 setmetatable(command, { __index = function(t,k)
