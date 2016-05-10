@@ -1012,10 +1012,9 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   return status;
 }
 
-static Proto * cloneproto (lua_State *L, const Proto *src) {
+void cloneproto (lua_State *L, Proto *f, const Proto *src) {
   /* copy constants and nested proto */
   int i,n;
-  Proto *f = luaF_newproto(L, src->sp);
   n = src->sp->sizek;
   f->k=luaM_newvector(L,n,TValue);
   for (i=0; i<n; i++) setnilvalue(&f->k[i]);
@@ -1033,9 +1032,9 @@ static Proto * cloneproto (lua_State *L, const Proto *src) {
   f->p=luaM_newvector(L,n,struct Proto *);
   for (i=0; i<n; i++) f->p[i]=NULL;
   for (i=0; i<n; i++) {
-    f->p[i]=cloneproto(L, src->p[i]);
+    f->p[i]= luaF_newproto(L, src->p[i]->sp);
+	cloneproto(L, f->p[i], src->p[i]);
   }
-  return f;
 }
 
 LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
@@ -1049,9 +1048,10 @@ LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
     return;
   }
   cl = luaF_newLclosure(L,f->nupvalues);
-  cl->p = cloneproto(L, f->p);
   setclLvalue(L,L->top,cl);
   api_incr_top(L);
+  cl->p = luaF_newproto(L, f->p->sp);
+  cloneproto(L, cl->p, f->p);
   luaF_initupvals(L, cl);
 
   if (cl->nupvalues >= 1) {  /* does it have an upvalue? */
