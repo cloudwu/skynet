@@ -492,15 +492,19 @@ static int marksharedproto (global_State *g, SharedProto *f) {
 ** NULL, so the use of 'markobjectN')
 */
 static int traverseproto (global_State *g, Proto *f) {
-  int i;
+  int i,nk,np;
   if (f->cache && iswhite(f->cache))
     f->cache = NULL;  /* allow cache to be collected */
-  for (i = 0; i < f->sp->sizek; i++)  /* mark literals */
+  if (f->sp == NULL)
+    return sizeof(Proto);
+  nk = (f->k == NULL) ? 0 : f->sp->sizek;
+  np = (f->p == NULL) ? 0 : f->sp->sizep;
+  for (i = 0; i < nk; i++)  /* mark literals */
     markvalue(g, &f->k[i]);
-  for (i = 0; i < f->sp->sizep; i++)  /* mark nested protos */
+  for (i = 0; i < np; i++)  /* mark nested protos */
     markobjectN(g, f->p[i]);
-  return sizeof(Proto) + sizeof(Proto *) * f->sp->sizep +
-                         sizeof(TValue) * f->sp->sizek +
+  return sizeof(Proto) + sizeof(Proto *) * np +
+                         sizeof(TValue) * nk +
                          marksharedproto(g, f->sp);
 }
 

@@ -16,7 +16,10 @@ skynet.start(function()
     end)
     local libs = {}
     for k,v in ipairs(names) do
-        libs[v] = require(v)
+        local ok, m = pcall(require, v)
+        if ok then
+            libs[v] = m
+        end
     end
     skynet.error(limit, err)
     skynet.exit()
