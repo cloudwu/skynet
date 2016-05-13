@@ -69,6 +69,14 @@ function dbgcmd.SUPPORT(pname)
 	return skynet.ret(skynet.pack(skynet.dispatch(pname) ~= nil))
 end
 
+function dbgcmd.PING()
+	return skynet.ret()
+end
+
+function dbgcmd.LINK()
+	-- no return, raise error when exit
+end
+
 return dbgcmd
 end -- function init_dbgcmd
 

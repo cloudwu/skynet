@@ -115,7 +115,7 @@ function COMMAND.help()
 		help = "This help message",
 		list = "List all the service",
 		stat = "Dump all stats",
-		info = "Info address : get service infomation",
+		info = "info address : get service infomation",
 		exit = "exit address : kill a lua service",
 		kill = "kill address : kill service",
 		mem = "mem : show memory status",
@@ -133,6 +133,7 @@ function COMMAND.help()
 		signal = "signal address sig",
 		cmem = "Show C memory info",
 		shrtbl = "Show shared short string table info",
+		ping = "ping address",
 	}
 end
 
@@ -282,4 +283,12 @@ end
 function COMMAND.shrtbl()
 	local n, total, longest, space = memory.ssinfo()
 	return { n = n, total = total, longest = longest, space = space }
+end
+
+function COMMAND.ping(fd, address)
+	address = adjust_address(address)
+	local ti = skynet.now()
+	skynet.call(address, "debug", "PING")
+	ti = skynet.now() - ti
+	return tostring(ti)
 end
