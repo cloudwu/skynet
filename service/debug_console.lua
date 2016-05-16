@@ -228,9 +228,9 @@ function COMMAND.task(fd, address)
 	return skynet.call(address,"debug","TASK")
 end
 
-function COMMAND.info(fd, address)
+function COMMAND.info(fd, address, ...)
 	address = adjust_address(address)
-	return skynet.call(address,"debug","INFO")
+	return skynet.call(address,"debug","INFO", ...)
 end
 
 function COMMAND.debug(fd, address)
