@@ -518,7 +518,7 @@ pack_meta_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
 
 static void
 pack_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
-	if (luaL_getmetafield(L, 1, "__pairs") != LUA_TNIL) {
+	if (luaL_getmetafield(L, -1, "__pairs") != LUA_TNIL) {
 		pack_meta_dict(L, b, isarray, depth);
 	} else {
 		pack_simple_dict(L, b, isarray, depth);
