@@ -409,7 +409,44 @@ bson_numstr( char *str, unsigned int i ) {
 }
 
 static void
-pack_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
+pack_dict_data(lua_State *L, struct bson *b, bool isarray, int depth, int kt) {
+	char numberkey[32];
+	const char * key = NULL;
+	size_t sz;
+	if (isarray) {
+		if (kt != LUA_TNUMBER) {
+			luaL_error(L, "Invalid array key type : %s", lua_typename(L, kt));
+			return;
+		}
+		sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
+		key = numberkey;
+
+		append_one(b, L, key, sz, depth);
+		lua_pop(L,1);
+	} else {
+		switch(kt) {
+		case LUA_TNUMBER:
+			// copy key, don't change key type
+			lua_pushvalue(L,-2);
+			lua_insert(L,-2);
+			key = lua_tolstring(L,-2,&sz);
+			append_one(b, L, key, sz, depth);
+			lua_pop(L,2);
+			break;
+		case LUA_TSTRING:
+			key = lua_tolstring(L,-2,&sz);
+			append_one(b, L, key, sz, depth);
+			lua_pop(L,1);
+			break;
+		default:
+			luaL_error(L, "Invalid key type : %s", lua_typename(L, kt));
+			return;
+		}
+	}
+}
+
+static void
+pack_simple_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
 	if (depth > MAX_DEPTH) {
 		luaL_error(L, "Too depth while encoding bson");
 	}
@@ -418,42 +455,47 @@ pack_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
 	lua_pushnil(L);
 	while(lua_next(L,-2) != 0) {
 		int kt = lua_type(L, -2);
-		char numberkey[32];
-		const char * key = NULL;
-		size_t sz;
-		if (isarray) {
-			if (kt != LUA_TNUMBER) {
-				luaL_error(L, "Invalid array key type : %s", lua_typename(L, kt));
-				return;
-			}
-			sz = bson_numstr(numberkey, (unsigned int)lua_tointeger(L,-2)-1);
-			key = numberkey;
-
-			append_one(b, L, key, sz, depth);
-			lua_pop(L,1);
-		} else {
-			switch(kt) {
-			case LUA_TNUMBER:
-				// copy key, don't change key type
-				lua_pushvalue(L,-2);
-				lua_insert(L,-2);
-				key = lua_tolstring(L,-2,&sz);
-				append_one(b, L, key, sz, depth);
-				lua_pop(L,2);
-				break;
-			case LUA_TSTRING:
-				key = lua_tolstring(L,-2,&sz);
-				append_one(b, L, key, sz, depth);
-				lua_pop(L,1);
-				break;
-			default:
-				luaL_error(L, "Invalid key type : %s", lua_typename(L, kt));
-				return;
-			}
-		}
+		pack_dict_data(L, b, isarray, depth, kt);
 	}
 	write_byte(b,0);
 	write_length(b, b->size - length, length);
+}
+
+
+static void
+pack_meta_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
+	if (depth > MAX_DEPTH) {
+		luaL_error(L, "Too depth while encoding bson");
+	}
+	luaL_checkstack(L, 16, NULL);	// reserve enough stack space to pack table
+	int length = reserve_length(b);
+
+	lua_pushvalue(L, -2); // push meta_obj
+	lua_call(L, 1, 3); // call __pairs_func => next_func, t_data, first_k
+	for(;;) {
+		lua_pushvalue(L, -2); // copy data
+		lua_pushvalue(L, -2); // copy k
+		lua_copy(L, -5, -3); // copy next_func replace old_k
+		lua_call(L, 2, 2); // call next_func
+
+		int kt = lua_type(L, -2);
+		if (kt == LUA_TNIL) {
+			lua_pop(L, 4); // pop all k, v, next_func, obj
+			break;
+		}
+		pack_dict_data(L, b, isarray, depth, kt);
+	}
+	write_byte(b,0);
+	write_length(b, b->size - length, length);
+}
+
+static void
+pack_dict(lua_State *L, struct bson *b, bool isarray, int depth) {
+	if (luaL_getmetafield(L, -1, "__pairs") != LUA_TNIL) {
+		pack_meta_dict(L, b, isarray, depth);
+	} else {
+		pack_simple_dict(L, b, isarray, depth);
+	}
 }
 
 static void
