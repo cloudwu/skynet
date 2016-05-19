@@ -1,5 +1,5 @@
 /*
-** $Id: lparser.c,v 2.152 2016/03/07 19:25:39 roberto Exp $
+** $Id: lparser.c,v 2.153 2016/05/13 19:10:16 roberto Exp $
 ** Lua Parser
 ** See Copyright Notice in lua.h
 */
@@ -269,27 +269,26 @@ static void markupval (FuncState *fs, int level) {
   Find variable with given name 'n'. If it is an upvalue, add this
   upvalue into all intermediate functions.
 */
-static int singlevaraux (FuncState *fs, TString *n, expdesc *var, int base) {
+static void singlevaraux (FuncState *fs, TString *n, expdesc *var, int base) {
   if (fs == NULL)  /* no more levels? */
-    return VVOID;  /* default is global */
+    init_exp(var, VVOID, 0);  /* default is global */
   else {
     int v = searchvar(fs, n);  /* look up locals at current level */
     if (v >= 0) {  /* found? */
       init_exp(var, VLOCAL, v);  /* variable is local */
       if (!base)
         markupval(fs, v);  /* local will be used as an upval */
-      return VLOCAL;
     }
     else {  /* not found as local at current level; try upvalues */
       int idx = searchupvalue(fs, n);  /* try existing upvalues */
       if (idx < 0) {  /* not found? */
-        if (singlevaraux(fs->prev, n, var, 0) == VVOID) /* try upper levels */
-          return VVOID;  /* not found; is a global */
+        singlevaraux(fs->prev, n, var, 0);  /* try upper levels */
+        if (var->k == VVOID)  /* not found? */
+          return;  /* it is a global */
         /* else was LOCAL or UPVAL */
         idx  = newupvalue(fs, n, var);  /* will be a new upvalue */
       }
-      init_exp(var, VUPVAL, idx);
-      return VUPVAL;
+      init_exp(var, VUPVAL, idx);  /* new or old upvalue */
     }
   }
 }
@@ -298,10 +297,11 @@ static int singlevaraux (FuncState *fs, TString *n, expdesc *var, int base) {
 static void singlevar (LexState *ls, expdesc *var) {
   TString *varname = str_checkname(ls);
   FuncState *fs = ls->fs;
-  if (singlevaraux(fs, varname, var, 1) == VVOID) {  /* global name? */
+  singlevaraux(fs, varname, var, 1);
+  if (var->k == VVOID) {  /* global name? */
     expdesc key;
     singlevaraux(fs, ls->envn, var, 1);  /* get environment variable */
-    lua_assert(var->k == VLOCAL || var->k == VUPVAL);
+    lua_assert(var->k != VVOID);  /* this one must exist */
     codestring(ls, &key, varname);  /* key is variable name */
     luaK_indexed(fs, var, &key);  /* env[varname] */
   }
