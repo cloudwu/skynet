@@ -1,5 +1,5 @@
 /*
-** $Id: lua.h,v 1.330 2016/01/13 17:55:19 roberto Exp $
+** $Id: lua.h,v 1.331 2016/05/30 15:53:28 roberto Exp $
 ** Lua - A Scripting Language
 ** Lua.org, PUC-Rio, Brazil (http://www.lua.org)
 ** See Copyright Notice at the end of this file
@@ -363,7 +363,7 @@ LUA_API void      (lua_setallocf) (lua_State *L, lua_Alloc f, void *ud);
 #define lua_pushliteral(L, s)	lua_pushstring(L, "" s)
 
 #define lua_pushglobaltable(L)  \
-	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS)
+	((void)lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS))
 
 #define lua_tostring(L,i)	lua_tolstring(L, (i), NULL)
 

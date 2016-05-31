@@ -1,5 +1,5 @@
 /*
-** $Id: lobject.c,v 2.110 2016/05/02 14:00:32 roberto Exp $
+** $Id: lobject.c,v 2.111 2016/05/20 14:07:48 roberto Exp $
 ** Some generic functions over Lua objects
 ** See Copyright Notice in lua.h
 */
@@ -293,6 +293,9 @@ static const char *l_str2d (const char *s, lua_Number *result) {
 }
 
 
+#define MAXBY10		cast(lua_Unsigned, LUA_MAXINTEGER / 10)
+#define MAXLASTD	cast_int(LUA_MAXINTEGER % 10)
+
 static const char *l_str2int (const char *s, lua_Integer *result) {
   lua_Unsigned a = 0;
   int empty = 1;
@@ -309,7 +312,10 @@ static const char *l_str2int (const char *s, lua_Integer *result) {
   }
   else {  /* decimal */
     for (; lisdigit(cast_uchar(*s)); s++) {
-      a = a * 10 + *s - '0';
+      int d = *s - '0';
+      if (a >= MAXBY10 && (a > MAXBY10 || d > MAXLASTD + neg))  /* overflow? */
+        return NULL;  /* do not accept it (as integer) */
+      a = a * 10 + d;
       empty = 0;
     }
   }

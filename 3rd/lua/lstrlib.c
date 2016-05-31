@@ -1,5 +1,5 @@
 /*
-** $Id: lstrlib.c,v 1.250 2016/05/18 18:19:51 roberto Exp $
+** $Id: lstrlib.c,v 1.251 2016/05/20 14:13:21 roberto Exp $
 ** Standard library for string operations and pattern-matching
 ** See Copyright Notice in lua.h
 */
@@ -928,20 +928,14 @@ static void addquoted (luaL_Buffer *b, const char *s, size_t len) {
 
 
 /*
-** Convert a Lua number to a string in floating-point hexadecimal
-** format. Ensures the resulting string uses a dot as the radix
-** character.
+** Ensures the 'buff' string uses a dot as the radix character.
 */
-static void addliteralnum (lua_State *L, luaL_Buffer *b, lua_Number n) {
-  char *buff = luaL_prepbuffsize(b, MAX_ITEM);
-  int nb = lua_number2strx(L, buff, MAX_ITEM,
-                              "%" LUA_NUMBER_FRMLEN "a", n);
+static void checkdp (char *buff, int nb) {
   if (memchr(buff, '.', nb) == NULL) {  /* no dot? */
     char point = lua_getlocaledecpoint();  /* try locale point */
     char *ppoint = memchr(buff, point, nb);
     if (ppoint) *ppoint = '.';  /* change it to a dot */
   }
-  luaL_addsize(b, nb);
 }
 
 
@@ -954,12 +948,23 @@ static void addliteral (lua_State *L, luaL_Buffer *b, int arg) {
       break;
     }
     case LUA_TNUMBER: {
-      if (!lua_isinteger(L, arg)) {  /* write floats as hexa ('%a') */
-        addliteralnum(L, b, lua_tonumber(L, arg));
-        break;
+      char *buff = luaL_prepbuffsize(b, MAX_ITEM);
+      int nb;
+      if (!lua_isinteger(L, arg)) {  /* float? */
+        lua_Number n = lua_tonumber(L, arg);  /* write as hexa ('%a') */
+        nb = lua_number2strx(L, buff, MAX_ITEM, "%" LUA_NUMBER_FRMLEN "a", n);
+        checkdp(buff, nb);  /* ensure it uses a dot */
       }
-      /* else integers; write in "native" format */
-    } /* FALLTHROUGH */
+      else {  /* integers */
+        lua_Integer n = lua_tointeger(L, arg);
+        const char *format = (n == LUA_MININTEGER)  /* corner case? */
+                           ? "0x%" LUA_INTEGER_FRMLEN "x"  /* use hexa */
+                           : LUA_INTEGER_FMT;  /* else use default format */
+        nb = l_sprintf(buff, MAX_ITEM, format, n);
+      }
+      luaL_addsize(b, nb);
+      break;
+    }
     case LUA_TNIL: case LUA_TBOOLEAN: {
       luaL_tolstring(L, arg, NULL);
       luaL_addvalue(b);
