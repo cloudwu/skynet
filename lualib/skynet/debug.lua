@@ -20,7 +20,6 @@ function dbgcmd.MEM()
 end
 
 function dbgcmd.GC()
-	export.clear()
 	collectgarbage "collect"
 end
 
