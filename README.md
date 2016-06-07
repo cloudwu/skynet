@@ -26,13 +26,13 @@ Run these in different consoles:
 ./3rd/lua/lua examples/client.lua 	# Launch a client, and try to input hello.
 ```
 
-## About Lua
+## About Lua version
 
-Skynet now uses a modified version of lua 5.3.2 ( http://www.lua.org/ftp/lua-5.3.2.tar.gz ) .
+Skynet now uses a modified version of lua 5.3.3 ( http://www.lua.org/ftp/lua-5.3.3.tar.gz ) .
 
 For details: http://lua-users.org/lists/lua-l/2014-03/msg00489.html
 
-You can also use other official Lua versions, just edit the Makefile by yourself.
+You can also use official Lua versions, just edit the Makefile by yourself.
 
 ## How To Use (Sorry, Only in Chinese now)
 
