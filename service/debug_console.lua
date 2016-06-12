@@ -91,8 +91,7 @@ local function console_main_loop(stdin, print)
 				local code, url = httpd.read_request(sockethelper.readfunc(stdin, cmdline.. "\n"), 8192)
 				local cmdline = url:sub(2):gsub("/"," ")
 				docmd(cmdline, print, stdin)
-				socket.close(stdin)
-				return
+				break
 			end
 			if cmdline ~= "" then
 				docmd(cmdline, print, stdin)
