@@ -318,22 +318,26 @@ function mongo_cursor:count(with_limit_and_skip)
 end
 
 
--- collection:createIndex({username = 1}, {unique = true})
-function mongo_collection:createIndex(keys, option)
+-- collection:createIndex({username = 1},{index2 = 1}, {unique = true})
+function mongo_collection:createIndex(...)
+	local paramLen = select("#", ...)
+	assert(paramLen >= 2)
+	local option = select(paramLen, ...)
 	local name = option.name
 	option.name = nil
-
+	local doc = {key = {}}
 	if not name then
-		for k, v in pairs(keys) do
-			name = (name == nil) and k or (name .. "_" .. k)
-			name = name  .. "_" .. v
-		end
+	    for i = 1 , paramLen - 1 do
+	    	for k,v in pairs(select(i, ...)) do
+	    		table.insert(doc.key, k)
+	    		table.insert(doc.key, v)
+				name = (name == nil) and k or (name .. "_" .. k)
+				name = name  .. "_" .. v
+	    	end
+	    end
 	end
-
-
-	local doc = {};
 	doc.name = name
-	doc.key = keys
+	doc.key = bson_encode_order(table.unpack(doc.key))
 	for k, v in pairs(option) do
 		doc[k] = v
 	end
