@@ -325,18 +325,19 @@ function mongo_collection:createIndex(...)
 	local option = select(paramLen, ...)
 	local name = option.name
 	option.name = nil
-
 	local doc = {key = {}}
 	if not name then
 	    for i = 1 , paramLen - 1 do
 	    	for k,v in pairs(select(i, ...)) do
-		        doc.key[k] = v
+	    		table.insert(doc.key, k)
+	    		table.insert(doc.key, v)
 				name = (name == nil) and k or (name .. "_" .. k)
 				name = name  .. "_" .. v
 	    	end
 	    end
 	end
 	doc.name = name
+	doc.key = bson_encode_order(table.unpack(doc.key))
 	for k, v in pairs(option) do
 		doc[k] = v
 	end
