@@ -4,6 +4,8 @@ local core = require "skynet.core"
 local socket = require "socket"
 local snax = require "snax"
 local memory = require "memory"
+local httpd = require "http.httpd"
+local sockethelper = require "http.sockethelper"
 
 local port = tonumber(...)
 local COMMAND = {}
@@ -83,6 +85,14 @@ local function console_main_loop(stdin, print)
 			local cmdline = socket.readline(stdin, "\n")
 			if not cmdline then
 				break
+			end
+			if cmdline:sub(1,4) == "GET " then
+				-- http
+				local code, url = httpd.read_request(sockethelper.readfunc(stdin, cmdline.. "\n"), 8192)
+				local cmdline = url:sub(2):gsub("/"," ")
+				docmd(cmdline, print, stdin)
+				socket.close(stdin)
+				return
 			end
 			if cmdline ~= "" then
 				docmd(cmdline, print, stdin)
