@@ -344,7 +344,13 @@ local function IndexModel(option)
 	local keys = {}
 	local name
 	for _, kv in ipairs(option) do
-		local k,v = next(kv)
+		local k,v
+		if type(kv) == "string" then
+			k = kv
+			v = 1
+		else
+			k,v = next(kv)
+		end
 		table.insert(keys, k)
 		table.insert(keys, v)
 		name = (name == nil) and k or (name .. "_" .. k)
@@ -358,6 +364,8 @@ local function IndexModel(option)
 end
 
 -- collection:createIndex { { key1 = 1}, { key2 = 1 },  unique = true }
+-- or collection:createIndex { "key1", "key2",  unique = true }
+-- or collection:createIndex( { key1 = 1} , { unique = true } )	-- For compatibility
 function mongo_collection:createIndex(arg1 , arg2)
 	if arg2 then
 		return createIndex_onekey(self, arg1, arg2)
