@@ -326,6 +326,7 @@ local function createIndex_onekey(self, key, option)
 		doc[k] = v
 	end
 	local k,v = next(key)	-- support only one key
+	assert(next(key,k) == nil, "Use new api for multi-keys")
 	doc.name = doc.name or (k .. "_" .. v)
 	doc.key = key
 
@@ -356,6 +357,7 @@ local function IndexModel(option)
 		name = (name == nil) and k or (name .. "_" .. k)
 		name = name  .. "_" .. v
 	end
+	assert(name, "Need keys")
 
 	doc.name = doc.name or name
 	doc.key = bson_encode_order(table.unpack(keys))
