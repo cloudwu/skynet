@@ -1,3 +1,12 @@
+v1.0.0-rc4 (2016-6-13)
+-----------
+* Update lua to 5.3.3
+* Update jemalloc to 4.2.1
+* Add debug console command ping
+* Lua bson support __pairs
+* Add mongo.createIndexes and fix bug in old mongo.createIndex
+* Handle signal HUP to reopen log file (for logrotate)
+
 v1.0.0-rc3 (2016-5-9)
 -----------
 * Update jemalloc 4.1.1
