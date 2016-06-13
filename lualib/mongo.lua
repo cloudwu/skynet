@@ -366,7 +366,7 @@ function mongo_collection:createIndex(option , onekey)
 	return self.database:runCommand("createIndexes", self.name, "indexes", { IndexModel(option) })
 end
 
-function mongo_collection:createIndexs(...)
+function mongo_collection:createIndexes(...)
 	local idx = { ... }
 	for k,v in ipairs(idx) do
 		idx[k] = IndexModel(v)
