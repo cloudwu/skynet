@@ -358,12 +358,12 @@ local function IndexModel(option)
 end
 
 -- collection:createIndex { { key1 = 1}, { key2 = 1 },  unique = true }
-function mongo_collection:createIndex(option , onekey)
-	if onekey then
-		return createIndex_onekey(self, option, onekey)
+function mongo_collection:createIndex(arg1 , arg2)
+	if arg2 then
+		return createIndex_onekey(self, arg1, arg2)
+	else
+		return self.database:runCommand("createIndexes", self.name, "indexes", { IndexModel(arg1) })
 	end
-
-	return self.database:runCommand("createIndexes", self.name, "indexes", { IndexModel(option) })
 end
 
 function mongo_collection:createIndexes(...)
