@@ -48,7 +48,7 @@ CSERVICE = snlua logger gate harbor
 LUA_CLIB = skynet socketdriver bson mongo md5 netpack \
   clientsocket memory profile multicast \
   cluster crypt sharedata stm sproto lpeg \
-  mysqlaux debugchannel
+  mysqlaux debugchannel mongo_auth
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
   skynet_server.c skynet_start.c skynet_timer.c skynet_error.c \
@@ -130,8 +130,21 @@ $(LUA_CLIB_PATH)/mysqlaux.so : lualib-src/lua-mysqlaux.c | $(LUA_CLIB_PATH)
 $(LUA_CLIB_PATH)/debugchannel.so : lualib-src/lua-debugchannel.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@	
 
+openssl_macosx:
+	cd 3rd/openssl && ./Configure darwin64-x86_64-cc no-shared && make
+	
+openssl_linux:
+	cd 3rd/openssl && ./config no-shared no-asm && make
+
+openssl_freebsd:
+	cd 3rd/openssl && ./config no-shared no-asm && make
+
+$(LUA_CLIB_PATH)/mongo_auth.so : lualib-src/lua-mongo_auth.c lualib-src/mongoc-b64.c | $(LUA_CLIB_PATH) openssl_$(PLAT)
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ 3rd/openssl/libcrypto.a -o $@ -I3rd/openssl/include
+
 clean :
 	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
+	$(MAKE) clean -C 3rd/openssl/
 
 cleanall: clean
 ifneq (,$(wildcard 3rd/jemalloc/Makefile))

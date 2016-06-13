@@ -1,0 +1,12 @@
+root = "./test/"
+default_lua_path = "./lualib/?.lua;./lualib/?/init.lua"
+thread = 1
+logger = nil
+harbor = 0
+start = "testmongoa"
+bootstrap = "snlua bootstrap"	-- The service for bootstrap
+luaservice = "./service/?.lua;".. root .."?.lua;"
+lualoader = "lualib/loader.lua"
+lua_path = root .. "/?.lua;" .. root .. "?.lua;" ..  default_lua_path
+cpath = "./cservice/?.so"
+
