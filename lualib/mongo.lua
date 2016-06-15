@@ -84,11 +84,15 @@ end
 local function mongo_auth(mongoc)
 	local user = rawget(mongoc,	"username")
 	local pass = rawget(mongoc,	"password")
+	local authmod = rawget(mongoc, "authmod") or "scram_sha1"
+	authmod = "auth_" ..  authmod
 
 	return function()
 		if user	~= nil and pass	~= nil then
---			assert(mongoc:auth(user, pass))
-			assert(mongoc:auth_scram_sha1(user, pass))
+			-- autmod can be "mongodb_cr" or "scram_sha1"
+			local auth_func = mongoc[authmod]
+			assert(auth_func , "Invalid authmod")
+			assert(auth_func(mongoc,user, pass))
 		end
 		local rs_data =	mongoc:runCommand("ismaster")
 		if rs_data.ok == 1 then
@@ -124,6 +128,7 @@ function mongo.client( conf	)
 		port = first.port or 27017,
 		username = first.username,
 		password = first.password,
+		authmod = first.authmod,
 	}
 
 	obj.__id = 0
@@ -174,7 +179,7 @@ function mongo_client:runCommand(...)
 	return self.admin:runCommand(...)
 end
 
-function mongo_client:auth(user,password)
+function mongo_client:auth_mongodb_cr(user,password)
 	local password = md5.sumhexa(string.format("%s:mongo:%s",user,password))
 	local result= self:runCommand "getnonce"
 	if result.ok ~=1 then
