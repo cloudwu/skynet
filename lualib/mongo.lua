@@ -318,30 +318,73 @@ function mongo_cursor:count(with_limit_and_skip)
 end
 
 
+-- For compatibility.
 -- collection:createIndex({username = 1}, {unique = true})
-function mongo_collection:createIndex(keys, option)
-	local name = option.name
-	option.name = nil
-
-	if not name then
-		for k, v in pairs(keys) do
-			name = (name == nil) and k or (name .. "_" .. k)
-			name = name  .. "_" .. v
-		end
-	end
-
-
-	local doc = {};
-	doc.name = name
-	doc.key = keys
-	for k, v in pairs(option) do
+local function createIndex_onekey(self, key, option)
+	local doc = {}
+	for k,v in pairs(option) do
 		doc[k] = v
 	end
+	local k,v = next(key)	-- support only one key
+	assert(next(key,k) == nil, "Use new api for multi-keys")
+	doc.name = doc.name or (k .. "_" .. v)
+	doc.key = key
+
 	return self.database:runCommand("createIndexes", self.name, "indexes", {doc})
 end
 
-mongo_collection.ensureIndex = mongo_collection.createIndex;
 
+local function IndexModel(option)
+	local doc = {}
+	for k,v in pairs(option) do
+		if type(k) == "string" then
+			doc[k] = v
+		end
+	end
+
+	local keys = {}
+	local name
+	for _, kv in ipairs(option) do
+		local k,v
+		if type(kv) == "string" then
+			k = kv
+			v = 1
+		else
+			k,v = next(kv)
+		end
+		table.insert(keys, k)
+		table.insert(keys, v)
+		name = (name == nil) and k or (name .. "_" .. k)
+		name = name  .. "_" .. v
+	end
+	assert(name, "Need keys")
+
+	doc.name = doc.name or name
+	doc.key = bson_encode_order(table.unpack(keys))
+
+	return doc
+end
+
+-- collection:createIndex { { key1 = 1}, { key2 = 1 },  unique = true }
+-- or collection:createIndex { "key1", "key2",  unique = true }
+-- or collection:createIndex( { key1 = 1} , { unique = true } )	-- For compatibility
+function mongo_collection:createIndex(arg1 , arg2)
+	if arg2 then
+		return createIndex_onekey(self, arg1, arg2)
+	else
+		return self.database:runCommand("createIndexes", self.name, "indexes", { IndexModel(arg1) })
+	end
+end
+
+function mongo_collection:createIndexes(...)
+	local idx = { ... }
+	for k,v in ipairs(idx) do
+		idx[k] = IndexModel(v)
+	end
+	return self.database:runCommand("createIndexes", self.name, "indexes", idx)
+end
+
+mongo_collection.ensureIndex = mongo_collection.createIndex
 
 function mongo_collection:drop()
 	return self.database:runCommand("drop", self.name)

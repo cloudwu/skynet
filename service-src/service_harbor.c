@@ -346,7 +346,6 @@ dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
 	struct harbor_msg_queue * queue = node->queue;
 	uint32_t handle = node->value;
 	int harbor_id = handle >> HANDLE_REMOTE_SHIFT;
-	assert(harbor_id != 0);
 	struct skynet_context * context = h->ctx;
 	struct slave *s = &h->s[harbor_id];
 	int fd = s->fd;
@@ -365,6 +364,16 @@ dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
 				while ((m = pop_queue(queue))!=NULL) {
 					push_queue_msg(s->queue, m);
 				}
+			}
+			if (harbor_id == (h->slave >> HANDLE_REMOTE_SHIFT)) {
+				// the harbor_id is local
+				struct harbor_msg * m;
+				while ((m = pop_queue(s->queue)) != NULL) {
+					int type = m->header.destination >> HANDLE_REMOTE_SHIFT;
+					skynet_send(context, m->header.source, handle , type | PTYPE_TAG_DONTCOPY, m->header.session, m->buffer, m->size);
+				}
+				release_queue(s->queue);
+				s->queue = NULL;
 			}
 		}
 		return;

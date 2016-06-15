@@ -41,6 +41,12 @@ lexpandshrtbl(lua_State *L) {
 	return 0;
 }
 
+static int
+lcurrent(lua_State *L) {
+	lua_pushinteger(L, malloc_current_memory());
+	return 1;
+}
+
 int
 luaopen_memory(lua_State *L) {
 	luaL_checkversion(L);
@@ -53,6 +59,7 @@ luaopen_memory(lua_State *L) {
 		{ "info", dump_mem_lua },
 		{ "ssinfo", luaS_shrinfo },
 		{ "ssexpand", lexpandshrtbl },
+		{ "current", lcurrent },
 		{ NULL, NULL },
 	};
 
