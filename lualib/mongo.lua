@@ -4,6 +4,7 @@ local socketchannel	= require "socketchannel"
 local skynet = require "skynet"
 local driver = require "mongo.driver"
 local md5 =	require	"md5"
+local crypt = require "crypt"
 local rawget = rawget
 local assert = assert
 
@@ -83,10 +84,15 @@ end
 local function mongo_auth(mongoc)
 	local user = rawget(mongoc,	"username")
 	local pass = rawget(mongoc,	"password")
+	local authmod = rawget(mongoc, "authmod") or "scram_sha1"
+	authmod = "auth_" ..  authmod
 
 	return function()
 		if user	~= nil and pass	~= nil then
-			assert(mongoc:auth(user, pass))
+			-- autmod can be "mongodb_cr" or "scram_sha1"
+			local auth_func = mongoc[authmod]
+			assert(auth_func , "Invalid authmod")
+			assert(auth_func(mongoc,user, pass))
 		end
 		local rs_data =	mongoc:runCommand("ismaster")
 		if rs_data.ok == 1 then
@@ -122,6 +128,7 @@ function mongo.client( conf	)
 		port = first.port or 27017,
 		username = first.username,
 		password = first.password,
+		authmod = first.authmod,
 	}
 
 	obj.__id = 0
@@ -172,7 +179,7 @@ function mongo_client:runCommand(...)
 	return self.admin:runCommand(...)
 end
 
-function mongo_client:auth(user,password)
+function mongo_client:auth_mongodb_cr(user,password)
 	local password = md5.sumhexa(string.format("%s:mongo:%s",user,password))
 	local result= self:runCommand "getnonce"
 	if result.ok ~=1 then
@@ -182,6 +189,83 @@ function mongo_client:auth(user,password)
 	local key =	md5.sumhexa(string.format("%s%s%s",result.nonce,user,password))
 	local result= self:runCommand ("authenticate",1,"user",user,"nonce",result.nonce,"key",key)
 	return result.ok ==	1
+end
+
+local function salt_password(password, salt, iter)
+	salt = salt .. "\0\0\0\1"
+	local output = crypt.hmac_sha1(password, salt)
+	local inter = output
+	for i=2,iter do
+		inter = crypt.hmac_sha1(password, inter)
+		output = crypt.xor_str(output, inter)
+	end
+	return output
+end
+
+function mongo_client:auth_scram_sha1(username,password)
+	local user = string.gsub(string.gsub(username, '=', '=3D'), ',' , '=2C')
+	local nonce = crypt.base64encode(crypt.randomkey())
+	local first_bare = "n="  .. user .. ",r="  .. nonce
+	local sasl_start_payload = crypt.base64encode("n,," .. first_bare)
+	local r
+
+	r = self:runCommand("saslStart",1,"autoAuthorize",1,"mechanism","SCRAM-SHA-1","payload",sasl_start_payload)
+	if r.ok ~= 1 then
+		return false
+	end
+
+	local conversationId = r['conversationId']
+	local server_first = r['payload']
+	local parsed_s = crypt.base64decode(server_first)
+	local parsed_t = {}
+	for k, v in string.gmatch(parsed_s, "(%w+)=([^,]*)") do
+		parsed_t[k] = v
+	end
+	local iterations = tonumber(parsed_t['i'])
+	local salt = parsed_t['s']
+	local rnonce = parsed_t['r']
+
+	if not string.sub(rnonce, 1, 12) == nonce then
+		skynet.error("Server returned an invalid nonce.")
+		return false
+	end
+	local without_proof = "c=biws,r=" .. rnonce
+	local pbkdf2_key = md5.sumhexa(string.format("%s:mongo:%s",username,password))
+	local salted_pass = salt_password(pbkdf2_key, crypt.base64decode(salt), iterations)
+	local client_key = crypt.hmac_sha1(salted_pass, "Client Key")
+	local stored_key = crypt.sha1(client_key)
+	local auth_msg = first_bare .. ',' .. parsed_s .. ',' .. without_proof
+	local client_sig = crypt.hmac_sha1(stored_key, auth_msg)
+	local client_key_xor_sig = crypt.xor_str(client_key, client_sig)
+	local client_proof = "p=" .. crypt.base64encode(client_key_xor_sig)
+	local client_final = crypt.base64encode(without_proof .. ',' .. client_proof)
+	local server_key = crypt.hmac_sha1(salted_pass, "Server Key")
+	local server_sig = crypt.base64encode(crypt.hmac_sha1(server_key, auth_msg))
+
+	r = self:runCommand("saslContinue",1,"conversationId",conversationId,"payload",client_final)
+	if r.ok ~= 1 then
+		return false
+	end
+	parsed_s = crypt.base64decode(r['payload'])
+	parsed_t = {}
+	for k, v in string.gmatch(parsed_s, "(%w+)=([^,]*)") do
+		parsed_t[k] = v
+	end
+	if parsed_t['v'] ~= server_sig then
+		skynet.error("Server returned an invalid signature.")
+		return false
+	end
+	if not r.done then
+		r = self:runCommand("saslContinue",1,"conversationId",conversationId,"payload","")
+		if r.ok ~= 1 then
+			return false
+		end
+		if not r.done then
+			skynet.error("SASL conversation failed to complete.")
+			return false
+		end
+	end
+	return true
 end
 
 function mongo_client:logout()
