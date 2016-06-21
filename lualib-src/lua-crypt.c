@@ -751,7 +751,7 @@ ldhexchange(lua_State *L) {
 	if (x64 == 0)
 		return luaL_error(L, "Can't be 0");
 
-	uint64_t r = powmodp(5,	x64);
+	uint64_t r = powmodp(G,	x64);
 	push64(L, r);
 	return 1;
 }
