@@ -1,3 +1,11 @@
+v1.0.0-rc5 (2016-7-4)
+-----------
+* MongoDB : Support auth_scram_sha1
+* MongoDB : Auto determine primary host
+* Bugfix : memory leak in multicast
+* Bugfix : Lua 5.3.3
+* Bson : support meta array
+
 v1.0.0-rc4 (2016-6-13)
 -----------
 * Update lua to 5.3.3
