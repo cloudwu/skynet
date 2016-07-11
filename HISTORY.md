@@ -1,3 +1,7 @@
+v1.0.0 (2016-7-11)
+-----------
+* Version 1.0.0 Released
+
 v1.0.0-rc5 (2016-7-4)
 -----------
 * MongoDB : Support auth_scram_sha1
