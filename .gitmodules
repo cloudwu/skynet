@@ -7,3 +7,6 @@
 [submodule "3rd/lua-openssl"]
 	path = 3rd/lua-openssl
 	url = https://github.com/zhaozg/lua-openssl.git
+[submodule "3rd/lua-cjson"]
+	path = 3rd/lua-cjson
+	url = https://github.com/mpx/lua-cjson.git
