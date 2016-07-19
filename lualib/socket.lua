@@ -300,6 +300,14 @@ function socket.read(id, sz)
 	end
 end
 
+function socket.fdcount()
+    local count = 0
+    for id, s in pairs(socket_pool) do
+        count = count + 1
+    end
+    return count
+end
+
 function socket.readall(id)
 	local s = socket_pool[id]
 	assert(s)
