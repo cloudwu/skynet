@@ -301,3 +301,7 @@ function COMMAND.ping(fd, address)
 	ti = skynet.now() - ti
 	return tostring(ti)
 end
+
+if type(cmdext) == "function" then
+    cmdext(COMMAND)
+end
