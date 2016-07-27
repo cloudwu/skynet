@@ -3,10 +3,10 @@
 	url = https://github.com/jemalloc/jemalloc.git
 [submodule "3rd/lua-iconv"]
 	path = 3rd/lua-iconv
-	url = https://github.com/ittner/lua-iconv.git
+	url = https://github.com/ldy105cn/lua-iconv.git
 [submodule "3rd/lua-openssl"]
 	path = 3rd/lua-openssl
-	url = https://github.com/zhaozg/lua-openssl.git
+	url = https://github.com/ldy105cn/lua-openssl.git
 [submodule "3rd/lua-cjson"]
 	path = 3rd/lua-cjson
-	url = https://github.com/mpx/lua-cjson.git
+	url = https://github.com/ldy105cn/lua-cjson.git
