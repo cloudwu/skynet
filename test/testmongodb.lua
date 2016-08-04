@@ -38,24 +38,27 @@ function test_find_and_remove()
 	db[db_name].testdb:dropIndex("*")
 	db[db_name].testdb:drop()
 
-	db[db_name].testdb:ensureIndex({test_key = 1}, {unique = true, name = "test_key_index"})
+	db[db_name].testdb:ensureIndex({test_key = 1}, {test_key2 = -1}, {unique = true, name = "test_index"})
 
-	local ret = db[db_name].testdb:safe_insert({test_key = 1})
+	local ret = db[db_name].testdb:safe_insert({test_key = 1, test_key2 = 1})
 	assert(ret and ret.n == 1)
 
-	local ret = db[db_name].testdb:safe_insert({test_key = 2})
+	local ret = db[db_name].testdb:safe_insert({test_key = 1, test_key2 = 2})
 	assert(ret and ret.n == 1)
 
-	local ret = db[db_name].testdb:findOne({test_key = 1})
-	assert(ret and ret.test_key == 1)
+	local ret = db[db_name].testdb:safe_insert({test_key = 2, test_key2 = 3})
+	assert(ret and ret.n == 1)
 
-	local ret = db[db_name].testdb:find({test_key = {['$gt'] = 0}}):sort({test_key = -1}):skip(1):limit(1)
- 	assert(ret:count() == 2)
+	local ret = db[db_name].testdb:findOne({test_key2 = 1})
+	assert(ret and ret.test_key2 == 1)
+
+	local ret = db[db_name].testdb:find({test_key2 = {['$gt'] = 0}}):sort({test_key = 1}, {test_key2 = -1}):skip(1):limit(1)
+ 	assert(ret:count() == 3)
  	assert(ret:count(true) == 1)
 	if ret:hasNext() then
 		ret = ret:next()
 	end
-	assert(ret and ret.test_key == 1)
+	assert(ret and ret.test_key2 == 1)
 
 	db[db_name].testdb:delete({test_key = 1})
 	db[db_name].testdb:delete({test_key = 2})
