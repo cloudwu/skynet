@@ -286,6 +286,9 @@ function COMMAND.cmem()
 	for k,v in pairs(info) do
 		tmp[skynet.address(k)] = v
 	end
+	tmp.total = memory.total()
+	tmp.block = memory.block()
+
 	return tmp
 end
 
