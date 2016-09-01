@@ -7,7 +7,11 @@ local memory = require "memory"
 local httpd = require "http.httpd"
 local sockethelper = require "http.sockethelper"
 
-local port = tonumber(...)
+local arg = table.pack(...)
+assert(arg.n <= 2)
+local ip = (arg.n == 2 and arg[1] or "127.0.0.1")
+local port = tonumber(arg[arg.n])
+
 local COMMAND = {}
 
 local function format_table(t)
@@ -103,8 +107,8 @@ local function console_main_loop(stdin, print)
 end
 
 skynet.start(function()
-	local listen_socket = socket.listen ("127.0.0.1", port)
-	skynet.error("Start debug console at 127.0.0.1 " .. port)
+	local listen_socket = socket.listen (ip, port)
+	skynet.error("Start debug console at " .. ip .. ":" .. port)
 	socket.start(listen_socket , function(id, addr)
 		local function print(...)
 			local t = { ... }
