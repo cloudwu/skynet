@@ -438,7 +438,7 @@ lnewconf(lua_State *L) {
 
 	convert_stringmap(&ctx, tbl);
 
-	lua_pushlightuserdata(L, tbl);	
+	lua_pushlightuserdata(L, tbl);
 
 	return 1;
 error:
@@ -523,7 +523,7 @@ lookup_key(struct table *tbl, uint32_t keyhash, int key, int keytype, const char
 		if (n->next < 0) {
 			return NULL;
 		}
-		n = &tbl->hash[n->next];		
+		n = &tbl->hash[n->next];
 	}
 }
 
@@ -632,7 +632,7 @@ lnextkey(lua_State *L) {
 	struct node *n = lookup_key(tbl, keyhash, key, keytype, str, sz);
 	if (n) {
 		++n;
-		int index = n-tbl->hash;
+		int index = n->tbl->hash;
 		if (index == tbl->sizehash) {
 			return 0;
 		}
@@ -671,7 +671,7 @@ releaseobj(lua_State *L) {
 
 static int
 lboxconf(lua_State *L) {
-	struct table * tbl = get_table(L,1);	
+	struct table * tbl = get_table(L,1);
 	struct state * s = lua_touserdata(tbl->L, 1);
 	ATOM_INC(&s->ref);
 
@@ -701,7 +701,7 @@ lisdirty(lua_State *L) {
 	struct state * s = lua_touserdata(tbl->L, 1);
 	int d = s->dirty;
 	lua_pushboolean(L, d);
-	
+
 	return 1;
 }
 
