@@ -227,7 +227,7 @@ skynet_strdup(const char *str) {
 }
 
 void * 
-skynet_lalloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+skynet_lalloc(void *ptr, size_t osize, size_t nsize) {
 	if (nsize == 0) {
 		raw_free(ptr);
 		return NULL;

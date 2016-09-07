@@ -81,7 +81,7 @@ forward_cb(struct skynet_context * context, void * ud, int type, int session, ui
 }
 
 static int
-_callback(lua_State *L) {
+lcallback(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	int forward = lua_toboolean(L, 2);
 	luaL_checktype(L,1,LUA_TFUNCTION);
@@ -101,7 +101,7 @@ _callback(lua_State *L) {
 }
 
 static int
-_command(lua_State *L) {
+lcommand(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	const char * cmd = luaL_checkstring(L,1);
 	const char * result;
@@ -119,7 +119,7 @@ _command(lua_State *L) {
 }
 
 static int
-_intcommand(lua_State *L) {
+lintcommand(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	const char * cmd = luaL_checkstring(L,1);
 	const char * result;
@@ -141,7 +141,7 @@ _intcommand(lua_State *L) {
 }
 
 static int
-_genid(lua_State *L) {
+lgenid(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	int session = skynet_send(context, 0, 0, PTYPE_TAG_ALLOCSESSION , 0 , NULL, 0);
 	lua_pushinteger(L, session);
@@ -167,7 +167,7 @@ get_dest_string(lua_State *L, int index) {
 	 integer len
  */
 static int
-_send(lua_State *L) {
+lsend(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	uint32_t dest = (uint32_t)lua_tointeger(L, 1);
 	const char * dest_string = NULL;
@@ -224,7 +224,7 @@ _send(lua_State *L) {
 }
 
 static int
-_redirect(lua_State *L) {
+lredirect(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	uint32_t dest = (uint32_t)lua_tointeger(L,1);
 	const char * dest_string = NULL;
@@ -267,14 +267,32 @@ _redirect(lua_State *L) {
 }
 
 static int
-_error(lua_State *L) {
+lerror(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	skynet_error(context, "%s", luaL_checkstring(L,1));
+	int n = lua_gettop(L);
+	if (n <= 1) {
+		lua_settop(L, 1);
+		const char * s = luaL_tolstring(L, 1, NULL);
+		skynet_error(context, "%s", s);
+		return 0;
+	}
+	luaL_Buffer b;
+	luaL_buffinit(L, &b);
+	int i;
+	for (i=1; i<=n; i++) {
+		luaL_tolstring(L, i, NULL);
+		luaL_addvalue(&b);
+		if (i<n) {
+			luaL_addchar(&b, ' ');
+		}
+	}
+	luaL_pushresult(&b);
+	skynet_error(context, "%s", lua_tostring(L, -1));
 	return 0;
 }
 
 static int
-_tostring(lua_State *L) {
+ltostring(lua_State *L) {
 	if (lua_isnoneornil(L,1)) {
 		return 0;
 	}
@@ -285,7 +303,7 @@ _tostring(lua_State *L) {
 }
 
 static int
-_harbor(lua_State *L) {
+lharbor(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	uint32_t handle = (uint32_t)luaL_checkinteger(L,1);
 	int harbor = 0;
@@ -298,7 +316,7 @@ _harbor(lua_State *L) {
 
 static int
 lpackstring(lua_State *L) {
-	_luaseri_pack(L);
+	luaseri_pack(L);
 	char * str = (char *)lua_touserdata(L, -2);
 	int sz = lua_tointeger(L, -1);
 	lua_pushlstring(L, str, sz);
@@ -338,19 +356,19 @@ luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
 
 	luaL_Reg l[] = {
-		{ "send" , _send },
-		{ "genid", _genid },
-		{ "redirect", _redirect },
-		{ "command" , _command },
-		{ "intcommand", _intcommand },
-		{ "error", _error },
-		{ "tostring", _tostring },
-		{ "harbor", _harbor },
-		{ "pack", _luaseri_pack },
-		{ "unpack", _luaseri_unpack },
+		{ "send" , lsend },
+		{ "genid", lgenid },
+		{ "redirect", lredirect },
+		{ "command" , lcommand },
+		{ "intcommand", lintcommand },
+		{ "error", lerror },
+		{ "tostring", ltostring },
+		{ "harbor", lharbor },
+		{ "pack", luaseri_pack },
+		{ "unpack", luaseri_unpack },
 		{ "packstring", lpackstring },
 		{ "trash" , ltrash },
-		{ "callback", _callback },
+		{ "callback", lcallback },
 		{ "now", lnow },
 		{ NULL, NULL },
 	};

@@ -551,7 +551,7 @@ seri(lua_State *L, struct block *b, int len) {
 }
 
 int
-_luaseri_unpack(lua_State *L) {
+luaseri_unpack(lua_State *L) {
 	if (lua_isnoneornil(L,1)) {
 		return 0;
 	}
@@ -595,7 +595,7 @@ _luaseri_unpack(lua_State *L) {
 }
 
 int
-_luaseri_pack(lua_State *L) {
+luaseri_pack(lua_State *L) {
 	struct block temp;
 	temp.next = NULL;
 	struct write_block wb;

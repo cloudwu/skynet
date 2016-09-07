@@ -1,5 +1,5 @@
 /*
-** $Id: ldo.h,v 2.28 2015/11/23 11:29:43 roberto Exp $
+** $Id: ldo.h,v 2.29 2015/12/21 13:02:14 roberto Exp $
 ** Stack and Call structure of Lua
 ** See Copyright Notice in lua.h
 */
@@ -25,7 +25,7 @@
 	  { pre; luaD_growstack(L, n); pos; } else { condmovestack(L,pre,pos); }
 
 /* In general, 'pre'/'pos' are empty (nothing to save) */
-#define luaD_checkstack(L,n)	luaD_checkstackaux(L,n,,)
+#define luaD_checkstack(L,n)	luaD_checkstackaux(L,n,(void)0,(void)0)
 
 
 
