@@ -242,6 +242,14 @@ socket_keepalive(int fd) {
 	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));  
 }
 
+static void
+socket_linger(int fd) {
+	struct linger li;
+	li.l_onoff = 1;
+	li.l_linger = 0;
+	setsockopt(fd, SOL_SOCKET, SO_LINGER, (void *)&li, sizeof(li));
+}
+
 static int
 reserve_id(struct socket_server *ss) {
 	int i;
@@ -798,7 +806,7 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 			return type;
 	}
 	if (request->shutdown || send_buffer_empty(s)) {
-		setsockopt(s->fd,SOL_SOCKET,SO_LINGER,(struct linger*)(int[]){1,0},sizeof(struct linger));
+		socket_linger(s->fd);
 		force_close(ss,s,result);
 		result->id = id;
 		result->opaque = request->opaque;
