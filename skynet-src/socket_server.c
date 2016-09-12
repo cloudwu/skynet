@@ -798,6 +798,7 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 			return type;
 	}
 	if (request->shutdown || send_buffer_empty(s)) {
+		setsockopt(s->fd,SOL_SOCKET,SO_LINGER,(struct linger*)(int[]){1,0},sizeof(struct linger));
 		force_close(ss,s,result);
 		result->id = id;
 		result->opaque = request->opaque;
