@@ -1,3 +1,46 @@
+v1.0.0 (2016-7-11)
+-----------
+* Version 1.0.0 Released
+
+v1.0.0-rc5 (2016-7-4)
+-----------
+* MongoDB : Support auth_scram_sha1
+* MongoDB : Auto determine primary host
+* Bugfix : memory leak in multicast
+* Bugfix : Lua 5.3.3
+* Bson : support meta array
+
+v1.0.0-rc4 (2016-6-13)
+-----------
+* Update lua to 5.3.3
+* Update jemalloc to 4.2.1
+* Add debug console command ping
+* Lua bson support __pairs
+* Add mongo.createIndexes and fix bug in old mongo.createIndex
+* Handle signal HUP to reopen log file (for logrotate)
+
+v1.0.0-rc3 (2016-5-9)
+-----------
+* Update jemalloc 4.1.1
+* Update lua 5.3.3 rc1
+* Update sproto to support encoding empty table
+* Make skynet.init stable (keep order)
+* skynet.getenv can return empty string
+* Add lua VM memory warning
+* lua VM support memory limit
+* skynet.pcall suport varargs
+* Bugfix : Global name query
+* Bugfix : snax.queryglobal
+
+v1.0.0-rc2 (2016-3-7)
+-----------
+* Fix a bug in lua 5.3.2
+* Update sproto (fix bugs and add ud for package)
+* Fix a bug in http
+* Fix a bug in harbor
+* Fix a bug in socket channel
+* Enhance remote debugger
+
 v1.0.0-rc (2015-12-28)
 -----------
 * Update to lua 5.3.2

@@ -95,7 +95,7 @@ end
 
 -- coroutine reuse
 
-local coroutine_pool = {}
+local coroutine_pool = setmetatable({}, { __mode = "kv" })
 
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
@@ -343,12 +343,7 @@ function skynet.exit()
 end
 
 function skynet.getenv(key)
-	local ret = c.command("GETENV",key)
-	if ret == "" then
-		return
-	else
-		return ret
-	end
+	return (c.command("GETENV",key))
 end
 
 function skynet.setenv(key, value)
@@ -553,13 +548,7 @@ function skynet.harbor(addr)
 	return c.harbor(addr)
 end
 
-function skynet.error(...)
-	local t = {...}
-	for i=1,#t do
-		t[i] = tostring(t[i])
-	end
-	return c.error(table.concat(t, " "))
-end
+skynet.error = c.error
 
 ----- register protocol
 do
@@ -592,9 +581,9 @@ function skynet.init(f, name)
 	if init_func == nil then
 		f()
 	else
-		if name == nil then
-			table.insert(init_func, f)
-		else
+		table.insert(init_func, f)
+		if name then
+			assert(type(name) == "string")
 			assert(init_func[name] == nil)
 			init_func[name] = f
 		end
@@ -605,8 +594,8 @@ local function init_all()
 	local funcs = init_func
 	init_func = nil
 	if funcs then
-		for k,v in pairs(funcs) do
-			v()
+		for _,f in ipairs(funcs) do
+			f()
 		end
 	end
 end
@@ -616,14 +605,14 @@ local function ret(f, ...)
 	return ...
 end
 
-local function init_template(start)
+local function init_template(start, ...)
 	init_all()
 	init_func = {}
-	return ret(init_all, start())
+	return ret(init_all, start(...))
 end
 
-function skynet.pcall(start)
-	return xpcall(init_template, debug.traceback, start)
+function skynet.pcall(start, ...)
+	return xpcall(init_template, debug.traceback, start, ...)
 end
 
 function skynet.init_service(start)
@@ -667,15 +656,15 @@ function skynet.term(service)
 	return _error_dispatch(0, service)
 end
 
-local function clear_pool()
-	coroutine_pool = {}
+function skynet.memlimit(bytes)
+	debug.getregistry().memlimit = bytes
+	skynet.memlimit = nil	-- set only once
 end
 
 -- Inject internal debug framework
 local debug = require "skynet.debug"
-debug(skynet, {
+debug.init(skynet, {
 	dispatch = skynet.dispatch_message,
-	clear = clear_pool,
 	suspend = suspend,
 })
 

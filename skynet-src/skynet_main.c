@@ -115,7 +115,7 @@ main(int argc, char *argv[]) {
 
 	struct skynet_config config;
 
-	struct lua_State *L = lua_newstate(skynet_lalloc, NULL);
+	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);	// link lua lib
 
 	int err = luaL_loadstring(L, load_config);
