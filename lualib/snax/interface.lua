@@ -84,7 +84,7 @@ return function (name , G, loader)
 	end
 
 	setmetatable(G,	{ __index = env , __newindex = init_system })
-	local ok, err = pcall(mainfunc)
+	local ok, err = xpcall(mainfunc, debug.traceback)
 	setmetatable(G, nil)
 	assert(ok,err)
 
