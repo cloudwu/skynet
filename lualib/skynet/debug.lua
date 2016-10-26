@@ -25,8 +25,10 @@ local function init(skynet, export)
 
 		function dbgcmd.STAT()
 			local stat = {}
-			stat.mqlen = skynet.mqlen()
 			stat.task = skynet.task()
+			stat.mqlen = skynet.stat "mqlen"
+			stat.cpu = skynet.stat "cpu"
+			stat.message = skynet.stat "message"
 			skynet.ret(skynet.pack(stat))
 		end
 
