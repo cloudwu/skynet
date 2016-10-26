@@ -48,6 +48,7 @@ struct skynet_context {
 	struct message_queue *queue;
 	FILE * logfile;
 	uint64_t cpu_cost;	// in microsec
+	uint64_t cpu_start;	// in microsec
 	char result[32];
 	uint32_t handle;
 	int session_id;
@@ -146,6 +147,7 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->endless = false;
 
 	ctx->cpu_cost = 0;
+	ctx->cpu_start = 0;
 	ctx->message_count = 0;
 	ctx->profile = G_NODE.profile;
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
@@ -268,9 +270,9 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	++ctx->message_count;
 	int reserve_msg;
 	if (ctx->profile) {
-		uint64_t start_time = skynet_thread_time();
+		ctx->cpu_start = skynet_thread_time();
 		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
-		uint64_t cost_time = skynet_thread_time() - start_time;
+		uint64_t cost_time = skynet_thread_time() - ctx->cpu_start;
 		ctx->cpu_cost += cost_time;
 	} else {
 		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
@@ -562,6 +564,14 @@ cmd_stat(struct skynet_context * context, const char * param) {
 	} else if (strcmp(param, "cpu") == 0) {
 		double t = (double)context->cpu_cost / 1000000.0;	// microsec
 		sprintf(context->result, "%lf", t);
+	} else if (strcmp(param, "time") == 0) {
+		if (context->profile) {
+			uint64_t ti = skynet_thread_time() - context->cpu_start;
+			double t = (double)ti / 1000000.0;	// microsec
+			sprintf(context->result, "%lf", t);
+		} else {
+			strcpy(context->result, "0");
+		}
 	} else if (strcmp(param, "message") == 0) {
 		sprintf(context->result, "%d", context->message_count);
 	} else {
