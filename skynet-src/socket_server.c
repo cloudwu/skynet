@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
+#include <termios.h>
 
 #define MAX_INFO 128
 // MAX_SOCKET will be 2^MAX_SOCKET_P
@@ -176,6 +177,7 @@ struct request_udp {
 	T Set opt
 	U Create UDP socket
 	C set udp address
+	R set uart
  */
 
 struct request_package {
@@ -192,6 +194,7 @@ struct request_package {
 		struct request_setopt setopt;
 		struct request_udp udp;
 		struct request_setudp set_udp;
+		struct request_setopt set_uart;
 	} u;
 	uint8_t dummy[256];
 };
@@ -942,6 +945,16 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 	return -1;
 }
 
+void set_uart(struct socket_server *ss, struct request_setopt *request)
+{
+	int id = request->id;
+	struct socket *s = &ss->slot[HASH_ID(id)];
+	if (s->type == SOCKET_TYPE_INVALID || s->id != id) {
+		return;
+	}
+	s->type = SOCKET_TYPE_CONNECTED;
+}
+
 // return type
 static int
 ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
@@ -986,6 +999,9 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 		return -1;
 	case 'U':
 		add_udp_socket(ss, (struct request_udp *)buffer);
+		return -1;
+	case 'R':
+		set_uart(ss, (struct request_setopt *)buffer);
 		return -1;
 	default:
 		fprintf(stderr, "socket-server: Unknown ctrl %c.\n",type);
@@ -1632,4 +1648,140 @@ socket_server_udp_address(struct socket_server *ss, struct socket_message *msg, 
 		return NULL;
 	}
 	return (const struct socket_udp_address *)address;
+}
+
+int
+set_uart_mode(int fd, int speed, int flow_ctrl, int databits, int stopbits, int parity)
+{
+	int   i;
+	int   speed_arr[] = { B115200, B19200, B9600, B4800, B2400, B1200, B300 };
+	int   name_arr[] = { 115200,  19200,  9600,  4800,  2400,  1200,  300 };
+
+	struct termios options;
+	if (tcgetattr(fd, &options) != 0)
+	{
+		perror("SetupSerial 1");
+		return -1;
+	}
+
+	for (i = 0; i < sizeof(speed_arr) / sizeof(int); i++)
+	{
+		if (speed == name_arr[i])
+		{
+			cfsetispeed(&options, speed_arr[i]);
+			cfsetospeed(&options, speed_arr[i]);
+		}
+	}
+
+	options.c_cflag |= CLOCAL;
+
+	options.c_cflag |= CREAD;
+
+	switch (flow_ctrl)
+	{
+	case 0:
+		options.c_cflag &= ~CRTSCTS;
+		break;
+	case 1:
+		options.c_cflag |= CRTSCTS;
+		break;
+	case 2:
+		options.c_cflag |= IXON | IXOFF | IXANY;
+		break;
+	}
+
+	options.c_cflag &= ~CSIZE;
+	switch (databits)
+	{
+	case 5:
+		options.c_cflag |= CS5;
+		break;
+	case 6:
+		options.c_cflag |= CS6;
+		break;
+	case 7:
+		options.c_cflag |= CS7;
+		break;
+	case 8:
+		options.c_cflag |= CS8;
+		break;
+	default:
+		fprintf(stderr, "Unsupported data size\n");
+		return -1;
+	}
+
+	switch (parity)
+	{
+	case 'n':
+	case 'N':
+		options.c_cflag &= ~PARENB;
+		options.c_iflag &= ~INPCK;
+		break;
+	case 'o':
+	case 'O':
+		options.c_cflag |= (PARODD | PARENB);
+		options.c_iflag |= INPCK;
+		break;
+	case 'e':
+	case 'E':
+		options.c_cflag |= PARENB;
+		options.c_cflag &= ~PARODD;
+		options.c_iflag |= INPCK;
+		break;
+	case 's':
+	case 'S':
+		options.c_cflag &= ~PARENB;
+		options.c_cflag &= ~CSTOPB;
+		break;
+	default:
+		fprintf(stderr, "Unsupported parity\n");
+		return -1;
+	}
+
+	switch (stopbits)
+	{
+	case 1:
+		options.c_cflag &= ~CSTOPB; break;
+	case 2:
+		options.c_cflag |= CSTOPB; break;
+	default:
+		fprintf(stderr, "Unsupported stop bits\n");
+		return -1;
+	}
+
+	options.c_oflag &= ~OPOST;
+	options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+
+	options.c_cc[VTIME] = 1;
+	options.c_cc[VMIN] = 1;
+
+	tcflush(fd, TCIFLUSH);
+
+	if (tcsetattr(fd, TCSANOW, &options) != 0)
+	{
+		perror("com set error!\n");
+		return -1;
+	}
+	return 1;
+}
+
+int
+uart_server_set(struct socket_server *ss, int id,
+	int speed, int flow_ctrl, int databits, int stopbits, int parity)
+{
+	struct socket * s = &ss->slot[HASH_ID(id)];
+	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
+		ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
+		return -1;
+	}
+	int fd = s->fd;
+
+	if (set_uart_mode(fd, speed, flow_ctrl, databits, stopbits, parity) < 0)
+		return -1;
+
+	struct request_package request;
+	request.u.set_uart.id = id;
+	send_request(ss, &request, 'R', sizeof(request.u.set_uart));
+
+	return 1;
 }

@@ -5,6 +5,7 @@
 #include "skynet_server.h"
 #include "skynet_mq.h"
 #include "skynet_harbor.h"
+#include "uart_server.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -204,4 +205,27 @@ skynet_socket_udp_address(struct skynet_socket_message *msg, int *addrsz) {
 	sm.ud = msg->ud;
 	sm.data = msg->buffer;
 	return (const char *)socket_server_udp_address(SOCKET_SERVER, &sm, addrsz);
+}
+
+int
+skynet_uart_open(struct skynet_context *ctx, const char *port) {
+	uint32_t source = skynet_context_handle(ctx);
+	return uart_server_open(SOCKET_SERVER, source,port);
+}
+
+int
+skynet_uart_set(struct skynet_context *ctx, int id, int speed, int flow_ctrl, int databits, int stopbits, int parity) {
+	return uart_server_set(SOCKET_SERVER, id, speed, flow_ctrl, databits, stopbits, parity);
+}
+
+int64_t
+skynet_uart_send(struct skynet_context *ctx, int id,const char *buffer, int sz) {
+	return uart_server_send(SOCKET_SERVER, id, buffer, sz);
+}
+
+void
+skynet_uart_close(struct skynet_context *ctx, int id)
+{
+	uint32_t source = skynet_context_handle(ctx);
+	uart_server_close(SOCKET_SERVER, source, id);
 }

@@ -45,14 +45,14 @@ update3rd :
 # skynet
 
 CSERVICE = snlua logger gate harbor
-LUA_CLIB = skynet socketdriver bson mongo md5 netpack \
+LUA_CLIB = skynet socketdriver uartdriver bson mongo md5 netpack \
   clientsocket memory profile multicast \
   cluster crypt sharedata stm sproto lpeg \
   mysqlaux debugchannel
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
   skynet_server.c skynet_start.c skynet_timer.c skynet_error.c \
-  skynet_harbor.c skynet_env.c skynet_monitor.c skynet_socket.c socket_server.c \
+  skynet_harbor.c skynet_env.c skynet_monitor.c skynet_socket.c socket_server.c uart_server.c\
   malloc_hook.c skynet_daemon.c skynet_log.c
 
 all : \
@@ -80,6 +80,9 @@ $(LUA_CLIB_PATH)/skynet.so : lualib-src/lua-skynet.c lualib-src/lua-seri.c | $(L
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src -Ilualib-src
 
 $(LUA_CLIB_PATH)/socketdriver.so : lualib-src/lua-socket.c | $(LUA_CLIB_PATH)
+	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src
+	
+$(LUA_CLIB_PATH)/uartdriver.so : lualib-src/lua-uart.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src
 
 $(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
