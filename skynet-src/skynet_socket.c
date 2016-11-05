@@ -218,7 +218,7 @@ skynet_uart_set(struct skynet_context *ctx, int id, int speed, int flow_ctrl, in
 	return uart_server_set(SOCKET_SERVER, id, speed, flow_ctrl, databits, stopbits, parity);
 }
 
-int64_t
+long
 skynet_uart_send(struct skynet_context *ctx, int id,const char *buffer, int sz) {
 	return uart_server_send(SOCKET_SERVER, id, buffer, sz);
 }
