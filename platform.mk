@@ -21,7 +21,7 @@ none :
 SKYNET_LIBS := -lpthread -lm
 SHARED := -fPIC --shared
 EXPORT := -Wl,-E
-MYCFLAGS := -I../../skynet-src
+SKYNET_CFLAGS =
 
 linux : PLAT = linux
 macosx : PLAT = macosx
@@ -33,13 +33,12 @@ macosx : EXPORT :=
 macosx linux arm : SKYNET_LIBS += -ldl
 linux freebsd arm : SKYNET_LIBS += -lrt
 arm : SKYNET_LIBS += -llinux-atmoic
-arm : MYCFLAGS += -DLUA_32BITS
-
+arm : SKYNET_CFLAGS += -DLUA_32BITS
 
 # Turn off jemalloc and malloc hook on macosx
 
 macosx arm : MALLOC_STATICLIB :=
-macosx arm : SKYNET_DEFINES :=-DNOUSE_JEMALLOC
+macosx arm : SKYNET_DEFINES := -DNOUSE_JEMALLOC
 
 linux macosx freebsd arm :
-	$(MAKE) all PLAT=$@ SKYNET_LIBS="$(SKYNET_LIBS)" SHARED="$(SHARED)" EXPORT="$(EXPORT)" MALLOC_STATICLIB="$(MALLOC_STATICLIB)" SKYNET_DEFINES="$(SKYNET_DEFINES)" MYCFLAGS="$(MYCFLAGS)"
+	$(MAKE) all PLAT=$@ SKYNET_LIBS="$(SKYNET_LIBS)" SHARED="$(SHARED)" EXPORT="$(EXPORT)" MALLOC_STATICLIB="$(MALLOC_STATICLIB)" SKYNET_DEFINES="$(SKYNET_DEFINES)" SKYNET_CFLAGS="$(SKYNET_CFLAGS)"

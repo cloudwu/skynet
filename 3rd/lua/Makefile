@@ -15,11 +15,11 @@ AR= ar rcu
 RANLIB= ranlib
 RM= rm -f
 
-SYSCFLAGS=
+SYSCFLAGS+=
 SYSLDFLAGS=
 SYSLIBS=
 
-MYCFLAGS=
+MYCFLAGS= -I../../skynet-src
 MYLDFLAGS=
 MYLIBS=
 MYOBJS=
@@ -125,7 +125,8 @@ solaris:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN -D_REENTRANT" SYSLIBS="-ldl"
 
 arm:
-	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX" SYSLIBS="-Wl,-E -ldl -lreadline -llinux-atmoic -lncurses"
+	@echo "MYCFLAGS= $(MYCFLAGS)"
+	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_32BITS" SYSLIBS="-Wl,-E -ldl -lreadline -llinux-atmoic -lncurses"
 
 # list targets that do not create files (but not all makes understand .PHONY)
 .PHONY: all $(PLATS) default o a clean depend echo none
