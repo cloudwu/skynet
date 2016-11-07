@@ -1,7 +1,7 @@
 local skynet = require "skynet"
 local uart = require "uart"
 
-local fd
+local id
 
 skynet.start(function()
 	local cb = function(id,data)
@@ -10,8 +10,8 @@ skynet.start(function()
 			uart.close(fd)
 			skynet.exit()
 		end
-		uart.send(fd,"ok "..data)
+		uart.send(id,"ok "..data)
 	end
-	fd = uart.open (cb, "/dev/ttyS1")
-	uart.set (fd, 115200, 0, 8, 1, 'N')
+	id = uart.open (cb, "/dev/ttyS1")
+	uart.set(id, 115200, 0, 8, 1, 'N')
 end)

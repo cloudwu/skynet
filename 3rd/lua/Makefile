@@ -126,7 +126,7 @@ solaris:
 
 arm:
 	@echo "MYCFLAGS= $(MYCFLAGS)"
-	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_32BITS" SYSLIBS="-Wl,-E -ldl -lreadline -llinux-atmoic -lncurses"
+	$(MAKE) $(ALL_A) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_32BITS" SYSLIBS="-Wl,-E -ldl -llinux-atmoic"
 
 # list targets that do not create files (but not all makes understand .PHONY)
 .PHONY: all $(PLATS) default o a clean depend echo none
