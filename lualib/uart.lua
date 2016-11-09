@@ -28,7 +28,7 @@ uart_message[2] = function(id, _ , _)
 		return
 	end
 	-- log remote addr
-	s.connected = false
+	s.connected = true
 end
 
 -- SKYNET_SOCKET_TYPE_CLOSE = 3
