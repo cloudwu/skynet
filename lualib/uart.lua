@@ -25,16 +25,16 @@ end
 uart_message[2] = function(id, _ , _)
 	local s = uart_pool[id]
 	if s == nil then
+		skynet.error("uart: no open uart")
 		return
 	end
-	-- log remote addr
-	s.connected = true
 end
 
 -- SKYNET_SOCKET_TYPE_CLOSE = 3
 uart_message[3] = function (id)
 	local s = uart_pool[id]
 	if s == nil then
+		skynet.error("uart: no open uart")
 		return
 	end
 	uart_pool[id] = nil
