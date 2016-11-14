@@ -55,4 +55,16 @@ function sharedata.flush()
 	collectgarbage()
 end
 
+function sharedata.deepcopy(name, ...)
+	if cache[name] then
+		local cobj = cache[name].__obj
+		return sd.copy(cobj, ...)
+	end
+
+	local cobj = skynet.call(service, "lua", "query", name)
+	local ret = sd.copy(cobj, ...)
+	skynet.send(service, "lua", "confirm" , cobj)
+	return ret
+end
+
 return sharedata
