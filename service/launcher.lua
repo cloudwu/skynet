@@ -24,7 +24,10 @@ end
 function command.STAT()
 	local list = {}
 	for k,v in pairs(services) do
-		local stat = skynet.call(k,"debug","STAT")
+		local ok, stat = pcall(skynet.call,k,"debug","STAT")
+		if not ok then
+			stat = string.format("ERROR (%s)",v)
+		end
 		list[skynet.address(k)] = stat
 	end
 	return list
@@ -41,8 +44,12 @@ end
 function command.MEM()
 	local list = {}
 	for k,v in pairs(services) do
-		local kb, bytes = skynet.call(k,"debug","MEM")
-		list[skynet.address(k)] = string.format("%.2f Kb (%s)",kb,v)
+		local ok, kb, bytes = pcall(skynet.call,k,"debug","MEM")
+		if not ok then
+			list[skynet.address(k)] = string.format("ERROR (%s)",v)
+		else
+			list[skynet.address(k)] = string.format("%.2f Kb (%s)",kb,v)
+		end
 	end
 	return list
 end

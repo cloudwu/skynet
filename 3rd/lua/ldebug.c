@@ -1,5 +1,5 @@
 /*
-** $Id: ldebug.c,v 2.115 2015/05/22 17:45:56 roberto Exp $
+** $Id: ldebug.c,v 2.120 2016/03/31 19:01:21 roberto Exp $
 ** Debug Interface
 ** See Copyright Notice in lua.h
 */
@@ -69,7 +69,13 @@ static void swapextra (lua_State *L) {
 
 
 /*
-** this function can be called asynchronous (e.g. during a signal)
+** This function can be called asynchronously (e.g. during a signal).
+** Fields 'oldpc', 'basehookcount', and 'hookcount' (set by
+** 'resethookcount') are for debug only, and it is no problem if they
+** get arbitrary values (causes at most one wrong hook call). 'hookmask'
+** is an atomic value. We assume that pointers are atomic too (e.g., gcc
+** ensures that for all platforms where it runs). Moreover, 'hook' is
+** always checked before being called (see 'luaD_hook').
 */
 LUA_API void lua_sethook (lua_State *L, lua_Hook func, int mask, int count) {
   if (func == NULL || mask == 0) {  /* turn off hooks? */
@@ -118,7 +124,7 @@ LUA_API int lua_getstack (lua_State *L, int level, lua_Debug *ar) {
 
 
 static const char *upvalname (Proto *p, int uv) {
-  TString *s = check_exp(uv < p->sizeupvalues, p->sp->upvalues[uv].name);
+  TString *s = check_exp(uv < p->sp->sizeupvalues, p->sp->upvalues[uv].name);
   if (s == NULL) return "?";
   else return getstr(s);
 }
@@ -558,7 +564,7 @@ static const char *varinfo (lua_State *L, const TValue *o) {
 
 
 l_noret luaG_typeerror (lua_State *L, const TValue *o, const char *op) {
-  const char *t = objtypename(o);
+  const char *t = luaT_objtypename(L, o);
   luaG_runerror(L, "attempt to %s a %s value%s", op, t, varinfo(L, o));
 }
 
@@ -590,9 +596,9 @@ l_noret luaG_tointerror (lua_State *L, const TValue *p1, const TValue *p2) {
 
 
 l_noret luaG_ordererror (lua_State *L, const TValue *p1, const TValue *p2) {
-  const char *t1 = objtypename(p1);
-  const char *t2 = objtypename(p2);
-  if (t1 == t2)
+  const char *t1 = luaT_objtypename(L, p1);
+  const char *t2 = luaT_objtypename(L, p2);
+  if (strcmp(t1, t2) == 0)
     luaG_runerror(L, "attempt to compare two %s values", t1);
   else
     luaG_runerror(L, "attempt to compare %s with %s", t1, t2);
@@ -618,7 +624,7 @@ l_noret luaG_errormsg (lua_State *L) {
     setobjs2s(L, L->top, L->top - 1);  /* move argument */
     setobjs2s(L, L->top - 1, errfunc);  /* push function */
     L->top++;  /* assume EXTRA_STACK */
-    luaD_call(L, L->top - 2, 1, 0);  /* call it */
+    luaD_callnoyield(L, L->top - 2, 1);  /* call it */
   }
   luaD_throw(L, LUA_ERRRUN);
 }
@@ -640,9 +646,11 @@ l_noret luaG_runerror (lua_State *L, const char *fmt, ...) {
 void luaG_traceexec (lua_State *L) {
   CallInfo *ci = L->ci;
   lu_byte mask = L->hookmask;
-  int counthook = ((mask & LUA_MASKCOUNT) && L->hookcount == 0);
+  int counthook = (--L->hookcount == 0 && (mask & LUA_MASKCOUNT));
   if (counthook)
     resethookcount(L);  /* reset count */
+  else if (!(mask & LUA_MASKLINE))
+    return;  /* no line hook and count != 0; nothing to be done */
   if (ci->callstatus & CIST_HOOKYIELD) {  /* called hook last time? */
     ci->callstatus &= ~CIST_HOOKYIELD;  /* erase mark */
     return;  /* do not call hook again (VM yielded, so it did not move) */

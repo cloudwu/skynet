@@ -158,10 +158,11 @@ A schema text can be self-described by the sproto schema language.
 .type {
     .field {
         name 0 : string
-        type 1 : string
-        id 2 : integer
-        array 3 : boolean
-        key 4 : integer	# optional tag for map
+        buildin	1 : integer
+        type 2 : integer
+        tag 3 : integer
+        array 4	: boolean
+        key 5 : integer # If key exists, array must be true, and it's a map.
     }
     name 0 : string
     fields 1 : *field
@@ -169,9 +170,9 @@ A schema text can be self-described by the sproto schema language.
 
 .protocol {
     name 0 : string
-    id 1 : integer
-    request 2 : string
-    response 3 : string
+    tag 1 : integer
+    request 2 : integer # index
+    response 3 : integer # index
 }
 
 .group {
@@ -209,19 +210,39 @@ Each integer number must be serialized in little-endian format.
 The sproto message must be a user defined type struct, and a struct is encoded in three parts. The header, the field part, and the data part. 
 The tag and small integer or boolean will be encoded in field part, and others are in data part.
 
-All the fields must be encoded in ascending order (by tag). The tags of fields can be discontinuous, if a field is nil. (default value in lua), don't encode it in message.
+All the fields must be encoded in ascending order (by tag, base 0). The tags of fields can be discontinuous, if a field is nil. (default value in lua), don't encode it in message.
 
 The header is a 16bit integer. It is the number of fields.
 
 Each field in field part is a 16bit integer (n). If n is zero, that means the field data is encoded in data part ;
 
-If n is even (and not zero), the value of this field is n/2-1 ;
+If n is even (and not zero), the value of this field is n/2-1 , and the tag increases 1;
 
 If n is odd, that means the tags is not continuous, and we should add current tag by (n+1)/2 .
+
+Arrays are always encode in data part, 4 bytes header for the size, and the following bytes is the contents. See the example 2 for the struct array; example 3/4 for the integer array ; example 5 for the boolean array.
+
+Fot integer array, an additional byte (4 or 8) to indicate the value is 32bit or 64bit.
 
 Read the examples below to see more details.
 
 Notice: If the tag is not declared in schema, the decoder will simply ignore the field for protocol version compatibility.
+
+```
+.Person {
+    name 0 : string
+    age 1 : integer
+    marital 2 : boolean
+    children 3 : *Person
+}
+
+.Data {
+	numbers 0 : *integer
+	bools 1 : *boolean
+	number 2 : integer
+	bignumber 3 : integer
+}
+```
 
 Example 1:
 
@@ -243,7 +264,8 @@ person {
     name = "Bob",
     age = 40,
     children = {
-        { name = "Alice" ,  age = 13, marital = false },
+        { name = "Alice" ,  age = 13 },
+        { name = "Carol" ,  age = 5 },
     }
 }
 
@@ -256,13 +278,95 @@ person {
 03 00 00 00 (sizeof "Bob")
 42 6F 62 ("Bob")
 
-11 00 00 00 (sizeof struct)
-03 00 (fn = 3)
+26 00 00 00 (sizeof children)
+
+0F 00 00 00 (sizeof child 1)
+02 00 (fn = 2)
 00 00 (id = 0, value in data part)
 1C 00 (id = 1, value = 13)
-02 00 (id = 2, value = false)
 05 00 00 00 (sizeof "Alice")
 41 6C 69 63 65 ("Alice")
+
+0F 00 00 00 (sizeof child 2)
+02 00 (fn = 2)
+00 00 (id = 0, value in data part)
+0C 00 (id = 1, value = 5)
+05 00 00 00 (sizeof "Carol")
+43 61 72 6F 6C ("Carol")
+```
+
+Example 3:
+
+```
+data {
+    numbers = { 1,2,3,4,5 }
+}
+
+01 00 (fn = 1)
+00 00 (id = 0, value in data part)
+
+15 00 00 00 (sizeof numbers)
+04 ( sizeof int32 )
+01 00 00 00 (1)
+02 00 00 00 (2)
+03 00 00 00 (3)
+04 00 00 00 (4)
+05 00 00 00 (5)
+```
+
+Example 4:
+```
+data {
+    numbers = {
+        (1<<32)+1,
+        (1<<32)+2,
+        (1<<32)+3,
+    }
+}
+
+01 00 (fn = 1)
+00 00 (id = 0, value in data part)
+
+19 00 00 00 (sizeof numbers)
+08 ( sizeof int64 )
+01 00 00 00 01 00 00 00 ( (1<32) + 1)
+02 00 00 00 01 00 00 00 ( (1<32) + 2)
+03 00 00 00 01 00 00 00 ( (1<32) + 3)
+```
+
+Example 5:
+```
+data {
+    bools = { false, true, false }
+}
+
+02 00 (fn = 2)
+01 00 (skip id = 0)
+00 00 (id = 1, value in data part)
+
+03 00 00 00 (sizeof bools)
+00 (false)
+01 (true)
+00 (false)
+```
+
+Example 6:
+```
+data {
+    number = 100000,
+    bignumber = -10000000000,
+}
+
+03 00 (fn = 3)
+03 00 (skip id = 1)
+00 00 (id = 2, value in data part)
+00 00 (id = 3, value in data part)
+
+04 00 00 00 (sizeof number, data part)
+A0 86 01 00 (100000, 32bit integer)
+
+08 00 00 00 (sizeof bignumber, data part)
+00 1C F4 AB FD FF FF FF (-10000000000, 64bit integer)
 ```
 
 0 Packing
@@ -270,7 +374,7 @@ person {
 
 The algorithm is very similar to [Cap'n proto](http://kentonv.github.io/capnproto/), but 0x00 is not treated specially. 
 
-In packed format, the message if padding to 8. Each 8 byte is reduced to a tag byte followed by zero to eight content bytes. 
+In packed format, the message is padding to 8. Each 8 byte is reduced to a tag byte followed by zero to eight content bytes. 
 The bits of the tag byte correspond to the bytes of the unpacked word, with the least-significant bit corresponding to the first byte. 
 Each zero bit indicates that the corresponding byte is zero. The non-zero bytes are packed following the tag.
 
@@ -281,7 +385,7 @@ unpacked (hex):  08 00 00 00 03 00 02 00   19 00 00 00 aa 01 00 00
 packed (hex):  51 08 03 02   31 19 aa 01
 ```
 
-Tag 0xff is treated specially. A number N is following the 0xff tag. N means (N+1)*8 bytes should be copied directly. 
+Tag 0xff is treated specially. A number N is following the 0xff tag. N means (N+1)\*8 bytes should be copied directly. 
 The bytes may or may not contain zeros. Because of this rule, the worst-case space overhead of packing is 2 bytes per 2 KiB of input.
 
 For example:

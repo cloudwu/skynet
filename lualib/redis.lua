@@ -4,6 +4,7 @@ local socketchannel = require "socketchannel"
 
 local table = table
 local string = string
+local assert = assert
 
 local redis = {}
 local command = {}
@@ -53,16 +54,74 @@ redcmd[42] = function(fd, data)	-- '*'
 	local noerr = true
 	for i = 1,n do
 		local ok, v = read_response(fd)
-		if ok then
-			bulk[i] = v
-		else
+		if not ok then
 			noerr = false
 		end
+		bulk[i] = v
 	end
 	return noerr, bulk
 end
 
 -------------------
+
+function command:disconnect()
+	self[1]:close()
+	setmetatable(self, nil)
+end
+
+-- msg could be any type of value
+
+local function make_cache(f)
+	return setmetatable({}, {
+		__mode = "kv",
+		__index = f,
+	})
+end
+
+local header_cache = make_cache(function(t,k)
+		local s = "\r\n$" .. k .. "\r\n"
+		t[k] = s
+		return s
+	end)
+
+local command_cache = make_cache(function(t,cmd)
+		local s = "\r\n$"..#cmd.."\r\n"..cmd:upper()
+		t[cmd] = s
+		return s
+	end)
+
+local count_cache = make_cache(function(t,k)
+		local s = "*" .. k
+		t[k] = s
+		return s
+	end)
+
+local function compose_message(cmd, msg)
+	local t = type(msg)
+	local lines = {}
+
+	if t == "table" then
+		lines[1] = count_cache[#msg+1]
+		lines[2] = command_cache[cmd]
+		local idx = 3
+		for _,v in ipairs(msg) do
+			v= tostring(v)
+			lines[idx] = header_cache[#v]
+			lines[idx+1] = v
+			idx = idx + 2
+		end
+		lines[idx] = "\r\n"
+	else
+		msg = tostring(msg)
+		lines[1] = "*2"
+		lines[2] = command_cache[cmd]
+		lines[3] = header_cache[#msg]
+		lines[4] = msg
+		lines[5] = "\r\n"
+	end
+
+	return lines
+end
 
 local function redis_login(auth, db)
 	if auth == nil and db == nil then
@@ -70,10 +129,10 @@ local function redis_login(auth, db)
 	end
 	return function(so)
 		if auth then
-			so:request("AUTH "..auth.."\r\n", read_response)
+			so:request(compose_message("AUTH", auth), read_response)
 		end
 		if db then
-			so:request("SELECT "..db.."\r\n", read_response)
+			so:request(compose_message("SELECT", db), read_response)
 		end
 	end
 end
@@ -88,49 +147,6 @@ function redis.connect(db_conf)
 	-- try connect first only once
 	channel:connect(true)
 	return setmetatable( { channel }, meta )
-end
-
-function command:disconnect()
-	self[1]:close()
-	setmetatable(self, nil)
-end
-
--- msg could be any type of value
-local function pack_value(lines, v)
-	if v == nil then
-		return
-	end
-
-	v = tostring(v)
-
-	table.insert(lines,"$"..#v)
-	table.insert(lines,v)
-end
-
-local function compose_message(cmd, msg)
-	local len = 1
-	local t = type(msg)
-
-	if t == "table" then
-		len = len + #msg
-	elseif t ~= nil then
-		len = len + 1
-	end
-
-	local lines = {"*" .. len}
-	pack_value(lines, cmd)
-
-	if t == "table" then
-		for _,v in ipairs(msg) do
-			pack_value(lines, v)
-		end
-	else
-		pack_value(lines, msg)
-	end
-	table.insert(lines, "")
-
-	local chunk =  table.concat(lines,"\r\n")
-	return chunk
 end
 
 setmetatable(command, { __index = function(t,k)
@@ -161,6 +177,48 @@ function command:sismember(key, value)
 	return fd:request(compose_message ("SISMEMBER", {key, value}), read_boolean)
 end
 
+local function compose_table(lines, msg)
+	local tinsert = table.insert
+	tinsert(lines, count_cache[#msg])
+	for _,v in ipairs(msg) do
+		v = tostring(v)
+		tinsert(lines,header_cache[#v])
+		tinsert(lines,v)
+	end
+	tinsert(lines, "\r\n")
+	return lines
+end
+
+function command:pipeline(ops,resp)
+	assert(ops and #ops > 0, "pipeline is null")
+
+	local fd = self[1]
+
+	local cmds = {}
+	for _, cmd in ipairs(ops) do
+		compose_table(cmds, cmd)
+	end
+
+	if resp then
+		return fd:request(cmds, function (fd)
+			for i=1, #ops do
+				local ok, out = read_response(fd)
+				table.insert(resp, {ok = ok, out = out})
+			end
+			return true, resp
+		end)
+	else
+		return fd:request(cmds, function (fd)
+			local ok, out
+			for i=1, #ops do
+				ok, out = read_response(fd)
+			end
+			-- return last response
+			return ok,out
+		end)
+	end
+end
+
 --- watch mode
 
 local watch = {}
@@ -175,7 +233,7 @@ local watchmeta = {
 local function watch_login(obj, auth)
 	return function(so)
 		if auth then
-			so:request("AUTH "..auth.."\r\n", read_response)
+			so:request(compose_message("AUTH", auth), read_response)
 		end
 		for k in pairs(obj.__psubscribe) do
 			so:request(compose_message ("PSUBSCRIBE", k))

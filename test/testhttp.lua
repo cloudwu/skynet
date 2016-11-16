@@ -3,6 +3,8 @@ local httpc = require "http.httpc"
 local dns = require "dns"
 
 skynet.start(function()
+	httpc.dns()	-- set dns server
+	httpc.timeout = 100	-- set timeout 1 second
 	print("GET baidu.com")
 	local respheader = {}
 	local status, body = httpc.get("baidu.com", "/", respheader)

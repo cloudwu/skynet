@@ -494,7 +494,7 @@ static int
 lfromhex(lua_State *L) {
 	size_t sz = 0;
 	const char * text = luaL_checklstring(L, 1, &sz);
-	if (sz & 2) {
+	if (sz & 1) {
 		return luaL_error(L, "Invalid hex text size %d", (int)sz);
 	}
 	char tmp[SMALL_CHUNK];
@@ -751,7 +751,7 @@ ldhexchange(lua_State *L) {
 	if (x64 == 0)
 		return luaL_error(L, "Can't be 0");
 
-	uint64_t r = powmodp(5,	x64);
+	uint64_t r = powmodp(G,	x64);
 	push64(L, r);
 	return 1;
 }
@@ -878,6 +878,25 @@ lb64decode(lua_State *L) {
 	return 1;
 }
 
+static int
+lxor_str(lua_State *L) {
+	size_t len1,len2;
+	const char *s1 = luaL_checklstring(L,1,&len1);
+	const char *s2 = luaL_checklstring(L,2,&len2);
+	if (len2 == 0) {
+		return luaL_error(L, "Can't xor empty string");
+	}
+	luaL_Buffer b;
+	char * buffer = luaL_buffinitsize(L, &b, len1);
+	int i;
+	for (i=0;i<len1;i++) {
+		buffer[i] = s1[i] ^ s2[i % len2];
+	}
+	luaL_addsize(&b, len1);
+	luaL_pushresult(&b);
+	return 1;
+}
+
 // defined in lsha1.c
 int lsha1(lua_State *L);
 int lhmac_sha1(lua_State *L);
@@ -885,7 +904,12 @@ int lhmac_sha1(lua_State *L);
 int
 luaopen_crypt(lua_State *L) {
 	luaL_checkversion(L);
-	srandom(time(NULL));
+	static int init = 0;
+	if (!init) {
+		// Don't need call srandom more than once.
+		init = 1 ;
+		srandom(time(NULL));
+	}
 	luaL_Reg l[] = {
 		{ "hashkey", lhashkey },
 		{ "randomkey", lrandomkey },
@@ -901,6 +925,7 @@ luaopen_crypt(lua_State *L) {
 		{ "sha1", lsha1 },
 		{ "hmac_sha1", lhmac_sha1 },
 		{ "hmac_hash", lhmac_hash },
+		{ "xor_str", lxor_str },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);

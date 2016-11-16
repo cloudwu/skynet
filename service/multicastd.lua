@@ -66,19 +66,6 @@ end
 -- publish a message, for local node, use the message pointer (call mc.bind to add the reference)
 -- for remote node, call remote_publish. (call mc.unpack and skynet.tostring to convert message pointer to string)
 local function publish(c , source, pack, size)
-	local group = channel[c]
-	if group == nil or next(group) == nil then
-		-- dead channel, delete the pack. mc.bind returns the pointer in pack
-		local pack = mc.bind(pack, 1)
-		mc.close(pack)
-		return
-	end
-	mc.bind(pack, channel_n[c])
-	local msg = skynet.tostring(pack, size)
-	for k in pairs(group) do
-		-- the msg is a pointer to the real message, publish pointer in local is ok.
-		skynet.redirect(k, source, "multicast", c , msg)
-	end
 	local remote = channel_remote[c]
 	if remote then
 		-- remote publish should unpack the pack, because we should not publish the pointer out.
@@ -87,6 +74,20 @@ local function publish(c , source, pack, size)
 		for node in pairs(remote) do
 			remote_publish(node, c, source, msg)
 		end
+	end
+
+	local group = channel[c]
+	if group == nil or next(group) == nil then
+		-- dead channel, delete the pack. mc.bind returns the pointer in pack and free the pack (struct mc_package **)
+		local pack = mc.bind(pack, 1)
+		mc.close(pack)
+		return
+	end
+	local msg = skynet.tostring(pack, size)	-- copy (pack,size) to a string
+	mc.bind(pack, channel_n[c])	-- mc.bind will free the pack(struct mc_package **)
+	for k in pairs(group) do
+		-- the msg is a pointer to the real message, publish pointer in local is ok.
+		skynet.redirect(k, source, "multicast", c , msg)
 	end
 end
 

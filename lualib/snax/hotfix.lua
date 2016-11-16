@@ -1,7 +1,4 @@
 local si = require "snax.interface"
-local io = io
-
-local hotfix = {}
 
 local function envid(f)
 	local i = 1

@@ -1,5 +1,5 @@
 /*
-** $Id: lbaselib.c,v 1.310 2015/03/28 19:14:47 roberto Exp $
+** $Id: lbaselib.c,v 1.313 2016/04/11 19:18:40 roberto Exp $
 ** Basic library
 ** See Copyright Notice in lua.h
 */
@@ -86,8 +86,8 @@ static int luaB_tonumber (lua_State *L) {
     const char *s;
     lua_Integer n = 0;  /* to avoid warnings */
     lua_Integer base = luaL_checkinteger(L, 2);
-    luaL_checktype(L, 1, LUA_TSTRING);  /* before 'luaL_checklstring'! */
-    s = luaL_checklstring(L, 1, &l);
+    luaL_checktype(L, 1, LUA_TSTRING);  /* no numbers as strings */
+    s = lua_tolstring(L, 1, &l);
     luaL_argcheck(L, 2 <= base && base <= 36, 2, "base out of range");
     if (b_str2int(s, (int)base, &n) == s + l) {
       lua_pushinteger(L, n);
@@ -102,8 +102,8 @@ static int luaB_tonumber (lua_State *L) {
 static int luaB_error (lua_State *L) {
   int level = (int)luaL_optinteger(L, 2, 1);
   lua_settop(L, 1);
-  if (lua_isstring(L, 1) && level > 0) {  /* add extra information? */
-    luaL_where(L, level);
+  if (lua_type(L, 1) == LUA_TSTRING && level > 0) {
+    luaL_where(L, level);   /* add extra information */
     lua_pushvalue(L, 1);
     lua_concat(L, 2);
   }
@@ -198,12 +198,10 @@ static int luaB_collectgarbage (lua_State *L) {
 }
 
 
-/*
-** This function has all type names as upvalues, to maximize performance.
-*/
 static int luaB_type (lua_State *L) {
-  luaL_checkany(L, 1);
-  lua_pushvalue(L, lua_upvalueindex(lua_type(L, 1) + 1));
+  int t = lua_type(L, 1);
+  luaL_argcheck(L, t != LUA_TNONE, 1, "value expected");
+  lua_pushstring(L, lua_typename(L, t));
   return 1;
 }
 
@@ -243,18 +241,7 @@ static int luaB_pairs (lua_State *L) {
 
 
 /*
-** Traversal function for 'ipairs' for raw tables
-*/
-static int ipairsaux_raw (lua_State *L) {
-  lua_Integer i = luaL_checkinteger(L, 2) + 1;
-  luaL_checktype(L, 1, LUA_TTABLE);
-  lua_pushinteger(L, i);
-  return (lua_rawgeti(L, 1, i) == LUA_TNIL) ? 1 : 2;
-}
-
-
-/*
-** Traversal function for 'ipairs' for tables with metamethods
+** Traversal function for 'ipairs'
 */
 static int ipairsaux (lua_State *L) {
   lua_Integer i = luaL_checkinteger(L, 2) + 1;
@@ -264,18 +251,15 @@ static int ipairsaux (lua_State *L) {
 
 
 /*
-** This function will use either 'ipairsaux' or 'ipairsaux_raw' to
-** traverse a table, depending on whether the table has metamethods
-** that can affect the traversal.
+** 'ipairs' function. Returns 'ipairsaux', given "table", 0.
+** (The given "table" may not be a table.)
 */
 static int luaB_ipairs (lua_State *L) {
-  lua_CFunction iter = (luaL_getmetafield(L, 1, "__index") != LUA_TNIL)
-                       ? ipairsaux : ipairsaux_raw;
 #if defined(LUA_COMPAT_IPAIRS)
-  return pairsmeta(L, "__ipairs", 1, iter);
+  return pairsmeta(L, "__ipairs", 1, ipairsaux);
 #else
   luaL_checkany(L, 1);
-  lua_pushcfunction(L, iter);  /* iteration function */
+  lua_pushcfunction(L, ipairsaux);  /* iteration function */
   lua_pushvalue(L, 1);  /* state */
   lua_pushinteger(L, 0);  /* initial value */
   return 3;
@@ -490,9 +474,9 @@ static const luaL_Reg base_funcs[] = {
   {"setmetatable", luaB_setmetatable},
   {"tonumber", luaB_tonumber},
   {"tostring", luaB_tostring},
+  {"type", luaB_type},
   {"xpcall", luaB_xpcall},
   /* placeholders */
-  {"type", NULL},
   {"_G", NULL},
   {"_VERSION", NULL},
   {NULL, NULL}
@@ -500,7 +484,6 @@ static const luaL_Reg base_funcs[] = {
 
 
 LUAMOD_API int luaopen_base (lua_State *L) {
-  int i;
   /* open lib into global table */
   lua_pushglobaltable(L);
   luaL_setfuncs(L, base_funcs, 0);
@@ -510,11 +493,6 @@ LUAMOD_API int luaopen_base (lua_State *L) {
   /* set global _VERSION */
   lua_pushliteral(L, LUA_VERSION);
   lua_setfield(L, -2, "_VERSION");
-  /* set function 'type' with proper upvalues */
-  for (i = 0; i < LUA_NUMTAGS; i++)  /* push all type names as upvalues */
-    lua_pushstring(L, lua_typename(L, i));
-  lua_pushcclosure(L, luaB_type, LUA_NUMTAGS);
-  lua_setfield(L, -2, "type");
   return 1;
 }
 

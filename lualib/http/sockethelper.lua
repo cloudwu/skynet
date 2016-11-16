@@ -8,7 +8,43 @@ local socket_error = setmetatable({} , { __tostring = function() return "[Socket
 
 sockethelper.socket_error = socket_error
 
-function sockethelper.readfunc(fd)
+local function preread(fd, str)
+	return function (sz)
+		if str then
+			if sz == #str or sz == nil then
+				local ret = str
+				str = nil
+				return ret
+			else
+				if sz < #str then
+					local ret = str:sub(1,sz)
+					str = str:sub(sz + 1)
+					return ret
+				else
+					sz = sz - #str
+					local ret = readbytes(fd, sz)
+					if ret then
+						return str .. ret
+					else
+						error(socket_error)
+					end
+				end
+			end
+		else
+			local ret = readbytes(fd, sz)
+			if ret then
+				return ret
+			else
+				error(socket_error)
+			end
+		end
+	end
+end
+
+function sockethelper.readfunc(fd, pre)
+	if pre then
+		return preread(fd, pre)
+	end
 	return function (sz)
 		local ret = readbytes(fd, sz)
 		if ret then
@@ -18,6 +54,8 @@ function sockethelper.readfunc(fd)
 		end
 	end
 end
+
+sockethelper.readall = socket.readall
 
 function sockethelper.writefunc(fd)
 	return function(content)

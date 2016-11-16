@@ -10,6 +10,7 @@
 #include "skynet_monitor.h"
 #include "skynet_imp.h"
 #include "skynet_log.h"
+#include "skynet_timer.h"
 #include "spinlock.h"
 #include "atomic.h"
 
@@ -46,12 +47,16 @@ struct skynet_context {
 	skynet_cb cb;
 	struct message_queue *queue;
 	FILE * logfile;
+	uint64_t cpu_cost;	// in microsec
+	uint64_t cpu_start;	// in microsec
 	char result[32];
 	uint32_t handle;
 	int session_id;
 	int ref;
+	int message_count;
 	bool init;
 	bool endless;
+	bool profile;
 
 	CHECKCALLING_DECL
 };
@@ -61,6 +66,7 @@ struct skynet_node {
 	int init;
 	uint32_t monitor_exit;
 	pthread_key_t handle_key;
+	bool profile;	// default is off
 };
 
 static struct skynet_node G_NODE;
@@ -139,6 +145,11 @@ skynet_context_new(const char * name, const char *param) {
 
 	ctx->init = false;
 	ctx->endless = false;
+
+	ctx->cpu_cost = 0;
+	ctx->cpu_start = 0;
+	ctx->message_count = 0;
+	ctx->profile = G_NODE.profile;
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
 	ctx->handle = 0;	
 	ctx->handle = skynet_handle_register(ctx);
@@ -256,9 +267,19 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	if (ctx->logfile) {
 		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
 	}
-	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
+	++ctx->message_count;
+	int reserve_msg;
+	if (ctx->profile) {
+		ctx->cpu_start = skynet_thread_time();
+		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
+		uint64_t cost_time = skynet_thread_time() - ctx->cpu_start;
+		ctx->cpu_cost += cost_time;
+	} else {
+		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
+	}
+	if (!reserve_msg) {
 		skynet_free(msg->data);
-	} 
+	}
 	CHECKCALLING_END(ctx)
 }
 
@@ -430,13 +451,6 @@ cmd_name(struct skynet_context * context, const char * param) {
 }
 
 static const char *
-cmd_now(struct skynet_context * context, const char * param) {
-	uint32_t ti = skynet_gettime();
-	sprintf(context->result,"%u",ti);
-	return context->result;
-}
-
-static const char *
 cmd_exit(struct skynet_context * context, const char * param) {
 	handle_exit(context, 0);
 	return NULL;
@@ -507,19 +521,9 @@ cmd_setenv(struct skynet_context * context, const char * param) {
 
 static const char *
 cmd_starttime(struct skynet_context * context, const char * param) {
-	uint32_t sec = skynet_gettime_fixsec();
+	uint32_t sec = skynet_starttime();
 	sprintf(context->result,"%u",sec);
 	return context->result;
-}
-
-static const char *
-cmd_endless(struct skynet_context * context, const char * param) {
-	if (context->endless) {
-		strcpy(context->result, "1");
-		context->endless = false;
-		return context->result;
-	}
-	return NULL;
 }
 
 static const char *
@@ -546,9 +550,33 @@ cmd_monitor(struct skynet_context * context, const char * param) {
 }
 
 static const char *
-cmd_mqlen(struct skynet_context * context, const char * param) {
-	int len = skynet_mq_length(context->queue);
-	sprintf(context->result, "%d", len);
+cmd_stat(struct skynet_context * context, const char * param) {
+	if (strcmp(param, "mqlen") == 0) {
+		int len = skynet_mq_length(context->queue);
+		sprintf(context->result, "%d", len);
+	} else if (strcmp(param, "endless") == 0) {
+		if (context->endless) {
+			strcpy(context->result, "1");
+			context->endless = false;
+		} else {
+			strcpy(context->result, "0");
+		}
+	} else if (strcmp(param, "cpu") == 0) {
+		double t = (double)context->cpu_cost / 1000000.0;	// microsec
+		sprintf(context->result, "%lf", t);
+	} else if (strcmp(param, "time") == 0) {
+		if (context->profile) {
+			uint64_t ti = skynet_thread_time() - context->cpu_start;
+			double t = (double)ti / 1000000.0;	// microsec
+			sprintf(context->result, "%lf", t);
+		} else {
+			strcpy(context->result, "0");
+		}
+	} else if (strcmp(param, "message") == 0) {
+		sprintf(context->result, "%d", context->message_count);
+	} else {
+		context->result[0] = '\0';
+	}
 	return context->result;
 }
 
@@ -619,17 +647,15 @@ static struct command_func cmd_funcs[] = {
 	{ "REG", cmd_reg },
 	{ "QUERY", cmd_query },
 	{ "NAME", cmd_name },
-	{ "NOW", cmd_now },
 	{ "EXIT", cmd_exit },
 	{ "KILL", cmd_kill },
 	{ "LAUNCH", cmd_launch },
 	{ "GETENV", cmd_getenv },
 	{ "SETENV", cmd_setenv },
 	{ "STARTTIME", cmd_starttime },
-	{ "ENDLESS", cmd_endless },
 	{ "ABORT", cmd_abort },
 	{ "MONITOR", cmd_monitor },
-	{ "MQLEN", cmd_mqlen },
+	{ "STAT", cmd_stat },
 	{ "LOGON", cmd_logon },
 	{ "LOGOFF", cmd_logoff },
 	{ "SIGNAL", cmd_signal },
@@ -787,3 +813,7 @@ skynet_initthread(int m) {
 	pthread_setspecific(G_NODE.handle_key, (void *)v);
 }
 
+void
+skynet_profile_enable(int enable) {
+	G_NODE.profile = (bool)enable;
+}
