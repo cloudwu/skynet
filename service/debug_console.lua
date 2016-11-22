@@ -242,7 +242,11 @@ function COMMAND.inject(address, filename)
 	end
 	local source = f:read "*a"
 	f:close()
-	return skynet.call(address, "debug", "RUN", source, filename)
+	local ok, output = skynet.call(address, "debug", "RUN", source, filename)
+	if ok == false then
+		error(output)
+	end
+	return output
 end
 
 function COMMAND.task(address)
