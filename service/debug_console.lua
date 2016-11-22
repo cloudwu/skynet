@@ -45,7 +45,6 @@ local function dump_list(print, list)
 	for _,v in ipairs(index) do
 		dump_line(print, v, list[v])
 	end
-	print("OK")
 end
 
 local function split_cmdline(cmdline)
@@ -81,11 +80,11 @@ local function docmd(cmdline, print, fd)
 			else
 				dump_list(print, list)
 			end
-		else
-			print("OK")
 		end
+		print("<CMD OK>")
 	else
-		print("Error:", list)
+		print(list)
+		print("<CMD Error>")
 	end
 end
 
