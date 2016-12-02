@@ -69,7 +69,6 @@ concat_table(lua_State *L, int index, void *buffer, size_t tlen) {
 	lua_pop(L, 1);
 }
 
-
 static size_t
 count_size(lua_State *L, int index) {
 	size_t tlen = 0;
@@ -125,14 +124,6 @@ lunpack(lua_State *L) {
 	}
 	else {
 		lua_pushlightuserdata(L, message->buffer);
-	}
-	if (message->type == SKYNET_SOCKET_TYPE_UDP) {
-		int addrsz = 0;
-		const char * addrstring = skynet_socket_udp_address(message, &addrsz);
-		if (addrstring) {
-			lua_pushlstring(L, addrstring, addrsz);
-			return 5;
-		}
 	}
 	return 4;
 }

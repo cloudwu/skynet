@@ -1658,58 +1658,39 @@ set_uart_mode(int fd, int speed, int flow_ctrl, int databits, int stopbits, int 
 	int   name_arr[] = { 115200,  19200,  9600,  4800,  2400,  1200,  300 };
 
 	struct termios options;
-	if (tcgetattr(fd, &options) != 0)
-	{
-		perror("SetupSerial 1");
+	if (tcgetattr(fd, &options) != 0){
+		perror("SetupSerial");
+		printf("fd:%d", fd);
 		return -1;
 	}
-
-	for (i = 0; i < sizeof(speed_arr) / sizeof(int); i++)
-	{
-		if (speed == name_arr[i])
-		{
+	for (i = 0; i < sizeof(speed_arr) / sizeof(int); i++){
+		if (speed == name_arr[i]){
 			cfsetispeed(&options, speed_arr[i]);
 			cfsetospeed(&options, speed_arr[i]);
 		}
 	}
-
 	options.c_cflag |= CLOCAL;
-
 	options.c_cflag |= CREAD;
-
 	switch (flow_ctrl)
 	{
-	case 0:
-		options.c_cflag &= ~CRTSCTS;
-		break;
-	case 1:
-		options.c_cflag |= CRTSCTS;
-		break;
-	case 2:
-		options.c_cflag |= IXON | IXOFF | IXANY;
-		break;
+	case 0:options.c_cflag &= ~CRTSCTS;break;
+	case 1:options.c_cflag |= CRTSCTS;break;
+	case 2:options.c_cflag |= IXON | IXOFF | IXANY;break;
+	default: 
+		fprintf(stderr, "Unsupported flow_ctrl\n");
+		return -1;
 	}
-
 	options.c_cflag &= ~CSIZE;
 	switch (databits)
 	{
-	case 5:
-		options.c_cflag |= CS5;
-		break;
-	case 6:
-		options.c_cflag |= CS6;
-		break;
-	case 7:
-		options.c_cflag |= CS7;
-		break;
-	case 8:
-		options.c_cflag |= CS8;
-		break;
+	case 5:options.c_cflag |= CS5;break;
+	case 6:options.c_cflag |= CS6;break;
+	case 7:options.c_cflag |= CS7;break;
+	case 8:options.c_cflag |= CS8;break;
 	default:
 		fprintf(stderr, "Unsupported data size\n");
 		return -1;
 	}
-
 	switch (parity)
 	{
 	case 'n':
@@ -1737,24 +1718,18 @@ set_uart_mode(int fd, int speed, int flow_ctrl, int databits, int stopbits, int 
 		fprintf(stderr, "Unsupported parity\n");
 		return -1;
 	}
-
 	switch (stopbits)
 	{
-	case 1:
-		options.c_cflag &= ~CSTOPB; break;
-	case 2:
-		options.c_cflag |= CSTOPB; break;
+	case 1:options.c_cflag &= ~CSTOPB; break;
+	case 2:options.c_cflag |= CSTOPB; break;
 	default:
 		fprintf(stderr, "Unsupported stop bits\n");
 		return -1;
 	}
-
 	options.c_oflag &= ~OPOST;
 	options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-
 	options.c_cc[VTIME] = 1;
 	options.c_cc[VMIN] = 1;
-
 	tcflush(fd, TCIFLUSH);
 
 	if (tcsetattr(fd, TCSANOW, &options) != 0)
@@ -1762,6 +1737,7 @@ set_uart_mode(int fd, int speed, int flow_ctrl, int databits, int stopbits, int 
 		perror("com set error!\n");
 		return -1;
 	}
+
 	return 1;
 }
 
@@ -1775,13 +1751,10 @@ uart_server_set(struct socket_server *ss, int id,
 		return -1;
 	}
 	int fd = s->fd;
-
 	if (set_uart_mode(fd, speed, flow_ctrl, databits, stopbits, parity) < 0)
 		return -1;
-
 	struct request_package request;
 	request.u.set_uart.id = id;
 	send_request(ss, &request, 'R', sizeof(request.u.set_uart));
-
 	return 1;
 }

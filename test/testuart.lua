@@ -6,7 +6,7 @@ local id
 skynet.start(function()
 	local cb = function(id,data)
 		print("recv data:" .. data)
-		if string.sub(data,1,-2) == "quit" then
+		if string.sub(data,1,4) == "quit" then
 			uart.close(fd)
 			skynet.exit()
 		end

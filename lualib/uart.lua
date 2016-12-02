@@ -8,6 +8,25 @@ local uart_pool = {}
 
 local uart_message = {}
 
+local function wakeup(s)
+	local co = s.co
+	if co then
+		s.co = nil
+		skynet.wakeup(co)
+	end
+end
+
+local function suspend(s)
+	assert(not s.co)
+	s.co = coroutine.running()
+	skynet.wait(s.co)
+	-- wakeup closing corouting every time suspend,
+	-- because socket.close() will wait last socket buffer operation before clear the buffer.
+	if s.closing then
+		skynet.wakeup(s.closing)
+	end
+end
+
 -- SKYNET_SOCKET_TYPE_DATA = 1
 uart_message[1] = function (id, size, data)
 	local s = uart_pool[id]
@@ -28,6 +47,7 @@ uart_message[2] = function(id, _ , _)
 		skynet.error("uart: no open uart")
 		return
 	end
+	wakeup(s)
 end
 
 -- SKYNET_SOCKET_TYPE_CLOSE = 3
@@ -51,12 +71,15 @@ skynet.register_protocol {
 
 local function create_uart_object(id, cb)
 	assert(not uart_pool[id], "uart is not close")
-	uart_pool[id] = {
+	s = {
 		id = id,
 		connected = false,
 		protocol = "UART",
 		callback = cb,
+		co = false,
 	}
+	uart_pool[id] = s
+	suspend(s)
 end
 
 function uart.open(callback,port)
