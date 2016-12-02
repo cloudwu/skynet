@@ -162,6 +162,9 @@ function suspend(co, result, command, param, size)
 	elseif command == "RETURN" then
 		local co_session = session_coroutine_id[co]
 		if co_session == 0 then
+			if size ~= nil then
+				c.trash(param, size)
+			end
 			return suspend(co, coroutine_resume(co, false))	-- send don't need ret
 		end
 		local co_address = session_coroutine_address[co]
