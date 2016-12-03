@@ -20,8 +20,6 @@ local function suspend(s)
 	assert(not s.co)
 	s.co = coroutine.running()
 	skynet.wait(s.co)
-	-- wakeup closing corouting every time suspend,
-	-- because socket.close() will wait last socket buffer operation before clear the buffer.
 	if s.closing then
 		skynet.wakeup(s.closing)
 	end
@@ -71,7 +69,7 @@ skynet.register_protocol {
 
 local function create_uart_object(id, cb)
 	assert(not uart_pool[id], "uart is not close")
-	s = {
+	local s = {
 		id = id,
 		connected = false,
 		protocol = "UART",
@@ -88,6 +86,7 @@ function uart.open(callback,port)
 		return id
 	end
 	create_uart_object(id, callback)
+	skynet.error("open "..port.." success")
 	return id
 end
 
@@ -106,7 +105,7 @@ function uart.send(id,data)
 		skynet.error("uart is not open")
 		return
 	end
-	if s.connected == false then
+	if not s.connected then
 		skynet.error("uart should set first")
 		return
 	end
