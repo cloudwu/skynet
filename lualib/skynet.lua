@@ -95,7 +95,7 @@ end
 
 -- coroutine reuse
 
-local coroutine_pool = {}
+local coroutine_pool = setmetatable({}, { __mode = "kv" })
 
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
@@ -161,6 +161,12 @@ function suspend(co, result, command, param, size)
 		sleep_session[co] = param
 	elseif command == "RETURN" then
 		local co_session = session_coroutine_id[co]
+		if co_session == 0 then
+			if size ~= nil then
+				c.trash(param, size)
+			end
+			return suspend(co, coroutine_resume(co, false))	-- send don't need ret
+		end
 		local co_address = session_coroutine_address[co]
 		if param == nil or session_response[co] then
 			error(debug.traceback(co))
@@ -343,12 +349,7 @@ function skynet.exit()
 end
 
 function skynet.getenv(key)
-	local ret = c.command("GETENV",key)
-	if ret == "" then
-		return
-	else
-		return ret
-	end
+	return (c.command("GETENV",key))
 end
 
 function skynet.setenv(key, value)
@@ -494,6 +495,8 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
 			suspend(co, coroutine_resume(co, session,source, p.unpack(msg,sz)))
+		elseif session ~= 0 then
+			c.send(source, skynet.PTYPE_ERROR, session, "")
 		else
 			unknown_request(session, source, msg, sz, proto[prototype].name)
 		end
@@ -553,13 +556,7 @@ function skynet.harbor(addr)
 	return c.harbor(addr)
 end
 
-function skynet.error(...)
-	local t = {...}
-	for i=1,#t do
-		t[i] = tostring(t[i])
-	end
-	return c.error(table.concat(t, " "))
-end
+skynet.error = c.error
 
 ----- register protocol
 do
@@ -616,14 +613,14 @@ local function ret(f, ...)
 	return ...
 end
 
-local function init_template(start)
+local function init_template(start, ...)
 	init_all()
 	init_func = {}
-	return ret(init_all, start())
+	return ret(init_all, start(...))
 end
 
-function skynet.pcall(start)
-	return xpcall(init_template, debug.traceback, start)
+function skynet.pcall(start, ...)
+	return xpcall(init_template, debug.traceback, start, ...)
 end
 
 function skynet.init_service(start)
@@ -645,11 +642,15 @@ function skynet.start(start_func)
 end
 
 function skynet.endless()
-	return c.command("ENDLESS")~=nil
+	return (c.intcommand("STAT", "endless") == 1)
 end
 
 function skynet.mqlen()
-	return c.intcommand "MQLEN"
+	return c.intcommand("STAT", "mqlen")
+end
+
+function skynet.stat(what)
+	return c.intcommand("STAT", what)
 end
 
 function skynet.task(ret)
@@ -667,15 +668,15 @@ function skynet.term(service)
 	return _error_dispatch(0, service)
 end
 
-local function clear_pool()
-	coroutine_pool = {}
+function skynet.memlimit(bytes)
+	debug.getregistry().memlimit = bytes
+	skynet.memlimit = nil	-- set only once
 end
 
 -- Inject internal debug framework
 local debug = require "skynet.debug"
-debug(skynet, {
+debug.init(skynet, {
 	dispatch = skynet.dispatch_message,
-	clear = clear_pool,
 	suspend = suspend,
 })
 

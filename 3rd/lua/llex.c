@@ -1,5 +1,5 @@
 /*
-** $Id: llex.c,v 2.95 2015/11/19 19:16:22 roberto Exp $
+** $Id: llex.c,v 2.96 2016/05/02 14:02:12 roberto Exp $
 ** Lexical Analyzer
 ** See Copyright Notice in lua.h
 */
@@ -162,7 +162,6 @@ static void inclinenumber (LexState *ls) {
 void luaX_setinput (lua_State *L, LexState *ls, ZIO *z, TString *source,
                     int firstchar) {
   ls->t.token = 0;
-  ls->decpoint = '.';
   ls->L = L;
   ls->current = firstchar;
   ls->lookahead.token = TK_EOS;  /* no look-ahead token */
@@ -207,35 +206,6 @@ static int check_next2 (LexState *ls, const char *set) {
 }
 
 
-/*
-** change all characters 'from' in buffer to 'to'
-*/
-static void buffreplace (LexState *ls, char from, char to) {
-  if (from != to) {
-    size_t n = luaZ_bufflen(ls->buff);
-    char *p = luaZ_buffer(ls->buff);
-    while (n--)
-      if (p[n] == from) p[n] = to;
-  }
-}
-
-
-/*
-** in case of format error, try to change decimal point separator to
-** the one defined in the current locale and check again
-*/
-static void trydecpoint (LexState *ls, TValue *o) {
-  char old = ls->decpoint;
-  ls->decpoint = lua_getlocaledecpoint();
-  buffreplace(ls, old, ls->decpoint);  /* try new decimal separator */
-  if (luaO_str2num(luaZ_buffer(ls->buff), o) == 0) {
-    /* format error with correct decimal point: no more options */
-    buffreplace(ls, ls->decpoint, '.');  /* undo change (for error message) */
-    lexerror(ls, "malformed number", TK_FLT);
-  }
-}
-
-
 /* LUA_NUMBER */
 /*
 ** this function is quite liberal in what it accepts, as 'luaO_str2num'
@@ -259,9 +229,8 @@ static int read_numeral (LexState *ls, SemInfo *seminfo) {
     else break;
   }
   save(ls, '\0');
-  buffreplace(ls, '.', ls->decpoint);  /* follow locale for decimal point */
   if (luaO_str2num(luaZ_buffer(ls->buff), &obj) == 0)  /* format error? */
-    trydecpoint(ls, &obj); /* try to update decimal point separator */
+    lexerror(ls, "malformed number", TK_FLT);
   if (ttisinteger(&obj)) {
     seminfo->i = ivalue(&obj);
     return TK_INT;

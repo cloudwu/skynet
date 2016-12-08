@@ -26,7 +26,6 @@ optint(const char *key, int opt) {
 	return strtol(str, NULL, 10);
 }
 
-/*
 static int
 optboolean(const char *key, int opt) {
 	const char * str = skynet_getenv(key);
@@ -36,7 +35,6 @@ optboolean(const char *key, int opt) {
 	}
 	return strcmp(str,"true")==0;
 }
-*/
 
 static const char *
 optstring(const char *key,const char * opt) {
@@ -115,7 +113,7 @@ main(int argc, char *argv[]) {
 
 	struct skynet_config config;
 
-	struct lua_State *L = lua_newstate(skynet_lalloc, NULL);
+	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);	// link lua lib
 
 	int err = luaL_loadstring(L, load_config);
@@ -137,6 +135,7 @@ main(int argc, char *argv[]) {
 	config.daemon = optstring("daemon", NULL);
 	config.logger = optstring("logger", NULL);
 	config.logservice = optstring("logservice", "logger");
+	config.profile = optboolean("profile", 1);
 
 	lua_close(L);
 

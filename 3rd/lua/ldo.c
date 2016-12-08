@@ -1,5 +1,5 @@
 /*
-** $Id: ldo.c,v 2.150 2015/11/19 19:16:22 roberto Exp $
+** $Id: ldo.c,v 2.151 2015/12/16 16:40:07 roberto Exp $
 ** Stack and Call structure of Lua
 ** See Copyright Notice in lua.h
 */
@@ -242,9 +242,14 @@ void luaD_inctop (lua_State *L) {
 /* }================================================================== */
 
 
+/*
+** Call a hook for the given event. Make sure there is a hook to be
+** called. (Both 'L->hook' and 'L->hookmask', which triggers this
+** function, can be changed asynchronously by signals.)
+*/
 void luaD_hook (lua_State *L, int event, int line) {
   lua_Hook hook = L->hook;
-  if (hook && L->allowhook) {
+  if (hook && L->allowhook) {  /* make sure there is a hook */
     CallInfo *ci = L->ci;
     ptrdiff_t top = savestack(L, L->top);
     ptrdiff_t ci_top = savestack(L, ci->top);

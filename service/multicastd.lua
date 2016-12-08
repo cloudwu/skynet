@@ -78,13 +78,13 @@ local function publish(c , source, pack, size)
 
 	local group = channel[c]
 	if group == nil or next(group) == nil then
-		-- dead channel, delete the pack. mc.bind returns the pointer in pack
+		-- dead channel, delete the pack. mc.bind returns the pointer in pack and free the pack (struct mc_package **)
 		local pack = mc.bind(pack, 1)
 		mc.close(pack)
 		return
 	end
-	mc.bind(pack, channel_n[c])
-	local msg = skynet.tostring(pack, size)
+	local msg = skynet.tostring(pack, size)	-- copy (pack,size) to a string
+	mc.bind(pack, channel_n[c])	-- mc.bind will free the pack(struct mc_package **)
 	for k in pairs(group) do
 		-- the msg is a pointer to the real message, publish pointer in local is ok.
 		skynet.redirect(k, source, "multicast", c , msg)
