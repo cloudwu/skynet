@@ -54,6 +54,8 @@ skynet.start(function()
 			if command == "hotfix" then
 				local hotfix = require "snax.hotfix"
 				skynet.ret(skynet.pack(hotfix(func, ...)))
+			elseif command == "profile" then
+				skynet.ret(skynet.pack(profile_table))
 			elseif command == "init" then
 				assert(not init, "Already init")
 				local initfunc = method[4] or function() end
