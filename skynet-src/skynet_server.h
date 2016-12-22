@@ -26,4 +26,6 @@ void skynet_globalinit(void);
 void skynet_globalexit(void);
 void skynet_initthread(int m);
 
+void skynet_profile_enable(int enable);
+
 #endif

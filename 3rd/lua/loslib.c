@@ -260,7 +260,8 @@ static int getfield (lua_State *L, const char *key, int d, int delta) {
 static const char *checkoption (lua_State *L, const char *conv, char *buff) {
   const char *option;
   int oplen = 1;
-  for (option = LUA_STRFTIMEOPTIONS; *option != '\0'; option += oplen) {
+  int convlen = (int)strlen(conv);
+  for (option = LUA_STRFTIMEOPTIONS; *option != '\0' && oplen <= convlen; option += oplen) {
     if (*option == '|')  /* next block? */
       oplen++;  /* next length */
     else if (memcmp(conv, option, oplen) == 0) {  /* match? */
