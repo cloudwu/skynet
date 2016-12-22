@@ -332,3 +332,7 @@ function COMMANDX.call(cmd)
 	local rets = table.pack(skynet.call(address, "lua", table.unpack(args, 2, args.n)))
 	return rets
 end
+
+if type(cmdext) == "function" then
+	cmdext(COMMAND)
+end
