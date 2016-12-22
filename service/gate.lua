@@ -22,7 +22,7 @@ function handler.message(fd, msg, sz)
 	local c = connection[fd]
 	local agent = c.agent
 	if agent then
-		skynet.redirect(agent, c.client, "client", 0, msg, sz)
+		skynet.redirect(agent, c.client, "client", 1, msg, sz)
 	else
 		skynet.send(watchdog, "lua", "socket", "data", fd, netpack.tostring(msg, sz))
 	end

@@ -8,6 +8,7 @@ local NORET = {}
 local pool = {}
 local pool_count = {}
 local objmap = {}
+local collect_tick = 600
 
 local function newobj(name, tbl)
 	assert(pool[name] == nil)
@@ -19,17 +20,28 @@ local function newobj(name, tbl)
 	pool_count[name] = { n = 0, threshold = 16 }
 end
 
+local function collect10sec()
+	if collect_tick > 10 then
+		collect_tick = 10
+	end
+end
+
 local function collectobj()
 	while true do
-		skynet.sleep(600 * 100)	-- sleep 10 min
-		collectgarbage()
-		for obj, v in pairs(objmap) do
-			if v == true then
-				if sharedata.host.getref(obj) <= 0  then
-					objmap[obj] = nil
-					sharedata.host.delete(obj)
+		skynet.sleep(100)	-- sleep 1s
+		if collect_tick <= 0 then
+			collect_tick = 600	-- reset tick count to 600 sec
+			collectgarbage()
+			for obj, v in pairs(objmap) do
+				if v == true then
+					if sharedata.host.getref(obj) <= 0  then
+						objmap[obj] = nil
+						sharedata.host.delete(obj)
+					end
 				end
 			end
+		else
+			collect_tick = collect_tick - 1
 		end
 	end
 end
@@ -109,6 +121,7 @@ function CMD.update(name, t, ...)
 			response(true, newobj)
 		end
 	end
+	collect10sec()	-- collect in 10 sec
 end
 
 local function check_watch(queue)
