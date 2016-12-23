@@ -256,6 +256,8 @@ function skynet.timeout(ti, func)
 	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
+
+        return co
 end
 
 function skynet.sleep(ti)
@@ -645,7 +647,7 @@ function skynet.task(ret)
 	local t = 0
 	for session,co in pairs(session_id_coroutine) do
 		if ret then
-			ret[session] = debug.traceback(co)
+			ret[session] = co
 		end
 		t = t + 1
 	end
