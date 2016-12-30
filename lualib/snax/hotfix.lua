@@ -53,8 +53,8 @@ local function collect_all_uv(funcs)
 end
 
 local function loader(source)
-	return function (filename, ...)
-		return load(source, "=patch", ...)
+	return function (path, name, G)
+		return load(source, "=patch", "bt", G)
 	end
 end
 
