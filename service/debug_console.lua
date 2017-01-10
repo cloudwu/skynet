@@ -155,6 +155,7 @@ function COMMAND.help()
 		shrtbl = "Show shared short string table info",
 		ping = "ping address",
 		call = "call address ...",
+		detail = "task address : show all service task traceback",
 	}
 end
 
@@ -331,4 +332,9 @@ function COMMANDX.call(cmd)
 	end
 	local rets = table.pack(skynet.call(address, "lua", table.unpack(args, 2, args.n)))
 	return rets
+end
+
+function COMMAND.detail(fd, address)
+	address = adjust_address(address)
+	return skynet.call(address,"debug","DETAIL")
 end

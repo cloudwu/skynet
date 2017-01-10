@@ -55,6 +55,8 @@ local dead_service = {}
 local error_queue = {}
 local fork_queue = {}
 
+local traceback_cache = {}
+
 -- suspend is function
 local suspend
 
@@ -69,6 +71,7 @@ local function dispatch_error_queue()
 	if session then
 		local co = session_id_coroutine[session]
 		session_id_coroutine[session] = nil
+		traceback_cache[session] = nil
 		return suspend(co, coroutine_resume(co, false))
 	end
 end
@@ -156,8 +159,10 @@ function suspend(co, result, command, param, size)
 	end
 	if command == "CALL" then
 		session_id_coroutine[param] = co
+		traceback_cache[param] = debug.traceback(co)
 	elseif command == "SLEEP" then
 		session_id_coroutine[param] = co
+		traceback_cache[param] = debug.traceback(co)
 		sleep_session[co] = param
 	elseif command == "RETURN" then
 		local co_session = session_coroutine_id[co]
@@ -262,6 +267,7 @@ function skynet.timeout(ti, func)
 	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
+	traceback_cache[session] = debug.traceback()
 end
 
 function skynet.sleep(ti)
@@ -289,6 +295,7 @@ function skynet.wait(co)
 	co = co or coroutine.running()
 	sleep_session[co] = nil
 	session_id_coroutine[session] = nil
+	traceback_cache[session] = nil
 end
 
 local self_handle
@@ -467,10 +474,12 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 		local co = session_id_coroutine[session]
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
+			traceback_cache[session] = nil
 		elseif co == nil then
 			unknown_response(session, source, msg, sz)
 		else
 			session_id_coroutine[session] = nil
+			traceback_cache[session] = nil
 			suspend(co, coroutine_resume(co, true, msg, sz))
 		end
 	else
@@ -658,6 +667,17 @@ function skynet.task(ret)
 	for session,co in pairs(session_id_coroutine) do
 		if ret then
 			ret[session] = debug.traceback(co)
+		end
+		t = t + 1
+	end
+	return t
+end
+
+function skynet.detail(ret)
+	local t = 0
+	for session,info in pairs(traceback_cache) do
+		if ret then
+			ret[session] = info
 		end
 		t = t + 1
 	end
