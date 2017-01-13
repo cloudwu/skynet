@@ -1,5 +1,5 @@
 /*
-** $Id: lua.c,v 1.229 2016/12/22 13:08:50 roberto Exp $
+** $Id: lua.c,v 1.230 2017/01/12 17:14:26 roberto Exp $
 ** Lua stand-alone interpreter
 ** See Copyright Notice in lua.h
 */
@@ -20,8 +20,6 @@
 #include "lualib.h"
 #include "lstring.h"
 
-
-#define LUA_VERSUFFIX          "_" LUA_VERSION_MAJOR "_" LUA_VERSION_MINOR
 
 
 #if !defined(LUA_PROMPT)
@@ -535,88 +533,6 @@ static int runargs (lua_State *L, char **argv, int n) {
 
 
 
-/*
-** {==================================================================
-** Set Paths
-** ===================================================================
-*/
-
-/*
-** LUA_PATH_VAR and LUA_CPATH_VAR are the names of the environment
-** variables that Lua check to set its paths.
-*/
-#if !defined(LUA_PATH_VAR)
-#define LUA_PATH_VAR    "LUA_PATH"
-#endif
-
-#if !defined(LUA_CPATH_VAR)
-#define LUA_CPATH_VAR   "LUA_CPATH"
-#endif
-
-#define LUA_PATHVARVERSION              LUA_PATH_VAR LUA_VERSUFFIX
-#define LUA_CPATHVARVERSION             LUA_CPATH_VAR LUA_VERSUFFIX
-
-
-#define AUXMARK         "\1"	/* auxiliary mark */
-
-
-#if defined(LUA_USE_WINDOWS)
-
-
-/*
-** Replace in the path (on the top of the stack) any occurrence
-** of LUA_EXEC_DIR with the executable's path.
-*/
-static void setprogdir (lua_State *L) {
-  char buff[MAX_PATH + 1];
-  char *lb;
-  DWORD nsize = sizeof(buff)/sizeof(char);
-  DWORD n = GetModuleFileNameA(NULL, buff, nsize);  /* get exec. name */
-  if (n == 0 || n == nsize || (lb = strrchr(buff, '\\')) == NULL)
-    luaL_error(L, "unable to get ModuleFileName");
-  else {
-    *lb = '\0';  /* cut name on the last '\\' to get the path */
-    luaL_gsub(L, lua_tostring(L, -1), LUA_EXEC_DIR, buff);
-    lua_remove(L, -2);  /* remove original string */
-  }
-}
-
-#else
-
-#define setprogdir(L)           ((void)0)
-
-#endif
-
-/*
-** Change a path according to corresponding environment variables
-*/
-static void chgpath (lua_State *L, const char *fieldname,
-                                   const char *envname1,
-                                   const char *envname2,
-                                   int noenv) {
-  const char *path = getenv(envname1);
-  lua_getglobal(L, LUA_LOADLIBNAME);  /* get 'package' table */
-  lua_getfield(L, -1, fieldname);  /* get original path */
-  if (path == NULL)  /* no environment variable? */
-    path = getenv(envname2);  /* try alternative name */
-  if (path == NULL || noenv)  /* no environment variable? */
-    lua_pushvalue(L, -1);  /* use original value */
-  else {
-    const char *def = lua_tostring(L, -1);  /* default path */
-    /* replace ";;" by ";AUXMARK;" and then AUXMARK by default path */
-    path = luaL_gsub(L, path, LUA_PATH_SEP LUA_PATH_SEP,
-                              LUA_PATH_SEP AUXMARK LUA_PATH_SEP);
-    luaL_gsub(L, path, AUXMARK, def);
-    lua_remove(L, -2); /* remove result from 1st 'gsub' */
-  }
-  setprogdir(L);
-  lua_setfield(L, -3, fieldname);  /* set path value */
-  lua_pop(L, 2);  /* pop 'package' table and original path  */
-}
-
-/* }================================================================== */
-
-
 static int handle_luainit (lua_State *L) {
   const char *name = "=" LUA_INITVARVERSION;
   const char *init = getenv(name + 1);
@@ -649,10 +565,11 @@ static int pmain (lua_State *L) {
   }
   if (args & has_v)  /* option '-v'? */
     print_version();
+  if (args & has_E) {  /* option '-E'? */
+    lua_pushboolean(L, 1);  /* signal for libraries to ignore env. vars. */
+    lua_setfield(L, LUA_REGISTRYINDEX, "LUA_NOENV");
+  }
   luaL_openlibs(L);  /* open standard libraries */
-  /* change paths according to env variables */
-  chgpath(L, "path", LUA_PATHVARVERSION, LUA_PATH_VAR, (args & has_E));
-  chgpath(L, "cpath", LUA_CPATHVARVERSION, LUA_CPATH_VAR, (args & has_E));
   createargtable(L, argv, argc, script);  /* create table 'arg' */
   if (!(args & has_E)) {  /* no option '-E'? */
     if (handle_luainit(L) != LUA_OK)  /* run LUA_INIT */

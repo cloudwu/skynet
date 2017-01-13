@@ -1,5 +1,5 @@
 /*
-** $Id: loadlib.c,v 1.129 2016/12/04 20:17:24 roberto Exp $
+** $Id: loadlib.c,v 1.130 2017/01/12 17:14:26 roberto Exp $
 ** Dynamic library loader for Lua
 ** See Copyright Notice in lua.h
 **
@@ -62,6 +62,9 @@
 static const int CLIBS = 0;
 
 #define LIB_FAIL	"open"
+
+
+#define setprogdir(L)           ((void)0)
 
 
 /*
@@ -155,6 +158,30 @@ static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym) {
 #endif
 
 
+#undef setprogdir
+
+
+/*
+** Replace in the path (on the top of the stack) any occurrence
+** of LUA_EXEC_DIR with the executable's path.
+*/
+static void setprogdir (lua_State *L) {
+  char buff[MAX_PATH + 1];
+  char *lb;
+  DWORD nsize = sizeof(buff)/sizeof(char);
+  DWORD n = GetModuleFileNameA(NULL, buff, nsize);  /* get exec. name */
+  if (n == 0 || n == nsize || (lb = strrchr(buff, '\\')) == NULL)
+    luaL_error(L, "unable to get ModuleFileName");
+  else {
+    *lb = '\0';  /* cut name on the last '\\' to get the path */
+    luaL_gsub(L, lua_tostring(L, -1), LUA_EXEC_DIR, buff);
+    lua_remove(L, -2);  /* remove original string */
+  }
+}
+
+
+
+
 static void pusherror (lua_State *L) {
   int error = GetLastError();
   char buffer[128];
@@ -221,6 +248,67 @@ static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym) {
 
 /* }====================================================== */
 #endif				/* } */
+
+
+/*
+** {==================================================================
+** Set Paths
+** ===================================================================
+*/
+
+/*
+** LUA_PATH_VAR and LUA_CPATH_VAR are the names of the environment
+** variables that Lua check to set its paths.
+*/
+#if !defined(LUA_PATH_VAR)
+#define LUA_PATH_VAR    "LUA_PATH"
+#endif
+
+#if !defined(LUA_CPATH_VAR)
+#define LUA_CPATH_VAR   "LUA_CPATH"
+#endif
+
+
+#define AUXMARK         "\1"	/* auxiliary mark */
+
+
+/*
+** return registry.LUA_NOENV as a boolean
+*/
+static int noenv (lua_State *L) {
+  int b;
+  lua_getfield(L, LUA_REGISTRYINDEX, "LUA_NOENV");
+  b = lua_toboolean(L, -1);
+  lua_pop(L, 1);  /* remove value */
+  return b;
+}
+
+
+/*
+** Set a path
+*/
+static void setpath (lua_State *L, const char *fieldname,
+                                   const char *envname,
+                                   const char *dft) {
+  const char *nver = lua_pushfstring(L, "%s%s", envname, LUA_VERSUFFIX);
+  const char *path = getenv(nver);  /* use versioned name */
+  if (path == NULL)  /* no environment variable? */
+    path = getenv(envname);  /* try unversioned name */
+  if (path == NULL || noenv(L))  /* no environment variable? */
+    lua_pushstring(L, dft);  /* use default */
+  else {
+    /* replace ";;" by ";AUXMARK;" and then AUXMARK by default path */
+    path = luaL_gsub(L, path, LUA_PATH_SEP LUA_PATH_SEP,
+                              LUA_PATH_SEP AUXMARK LUA_PATH_SEP);
+    luaL_gsub(L, path, AUXMARK, dft);
+    lua_remove(L, -2); /* remove result from 1st 'gsub' */
+  }
+  setprogdir(L);
+  lua_setfield(L, -3, fieldname);  /* package[fieldname] = path value */
+  lua_pop(L, 1);  /* pop versioned variable name */
+}
+
+/* }================================================================== */
 
 
 /*
@@ -680,10 +768,9 @@ LUAMOD_API int luaopen_package (lua_State *L) {
   createclibstable(L);
   luaL_newlib(L, pk_funcs);  /* create 'package' table */
   createsearcherstable(L);
-  lua_pushstring(L, LUA_PATH_DEFAULT);
-  lua_setfield(L, -2, "path");  /* package.path = default path */
-  lua_pushstring(L, LUA_CPATH_DEFAULT);
-  lua_setfield(L, -2, "cpath");  /* package.cpath = default cpath */
+  /* set paths */
+  setpath(L, "path", LUA_PATH_VAR, LUA_PATH_DEFAULT);
+  setpath(L, "cpath", LUA_CPATH_VAR, LUA_CPATH_DEFAULT);
   /* store config information */
   lua_pushliteral(L, LUA_DIRSEP "\n" LUA_PATH_SEP "\n" LUA_PATH_MARK "\n"
                      LUA_EXEC_DIR "\n" LUA_IGMARK "\n");
