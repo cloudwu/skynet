@@ -11,6 +11,13 @@ local harbor = {}
 local harbor_service
 local monitor = {}
 local monitor_master_set = {}
+local watchers = {}
+
+local function notify_watchers(sig, slaveid)
+    for _,w in ipairs(watchers) do
+        skynet.send(w, "lua", "slave_notify", sig, slaveid)
+    end
+end
 
 local function read_package(fd)
 	local sz = socket.read(fd, 1)
@@ -98,6 +105,7 @@ local function monitor_master(master_fd)
 					monitor_clear(id_name)
 					socket.close(fd)
 				end
+                                notify_watchers("D", id_name)
 			end
 		else
 			skynet.error("Master disconnect")
@@ -167,6 +175,10 @@ local function monitor_harbor(master_fd)
 			skynet.error("Unknown command ", command)
 		end
 	end
+end
+
+function harbor.watch(addr)
+    table.insert(watchers, addr)
 end
 
 function harbor.REGISTER(fd, name, handle)
