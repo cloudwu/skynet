@@ -177,7 +177,7 @@ local function monitor_harbor(master_fd)
 	end
 end
 
-function harbor.watch(addr)
+function harbor.watch(_,addr)
     table.insert(watchers, addr)
 end
 
