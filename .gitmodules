@@ -16,3 +16,6 @@
 [submodule "3rd/lua-mt19937"]
 	path = 3rd/lua-mt19937
 	url = https://github.com/ldy105cn/mt19937.git
+[submodule "3rd/luareload"]
+	path = 3rd/luareload
+	url = https://github.com/ldy105cn/luareload.git
