@@ -1,4 +1,4 @@
-local system = { "init", "exit", "hotfix","name" }
+local system = { "init", "exit", "hotfix","profile","name" }
 
 do
         for k, v in ipairs(system) do
