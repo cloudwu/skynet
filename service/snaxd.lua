@@ -66,8 +66,11 @@ skynet.start(function()
 				end)
 				init = true
                         elseif command == "name" then
-                                local func = method[4] or function () return SERVICE_NAME end
-                                skynet.ret(skynet.pack(func()))
+                                if method[4] then
+                                    skynet.ret(skynet.pack(method[4]()))
+                                else
+                                    skynet.ret(skynet.pack(SERVICE_NAME))
+                                end
 			else
 				assert(init, "Never init")
 				assert(command == "exit")
