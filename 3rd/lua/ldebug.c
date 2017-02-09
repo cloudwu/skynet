@@ -1,5 +1,5 @@
 /*
-** $Id: ldebug.c,v 2.120 2016/03/31 19:01:21 roberto Exp $
+** $Id: ldebug.c,v 2.121 2016/10/19 12:32:10 roberto Exp $
 ** Debug Interface
 ** See Copyright Notice in lua.h
 */
@@ -38,7 +38,8 @@
 #define ci_func(ci)		(clLvalue((ci)->func))
 
 
-static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name);
+static const char *funcnamefromcode (lua_State *L, CallInfo *ci,
+                                    const char **name);
 
 
 static int currentpc (CallInfo *ci) {
@@ -244,6 +245,20 @@ static void collectvalidlines (lua_State *L, Closure *f) {
 }
 
 
+static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name) {
+  if (ci == NULL)  /* no 'ci'? */
+    return NULL;  /* no info */
+  else if (ci->callstatus & CIST_FIN) {  /* is this a finalizer? */
+    *name = "__gc";
+    return "metamethod";  /* report it as such */
+  }
+  /* calling function is a known Lua function? */
+  else if (!(ci->callstatus & CIST_TAIL) && isLua(ci->previous))
+    return funcnamefromcode(L, ci->previous, name);
+  else return NULL;  /* no way to find a name */
+}
+
+
 static int auxgetinfo (lua_State *L, const char *what, lua_Debug *ar,
                        Closure *f, CallInfo *ci) {
   int status = 1;
@@ -274,11 +289,7 @@ static int auxgetinfo (lua_State *L, const char *what, lua_Debug *ar,
         break;
       }
       case 'n': {
-        /* calling function is a known Lua function? */
-        if (ci && !(ci->callstatus & CIST_TAIL) && isLua(ci->previous))
-          ar->namewhat = getfuncname(L, ci->previous, &ar->name);
-        else
-          ar->namewhat = NULL;
+        ar->namewhat = getfuncname(L, ci, &ar->name);
         if (ar->namewhat == NULL) {
           ar->namewhat = "";  /* not found */
           ar->name = NULL;
@@ -471,8 +482,15 @@ static const char *getobjname (Proto *p, int lastpc, int reg,
 }
 
 
-static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name) {
-  TMS tm = (TMS)0;  /* to avoid warnings */
+/*
+** Try to find a name for a function based on the code that called it.
+** (Only works when function was called by a Lua function.)
+** Returns what the name is (e.g., "for iterator", "method",
+** "metamethod") and sets '*name' to point to the name.
+*/
+static const char *funcnamefromcode (lua_State *L, CallInfo *ci,
+                                     const char **name) {
+  TMS tm = (TMS)0;  /* (initial value avoids warnings) */
   Proto *p = ci_func(ci)->p;  /* calling function */
   int pc = currentpc(ci);  /* calling instruction index */
   Instruction i = p->sp->code[pc];  /* calling instruction */
@@ -482,13 +500,13 @@ static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name) {
   }
   switch (GET_OPCODE(i)) {
     case OP_CALL:
-    case OP_TAILCALL:  /* get function name */
-      return getobjname(p, pc, GETARG_A(i), name);
+    case OP_TAILCALL:
+      return getobjname(p, pc, GETARG_A(i), name);  /* get function name */
     case OP_TFORCALL: {  /* for iterator */
       *name = "for iterator";
        return "for iterator";
     }
-    /* all other instructions can call only through metamethods */
+    /* other instructions can do calls through metamethods */
     case OP_SELF: case OP_GETTABUP: case OP_GETTABLE:
       tm = TM_INDEX;
       break;
@@ -509,7 +527,8 @@ static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name) {
     case OP_EQ: tm = TM_EQ; break;
     case OP_LT: tm = TM_LT; break;
     case OP_LE: tm = TM_LE; break;
-    default: lua_assert(0);  /* other instructions cannot call a function */
+    default:
+      return NULL;  /* cannot find a reasonable name */
   }
   *name = getstr(G(L)->tmname[tm]);
   return "metamethod";
