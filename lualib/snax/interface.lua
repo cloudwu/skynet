@@ -1,3 +1,4 @@
+local system = require"snax.sysfunc"
 local skynet = require "skynet"
 
 local function dft_loader(path, name, G)
@@ -51,11 +52,8 @@ return function (name , G, loader)
 	local env = setmetatable({} , { __index = temp_global })
 	local func = {}
 
-	local system = { "init", "exit", "hotfix" }
-
 	do
 		for k, v in ipairs(system) do
-			system[v] = k
 			func[k] = { k , "system", v }
 		end
 	end

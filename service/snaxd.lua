@@ -49,11 +49,6 @@ end
 skynet.start(function()
 	local init = false
 	local function dispatcher( session , source , id, ...)
-                if id == "name" then
-                    skynet.ret(skynet.pack(snax_name))
-                    return
-                end
-
 		local method = func[id]
 
 		if method[2] == "system" then
@@ -70,6 +65,9 @@ skynet.start(function()
 					return profile_table
 				end)
 				init = true
+                        elseif command == "name" then
+                                local func = method[4] or function () return SERVICE_NAME end
+                                skynet.ret(skynet.pack(func()))
 			else
 				assert(init, "Never init")
 				assert(command == "exit")

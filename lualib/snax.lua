@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local snax_interface = require "snax.interface"
+local sysfunc = require"snax.sysfunc"
 
 local snax = {}
 local typeclass = {}
@@ -147,6 +148,12 @@ end
 
 function snax.exit(...)
 	snax.kill(snax.self(), ...)
+end
+
+function snax.name(handle)
+    handle = handle or skynet.self()
+
+    return skynet_call(handle, "snax",sysfunc.name)
 end
 
 local function test_result(ok, ...)
