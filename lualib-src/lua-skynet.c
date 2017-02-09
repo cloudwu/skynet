@@ -126,15 +126,30 @@ lintcommand(lua_State *L) {
 	const char * parm = NULL;
 	char tmp[64];	// for integer parm
 	if (lua_gettop(L) == 2) {
-		int32_t n = (int32_t)luaL_checkinteger(L,2);
-		sprintf(tmp, "%d", n);
-		parm = tmp;
+		if (lua_isnumber(L, 2)) {
+			int32_t n = (int32_t)luaL_checkinteger(L,2);
+			sprintf(tmp, "%d", n);
+			parm = tmp;
+		} else {
+			parm = luaL_checkstring(L,2);
+		}
 	}
 
 	result = skynet_command(context, cmd, parm);
 	if (result) {
-		lua_Integer r = strtoll(result, NULL, 0);
-		lua_pushinteger(L, r);
+		char *endptr = NULL; 
+		lua_Integer r = strtoll(result, &endptr, 0);
+		if (endptr == NULL || *endptr != '\0') {
+			// may be real number
+			double n = strtod(result, &endptr);
+			if (endptr == NULL || *endptr != '\0') {
+				return luaL_error(L, "Invalid result %s", result);
+			} else {
+				lua_pushnumber(L, n);
+			}
+		} else {
+			lua_pushinteger(L, r);
+		}
 		return 1;
 	}
 	return 0;
