@@ -149,6 +149,13 @@ function snax.exit(...)
 	snax.kill(snax.self(), ...)
 end
 
+function snax.name(handle)
+    local sysfunc = require"snax.sysfunc"
+    handle = handle or skynet.self()
+
+    return skynet_call(handle, "snax",sysfunc.name)
+end
+
 local function test_result(ok, ...)
 	if ok then
 		return ...

@@ -67,6 +67,12 @@ skynet.start(function()
 					return profile_table
 				end)
 				init = true
+                        elseif command == "name" then
+                                if method[4] then
+                                    skynet.ret(skynet.pack(method[4]()))
+                                else
+                                    skynet.ret(skynet.pack(SERVICE_NAME))
+                                end
 			else
 				assert(init, "Never init")
 				assert(command == "exit")

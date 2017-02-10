@@ -31,6 +31,10 @@ local function response_name(name)
 	end
 end
 
+function harbor.watch(addr)
+    -- donothing
+end
+
 function harbor.REGISTER(name, handle)
 	assert(globalname[name] == nil)
 	globalname[name] = handle
