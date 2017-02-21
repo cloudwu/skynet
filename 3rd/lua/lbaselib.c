@@ -1,5 +1,5 @@
 /*
-** $Id: lbaselib.c,v 1.313 2016/04/11 19:18:40 roberto Exp $
+** $Id: lbaselib.c,v 1.314 2016/09/05 19:06:34 roberto Exp $
 ** Basic library
 ** See Copyright Notice in lua.h
 */
@@ -208,8 +208,8 @@ static int luaB_type (lua_State *L) {
 
 static int pairsmeta (lua_State *L, const char *method, int iszero,
                       lua_CFunction iter) {
+  luaL_checkany(L, 1);
   if (luaL_getmetafield(L, 1, method) == LUA_TNIL) {  /* no metamethod? */
-    luaL_checktype(L, 1, LUA_TTABLE);  /* argument must be a table */
     lua_pushcfunction(L, iter);  /* will return generator, */
     lua_pushvalue(L, 1);  /* state, */
     if (iszero) lua_pushinteger(L, 0);  /* and initial value */

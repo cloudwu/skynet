@@ -494,7 +494,7 @@ static int
 lfromhex(lua_State *L) {
 	size_t sz = 0;
 	const char * text = luaL_checklstring(L, 1, &sz);
-	if (sz & 2) {
+	if (sz & 1) {
 		return luaL_error(L, "Invalid hex text size %d", (int)sz);
 	}
 	char tmp[SMALL_CHUNK];
@@ -751,7 +751,7 @@ ldhexchange(lua_State *L) {
 	if (x64 == 0)
 		return luaL_error(L, "Can't be 0");
 
-	uint64_t r = powmodp(5,	x64);
+	uint64_t r = powmodp(G,	x64);
 	push64(L, r);
 	return 1;
 }

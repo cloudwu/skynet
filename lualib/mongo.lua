@@ -7,6 +7,7 @@ local md5 =	require	"md5"
 local crypt = require "crypt"
 local rawget = rawget
 local assert = assert
+local table = table
 
 local bson_encode =	bson.encode
 local bson_encode_order	= bson.encode_order
@@ -105,12 +106,38 @@ local function mongo_auth(mongoc)
 				mongoc.__sock:changebackup(backup)
 			end
 			if rs_data.ismaster	then
+				if rawget(mongoc, "__pickserver") then
+					rawset(mongoc, "__pickserver", nil)
+				end
 				return
 			else
-				local host,	port = __parse_addr(rs_data.primary)
-				mongoc.host	= host
-				mongoc.port	= port
-				mongoc.__sock:changehost(host, port)
+				if rs_data.primary then
+					local host,	port = __parse_addr(rs_data.primary)
+					mongoc.host	= host
+					mongoc.port	= port
+					mongoc.__sock:changehost(host, port)
+				else
+					skynet.error("WARNING: NO PRIMARY RETURN " .. rs_data.me)
+					-- determine the primary db using hosts
+					local pickserver = {}
+					if rawget(mongoc, "__pickserver") == nil then
+						for _, v in ipairs(rs_data.hosts) do
+							if v ~= rs_data.me then
+								table.insert(pickserver, v)
+							end
+							rawset(mongoc, "__pickserver", pickserver)
+						end
+					end
+					if #mongoc.__pickserver <= 0 then
+						error("CAN NOT DETERMINE THE PRIMARY DB")
+					end
+					skynet.error("INFO: TRY TO CONNECT " .. mongoc.__pickserver[1])
+					local host, port = __parse_addr(mongoc.__pickserver[1])
+					table.remove(mongoc.__pickserver, 1)
+					mongoc.host	= host
+					mongoc.port	= port
+					mongoc.__sock:changehost(host, port)
+				end
 			end
 		end
 	end
@@ -369,8 +396,19 @@ function mongo_collection:find(query, selector)
 	} ,	cursor_meta)
 end
 
-function mongo_cursor:sort(key_list)
-	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key_list}
+-- cursor:sort { key = 1 } or cursor:sort( {key1 = 1}, {key2 = -1})
+function mongo_cursor:sort(key, key_v, ...)
+	if key_v then
+		local key_list = {}
+		for _, kp in ipairs {key, key_v, ...} do
+			local next_func, t = pairs(kp)
+			local k, v = next_func(t, v)	-- The first key pair
+			table.insert(key_list, k)
+			table.insert(key_list, v)
+		end
+		key = bson_encode_order(table.unpack(key_list))
+	end
+	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key}
 	return self
 end
 
