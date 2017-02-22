@@ -155,6 +155,7 @@ function COMMAND.help()
 		shrtbl = "Show shared short string table info",
 		ping = "ping address",
 		call = "call address ...",
+		test = "test cmd for chenhw"
 	}
 end
 
@@ -223,6 +224,25 @@ end
 
 function COMMAND.kill(address)
 	return skynet.call(".launcher", "lua", "KILL", address)
+end
+
+function COMMAND.test(address, cmd, data)
+	if address then
+		address = tonumber(string.sub(address, 2), 16)
+	else
+		address = 16777232
+	end
+	local t = snax.bind(address, "testservice")
+	local index = string.find(cmd,"%.")
+	local cmd1 = string.sub(cmd, 1, index-1)
+	local cmd2 = string.sub(cmd, index+1)
+	if cmd1 == "accept" then
+		cmd1 = "post"
+	elseif cmd1 == "response" then
+		cmd1 = "req"
+	end
+	print("vvvvvvvvvvvv",cmd1,cmd2)
+	t[cmd1][cmd2](data)
 end
 
 function COMMAND.gc()
