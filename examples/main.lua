@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local sprotoloader = require "sprotoloader"
+local snax = require "snax"
 
 local max_client = 64
 
@@ -15,8 +16,18 @@ skynet.start(function()
 	skynet.call(watchdog, "lua", "start", {
 		port = 8888,
 		maxclient = max_client,
+
 		nodelay = true,
 	})
 	skynet.error("Watchdog listen on", 8888)
+
+	local service1 = snax.newservice("testservice")
+
+	local service1 = skynet.newservice("myservice1")
+	print(skynet.call(service1, "lua", 1, 2, 3))
+
+	local service2 = skynet.newservice("myservice2")
+	print(skynet.call(service2, "lua", 1, 2, 3))
+
 	skynet.exit()
 end)
