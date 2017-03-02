@@ -211,7 +211,8 @@ function suspend(co, result, command, param, size)
 			end
 
 			local ret
-			if not dead_service[co_address] then
+			-- do not response when session == 0 (send)
+			if co_session ~= 0 and not dead_service[co_address] then
 				if ok then
 					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) ~= nil
 					if not ret then
