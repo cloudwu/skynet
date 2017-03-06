@@ -113,7 +113,8 @@ do -- begin skynetco.wrap
 		if ok then
 			return ...
 		else
-			error(debug.traceback(co), 2)
+			local errmsg = ...
+			error(errmsg..'\n'..debug.traceback(co), 2)
 		end
 	end
 
