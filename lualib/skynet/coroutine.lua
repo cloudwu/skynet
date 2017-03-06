@@ -109,11 +109,11 @@ end
 
 do -- begin skynetco.wrap
 
-	local function wrap_co(ok, ...)
+	local function wrap_co(co, ok, ...)
 		if ok then
 			return ...
 		else
-			error(...)
+			error(debug.traceback(co), 2)
 		end
 	end
 
@@ -122,7 +122,7 @@ function skynetco.wrap(f)
 		return f(...)
 	end)
 	return function(...)
-		return wrap_co(skynetco.resume(co, ...))
+		return wrap_co(co, skynetco.resume(co, ...))
 	end
 end
 
