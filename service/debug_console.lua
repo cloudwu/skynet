@@ -233,9 +233,7 @@ function COMMAND.test(address, cmd, data)
 		address = 16777232
 	end
 	local t = snax.bind(address, "testservice")
-	local index = string.find(cmd,"%.")
-	local cmd1 = string.sub(cmd, 1, index-1)
-	local cmd2 = string.sub(cmd, index+1)
+	local cmd1, cmd2 = string.match(cmd, "(%S+)%.(%S+)")
 	if cmd1 == "accept" then
 		cmd1 = "post"
 	elseif cmd1 == "response" then
