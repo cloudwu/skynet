@@ -239,7 +239,6 @@ function COMMAND.test(address, cmd, data)
 	elseif cmd1 == "response" then
 		cmd1 = "req"
 	end
-	print("vvvvvvvvvvvv",cmd1,cmd2)
 	t[cmd1][cmd2](data)
 end
 
