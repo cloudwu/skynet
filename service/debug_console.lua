@@ -229,14 +229,16 @@ end
 function COMMAND.test(address, cmd, data)
 	if address then
 		address = tonumber(string.sub(address, 2), 16)
+	else
+		address = 16777232
 	end
+	local t = snax.bind(address, "testservice")
 	local cmd1, cmd2 = string.match(cmd, "(%S+)%.(%S+)")
 	if cmd1 == "accept" then
 		cmd1 = "post"
 	elseif cmd1 == "response" then
 		cmd1 = "req"
 	end
-	local t = snax.bind(address, "testservice")
 	t[cmd1][cmd2](data)
 end
 
