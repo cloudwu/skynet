@@ -1,30 +1,26 @@
 local skynet = require "skynet"
 require "skynet.manager"	-- import skynet.register
 
-function set_timeout(ti, f)
-	local function t()
-		if f then
-			f()
-		end
-	end
- 	skynet.timeout(ti, t)
- 	return function() f=nil end
+local command = {}
+
+function command.RELOAD()
+	local reload = require "reload"
+	reload()
 end
 
-function force_fork(f)
-	local function func()
-		if f then
-			f()
-		end
-	end
- 	skynet.fork(func)
- 	return function() f=nil end
+function command.SPEAK(...)
+	print("FFFFFFFFFFFFFFFFFFFFF",...)
+	return "UUU"
 end
 
 skynet.start(function()
-	print("----------service1 start--------------@")
-	skynet.dispatch("lua", function(session, address, data1, data2, data3)
-		print("3333333333333333333",data1, data2, data3)
-		skynet.retpack("service1")
+	print("----------service1 start--------------")
+	skynet.dispatch("lua", function(session, address, cmd, ...)
+		local f = command[string.upper(cmd)]
+		if f then
+			skynet.ret(skynet.pack(f(...)))
+		else
+			error(string.format("Unknown command %s", tostring(cmd)))
+		end
 	end)
 end)

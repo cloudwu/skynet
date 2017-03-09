@@ -24,10 +24,10 @@ skynet.start(function()
 	local testservice = snax.newservice("testservice")
 
 	local myservice1 = skynet.newservice("myservice1")
-	print(skynet.call(myservice1, "lua", 1, 2, 3))
+	-- print(skynet.call(myservice1, "lua", 1, 2, 3))
 
 	local myservice2 = skynet.newservice("myservice2")
-	print(skynet.call(myservice2, "lua", 1, 2, 3))
+	-- print(skynet.call(myservice2, "lua", 1, 2, 3))
 
 
 	-- local echo_reload = skynet.newservice("echo_reload")
