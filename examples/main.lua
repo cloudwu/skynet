@@ -21,7 +21,7 @@ skynet.start(function()
 	})
 	skynet.error("Watchdog listen on", 8888)
 
-	local testservice = snax.uniqueservice("testservice")
+	local testservice = snax.newservice("testservice")
 
 	local myservice1 = skynet.newservice("myservice1")
 	print(skynet.call(myservice1, "lua", 1, 2, 3))
@@ -30,7 +30,7 @@ skynet.start(function()
 	print(skynet.call(myservice2, "lua", 1, 2, 3))
 
 
-	local echo_reload = skynet.newservice("echo_reload")
+	-- local echo_reload = skynet.newservice("echo_reload")
 
 	skynet.exit()
 end)

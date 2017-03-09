@@ -22,8 +22,9 @@ function force_fork(f)
 end
 
 skynet.start(function()
-	print("----------service1 start--------------")
-	skynet.dispatch("lua", function(session, address, data, data1, data2)
+	print("----------service1 start--------------@")
+	skynet.dispatch("lua", function(session, address, data1, data2, data3)
+		print("3333333333333333333",data1, data2, data3)
 		skynet.retpack("service1")
 	end)
 end)
