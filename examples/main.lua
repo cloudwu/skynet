@@ -21,13 +21,13 @@ skynet.start(function()
 	})
 	skynet.error("Watchdog listen on", 8888)
 
-	local service1 = snax.newservice("testservice")
+	local testservice = snax.uniqueservice("testservice")
 
-	local service1 = skynet.newservice("myservice1")
-	print(skynet.call(service1, "lua", 1, 2, 3))
+	local myservice1 = skynet.newservice("myservice1")
+	print(skynet.call(myservice1, "lua", 1, 2, 3))
 
-	local service2 = skynet.newservice("myservice2")
-	print(skynet.call(service2, "lua", 1, 2, 3))
+	local myservice2 = skynet.newservice("myservice2")
+	print(skynet.call(myservice2, "lua", 1, 2, 3))
 
 	skynet.exit()
 end)
