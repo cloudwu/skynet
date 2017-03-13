@@ -5,6 +5,7 @@ local coroutine = coroutine
 local assert = assert
 local pairs = pairs
 local pcall = pcall
+local table = table
 
 local profile = require "profile"
 
@@ -46,7 +47,7 @@ local session_coroutine_address = {}
 local session_response = {}
 local unresponse = {}
 
-local wakeup_session = {}
+local wakeup_queue = {}
 local sleep_session = {}
 
 local watching_service = {}
@@ -116,9 +117,8 @@ local function co_create(f)
 end
 
 local function dispatch_wakeup()
-	local co = next(wakeup_session)
+	local co = table.remove(wakeup_queue,1)
 	if co then
-		wakeup_session[co] = nil
 		local session = sleep_session[co]
 		if session then
 			session_id_coroutine[session] = "BREAK"
@@ -414,8 +414,8 @@ function skynet.retpack(...)
 end
 
 function skynet.wakeup(co)
-	if sleep_session[co] and wakeup_session[co] == nil then
-		wakeup_session[co] = true
+	if sleep_session[co] then
+		table.insert(wakeup_queue, co)
 		return true
 	end
 end
