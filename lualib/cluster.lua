@@ -21,8 +21,8 @@ function cluster.open(port)
 	end
 end
 
-function cluster.reload()
-	skynet.call(clusterd, "lua", "reload")
+function cluster.reload(config)
+	skynet.call(clusterd, "lua", "reload", config)
 end
 
 function cluster.proxy(node, name)

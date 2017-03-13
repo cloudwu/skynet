@@ -29,12 +29,16 @@ end
 
 local node_channel = setmetatable({}, { __index = open_channel })
 
-local function loadconfig()
-	local f = assert(io.open(config_name))
-	local source = f:read "*a"
-	f:close()
-	local tmp = {}
-	assert(load(source, "@"..config_name, "t", tmp))()
+local function loadconfig(tmp)
+	if tmp == nil then
+		tmp = {}
+		if config_name then
+			local f = assert(io.open(config_name))
+			local source = f:read "*a"
+			f:close()
+			assert(load(source, "@"..config_name, "t", tmp))()
+		end
+	end
 	for name,address in pairs(tmp) do
 		assert(type(address) == "string")
 		if node_address[name] ~= address then
@@ -47,8 +51,8 @@ local function loadconfig()
 	end
 end
 
-function command.reload()
-	loadconfig()
+function command.reload(source, config)
+	loadconfig(config)
 	skynet.ret(skynet.pack(nil))
 end
 
