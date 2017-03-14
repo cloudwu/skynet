@@ -70,6 +70,7 @@ local name = C(word)
 local typename = C(word * ("." * word) ^ 0)
 local tag = R"09" ^ 1 / tonumber
 local mainkey = "(" * blank0 * name * blank0 * ")"
+local decimal = "(" * blank0 * C(tag) * blank0 * ")"
 
 local function multipat(pat)
 	return Ct(blank0 * (pat * blanks) ^ 0 * pat^0 * blank0)
@@ -81,7 +82,7 @@ end
 
 local typedef = P {
 	"ALL",
-	FIELD = namedpat("field", (name * blanks * tag * blank0 * ":" * blank0 * (C"*")^-1 * typename * mainkey^0)),
+	FIELD = namedpat("field", (name * blanks * tag * blank0 * ":" * blank0 * (C"*")^-1 * typename * (mainkey +  decimal)^0)),
 	STRUCT = P"{" * multipat(V"FIELD" + V"TYPE") * P"}",
 	TYPE = namedpat("type", P"." * name * blank0 * V"STRUCT" ),
 	SUBPROTO = Ct((C"request" + C"response") * blanks * (typename + V"STRUCT")),
@@ -134,8 +135,12 @@ function convert.type(all, obj)
 			end
 			local mainkey = f[5]
 			if mainkey then
-				assert(field.array)
-				field.key = mainkey
+				if fieldtype == "integer" then
+					field.decimal = mainkey
+				else
+					assert(field.array)
+					field.key = mainkey
+				end
 			end
 			field.typename = fieldtype
 		else
@@ -167,6 +172,7 @@ local buildin_types = {
 	integer = 0,
 	boolean = 1,
 	string = 2,
+	binary = 2,	-- binary is a sub type of string
 }
 
 local function checktype(types, ptype, t)
@@ -275,7 +281,11 @@ local function packfield(f)
 	table.insert(strtbl, "\0\0")	-- name	(tag = 0, ref an object)
 	if f.buildin then
 		table.insert(strtbl, packvalue(f.buildin))	-- buildin (tag = 1)
-		table.insert(strtbl, "\1\0")	-- skip (tag = 2)
+		if f.extra then
+			table.insert(strtbl, packvalue(f.extra))	-- f.buildin can be integer or string
+		else
+			table.insert(strtbl, "\1\0")	-- skip (tag = 2)
+		end
 		table.insert(strtbl, packvalue(f.tag))		-- tag (tag = 3)
 	else
 		table.insert(strtbl, "\1\0")	-- skip (tag = 1)
@@ -299,8 +309,12 @@ local function packtype(name, t, alltypes)
 		tmp.array = f.array
 		tmp.name = f.name
 		tmp.tag = f.tag
+		tmp.extra = f.decimal
 
 		tmp.buildin = buildin_types[f.typename]
+		if f.typename == "binary" then
+			tmp.extra = 1	-- binary is sub type of string
+		end
 		local subtype
 		if not tmp.buildin then
 			subtype = assert(alltypes[f.typename])
