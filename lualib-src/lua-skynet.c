@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet.h"
 #include "lua-seri.h"
 
@@ -366,7 +368,7 @@ lnow(lua_State *L) {
 	return 1;
 }
 
-int
+LUAMOD_API int
 luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
 

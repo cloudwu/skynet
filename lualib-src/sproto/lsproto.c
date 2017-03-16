@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <string.h>
 #include <stdlib.h>
 #include "msvcint.h"
