@@ -90,7 +90,7 @@ static const char * load_config = "\
 	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
 	f:close()\
 	local result = {}\
-	assert(load(code,\'=(load)\',\'t\',result))()\
+	assert(load(code,\'=(load)\',\'t\',result))(...)\
 	return result\
 ";
 
@@ -119,8 +119,11 @@ main(int argc, char *argv[]) {
 	int err = luaL_loadstring(L, load_config);
 	assert(err == LUA_OK);
 	lua_pushstring(L, config_file);
+	for (int i = 2; i < argc; ++i) {
+		lua_pushstring(L, argv[i]);
+	}
 
-	err = lua_pcall(L, 1, 1, 0);
+	err = lua_pcall(L, argc-1, 1, 0);
 	if (err) {
 		fprintf(stderr,"%s\n",lua_tostring(L,-1));
 		lua_close(L);
