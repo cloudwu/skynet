@@ -34,12 +34,12 @@ write_pid(const char *pidfile) {
 	int pid = 0;
 	int fd = open(pidfile, O_RDWR|O_CREAT, 0644);
 	if (fd == -1) {
-		fprintf(stderr, "Can't create %s.\n", pidfile);
+		fprintf(stderr, "Can't create pidfile [%s].\n", pidfile);
 		return 0;
 	}
 	f = fdopen(fd, "r+");
 	if (f == NULL) {
-		fprintf(stderr, "Can't open %s.\n", pidfile);
+		fprintf(stderr, "Can't open pidfile [%s].\n", pidfile);
 		return 0;
 	}
 
@@ -65,6 +65,31 @@ write_pid(const char *pidfile) {
 	return pid;
 }
 
+static int
+redirect_fds() {
+	int nfd = open("/dev/null", O_RDWR);
+	if (nfd == -1) {
+		perror("Unable to open /dev/null: ");
+		return -1;
+	}
+	if (dup2(nfd, 0) < 0) {
+		perror("Unable to dup2 stdin(0): ");
+		return -1;
+	}
+	if (dup2(nfd, 1) < 0) {
+		perror("Unable to dup2 stdout(1): ");
+		return -1;
+	}
+	if (dup2(nfd, 2) < 0) {
+		perror("Unable to dup2 stderr(2): ");
+		return -1;
+	}
+
+	close(nfd);
+
+	return 0;
+}
+
 int
 daemon_init(const char *pidfile) {
 	int pid = check_pid(pidfile);
@@ -77,7 +102,7 @@ daemon_init(const char *pidfile) {
 #ifdef __APPLE__
 	fprintf(stderr, "'daemon' is deprecated: first deprecated in OS X 10.5 , use launchd instead.\n");
 #else
-	if (daemon(1,0)) {
+	if (daemon(1,1)) {
 		fprintf(stderr, "Can't daemonize.\n");
 		return 1;
 	}
@@ -85,6 +110,10 @@ daemon_init(const char *pidfile) {
 
 	pid = write_pid(pidfile);
 	if (pid == 0) {
+		return 1;
+	}
+
+	if (redirect_fds()) {
 		return 1;
 	}
 
