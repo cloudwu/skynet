@@ -10,14 +10,22 @@ function CMD.start(address, fd)
 	skynet.error(string.format("Attach to :%08x", address))
 	local handle
 	channel, handle = debugchannel.create()
-	skynet.call(address, "debug", "REMOTEDEBUG", fd, handle)
-	-- todo hook
-	skynet.ret(skynet.pack(nil))
+	local ok, err = pcall(skynet.call, address, "debug", "REMOTEDEBUG", fd, handle)
+	if not ok then
+		skynet.ret(skynet.pack(false, "Debugger attach failed"))
+	else
+		-- todo hook
+		skynet.ret(skynet.pack(true))
+	end
 	skynet.exit()
 end
 
 function CMD.cmd(cmdline)
 	channel:write(cmdline)
+end
+
+function CMD.ping()
+	skynet.ret()
 end
 
 skynet.start(function()
