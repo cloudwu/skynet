@@ -83,15 +83,20 @@ int sigign() {
 }
 
 static const char * load_config = "\
-	local config_name = ...\
-	local f = assert(io.open(config_name))\
-	local code = assert(f:read \'*a\')\
-	local function getenv(name) return assert(os.getenv(name), \'os.getenv() failed: \' .. name) end\
-	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
-	f:close()\
-	local result = {}\
-	assert(load(code,\'=(load)\',\'t\',result))()\
-	return result\
+	local config_name = ...\n\
+	local f = assert(io.open(config_name))\n\
+	local code = assert(f:read \'*a\')\n\
+	local function getenv(name) return assert(os.getenv(name), \'os.getenv() failed: \' .. name) end\n\
+	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\n\
+	f:close()\n\
+	local result = {}\n\
+	local function include(filename)\n\
+		assert(loadfile(filename, \'t\', result))()\n\
+	end\n\
+	setmetatable(result, { __index = { include = include } })\n\
+	assert(load(code,\'=(load)\',\'t\',result))()\n\
+	setmetatable(result, nil)\n\
+	return result\n\
 ";
 
 int
@@ -116,7 +121,7 @@ main(int argc, char *argv[]) {
 	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);	// link lua lib
 
-	int err = luaL_loadstring(L, load_config);
+	int err =  luaL_loadbufferx(L, load_config, strlen(load_config), "=[skynet config]", "t");
 	assert(err == LUA_OK);
 	lua_pushstring(L, config_file);
 
