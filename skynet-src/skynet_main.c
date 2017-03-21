@@ -84,16 +84,21 @@ int sigign() {
 
 static const char * load_config = "\
 	local config_name = ...\n\
-	local f = assert(io.open(config_name))\n\
-	local code = assert(f:read \'*a\')\n\
-	local function getenv(name) return assert(os.getenv(name), \'os.getenv() failed: \' .. name) end\n\
-	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\n\
-	f:close()\n\
+	local function load_config_file(filename)\n\
+		local f = assert(io.open(filename))\n\
+		local code = assert(f:read \'*a\')\n\
+		local function getenv(name) return assert(os.getenv(name), \'os.getenv() failed: \' .. name) end\n\
+		code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\n\
+		f:close()\n\
+		return code\n\
+	end\n\
 	local result = {}\n\
 	local function include(filename)\n\
-		assert(loadfile(filename, \'t\', result))()\n\
+		local code = load_config_file(filename)\n\
+		assert(load(code,\'=(load)\',\'t\',result))()\n\
 	end\n\
 	setmetatable(result, { __index = { include = include } })\n\
+	local code = load_config_file(config_name)\n\
 	assert(load(code,\'=(load)\',\'t\',result))()\n\
 	setmetatable(result, nil)\n\
 	return result\n\
