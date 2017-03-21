@@ -38,4 +38,9 @@ int skynet_socket_udp_connect(struct skynet_context *ctx, int id, const char * a
 int skynet_socket_udp_send(struct skynet_context *ctx, int id, const char * address, const void *buffer, int sz);
 const char * skynet_socket_udp_address(struct skynet_socket_message *, int *addrsz);
 
+int skynet_uart_open(struct skynet_context *ctx, const char *port);
+int skynet_uart_set(struct skynet_context *ctx, int id, int speed, int flow_ctrl, int databits, int stopbits, int parity);
+long skynet_uart_send(struct skynet_context *ctx, int id, const char *buffer, int sz);
+void skynet_uart_close(struct skynet_context *ctx, int id);
+
 #endif

@@ -1,5 +1,5 @@
 PLAT ?= none
-PLATS = linux freebsd macosx
+PLATS = linux freebsd macosx arm
 
 CC ?= gcc
 
@@ -21,20 +21,24 @@ none :
 SKYNET_LIBS := -lpthread -lm
 SHARED := -fPIC --shared
 EXPORT := -Wl,-E
+SKYNET_CFLAGS =
 
 linux : PLAT = linux
 macosx : PLAT = macosx
 freebsd : PLAT = freebsd
+arm : PLAT = arm
 
 macosx : SHARED := -fPIC -dynamiclib -Wl,-undefined,dynamic_lookup
 macosx : EXPORT :=
-macosx linux : SKYNET_LIBS += -ldl
-linux freebsd : SKYNET_LIBS += -lrt
+macosx linux arm : SKYNET_LIBS += -ldl
+linux freebsd arm : SKYNET_LIBS += -lrt
+arm : SKYNET_LIBS += -llinux-atmoic
+arm : SKYNET_CFLAGS += -DLUA_32BITS
 
 # Turn off jemalloc and malloc hook on macosx
 
-macosx : MALLOC_STATICLIB :=
-macosx : SKYNET_DEFINES :=-DNOUSE_JEMALLOC
+macosx arm : MALLOC_STATICLIB :=
+macosx arm : SKYNET_DEFINES := -DNOUSE_JEMALLOC
 
-linux macosx freebsd :
-	$(MAKE) all PLAT=$@ SKYNET_LIBS="$(SKYNET_LIBS)" SHARED="$(SHARED)" EXPORT="$(EXPORT)" MALLOC_STATICLIB="$(MALLOC_STATICLIB)" SKYNET_DEFINES="$(SKYNET_DEFINES)"
+linux macosx freebsd arm :
+	$(MAKE) all PLAT=$@ SKYNET_LIBS="$(SKYNET_LIBS)" SHARED="$(SHARED)" EXPORT="$(EXPORT)" MALLOC_STATICLIB="$(MALLOC_STATICLIB)" SKYNET_DEFINES="$(SKYNET_DEFINES)" SKYNET_CFLAGS="$(SKYNET_CFLAGS)"

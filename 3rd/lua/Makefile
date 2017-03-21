@@ -15,18 +15,18 @@ AR= ar rcu
 RANLIB= ranlib
 RM= rm -f
 
-SYSCFLAGS=
+SYSCFLAGS+=
 SYSLDFLAGS=
 SYSLIBS=
 
-MYCFLAGS=-I../../skynet-src
+MYCFLAGS= -I../../skynet-src
 MYLDFLAGS=
 MYLIBS=
 MYOBJS=
 
 # == END OF USER SETTINGS -- NO NEED TO CHANGE ANYTHING BELOW THIS LINE =======
 
-PLATS= aix bsd c89 freebsd generic linux macosx mingw posix solaris
+PLATS= aix bsd c89 freebsd generic linux macosx mingw posix solaris arm
 
 LUA_A=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
@@ -123,6 +123,10 @@ posix:
 
 solaris:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN -D_REENTRANT" SYSLIBS="-ldl"
+
+arm:
+	@echo "MYCFLAGS= $(MYCFLAGS)"
+	$(MAKE) $(ALL_A) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_32BITS" SYSLIBS="-Wl,-E -ldl -llinux-atmoic"
 
 # list targets that do not create files (but not all makes understand .PHONY)
 .PHONY: all $(PLATS) default o a clean depend echo none
