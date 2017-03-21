@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet_malloc.h"
 
 #include <stdlib.h>
@@ -674,7 +676,7 @@ ludp_address(lua_State *L) {
 	return 2;
 }
 
-int
+LUAMOD_API int
 luaopen_socketdriver(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {

@@ -1,5 +1,5 @@
 /*
-** $Id: lcode.c,v 2.109 2016/05/13 19:09:21 roberto Exp $
+** $Id: lcode.c,v 2.112 2016/12/22 13:08:50 roberto Exp $
 ** Code generator for Lua
 ** See Copyright Notice in lua.h
 */
@@ -40,7 +40,7 @@
 ** If expression is a numeric constant, fills 'v' with its value
 ** and returns 1. Otherwise, returns 0.
 */
-static int tonumeral(expdesc *e, TValue *v) {
+static int tonumeral(const expdesc *e, TValue *v) {
   if (hasjumps(e))
     return 0;  /* not a numeral */
   switch (e->k) {
@@ -86,7 +86,7 @@ void luaK_nil (FuncState *fs, int from, int n) {
 /*
 ** Gets the destination address of a jump instruction. Used to traverse
 ** a list of jumps.
-*/ 
+*/
 static int getjump (FuncState *fs, int pc) {
   int offset = GETARG_sBx(fs->f->sp->code[pc]);
   if (offset == NO_JUMP)  /* point to itself represents end of list */
@@ -176,7 +176,6 @@ int luaK_getlabel (FuncState *fs) {
 ** jump (that is, its condition), or the jump itself if it is
 ** unconditional.
 */
-
 static Instruction *getjumpcontrol (FuncState *fs, int pc) {
   Instruction *pi = &fs->f->sp->code[pc];
   if (pc >= 1 && testTMode(GET_OPCODE(*(pi-1))))
@@ -755,7 +754,7 @@ void luaK_exp2val (FuncState *fs, expdesc *e) {
 ** (that is, it is either in a register or in 'k' with an index
 ** in the range of R/K indices).
 ** Returns R/K index.
-*/  
+*/
 int luaK_exp2RK (FuncState *fs, expdesc *e) {
   luaK_exp2val(fs, e);
   switch (e->k) {  /* move constants to 'k' */
@@ -976,7 +975,8 @@ static int validop (int op, TValue *v1, TValue *v2) {
 ** Try to "constant-fold" an operation; return 1 iff successful.
 ** (In this case, 'e1' has the final result.)
 */
-static int constfolding (FuncState *fs, int op, expdesc *e1, expdesc *e2) {
+static int constfolding (FuncState *fs, int op, expdesc *e1,
+                                                const expdesc *e2) {
   TValue v1, v2, res;
   if (!tonumeral(e1, &v1) || !tonumeral(e2, &v2) || !validop(op, &v1, &v2))
     return 0;  /* non-numeric operands or not safe to fold */
@@ -1015,6 +1015,9 @@ static void codeunexpval (FuncState *fs, OpCode op, expdesc *e, int line) {
 ** (everything but logical operators 'and'/'or' and comparison
 ** operators).
 ** Expression to produce final result will be encoded in 'e1'.
+** Because 'luaK_exp2RK' can free registers, its calls must be
+** in "stack order" (that is, first on 'e2', which may have more
+** recent registers to be released).
 */
 static void codebinexpval (FuncState *fs, OpCode op,
                            expdesc *e1, expdesc *e2, int line) {
@@ -1061,9 +1064,9 @@ static void codecomp (FuncState *fs, BinOpr opr, expdesc *e1, expdesc *e2) {
 ** Aplly prefix operation 'op' to expression 'e'.
 */
 void luaK_prefix (FuncState *fs, UnOpr op, expdesc *e, int line) {
-  static expdesc ef = {VKINT, {0}, NO_JUMP, NO_JUMP};  /* fake 2nd operand */
+  static const expdesc ef = {VKINT, {0}, NO_JUMP, NO_JUMP};
   switch (op) {
-    case OPR_MINUS: case OPR_BNOT:
+    case OPR_MINUS: case OPR_BNOT:  /* use 'ef' as fake 2nd operand */
       if (constfolding(fs, op + LUA_OPUNM, e, &ef))
         break;
       /* FALLTHROUGH */

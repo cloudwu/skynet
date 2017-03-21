@@ -2,6 +2,8 @@
 // It's only for demo, limited feature. Don't use it in your project.
 // Rewrite socket library by yourself .
 
+#define LUA_LIB
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
@@ -183,7 +185,7 @@ lreadstdin(lua_State *L) {
 	return 1;
 }
 
-int
+LUAMOD_API int
 luaopen_clientsocket(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {

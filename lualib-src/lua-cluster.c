@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
@@ -475,7 +477,7 @@ lconcat(lua_State *L) {
 	return 2;
 }
 
-int
+LUAMOD_API int
 luaopen_cluster_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "packrequest", lpackrequest },

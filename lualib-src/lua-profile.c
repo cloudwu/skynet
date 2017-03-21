@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <stdio.h>
 #include <lua.h>
 #include <lauxlib.h>
@@ -50,20 +52,22 @@ diff_time(double start) {
 
 static int
 lstart(lua_State *L) {
-	if (lua_type(L,1) == LUA_TTHREAD) {
+	if (lua_gettop(L) != 0) {
 		lua_settop(L,1);
+		luaL_checktype(L, 1, LUA_TTHREAD);
 	} else {
 		lua_pushthread(L);
 	}
+	lua_pushvalue(L, 1);	// push coroutine
 	lua_rawget(L, lua_upvalueindex(2));
 	if (!lua_isnil(L, -1)) {
 		return luaL_error(L, "Thread %p start profile more than once", lua_topointer(L, 1));
 	}
-	lua_pushthread(L);
+	lua_pushvalue(L, 1);	// push coroutine
 	lua_pushnumber(L, 0);
 	lua_rawset(L, lua_upvalueindex(2));
 
-	lua_pushthread(L);
+	lua_pushvalue(L, 1);	// push coroutine
 	double ti = get_time();
 #ifdef DEBUG_LOG
 	fprintf(stderr, "PROFILE [%p] start\n", L);
@@ -76,25 +80,27 @@ lstart(lua_State *L) {
 
 static int
 lstop(lua_State *L) {
-	if (lua_type(L,1) == LUA_TTHREAD) {
+	if (lua_gettop(L) != 0) {
 		lua_settop(L,1);
+		luaL_checktype(L, 1, LUA_TTHREAD);
 	} else {
 		lua_pushthread(L);
 	}
+	lua_pushvalue(L, 1);	// push coroutine
 	lua_rawget(L, lua_upvalueindex(1));
 	if (lua_type(L, -1) != LUA_TNUMBER) {
 		return luaL_error(L, "Call profile.start() before profile.stop()");
 	} 
 	double ti = diff_time(lua_tonumber(L, -1));
-	lua_pushthread(L);
+	lua_pushvalue(L, 1);	// push coroutine
 	lua_rawget(L, lua_upvalueindex(2));
 	double total_time = lua_tonumber(L, -1);
 
-	lua_pushthread(L);
+	lua_pushvalue(L, 1);	// push coroutine
 	lua_pushnil(L);
 	lua_rawset(L, lua_upvalueindex(1));
 
-	lua_pushthread(L);
+	lua_pushvalue(L, 1);	// push coroutine
 	lua_pushnil(L);
 	lua_rawset(L, lua_upvalueindex(2));
 
@@ -194,7 +200,7 @@ lyield_co(lua_State *L) {
 	return timing_yield(L);
 }
 
-int
+LUAMOD_API int
 luaopen_profile(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
