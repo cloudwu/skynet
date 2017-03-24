@@ -9,8 +9,8 @@ function cluster.call(node, address, ...)
 end
 
 function cluster.send(node, address, ...)
-	-- skynet.pack(...) will free by cluster.core.packrequest
-	skynet.send(clusterd, "lua", "req", node, address, skynet.pack(...))
+	-- push is the same with req, but no response
+	skynet.send(clusterd, "lua", "push", node, address, skynet.pack(...))
 end
 
 function cluster.open(port)
