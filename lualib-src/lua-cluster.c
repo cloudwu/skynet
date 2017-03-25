@@ -37,7 +37,9 @@ fill_header(lua_State *L, uint8_t *buf, int sz) {
 }
 
 /*
-	The request package :
+	The request package : 
+		first WORD is size of the package with big-endian
+		DWORD in content is small-endian
 	size <= 0x8000 (32K) and address is id
 		WORD sz+9
 		BYTE 0
@@ -45,7 +47,7 @@ fill_header(lua_State *L, uint8_t *buf, int sz) {
 		DWORD session
 		PADDING msg(sz)
 	size > 0x8000 and address is id
-		DWORD 13
+		WORD 13
 		BYTE 1	; multireq	, 0x41: multi push
 		DWORD addr
 		DWORD session
@@ -59,7 +61,7 @@ fill_header(lua_State *L, uint8_t *buf, int sz) {
 		DWORD session
 		PADDING msg(sz)
 	size > 0x8000 and address is string
-		DWORD 10 + namelen
+		WORD 10 + namelen
 		BYTE 0x81	; 0xc1 : multi push
 		BYTE namelen
 		STRING name
@@ -335,6 +337,8 @@ lunpackrequest(lua_State *L) {
 }
 
 /*
+	The response package :
+	WORD size (big endian)
 	DWORD session
 	BYTE type
 		0: error
