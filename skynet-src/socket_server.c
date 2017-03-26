@@ -1491,6 +1491,7 @@ socket_server_bind(struct socket_server *ss, uintptr_t opaque, int fd) {
 void 
 socket_server_start(struct socket_server *ss, uintptr_t opaque, int id) {
 	struct request_package request;
+
 	request.u.start.id = id;
 	request.u.start.opaque = opaque;
 	send_request(ss, &request, 'S', sizeof(request.u.start));

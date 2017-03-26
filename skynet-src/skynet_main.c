@@ -77,6 +77,7 @@ _init_env(lua_State *L) {
 
 int sigign() {
 	struct sigaction sa;
+	memset(&sa,0,sizeof(sa));
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &sa, 0);
 	return 0;

@@ -355,6 +355,11 @@ function skynet.send(addr, typename, ...)
 	return c.send(addr, p.id, 0 , p.pack(...))
 end
 
+function skynet.sendLua(addr,...)
+	skynet.send(addr,"lua",false,...)
+end
+
+
 skynet.genid = assert(c.genid)
 
 skynet.redirect = function(dest,source,typename,...)
@@ -377,6 +382,7 @@ local function yield_call(service, session)
 	return msg,sz
 end
 
+
 function skynet.call(addr, typename, ...)
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , p.pack(...))
@@ -385,6 +391,13 @@ function skynet.call(addr, typename, ...)
 	end
 	return p.unpack(yield_call(addr, session))
 end
+
+function skynet.callLua(addr,...)
+	return skynet.call(addr,"lua",true,...)
+end
+
+
+
 
 function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
