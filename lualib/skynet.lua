@@ -1,3 +1,4 @@
+-- read https://github.com/cloudwu/skynet/wiki/FAQ for the module "skynet.core"
 local c = require "skynet.core"
 local tostring = tostring
 local tonumber = tonumber
