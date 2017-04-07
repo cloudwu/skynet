@@ -331,7 +331,7 @@ function skynet.exit()
 	for co, session in pairs(session_coroutine_id) do
 		local address = session_coroutine_address[co]
 		if session~=0 and address then
-			c.redirect(address, 0, skynet.PTYPE_ERROR, session, "")
+			c.send(address, skynet.PTYPE_ERROR, session, "")
 		end
 	end
 	for resp in pairs(unresponse) do
@@ -343,7 +343,7 @@ function skynet.exit()
 		tmp[address] = true
 	end
 	for address in pairs(tmp) do
-		c.redirect(address, 0, skynet.PTYPE_ERROR, 0, "")
+		c.send(address, skynet.PTYPE_ERROR, 0, "")
 	end
 	c.command("EXIT")
 	-- quit service
