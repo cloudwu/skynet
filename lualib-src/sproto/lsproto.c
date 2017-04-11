@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <string.h>
 #include <stdlib.h>
 #include "msvcint.h"
@@ -166,10 +168,16 @@ encode(const struct sproto_arg *args) {
 		lua_Integer v;
 		lua_Integer vh;
 		int isnum;
-		v = lua_tointegerx(L, -1, &isnum);
-		if(!isnum) {
-			return luaL_error(L, ".%s[%d] is not an integer (Is a %s)", 
-				args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
+		if (args->extra) {
+			// It's decimal.
+			lua_Number vn = lua_tonumber(L, -1);
+			v = (lua_Integer)(vn * args->extra + 0.5);
+		} else {
+			v = lua_tointegerx(L, -1, &isnum);
+			if(!isnum) {
+				return luaL_error(L, ".%s[%d] is not an integer (Is a %s)", 
+					args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
+			}
 		}
 		lua_pop(L,1);
 		// notice: in lua 5.2, lua_Integer maybe 52bit
@@ -332,8 +340,16 @@ decode(const struct sproto_arg *args) {
 	switch (args->type) {
 	case SPROTO_TINTEGER: {
 		// notice: in lua 5.2, 52bit integer support (not 64)
-		lua_Integer v = *(uint64_t*)args->value;
-		lua_pushinteger(L, v);
+		if (args->extra) {
+			// lua_Integer is 32bit in small lua.
+			uint64_t v = *(uint64_t*)args->value;
+			lua_Number vn = (lua_Number)v;
+			vn /= args->extra;
+			lua_pushnumber(L, vn);
+		} else {
+			lua_Integer v = *(uint64_t*)args->value;
+			lua_pushinteger(L, v);
+		}
 		break;
 	}
 	case SPROTO_TBOOLEAN: {
@@ -660,7 +676,7 @@ ldefault(lua_State *L) {
 	return 1;
 }
 
-int
+LUAMOD_API int
 luaopen_sproto_core(lua_State *L) {
 #ifdef luaL_checkversion
 	luaL_checkversion(L);

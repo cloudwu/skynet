@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet_malloc.h"
 
 #include <lua.h>
@@ -529,7 +531,7 @@ reply_length(lua_State *L) {
 	return 1;
 }
 
-int
+LUAMOD_API int
 luaopen_mongo_driver(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] ={

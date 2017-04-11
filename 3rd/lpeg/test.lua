@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
--- $Id: test.lua,v 1.109 2015/09/28 17:01:25 roberto Exp $
+-- $Id: test.lua,v 1.112 2017/01/14 18:55:22 roberto Exp $
 
 -- require"strict"    -- just to be pedantic
 
@@ -200,6 +200,14 @@ do
   }
   assert(pat:match'abc' == 1)
 end
+
+
+-- bug: loop in 'hascaptures'
+do
+  local p = m.C(-m.P{m.P'x' * m.V(1) + m.P'y'})
+  assert(p:match("xxx") == "")
+end
+
 
 
 -- test for small capture boundary
@@ -516,6 +524,27 @@ assert(m.match(m.Cs((##m.P("a") * 1 + m.P(1)/".")^0), "aloal") == "a..a.")
 assert(m.match(m.Cs((#((#m.P"a")/"") * 1 + m.P(1)/".")^0), "aloal") == "a..a.")
 assert(m.match(m.Cs((- -m.P("a") * 1 + m.P(1)/".")^0), "aloal") == "a..a.")
 assert(m.match(m.Cs((-((-m.P"a")/"") * 1 + m.P(1)/".")^0), "aloal") == "a..a.")
+
+
+-- fixed length
+do
+  -- 'and' predicate using fixed length
+  local p = m.C(#("a" * (m.P("bd") + "cd")) * 2)
+  assert(p:match("acd") == "ac")
+
+  p = #m.P{ "a" * m.V(2), m.P"b" } * 2
+  assert(p:match("abc") == 3)
+
+  p = #(m.P"abc" * m.B"c")
+  assert(p:match("abc") == 1 and not p:match("ab"))
+ 
+  p = m.P{ "a" * m.V(2), m.P"b"^1 }
+  checkerr("pattern may not have fixed length", m.B, p)
+
+  p = "abc" * (m.P"b"^1 + m.P"a"^0)
+  checkerr("pattern may not have fixed length", m.B, p)
+end
+
 
 p = -m.P'a' * m.Cc(1) + -m.P'b' * m.Cc(2) + -m.P'c' * m.Cc(3)
 assert(p:match('a') == 2 and p:match('') == 1 and p:match('b') == 1)
@@ -1096,6 +1125,32 @@ do
   local p = m.P{ m.Cmt(0, foo) * m.P(false) + m.P(1) * m.V(1) + m.P"" }
   p:match(string.rep('1', 10))
   assert(c == 11)
+end
+
+
+-- Return a match-time capture that returns 'n' captures
+local function manyCmt (n)
+    return m.Cmt("a", function ()
+             local a = {}; for i = 1, n do a[i] = n - i end
+             return true, unpack(a)
+           end)
+end
+
+-- bug in 1.0: failed match-time that used previous match-time results
+do
+  local x
+  local function aux (...) x = #{...}; return false end
+  local res = {m.match(m.Cmt(manyCmt(20), aux) + manyCmt(10), "a")}
+  assert(#res == 10 and res[1] == 9 and res[10] == 0)
+end
+
+
+-- bug in 1.0: problems with math-times returning too many captures
+do
+  local lim = 2^11 - 10
+  local res = {m.match(manyCmt(lim), "a")}
+  assert(#res == lim and res[1] == lim - 1 and res[lim] == 0)
+  checkerr("too many", m.match, manyCmt(2^15), "a")
 end
 
 p = (m.P(function () return true, "a" end) * 'a'

@@ -1012,7 +1012,7 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   return status;
 }
 
-void cloneproto (lua_State *L, Proto *f, const Proto *src) {
+static void cloneproto (lua_State *L, Proto *f, const Proto *src) {
   /* copy constants and nested proto */
   int i,n;
   n = src->sp->sizek;
