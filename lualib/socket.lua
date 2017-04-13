@@ -192,8 +192,16 @@ local function connect(id, func)
 	end
 end
 
-function socket.open(addr, port)
+function socket.open(addr, port, timeout)
 	local id = driver.connect(addr,port)
+	if timeout then
+		skynet.timeout(timeout, function ()
+			local s = socket_pool[id]
+			if s and s.connecting then
+				socket_message[5](id, nil, "Connect timeout")
+			end
+		end)
+	end
 	return connect(id)
 end
 
