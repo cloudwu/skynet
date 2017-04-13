@@ -99,7 +99,7 @@ function httpc.request(method, host, url, recvheader, header, content)
 	if async_dns and not hostname:match(".*%d+$") then
 		hostname = dns.resolve(hostname)
 	end
-	local fd = socket.connect(hostname, port)
+	local fd = socket.connect(hostname, port, timeout)
 	local finish
 	if timeout then
 		skynet.timeout(timeout, function()

@@ -1,4 +1,5 @@
 local socket = require "socket"
+local skynet = require "skynet"
 
 local readbytes = socket.read
 local writebytes = socket.write
@@ -66,8 +67,27 @@ function sockethelper.writefunc(fd)
 	end
 end
 
-function sockethelper.connect(host, port)
-	local fd = socket.open(host, port)
+function sockethelper.connect(host, port, timeout)
+	local fd
+	if timeout then
+		local drop_fd
+		-- asynchronous connect
+		skynet.fork(function()
+			fd = socket.open(host, port)
+			if drop_fd then
+				-- sockethelper.connect already return, and raise socket_error
+				socket.close(fd)
+			end
+		end)
+		skynet.sleep(timeout)
+		if not fd then
+			-- not connect yet
+			drop_fd = true
+		end
+	else
+		-- block connect
+		fd = socket.open(host, port)
+	end
 	if fd then
 		return fd
 	end
