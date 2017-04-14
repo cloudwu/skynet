@@ -66,8 +66,8 @@ function sockethelper.writefunc(fd)
 	end
 end
 
-function sockethelper.connect(host, port, timeout)
-	local fd = socket.open(host, port, timeout)
+function sockethelper.connect(host, port)
+	local fd = socket.open(host, port)
 	if fd then
 		return fd
 	end
