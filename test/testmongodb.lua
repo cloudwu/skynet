@@ -7,10 +7,18 @@ local host, db_name = ...
 function test_insert_without_index()
 	local db = mongo.client({host = host})
 
+
+	local r = db:runCommand("buildInfo",1)
+	for k, v in pairs(r) do
+		print(k,v)
+	end
 	db[db_name].testdb:dropIndex("*")
 	db[db_name].testdb:drop()
 
 	local ret = db[db_name].testdb:safe_insert({test_key = 1});
+	for k,v in pairs(ret) do
+		print(k,v)
+	end
 	assert(ret and ret.n == 1)
 
 	local ret = db[db_name].testdb:safe_insert({test_key = 1});
@@ -85,7 +93,7 @@ function test_expire_index()
 
 	for i = 1, 1000 do
 		skynet.sleep(11);
-		
+
 		local ret = db[db_name].testdb:findOne({test_key = 1})
 		if ret == nil then
 			return

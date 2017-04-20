@@ -158,7 +158,7 @@ local function dispatch_by_order(self)
 		local func, co = pop_response(self)
 		if not co then
 			-- close signal
-			wakeup_all(self, errmsg)
+			wakeup_all(self, "channel_closed")
 			break
 		end
 		local ok, result_ok, result_data, padding = pcall(func, self.__sock)
