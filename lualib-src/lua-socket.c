@@ -567,8 +567,9 @@ lsendlow(lua_State *L) {
 	int id = luaL_checkinteger(L, 1);
 	int sz = 0;
 	void *buffer = get_buffer(L, 2, &sz);
-	skynet_socket_send_lowpriority(ctx, id, buffer, sz);
-	return 0;
+	int err = skynet_socket_send_lowpriority(ctx, id, buffer, sz);
+	lua_pushboolean(L, !err);
+	return 1;
 }
 
 static int
@@ -593,6 +594,14 @@ lnodelay(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
 	skynet_socket_nodelay(ctx,id);
+	return 0;
+}
+static int
+lwarnsize(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	int sz = luaL_checkinteger(L, 2);
+	skynet_socket_warnsize(ctx,id,sz);
 	return 0;
 }
 
@@ -644,9 +653,7 @@ ludp_send(lua_State *L) {
 	int sz = 0;
 	void *buffer = get_buffer(L, 3, &sz);
 	int err = skynet_socket_udp_send(ctx, id, address, buffer, sz);
-
 	lua_pushboolean(L, !err);
-
 	return 1;
 }
 
@@ -704,6 +711,7 @@ luaopen_socketdriver(lua_State *L) {
 		{ "bind", lbind },
 		{ "start", lstart },
 		{ "nodelay", lnodelay },
+		{ "warnsize", lwarnsize},
 		{ "udp", ludp },
 		{ "udp_connect", ludp_connect },
 		{ "udp_send", ludp_send },

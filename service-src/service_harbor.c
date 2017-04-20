@@ -681,6 +681,8 @@ mainloop(struct skynet_context * context, void * ud, int type, int session, uint
 			}
 			break;
 		}
+		case SKYNET_SOCKET_TYPE_EMPTY:
+			break;
 		default:
 			skynet_error(context, "recv invalid socket message type %d", type);
 			break;

@@ -36,6 +36,10 @@ function SOCKET.warning(fd, size)
 	print("socket warning", fd, size)
 end
 
+function SOCKET.empty(fd)
+	print("socket emtpy", fd)
+end
+
 function SOCKET.data(fd, msg)
 end
 
