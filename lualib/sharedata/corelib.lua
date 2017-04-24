@@ -1,7 +1,6 @@
 local core = require "sharedata.core"
 local type = type
-local next = next
-local rawget = rawget
+local rawset = rawset
 
 local conf = {}
 
