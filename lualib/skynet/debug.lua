@@ -52,9 +52,9 @@ local function init(skynet, export)
 
 		function dbgcmd.RUN(source, filename)
 			local inject = require "skynet.inject"
-			local output = inject(skynet, source, filename , export.dispatch, skynet.register_protocol)
+			local ok, output = inject(skynet, source, filename , export.dispatch, skynet.register_protocol)
 			collectgarbage "collect"
-			skynet.ret(skynet.pack(table.concat(output, "\n")))
+			skynet.ret(skynet.pack(ok, table.concat(output, "\n")))
 		end
 
 		function dbgcmd.TERM(service)
@@ -75,7 +75,7 @@ local function init(skynet, export)
 		end
 
 		function dbgcmd.LINK()
-			-- no return, raise error when exit
+			skynet.response()	-- get response , but not return. raise error when exit
 		end
 
 		return dbgcmd

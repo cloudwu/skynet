@@ -45,7 +45,6 @@ local function dump_list(print, list)
 	for _,v in ipairs(index) do
 		dump_line(print, v, list[v])
 	end
-	print("OK")
 end
 
 local function split_cmdline(cmdline)
@@ -81,18 +80,18 @@ local function docmd(cmdline, print, fd)
 			else
 				dump_list(print, list)
 			end
-		else
-			print("OK")
 		end
+		print("<CMD OK>")
 	else
-		print("Error:", list)
+		print(list)
+		print("<CMD Error>")
 	end
 end
 
 local function console_main_loop(stdin, print)
 	print("Welcome to skynet console")
 	skynet.error(stdin, "connected")
-	pcall(function()
+	local ok, err = pcall(function()
 		while true do
 			local cmdline = socket.readline(stdin, "\n")
 			if not cmdline then
@@ -110,6 +109,9 @@ local function console_main_loop(stdin, print)
 			end
 		end
 	end)
+	if not ok then
+		skynet.error(stdin, err)
+	end
 	skynet.error(stdin, "disconnected")
 	socket.close(stdin)
 end
@@ -242,7 +244,11 @@ function COMMAND.inject(address, filename)
 	end
 	local source = f:read "*a"
 	f:close()
-	return skynet.call(address, "debug", "RUN", source, filename)
+	local ok, output = skynet.call(address, "debug", "RUN", source, filename)
+	if ok == false then
+		error(output)
+	end
+	return output
 end
 
 function COMMAND.task(address)
@@ -259,8 +265,11 @@ function COMMANDX.debug(cmd)
 	local address = adjust_address(cmd[2])
 	local agent = skynet.newservice "debug_agent"
 	local stop
-	skynet.fork(function()
+	local term_co = coroutine.running()
+	local function forward_cmd()
 		repeat
+			-- notice :  It's a bad practice to call socket.readline from two threads (this one and console_main_loop), be careful.
+			skynet.call(agent, "lua", "ping")	-- detect agent alive, if agent exit, raise error
 			local cmdline = socket.readline(cmd.fd, "\n")
 			cmdline = cmdline and cmdline:gsub("(.*)\r$", "%1")
 			if not cmdline then
@@ -269,9 +278,19 @@ function COMMANDX.debug(cmd)
 			end
 			skynet.send(agent, "lua", "cmd", cmdline)
 		until stop or cmdline == "cont"
+	end
+	skynet.fork(function()
+		pcall(forward_cmd)
+		skynet.wakeup(term_co)
 	end)
-	skynet.call(agent, "lua", "start", address, cmd.fd)
+	local ok, err = skynet.call(agent, "lua", "start", address, cmd.fd)
 	stop = true
+	-- wait for fork coroutine exit.
+	skynet.wait(term_co)
+
+	if not ok then
+		error(err)
+	end
 end
 
 function COMMAND.logon(address)

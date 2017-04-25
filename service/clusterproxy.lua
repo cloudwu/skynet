@@ -23,6 +23,10 @@ skynet.forward_type( forward_map ,function()
 		address = n
 	end
 	skynet.dispatch("system", function (session, source, msg, sz)
-		skynet.ret(skynet.rawcall(clusterd, "lua", skynet.pack("req", node, address, msg, sz)))
+		if session == 0 then
+			skynet.send(clusterd, "lua", "push", node, address, msg, sz)
+		else
+			skynet.ret(skynet.rawcall(clusterd, "lua", skynet.pack("req", node, address, msg, sz)))
+		end
 	end)
 end)

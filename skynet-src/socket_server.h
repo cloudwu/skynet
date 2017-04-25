@@ -7,7 +7,7 @@
 #define SOCKET_CLOSE 1
 #define SOCKET_OPEN 2
 #define SOCKET_ACCEPT 3
-#define SOCKET_ERROR 4
+#define SOCKET_ERR 4
 #define SOCKET_EXIT 5
 #define SOCKET_UDP 6
 

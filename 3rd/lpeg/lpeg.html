@@ -10,7 +10,7 @@
 </head>
 <body>
 
-<!-- $Id: lpeg.html,v 1.75 2015/09/28 17:17:41 roberto Exp $ -->
+<!-- $Id: lpeg.html,v 1.77 2017/01/13 13:40:05 roberto Exp $ -->
 
 <div id="container">
 	
@@ -577,8 +577,9 @@ It is equivalent to the following grammar in standard PEG notation:
 <h2><a name="captures">Captures</a></h2>
 
 <p>
-A <em>capture</em> is a pattern that creates values
-(the so called <em>semantic information</em>) when it matches.
+A <em>capture</em> is a pattern that produces values
+(the so called <em>semantic information</em>)
+according to what it matches.
 LPeg offers several kinds of captures,
 which produces values based on matches and combine these values to
 produce new values.
@@ -632,10 +633,7 @@ or no value when <code>number</code> is zero.</td></tr>
 </tbody></table>
 
 <p>
-A capture pattern produces its values every time it succeeds.
-For instance,
-a capture inside a loop produces as many values as matched by the loop.
-A capture produces a value only when it succeeds.
+A capture pattern produces its values only when it succeeds.
 For instance,
 the pattern <code>lpeg.C(lpeg.P"a"^-1)</code>
 produces the empty string when there is no <code>"a"</code>
@@ -643,14 +641,20 @@ produces the empty string when there is no <code>"a"</code>
 while the pattern <code>lpeg.C("a")^-1</code>
 does not produce any value when there is no <code>"a"</code>
 (because the pattern <code>"a"</code> fails).
+A pattern inside a loop or inside a recursive structure
+produces values for each match.
 </p>
 
 <p>
 Usually,
-LPeg evaluates all captures only after (and if) the entire match succeeds.
-During <em>match time</em> it only gathers enough information
-to produce the capture values later.
-As a particularly important consequence,
+LPeg does not specify when (and if) it evaluates its captures.
+(As an example,
+consider the pattern <code>lpeg.P"a" / func / 0</code>.
+Because the "division" by 0 instructs LPeg to throw away the
+results from the pattern,
+LPeg may or may not call <code>func</code>.)
+Therefore, captures should avoid side effects.
+Moreover,
 most captures cannot affect the way a pattern matches a subject.
 The only exception to this rule is the
 so-called <a href="#matchtime"><em>match-time capture</em></a>.
@@ -700,6 +704,12 @@ An <em>Outermost</em> capture means that the capture is not inside
 another complete capture.
 </p>
 
+<p>
+In the same way that LPeg does not specify when it evaluates captures,
+it does not specify whether it reuses
+values previously produced by the group
+or re-evaluates them.
+</p>
 
 <h3><a name="cap-cc"></a><code>lpeg.Cc ([value, ...])</code></h3>
 <p>
@@ -806,7 +816,7 @@ all replacements.
 <h3><a name="cap-t"></a><code>lpeg.Ct (patt)</code></h3>
 <p>
 Creates a <em>table capture</em>.
-This capture creates a table and puts all values from all anonymous captures
+This capture returns a table with all values from all anonymous captures
 made by <code>patt</code> inside this table in successive integer keys,
 starting at 1.
 Moreover,
@@ -872,7 +882,8 @@ there is no captured value.
 <p>
 Creates a <em>match-time capture</em>.
 Unlike all other captures,
-this one is evaluated immediately when a match occurs.
+this one is evaluated immediately when a match occurs
+(even if it is part of a larger pattern that fails later).
 It forces the immediate evaluation of all its nested captures
 and then calls <code>function</code>.
 </p>
@@ -1380,13 +1391,13 @@ and the new term for each repetition.
 <h2><a name="download"></a>Download</h2>
 
 <p>LPeg 
-<a href="http://www.inf.puc-rio.br/~roberto/lpeg/lpeg-1.0.0.tar.gz">source code</a>.</p>
+<a href="http://www.inf.puc-rio.br/~roberto/lpeg/lpeg-1.0.1.tar.gz">source code</a>.</p>
 
 
 <h2><a name="license">License</a></h2>
 
 <p>
-Copyright &copy; 2007-2015 Lua.org, PUC-Rio.
+Copyright &copy; 2007-2017 Lua.org, PUC-Rio.
 </p>
 <p>
 Permission is hereby granted, free of charge,
@@ -1424,7 +1435,7 @@ THE SOFTWARE.
 
 <div id="about">
 <p><small>
-$Id: lpeg.html,v 1.75 2015/09/28 17:17:41 roberto Exp $
+$Id: lpeg.html,v 1.77 2017/01/13 13:40:05 roberto Exp $
 </small></p>
 </div> <!-- id="about" -->
 

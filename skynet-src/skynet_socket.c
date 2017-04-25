@@ -89,7 +89,7 @@ skynet_socket_poll() {
 	case SOCKET_OPEN:
 		forward_message(SKYNET_SOCKET_TYPE_CONNECT, true, &result);
 		break;
-	case SOCKET_ERROR:
+	case SOCKET_ERR:
 		forward_message(SKYNET_SOCKET_TYPE_ERROR, true, &result);
 		break;
 	case SOCKET_ACCEPT:

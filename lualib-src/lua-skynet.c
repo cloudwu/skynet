@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet.h"
 #include "lua-seri.h"
 
@@ -172,17 +174,8 @@ get_dest_string(lua_State *L, int index) {
 	return dest_string;
 }
 
-/*
-	uint32 address
-	 string address
-	integer type
-	integer session
-	string message
-	 lightuserdata message_ptr
-	 integer len
- */
 static int
-lsend(lua_State *L) {
+send_message(lua_State *L, int source, int idx_type) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	uint32_t dest = (uint32_t)lua_tointeger(L, 1);
 	const char * dest_string = NULL;
@@ -193,68 +186,19 @@ lsend(lua_State *L) {
 		dest_string = get_dest_string(L, 1);
 	}
 
-	int type = luaL_checkinteger(L, 2);
+	int type = luaL_checkinteger(L, idx_type+0);
 	int session = 0;
-	if (lua_isnil(L,3)) {
+	if (lua_isnil(L,idx_type+1)) {
 		type |= PTYPE_TAG_ALLOCSESSION;
 	} else {
-		session = luaL_checkinteger(L,3);
+		session = luaL_checkinteger(L,idx_type+1);
 	}
 
-	int mtype = lua_type(L,4);
+	int mtype = lua_type(L,idx_type+2);
 	switch (mtype) {
 	case LUA_TSTRING: {
 		size_t len = 0;
-		void * msg = (void *)lua_tolstring(L,4,&len);
-		if (len == 0) {
-			msg = NULL;
-		}
-		if (dest_string) {
-			session = skynet_sendname(context, 0, dest_string, type, session , msg, len);
-		} else {
-			session = skynet_send(context, 0, dest, type, session , msg, len);
-		}
-		break;
-	}
-	case LUA_TLIGHTUSERDATA: {
-		void * msg = lua_touserdata(L,4);
-		int size = luaL_checkinteger(L,5);
-		if (dest_string) {
-			session = skynet_sendname(context, 0, dest_string, type | PTYPE_TAG_DONTCOPY, session, msg, size);
-		} else {
-			session = skynet_send(context, 0, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
-		}
-		break;
-	}
-	default:
-		luaL_error(L, "skynet.send invalid param %s", lua_typename(L, lua_type(L,4)));
-	}
-	if (session < 0) {
-		// send to invalid address
-		// todo: maybe throw an error would be better
-		return 0;
-	}
-	lua_pushinteger(L,session);
-	return 1;
-}
-
-static int
-lredirect(lua_State *L) {
-	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
-	uint32_t dest = (uint32_t)lua_tointeger(L,1);
-	const char * dest_string = NULL;
-	if (dest == 0) {
-		dest_string = get_dest_string(L, 1);
-	}
-	uint32_t source = (uint32_t)luaL_checkinteger(L,2);
-	int type = luaL_checkinteger(L,3);
-	int session = luaL_checkinteger(L,4);
-
-	int mtype = lua_type(L,5);
-	switch (mtype) {
-	case LUA_TSTRING: {
-		size_t len = 0;
-		void * msg = (void *)lua_tolstring(L,5,&len);
+		void * msg = (void *)lua_tolstring(L,idx_type+2,&len);
 		if (len == 0) {
 			msg = NULL;
 		}
@@ -266,8 +210,8 @@ lredirect(lua_State *L) {
 		break;
 	}
 	case LUA_TLIGHTUSERDATA: {
-		void * msg = lua_touserdata(L,5);
-		int size = luaL_checkinteger(L,6);
+		void * msg = lua_touserdata(L,idx_type+2);
+		int size = luaL_checkinteger(L,idx_type+3);
 		if (dest_string) {
 			session = skynet_sendname(context, source, dest_string, type | PTYPE_TAG_DONTCOPY, session, msg, size);
 		} else {
@@ -276,9 +220,45 @@ lredirect(lua_State *L) {
 		break;
 	}
 	default:
-		luaL_error(L, "skynet.redirect invalid param %s", lua_typename(L,mtype));
+		luaL_error(L, "invalid param %s", lua_typename(L, lua_type(L,idx_type+2)));
 	}
-	return 0;
+	if (session < 0) {
+		// send to invalid address
+		// todo: maybe throw an error would be better
+		return 0;
+	}
+	lua_pushinteger(L,session);
+	return 1;
+}
+
+/*
+	uint32 address
+	 string address
+	integer type
+	integer session
+	string message
+	 lightuserdata message_ptr
+	 integer len
+ */
+static int
+lsend(lua_State *L) {
+	return send_message(L, 0, 2);
+}
+
+/*
+	uint32 address
+	 string address
+	integer source_address
+	integer type
+	integer session
+	string message
+	 lightuserdata message_ptr
+	 integer len
+ */
+static int
+lredirect(lua_State *L) {
+	uint32_t source = (uint32_t)luaL_checkinteger(L,2);
+	return send_message(L, source, 3);
 }
 
 static int
@@ -366,7 +346,7 @@ lnow(lua_State *L) {
 	return 1;
 }
 
-int
+LUAMOD_API int
 luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
 

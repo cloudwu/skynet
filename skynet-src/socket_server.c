@@ -469,7 +469,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 _failed:
 	freeaddrinfo( ai_list );
 	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
-	return SOCKET_ERROR;
+	return SOCKET_ERR;
 }
 
 static int
@@ -550,7 +550,7 @@ send_list_udp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 			result->ud = 0;
 			result->data = NULL;
 
-			return SOCKET_ERROR;
+			return SOCKET_ERR;
 */
 		}
 
@@ -778,7 +778,7 @@ _failed:
 	result->data = "reach skynet socket number limit";
 	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
 
-	return SOCKET_ERROR;
+	return SOCKET_ERR;
 }
 
 static int
@@ -817,7 +817,7 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 	struct socket *s = new_fd(ss, id, request->fd, PROTOCOL_TCP, request->opaque, true);
 	if (s == NULL) {
 		result->data = "reach skynet socket number limit";
-		return SOCKET_ERROR;
+		return SOCKET_ERR;
 	}
 	sp_nonblocking(request->fd);
 	s->type = SOCKET_TYPE_BIND;
@@ -835,13 +835,13 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	struct socket *s = &ss->slot[HASH_ID(id)];
 	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
 		result->data = "invalid socket";
-		return SOCKET_ERROR;
+		return SOCKET_ERR;
 	}
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		if (sp_add(ss->event_fd, s->fd, s)) {
 			force_close(ss, s, result);
 			result->data = strerror(errno);
-			return SOCKET_ERROR;
+			return SOCKET_ERR;
 		}
 		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
 		s->opaque = request->opaque;
@@ -932,7 +932,7 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 		result->ud = 0;
 		result->data = "protocol mismatch";
 
-		return SOCKET_ERROR;
+		return SOCKET_ERR;
 	}
 	if (type == PROTOCOL_UDP) {
 		memcpy(s->p.udp_address, request->address, 1+2+4);	// 1 type, 2 port, 4 ipv4
@@ -1013,7 +1013,7 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_me
 			// close when error
 			force_close(ss, s, result);
 			result->data = strerror(errno);
-			return SOCKET_ERROR;
+			return SOCKET_ERR;
 		}
 		return -1;
 	}
@@ -1074,7 +1074,7 @@ forward_message_udp(struct socket_server *ss, struct socket *s, struct socket_me
 			// close when error
 			force_close(ss, s, result);
 			result->data = strerror(errno);
-			return SOCKET_ERROR;
+			return SOCKET_ERR;
 		}
 		return -1;
 	}
@@ -1111,7 +1111,7 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 			result->data = strerror(error);
 		else
 			result->data = strerror(errno);
-		return SOCKET_ERROR;
+		return SOCKET_ERR;
 	} else {
 		s->type = SOCKET_TYPE_CONNECTED;
 		result->opaque = s->opaque;
@@ -1182,7 +1182,7 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 
 static inline void 
 clear_closed_event(struct socket_server *ss, struct socket_message * result, int type) {
-	if (type == SOCKET_CLOSE || type == SOCKET_ERROR) {
+	if (type == SOCKET_CLOSE || type == SOCKET_ERR) {
 		int id = result->id;
 		int i;
 		for (i=ss->event_index; i<ss->event_n; i++) {
@@ -1240,7 +1240,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			if (ok > 0) {
 				return SOCKET_ACCEPT;
 			} if (ok < 0 ) {
-				return SOCKET_ERROR;
+				return SOCKET_ERR;
 			}
 			// when ok == 0, retry
 			break;
@@ -1261,7 +1261,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 						return SOCKET_UDP;
 					}
 				}
-				if (e->write && type != SOCKET_CLOSE && type != SOCKET_ERROR) {
+				if (e->write && type != SOCKET_CLOSE && type != SOCKET_ERR) {
 					// Try to dispatch write message next step if write flag set.
 					e->read = false;
 					--ss->event_index;
