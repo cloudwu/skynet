@@ -92,6 +92,7 @@ local function _error_dispatch(error_session, error_source)
 		if watching_session[error_session] then
 			table.insert(error_queue, error_session)
 		end
+		session_response[coroutine.running()] = true -- error report don't need response
 	end
 end
 
@@ -238,10 +239,16 @@ function suspend(co, result, command, param, size)
 	elseif command == "EXIT" then
 		-- coroutine exit
 		local address = session_coroutine_address[co]
-		release_watching(address)
-		session_coroutine_id[co] = nil
-		session_coroutine_address[co] = nil
-		session_response[co] = nil
+		local session = session_coroutine_id[co]
+		if address then
+			release_watching(address)
+			if session ~= 0 and not session_response[co] then
+				error "no response"	-- need response
+			end
+			session_coroutine_id[co] = nil
+			session_coroutine_address[co] = nil
+			session_response[co] = nil
+		end
 	elseif command == "QUIT" then
 		-- service exit
 		return

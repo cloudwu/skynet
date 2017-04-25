@@ -75,7 +75,7 @@ local function init(skynet, export)
 		end
 
 		function dbgcmd.LINK()
-			-- no return, raise error when exit
+			skynet.response()	-- get response , but not return. raise error when exit
 		end
 
 		return dbgcmd
