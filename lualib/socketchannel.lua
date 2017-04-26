@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local socket = require "socket"
 local socketdriver = require "socketdriver"
+local pstr = require "common.str"
 
 -- channel support auto reconnect , and capture socket error in request/response transaction
 -- { host = "", port = , auth = function(so) , response = function(so) session, data }
@@ -392,7 +393,8 @@ function channel:request(request, response, padding)
 		if not socket_write(fd , request) then
 			close_channel_socket(self)
 			wakeup_all(self)
-			error(socket_error)
+--			error(socket_error)
+            assert(false, "socket error, fd "..fd.."\nrequest:\n"..pstr.table2Str(request))
 		end
 	end
 
