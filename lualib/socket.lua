@@ -138,21 +138,39 @@ end
 
 local function default_warning(id, size)
 	local s = socket_pool[id]
-		local last = s.warningsize or 0
-		if last + 64 < size then	-- if size increase 64K
-			s.warningsize = size
-			skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id))
-		end
+	if not s then
+		return
+	end
+	local last = s.warningsize or 0
+	if last + 64 < size then	-- if size increase 64K
 		s.warningsize = size
+		skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id))
+	end
+	s.warningsize = size
+end
+
+local function default_empty(id)
+	local s = socket_pool[id]
+	if s then
+		s.warningsize = 0
+	end
 end
 
 -- SKYNET_SOCKET_TYPE_WARNING
 socket_message[7] = function(id, size)
 	local s = socket_pool[id]
 	if s then
-		local warning = s.warning or default_warning
+		local warning = s.on_warning or default_warning
 		warning(id, size)
 	end
+end
+--SKYNET_SOCKET_TYPE_EMPTY
+socket_message[8] = function(id)
+	local s = socket_pool[id]
+	if s then
+		local empty = s.on_empty or default_empty
+		empty(id)
+    end
 end
 
 skynet.register_protocol {
@@ -439,10 +457,25 @@ end
 socket.sendto = assert(driver.udp_send)
 socket.udp_address = assert(driver.udp_address)
 
-function socket.warning(id, callback)
+--callback(id, size)
+function socket.warning(id, callback, warnsz)
 	local obj = socket_pool[id]
 	assert(obj)
-	obj.warning = callback
+	obj.on_warning = callback
+	if warnsz then
+		driver.warnsize(id, warnsz)
+	end
+end
+
+--callback(id)
+function socket.empty(id, callback)
+	local obj = socket_pool[id]
+	assert(obj)
+	obj.on_empty = callback
+end
+
+function socket.checkid(id)
+	return socket_pool[id] ~= nil
 end
 
 return socket

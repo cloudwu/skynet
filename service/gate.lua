@@ -67,6 +67,10 @@ function handler.warning(fd, size)
 	skynet.send(watchdog, "lua", "socket", "warning", fd, size)
 end
 
+function handler.empty(fd, size)
+	skynet.send(watchdog, "lua", "socket", "empty", fd, size)
+end
+
 local CMD = {}
 
 function CMD.forward(source, fd, client, address)
