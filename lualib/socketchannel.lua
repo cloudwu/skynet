@@ -383,16 +383,23 @@ function channel:request(request, response, padding)
 	if padding then
 		-- padding may be a table, to support multi part request
 		-- multi part request use low priority socket write
-		-- socket_lwrite returns nothing
-		socket_lwrite(fd , request)
-		for _,v in ipairs(padding) do
-			socket_lwrite(fd, v)
-		end
-	else
-		if not socket_write(fd , request) then
+		-- now socket_lwrite returns as socket_write
+		local function sock_err()
 			close_channel_socket(self)
 			wakeup_all(self)
 			error(socket_error)
+		end
+		if not socket_lwrite(fd , request) then
+			sock_err()
+		end
+		for _,v in ipairs(padding) do
+			if not socket_lwrite(fd, v) then
+				sock_err()
+			end
+		end
+	else
+		if not socket_write(fd , request) then
+			sock_err()
 		end
 	end
 
