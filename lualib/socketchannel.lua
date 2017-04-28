@@ -376,6 +376,12 @@ end
 local socket_write = socket.write
 local socket_lwrite = socket.lwrite
 
+local function sock_err(self)
+	close_channel_socket(self)
+	wakeup_all(self)
+	error(socket_error)
+end
+
 function channel:request(request, response, padding)
 	assert(block_connect(self, true))	-- connect once
 	local fd = self.__sock[1]
@@ -384,22 +390,17 @@ function channel:request(request, response, padding)
 		-- padding may be a table, to support multi part request
 		-- multi part request use low priority socket write
 		-- now socket_lwrite returns as socket_write
-		local function sock_err()
-			close_channel_socket(self)
-			wakeup_all(self)
-			error(socket_error)
-		end
 		if not socket_lwrite(fd , request) then
-			sock_err()
+			sock_err(self)
 		end
 		for _,v in ipairs(padding) do
 			if not socket_lwrite(fd, v) then
-				sock_err()
+				sock_err(self)
 			end
 		end
 	else
 		if not socket_write(fd , request) then
-			sock_err()
+			sock_err(self)
 		end
 	end
 
