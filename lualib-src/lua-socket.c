@@ -567,8 +567,9 @@ lsendlow(lua_State *L) {
 	int id = luaL_checkinteger(L, 1);
 	int sz = 0;
 	void *buffer = get_buffer(L, 2, &sz);
-	skynet_socket_send_lowpriority(ctx, id, buffer, sz);
-	return 0;
+	int err = skynet_socket_send_lowpriority(ctx, id, buffer, sz);
+	lua_pushboolean(L, !err);
+	return 1;
 }
 
 static int
