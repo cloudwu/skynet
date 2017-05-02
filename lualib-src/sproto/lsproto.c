@@ -451,7 +451,8 @@ ldecode(lua_State *L) {
 	size_t sz;
 	int r;
 	if (st == NULL) {
-		return luaL_argerror(L, 1, "Need a sproto_type object");
+		// return nil
+		return 0;
 	}
 	sz = 0;
 	buffer = getbuffer(L, 2, &sz);
