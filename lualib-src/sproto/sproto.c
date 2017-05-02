@@ -32,6 +32,7 @@ struct sproto_type {
 struct protocol {
 	const char *name;
 	int tag;
+	int confirm;	// confirm == 1 where response nil
 	struct sproto_type * p[2];
 };
 
@@ -364,6 +365,7 @@ import_protocol(struct sproto *s, struct protocol *p, const uint8_t * stream) {
 	p->tag = -1;
 	p->p[SPROTO_REQUEST] = NULL;
 	p->p[SPROTO_RESPONSE] = NULL;
+	p->confirm = 0;
 	tag = 0;
 	for (i=0;i<fn;i++,tag++) {
 		int value = toword(stream + SIZEOF_FIELD * i);
@@ -394,6 +396,9 @@ import_protocol(struct sproto *s, struct protocol *p, const uint8_t * stream) {
 			if (value < 0 || value>=s->type_n)
 				return NULL;
 			p->p[SPROTO_RESPONSE] = &s->type[value];
+			break;
+		case 4:	// confirm
+			p->confirm = value;
 			break;
 		default:
 			return NULL;
@@ -542,6 +547,8 @@ sproto_dump(struct sproto *s) {
 		}
 		if (p->p[SPROTO_RESPONSE]) {
 			printf(" response:%s", p->p[SPROTO_RESPONSE]->name);
+		} else if (p->confirm) {
+			printf(" response nil");
 		}
 		printf("\n");
 	}
@@ -588,6 +595,12 @@ sproto_protoquery(const struct sproto *sp, int proto, int what) {
 		return p->p[what];
 	}
 	return NULL;
+}
+
+int
+sproto_protoresponse(const struct sproto * sp, int proto) {
+	struct protocol * p = query_proto(sp, proto);
+	return (p!=NULL && (p->p[SPROTO_RESPONSE] || p->confirm));
 }
 
 const char *

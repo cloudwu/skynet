@@ -275,7 +275,9 @@ lencode(lua_State *L) {
 	int tbl_index = 2;
 	struct sproto_type * st = lua_touserdata(L, 1);
 	if (st == NULL) {
-		return luaL_argerror(L, 1, "Need a sproto_type object");
+		luaL_checktype(L, tbl_index, LUA_TNIL);
+		lua_pushstring(L, "");
+		return 1;	// response nil
 	}
 	luaL_checktype(L, tbl_index, LUA_TTABLE);
 	luaL_checkstack(L, ENCODE_DEEPLEVEL*2 + 8, NULL);
@@ -573,7 +575,11 @@ lprotocol(lua_State *L) {
 	}
 	response = sproto_protoquery(sp, tag, SPROTO_RESPONSE);
 	if (response == NULL) {
-		lua_pushnil(L);
+		if (sproto_protoresponse(sp, tag)) {
+			lua_pushlightuserdata(L, NULL);	// response nil
+		} else {
+			lua_pushnil(L);
+		}
 	} else {
 		lua_pushlightuserdata(L, response);
 	}
