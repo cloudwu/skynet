@@ -71,12 +71,16 @@ function sockethelper.connect(host, port, timeout)
 	local fd
 	if timeout then
 		local drop_fd
+		local co = coroutine.running()
 		-- asynchronous connect
 		skynet.fork(function()
 			fd = socket.open(host, port)
 			if drop_fd then
 				-- sockethelper.connect already return, and raise socket_error
 				socket.close(fd)
+			else
+				-- socket.open before sleep, wakeup.
+				skynet.wakeup(co)
 			end
 		end)
 		skynet.sleep(timeout)
