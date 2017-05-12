@@ -1,0 +1,461 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D6D0F7FC1910D57A00E8C2DD /* lua-bson.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7081910D57A00E8C2DD /* lua-bson.c */; };
+		D6D0F7FD1910D57A00E8C2DD /* lua-clientsocket.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7091910D57A00E8C2DD /* lua-clientsocket.c */; };
+		D6D0F7FE1910D57A00E8C2DD /* lua-memory.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F70A1910D57A00E8C2DD /* lua-memory.c */; };
+		D6D0F7FF1910D57A00E8C2DD /* lua-mongo.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F70B1910D57A00E8C2DD /* lua-mongo.c */; };
+		D6D0F8001910D57A00E8C2DD /* lua-netpack.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F70C1910D57A00E8C2DD /* lua-netpack.c */; };
+		D6D0F8011910D57A00E8C2DD /* lua-profile.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F70D1910D57A00E8C2DD /* lua-profile.c */; };
+		D6D0F8021910D57A00E8C2DD /* lua-seri.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F70E1910D57A00E8C2DD /* lua-seri.c */; };
+		D6D0F8031910D57A00E8C2DD /* lua-skynet.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7101910D57A00E8C2DD /* lua-skynet.c */; };
+		D6D0F8041910D57A00E8C2DD /* lua-socket.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7111910D57A00E8C2DD /* lua-socket.c */; };
+		D6D0F8061910D57A00E8C2DD /* service_gate.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7271910D57A00E8C2DD /* service_gate.c */; };
+		D6D0F8071910D57A00E8C2DD /* service_harbor.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7281910D57A00E8C2DD /* service_harbor.c */; };
+		D6D0F8081910D57A00E8C2DD /* service_logger.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7291910D57A00E8C2DD /* service_logger.c */; };
+		D6D0F8091910D57A00E8C2DD /* service_master.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F72B1910D57A00E8C2DD /* service_master.c */; };
+		D6D0F80A1910D57A00E8C2DD /* service_snlua.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F72C1910D57A00E8C2DD /* service_snlua.c */; };
+		D6D0F80B1910D57A00E8C2DD /* malloc_hook.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F72E1910D57A00E8C2DD /* malloc_hook.c */; };
+		D6D0F80C1910D57A00E8C2DD /* skynet_env.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7321910D57A00E8C2DD /* skynet_env.c */; };
+		D6D0F80D1910D57A00E8C2DD /* skynet_error.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7341910D57A00E8C2DD /* skynet_error.c */; };
+		D6D0F80E1910D57A00E8C2DD /* skynet_handle.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7351910D57A00E8C2DD /* skynet_handle.c */; };
+		D6D0F80F1910D57A00E8C2DD /* skynet_harbor.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7371910D57A00E8C2DD /* skynet_harbor.c */; };
+		D6D0F8101910D57A00E8C2DD /* skynet_main.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F73A1910D57A00E8C2DD /* skynet_main.c */; };
+		D6D0F8111910D57A00E8C2DD /* skynet_module.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F73C1910D57A00E8C2DD /* skynet_module.c */; };
+		D6D0F8121910D57A00E8C2DD /* skynet_monitor.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F73E1910D57A00E8C2DD /* skynet_monitor.c */; };
+		D6D0F8131910D57A00E8C2DD /* skynet_mq.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7401910D57A00E8C2DD /* skynet_mq.c */; };
+		D6D0F8141910D57A00E8C2DD /* skynet_server.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7421910D57A00E8C2DD /* skynet_server.c */; };
+		D6D0F8151910D57A00E8C2DD /* skynet_socket.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7441910D57A00E8C2DD /* skynet_socket.c */; };
+		D6D0F8161910D57A00E8C2DD /* skynet_start.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7461910D57A00E8C2DD /* skynet_start.c */; };
+		D6D0F8171910D57A00E8C2DD /* skynet_timer.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F7471910D57A00E8C2DD /* skynet_timer.c */; };
+		D6D0F8181910D57A00E8C2DD /* socket_server.c in Sources */ = {isa = PBXBuildFile; fileRef = D6D0F74C1910D57A00E8C2DD /* socket_server.c */; };
+		D6D0F81C1910DAC200E8C2DD /* liblua.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D6D0F81B1910DAC200E8C2DD /* liblua.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D6D0F5581910D52C00E8C2DD /* Copy Files */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 8;
+			dstPath = usr/share/man/man1;
+			dstSubfolderSpec = 16;
+			files = (
+			);
+			name = "Copy Files";
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		D6D0F55A1910D52C00E8C2DD /* skynet */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = skynet; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6D0F7081910D57A00E8C2DD /* lua-bson.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-bson.c"; sourceTree = "<group>"; };
+		D6D0F7091910D57A00E8C2DD /* lua-clientsocket.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-clientsocket.c"; sourceTree = "<group>"; };
+		D6D0F70A1910D57A00E8C2DD /* lua-memory.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-memory.c"; sourceTree = "<group>"; };
+		D6D0F70B1910D57A00E8C2DD /* lua-mongo.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-mongo.c"; sourceTree = "<group>"; };
+		D6D0F70C1910D57A00E8C2DD /* lua-netpack.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-netpack.c"; sourceTree = "<group>"; };
+		D6D0F70D1910D57A00E8C2DD /* lua-profile.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-profile.c"; sourceTree = "<group>"; };
+		D6D0F70E1910D57A00E8C2DD /* lua-seri.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-seri.c"; sourceTree = "<group>"; };
+		D6D0F70F1910D57A00E8C2DD /* lua-seri.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "lua-seri.h"; sourceTree = "<group>"; };
+		D6D0F7101910D57A00E8C2DD /* lua-skynet.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-skynet.c"; sourceTree = "<group>"; };
+		D6D0F7111910D57A00E8C2DD /* lua-socket.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "lua-socket.c"; sourceTree = "<group>"; };
+		D6D0F7251910D57A00E8C2DD /* databuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = databuffer.h; sourceTree = "<group>"; };
+		D6D0F7261910D57A00E8C2DD /* hashid.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = hashid.h; sourceTree = "<group>"; };
+		D6D0F7271910D57A00E8C2DD /* service_gate.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = service_gate.c; sourceTree = "<group>"; };
+		D6D0F7281910D57A00E8C2DD /* service_harbor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = service_harbor.c; sourceTree = "<group>"; };
+		D6D0F7291910D57A00E8C2DD /* service_logger.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = service_logger.c; sourceTree = "<group>"; };
+		D6D0F72A1910D57A00E8C2DD /* service_lua.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = service_lua.h; sourceTree = "<group>"; };
+		D6D0F72B1910D57A00E8C2DD /* service_master.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = service_master.c; sourceTree = "<group>"; };
+		D6D0F72C1910D57A00E8C2DD /* service_snlua.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = service_snlua.c; sourceTree = "<group>"; };
+		D6D0F72E1910D57A00E8C2DD /* malloc_hook.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = malloc_hook.c; sourceTree = "<group>"; };
+		D6D0F72F1910D57A00E8C2DD /* malloc_hook.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = malloc_hook.h; sourceTree = "<group>"; };
+		D6D0F7301910D57A00E8C2DD /* rwlock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = rwlock.h; sourceTree = "<group>"; };
+		D6D0F7311910D57A00E8C2DD /* skynet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet.h; sourceTree = "<group>"; };
+		D6D0F7321910D57A00E8C2DD /* skynet_env.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_env.c; sourceTree = "<group>"; };
+		D6D0F7331910D57A00E8C2DD /* skynet_env.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_env.h; sourceTree = "<group>"; };
+		D6D0F7341910D57A00E8C2DD /* skynet_error.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_error.c; sourceTree = "<group>"; };
+		D6D0F7351910D57A00E8C2DD /* skynet_handle.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_handle.c; sourceTree = "<group>"; };
+		D6D0F7361910D57A00E8C2DD /* skynet_handle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_handle.h; sourceTree = "<group>"; };
+		D6D0F7371910D57A00E8C2DD /* skynet_harbor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_harbor.c; sourceTree = "<group>"; };
+		D6D0F7381910D57A00E8C2DD /* skynet_harbor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_harbor.h; sourceTree = "<group>"; };
+		D6D0F7391910D57A00E8C2DD /* skynet_imp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_imp.h; sourceTree = "<group>"; };
+		D6D0F73A1910D57A00E8C2DD /* skynet_main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_main.c; sourceTree = "<group>"; };
+		D6D0F73B1910D57A00E8C2DD /* skynet_malloc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_malloc.h; sourceTree = "<group>"; };
+		D6D0F73C1910D57A00E8C2DD /* skynet_module.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_module.c; sourceTree = "<group>"; };
+		D6D0F73D1910D57A00E8C2DD /* skynet_module.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_module.h; sourceTree = "<group>"; };
+		D6D0F73E1910D57A00E8C2DD /* skynet_monitor.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_monitor.c; sourceTree = "<group>"; };
+		D6D0F73F1910D57A00E8C2DD /* skynet_monitor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_monitor.h; sourceTree = "<group>"; };
+		D6D0F7401910D57A00E8C2DD /* skynet_mq.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_mq.c; sourceTree = "<group>"; };
+		D6D0F7411910D57A00E8C2DD /* skynet_mq.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_mq.h; sourceTree = "<group>"; };
+		D6D0F7421910D57A00E8C2DD /* skynet_server.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_server.c; sourceTree = "<group>"; };
+		D6D0F7431910D57A00E8C2DD /* skynet_server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_server.h; sourceTree = "<group>"; };
+		D6D0F7441910D57A00E8C2DD /* skynet_socket.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_socket.c; sourceTree = "<group>"; };
+		D6D0F7451910D57A00E8C2DD /* skynet_socket.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_socket.h; sourceTree = "<group>"; };
+		D6D0F7461910D57A00E8C2DD /* skynet_start.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_start.c; sourceTree = "<group>"; };
+		D6D0F7471910D57A00E8C2DD /* skynet_timer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = skynet_timer.c; sourceTree = "<group>"; };
+		D6D0F7481910D57A00E8C2DD /* skynet_timer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = skynet_timer.h; sourceTree = "<group>"; };
+		D6D0F7491910D57A00E8C2DD /* socket_epoll.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_epoll.h; sourceTree = "<group>"; };
+		D6D0F74A1910D57A00E8C2DD /* socket_kqueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_kqueue.h; sourceTree = "<group>"; };
+		D6D0F74B1910D57A00E8C2DD /* socket_poll.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_poll.h; sourceTree = "<group>"; };
+		D6D0F74C1910D57A00E8C2DD /* socket_server.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = socket_server.c; sourceTree = "<group>"; };
+		D6D0F74D1910D57A00E8C2DD /* socket_server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = socket_server.h; sourceTree = "<group>"; };
+		D6D0F81B1910DAC200E8C2DD /* liblua.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = liblua.a; path = ../3rd/lua/liblua.a; sourceTree = "<group>"; };
+		D6D0F81E1910DBBA00E8C2DD /* examples */ = {isa = PBXFileReference; lastKnownFileType = folder; path = examples; sourceTree = "<group>"; };
+		D6D0F81F1910DBBA00E8C2DD /* lualib */ = {isa = PBXFileReference; lastKnownFileType = folder; path = lualib; sourceTree = "<group>"; };
+		D6D0F8201910DBBA00E8C2DD /* service */ = {isa = PBXFileReference; lastKnownFileType = folder; path = service; sourceTree = "<group>"; };
+		D6D0F8211910DBBA00E8C2DD /* test */ = {isa = PBXFileReference; lastKnownFileType = folder; path = test; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D6D0F5571910D52C00E8C2DD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6D0F81C1910DAC200E8C2DD /* liblua.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D6D0F54F1910D4B200E8C2DD = {
+			isa = PBXGroup;
+			children = (
+				D6D0F5641910D57900E8C2DD /* src */,
+				D6D0F81D1910DAF700E8C2DD /* libs */,
+				D6D0F55B1910D52C00E8C2DD /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D6D0F55B1910D52C00E8C2DD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D6D0F55A1910D52C00E8C2DD /* skynet */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D6D0F5641910D57900E8C2DD /* src */ = {
+			isa = PBXGroup;
+			children = (
+				D6D0F81E1910DBBA00E8C2DD /* examples */,
+				D6D0F81F1910DBBA00E8C2DD /* lualib */,
+				D6D0F8201910DBBA00E8C2DD /* service */,
+				D6D0F8211910DBBA00E8C2DD /* test */,
+				D6D0F7071910D57A00E8C2DD /* lualib-src */,
+				D6D0F7241910D57A00E8C2DD /* service-src */,
+				D6D0F72D1910D57A00E8C2DD /* skynet-src */,
+			);
+			name = src;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		D6D0F7071910D57A00E8C2DD /* lualib-src */ = {
+			isa = PBXGroup;
+			children = (
+				D6D0F7081910D57A00E8C2DD /* lua-bson.c */,
+				D6D0F7091910D57A00E8C2DD /* lua-clientsocket.c */,
+				D6D0F70A1910D57A00E8C2DD /* lua-memory.c */,
+				D6D0F70B1910D57A00E8C2DD /* lua-mongo.c */,
+				D6D0F70C1910D57A00E8C2DD /* lua-netpack.c */,
+				D6D0F70D1910D57A00E8C2DD /* lua-profile.c */,
+				D6D0F70E1910D57A00E8C2DD /* lua-seri.c */,
+				D6D0F70F1910D57A00E8C2DD /* lua-seri.h */,
+				D6D0F7101910D57A00E8C2DD /* lua-skynet.c */,
+				D6D0F7111910D57A00E8C2DD /* lua-socket.c */,
+			);
+			path = "lualib-src";
+			sourceTree = "<group>";
+		};
+		D6D0F7241910D57A00E8C2DD /* service-src */ = {
+			isa = PBXGroup;
+			children = (
+				D6D0F7251910D57A00E8C2DD /* databuffer.h */,
+				D6D0F7261910D57A00E8C2DD /* hashid.h */,
+				D6D0F7271910D57A00E8C2DD /* service_gate.c */,
+				D6D0F7281910D57A00E8C2DD /* service_harbor.c */,
+				D6D0F7291910D57A00E8C2DD /* service_logger.c */,
+				D6D0F72A1910D57A00E8C2DD /* service_lua.h */,
+				D6D0F72B1910D57A00E8C2DD /* service_master.c */,
+				D6D0F72C1910D57A00E8C2DD /* service_snlua.c */,
+			);
+			path = "service-src";
+			sourceTree = "<group>";
+		};
+		D6D0F72D1910D57A00E8C2DD /* skynet-src */ = {
+			isa = PBXGroup;
+			children = (
+				D6D0F72E1910D57A00E8C2DD /* malloc_hook.c */,
+				D6D0F72F1910D57A00E8C2DD /* malloc_hook.h */,
+				D6D0F7301910D57A00E8C2DD /* rwlock.h */,
+				D6D0F7311910D57A00E8C2DD /* skynet.h */,
+				D6D0F7321910D57A00E8C2DD /* skynet_env.c */,
+				D6D0F7331910D57A00E8C2DD /* skynet_env.h */,
+				D6D0F7341910D57A00E8C2DD /* skynet_error.c */,
+				D6D0F7351910D57A00E8C2DD /* skynet_handle.c */,
+				D6D0F7361910D57A00E8C2DD /* skynet_handle.h */,
+				D6D0F7371910D57A00E8C2DD /* skynet_harbor.c */,
+				D6D0F7381910D57A00E8C2DD /* skynet_harbor.h */,
+				D6D0F7391910D57A00E8C2DD /* skynet_imp.h */,
+				D6D0F73A1910D57A00E8C2DD /* skynet_main.c */,
+				D6D0F73B1910D57A00E8C2DD /* skynet_malloc.h */,
+				D6D0F73C1910D57A00E8C2DD /* skynet_module.c */,
+				D6D0F73D1910D57A00E8C2DD /* skynet_module.h */,
+				D6D0F73E1910D57A00E8C2DD /* skynet_monitor.c */,
+				D6D0F73F1910D57A00E8C2DD /* skynet_monitor.h */,
+				D6D0F7401910D57A00E8C2DD /* skynet_mq.c */,
+				D6D0F7411910D57A00E8C2DD /* skynet_mq.h */,
+				D6D0F7421910D57A00E8C2DD /* skynet_server.c */,
+				D6D0F7431910D57A00E8C2DD /* skynet_server.h */,
+				D6D0F7441910D57A00E8C2DD /* skynet_socket.c */,
+				D6D0F7451910D57A00E8C2DD /* skynet_socket.h */,
+				D6D0F7461910D57A00E8C2DD /* skynet_start.c */,
+				D6D0F7471910D57A00E8C2DD /* skynet_timer.c */,
+				D6D0F7481910D57A00E8C2DD /* skynet_timer.h */,
+				D6D0F7491910D57A00E8C2DD /* socket_epoll.h */,
+				D6D0F74A1910D57A00E8C2DD /* socket_kqueue.h */,
+				D6D0F74B1910D57A00E8C2DD /* socket_poll.h */,
+				D6D0F74C1910D57A00E8C2DD /* socket_server.c */,
+				D6D0F74D1910D57A00E8C2DD /* socket_server.h */,
+			);
+			path = "skynet-src";
+			sourceTree = "<group>";
+		};
+		D6D0F81D1910DAF700E8C2DD /* libs */ = {
+			isa = PBXGroup;
+			children = (
+				D6D0F81B1910DAC200E8C2DD /* liblua.a */,
+			);
+			name = libs;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D6D0F5591910D52C00E8C2DD /* skynet */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6D0F5631910D52C00E8C2DD /* Build configuration list for PBXNativeTarget "skynet" */;
+			buildPhases = (
+				D6D0F5561910D52C00E8C2DD /* Sources */,
+				D6D0F5571910D52C00E8C2DD /* Frameworks */,
+				D6D0F5581910D52C00E8C2DD /* Copy Files */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = skynet;
+			productName = skynet;
+			productReference = D6D0F55A1910D52C00E8C2DD /* skynet */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D6D0F5501910D4B200E8C2DD /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0510;
+			};
+			buildConfigurationList = D6D0F5531910D4B200E8C2DD /* Build configuration list for PBXProject "skynet" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = D6D0F54F1910D4B200E8C2DD;
+			productRefGroup = D6D0F55B1910D52C00E8C2DD /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D6D0F5591910D52C00E8C2DD /* skynet */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D6D0F5561910D52C00E8C2DD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6D0F80E1910D57A00E8C2DD /* skynet_handle.c in Sources */,
+				D6D0F8121910D57A00E8C2DD /* skynet_monitor.c in Sources */,
+				D6D0F8171910D57A00E8C2DD /* skynet_timer.c in Sources */,
+				D6D0F8161910D57A00E8C2DD /* skynet_start.c in Sources */,
+				D6D0F8081910D57A00E8C2DD /* service_logger.c in Sources */,
+				D6D0F8151910D57A00E8C2DD /* skynet_socket.c in Sources */,
+				D6D0F8061910D57A00E8C2DD /* service_gate.c in Sources */,
+				D6D0F80D1910D57A00E8C2DD /* skynet_error.c in Sources */,
+				D6D0F8131910D57A00E8C2DD /* skynet_mq.c in Sources */,
+				D6D0F8111910D57A00E8C2DD /* skynet_module.c in Sources */,
+				D6D0F8031910D57A00E8C2DD /* lua-skynet.c in Sources */,
+				D6D0F8001910D57A00E8C2DD /* lua-netpack.c in Sources */,
+				D6D0F8091910D57A00E8C2DD /* service_master.c in Sources */,
+				D6D0F8041910D57A00E8C2DD /* lua-socket.c in Sources */,
+				D6D0F7FE1910D57A00E8C2DD /* lua-memory.c in Sources */,
+				D6D0F7FC1910D57A00E8C2DD /* lua-bson.c in Sources */,
+				D6D0F8071910D57A00E8C2DD /* service_harbor.c in Sources */,
+				D6D0F80C1910D57A00E8C2DD /* skynet_env.c in Sources */,
+				D6D0F7FF1910D57A00E8C2DD /* lua-mongo.c in Sources */,
+				D6D0F8011910D57A00E8C2DD /* lua-profile.c in Sources */,
+				D6D0F7FD1910D57A00E8C2DD /* lua-clientsocket.c in Sources */,
+				D6D0F8141910D57A00E8C2DD /* skynet_server.c in Sources */,
+				D6D0F8181910D57A00E8C2DD /* socket_server.c in Sources */,
+				D6D0F80F1910D57A00E8C2DD /* skynet_harbor.c in Sources */,
+				D6D0F8101910D57A00E8C2DD /* skynet_main.c in Sources */,
+				D6D0F8021910D57A00E8C2DD /* lua-seri.c in Sources */,
+				D6D0F80A1910D57A00E8C2DD /* service_snlua.c in Sources */,
+				D6D0F80B1910D57A00E8C2DD /* malloc_hook.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		D6D0F5541910D4B200E8C2DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				HEADER_SEARCH_PATHS = "";
+			};
+			name = Debug;
+		};
+		D6D0F5551910D4B200E8C2DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				HEADER_SEARCH_PATHS = "";
+			};
+			name = Release;
+		};
+		D6D0F5611910D52C00E8C2DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = NO;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_MODULES_AUTOLINK = NO;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CONFIGURATION_BUILD_DIR = ../;
+				COPY_PHASE_STRIP = NO;
+				DSTROOT = ../;
+				GCC_C_LANGUAGE_STANDARD = "compiler-default";
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+					NOUSE_JEMALLOC,
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../3rd/lua,
+					../3rd/jemalloc/include/jemalloc/,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					../3rd/lua,
+					"../3rd/lua-cjson",
+					../3rd/jemalloc/lib,
+					../cservice,
+					../luaclib,
+				);
+				MACOSX_DEPLOYMENT_TARGET = "";
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = "";
+			};
+			name = Debug;
+		};
+		D6D0F5621910D52C00E8C2DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = NO;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_MODULES_AUTOLINK = NO;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CONFIGURATION_BUILD_DIR = ../;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DSTROOT = ../;
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = "compiler-default";
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../3rd/lua,
+					../3rd/jemalloc/include/jemalloc/,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					../3rd/lua,
+					"../3rd/lua-cjson",
+					../3rd/jemalloc/lib,
+					../cservice,
+					../luaclib,
+				);
+				MACOSX_DEPLOYMENT_TARGET = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = "";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D6D0F5531910D4B200E8C2DD /* Build configuration list for PBXProject "skynet" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6D0F5541910D4B200E8C2DD /* Debug */,
+				D6D0F5551910D4B200E8C2DD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D6D0F5631910D52C00E8C2DD /* Build configuration list for PBXNativeTarget "skynet" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6D0F5611910D52C00E8C2DD /* Debug */,
+				D6D0F5621910D52C00E8C2DD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D6D0F5501910D4B200E8C2DD /* Project object */;
+}
