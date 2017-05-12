@@ -87,6 +87,8 @@ skynet.start(function()
 	end
 	print("testmysql success to connect to mysql server")
 
+	db:query("set names utf8") 
+
 	local res = db:query("drop table if exists cats")
 	res = db:query("create table cats "
 		               .."(id serial primary key, ".. "name varchar(5))")
