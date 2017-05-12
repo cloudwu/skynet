@@ -159,7 +159,7 @@ skynet_handle_findname(const char * name) {
 	int begin = 0;
 	int end = s->name_count - 1;
 	while (begin<=end) {
-		int mid = (begin+end)/2;
+		int mid = (end - begin)/2 + begin;
 		struct handle_name *n = &s->name[mid];
 		int c = strcmp(n->name, name);
 		if (c==0) {

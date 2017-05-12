@@ -121,7 +121,7 @@ skynet_mq_length(struct message_queue *q) {
 	if (head <= tail) {
 		return tail - head;
 	}
-	return tail + cap - head;
+	return (cap - head) + tail;
 }
 
 int
@@ -149,10 +149,7 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 		if (head >= cap) {
 			q->head = head = 0;
 		}
-		int length = tail - head;
-		if (length < 0) {
-			length += cap;
-		}
+		int length = skynet_mq_length(q);
 		while (length > q->overload_threshold) {
 			q->overload = length;
 			q->overload_threshold *= 2;
