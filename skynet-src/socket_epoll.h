@@ -59,6 +59,7 @@ sp_wait(int efd, struct event *e, int max) {
 		unsigned flag = ev[i].events;
 		e[i].write = (flag & EPOLLOUT) != 0;
 		e[i].read = (flag & EPOLLIN) != 0;
+		e[i].error = (flag & EPOLLERR) != 0;
 	}
 
 	return n;
