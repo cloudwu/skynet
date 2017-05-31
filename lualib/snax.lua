@@ -45,28 +45,32 @@ local skynet_send = skynet.send
 local skynet_call = skynet.call
 
 local function gen_post(type, handle)
+	local post_func
 	return setmetatable({} , {
 		__index = function( t, k )
 			local id = type.accept[k]
 			if not id then
 				error(string.format("post %s:%s no exist", type.name, k))
 			end
-			return function(...)
+			post_func = post_func or function(...)
 				skynet_send(handle, "snax", id, ...)
 			end
+			return post_func
 		end })
 end
 
 local function gen_req(type, handle)
+	local req_func
 	return setmetatable({} , {
 		__index = function( t, k )
 			local id = type.response[k]
 			if not id then
 				error(string.format("request %s:%s no exist", type.name, k))
 			end
-			return function(...)
+			req_func = req_func or function(...)
 				return skynet_call(handle, "snax", id, ...)
 			end
+			return req_func
 		end })
 end
 
