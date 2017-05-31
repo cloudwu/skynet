@@ -464,7 +464,7 @@ local function _mysql_login(self,user,password,database,on_connect)
         local scramble = scramble1..scramble_part2
         local token = _compute_token(password, scramble)
 
-        local client_flags = 260047;
+        local client_flags = 260045;
 
 		local req = strpack("<I4I4c24zs1z",
 			client_flags,

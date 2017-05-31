@@ -105,15 +105,17 @@ lrecv(lua_State *L) {
 	char buffer[CACHE_SIZE];
 	int r = recv(fd, buffer, CACHE_SIZE, 0);
 	if (r == 0) {
-		lua_pushliteral(L, "");
 		// close
-		return 1;
+		return 0;
 	}
 	if (r < 0) {
 		if (errno == EAGAIN || errno == EINTR) {
-			return 0;
+			lua_pushliteral(L, "");
+			return 1;
 		}
-		luaL_error(L, "socket error: %s", strerror(errno));
+		//luaL_error(L, "socket error: %s", strerror(errno));
+	
+		return 0;
 	}
 	lua_pushlstring(L, buffer, r);
 	return 1;
