@@ -678,7 +678,7 @@ ludp_address(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_socketdriver(lua_State *L) {
+luaopen_skynet_socketdriver(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "buffer", lnewbuffer },

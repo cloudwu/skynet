@@ -200,7 +200,7 @@ lyield_co(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_profile(lua_State *L) {
+luaopen_skynet_profile(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "start", lstart },
