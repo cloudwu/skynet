@@ -172,6 +172,9 @@ function command.socket(source, subcmd, fd, msg)
 			skynet.rawsend(addr, "lua", msg, sz)
 			return	-- no response
 		else
+			if type(addr) == "string" then
+				addr = register_name[addr] or addr
+			end
 			ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
 		end
 		if ok then
