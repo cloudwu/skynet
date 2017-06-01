@@ -6,6 +6,8 @@ local string = string
 local services = {}
 local command = {}
 local instance = {} -- for confirm (function command.LAUNCH / command.ERROR / command.LAUNCHOK)
+local server_status = true -- true : open, false : close
+local need_clean_services = {} -- when server stop, need clean services
 
 local function handle_to_address(handle)
 	return tonumber("0x" .. string.sub(handle , 2))
@@ -21,6 +23,14 @@ function command.LIST()
 	return list
 end
 
+function command.CLEAN_LIST()
+	local list = {}
+	for k,v in pairs(need_clean_services) do
+		list[skynet.address(k)] = v
+	end
+	return list
+end
+
 function command.STAT()
 	local list = {}
 	for k,v in pairs(services) do
@@ -31,6 +41,48 @@ function command.STAT()
 		list[skynet.address(k)] = stat
 	end
 	return list
+end
+
+-- check need clean services is clean ok
+local function check_clean_ok()
+	for k, v in pairs(need_clean_services) do
+		if v then
+			return false
+		end
+	end
+
+	return true
+end
+
+-- when need clean services clean ok, stop server
+local function stop_server()
+	-- kill all server
+	for k,v in pairs(services) do
+		skynet.kill(k)
+		services[k] = nil
+	end
+	core.command("STOPSERVER", "STOP SERVER BY COMMAND")
+	--skynet.exit()
+end
+
+function command.STOP()
+	if check_clean_ok() then
+		-- empty need_clean_services
+		stop_server()
+	else
+		for k,v in pairs(need_clean_services) do
+			skynet.call(k, "lua", "STOP", k)
+		end
+	end
+end
+
+function command.CLEAN_OK(service_inst)
+	if need_clean_services[service_inst] ~= nil then
+		need_clean_services[service_inst] = nil
+	end
+	if check_clean_ok() then
+		stop_server()
+	end
 end
 
 function command.KILL(_, handle)
@@ -75,12 +127,16 @@ function command.REMOVE(_, handle, kill)
 end
 
 local function launch_service(service, ...)
-	local param = table.concat({...}, " ")
+	local param_table = {...}
+	local param = table.concat(param_table, " ")
 	local inst = skynet.launch(service, param)
 	local response = skynet.response()
 	if inst then
 		services[inst] = service .. " " .. param
 		instance[inst] = response
+		if param_table[2] == "need_clean" then
+			need_clean_services[inst] = service .. " " .. param_table[1]
+		end
 	else
 		response(false)
 		return
