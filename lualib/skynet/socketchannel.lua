@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local socket = require "socket"
+local socket = require "skynet.socket"
 local socketdriver = require "socketdriver"
 
 -- channel support auto reconnect , and capture socket error in request/response transaction

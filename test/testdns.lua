@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local dns = require "dns"
+local dns = require "skynet.dns"
 
 skynet.start(function()
 	print("nameserver:", dns.server())	-- set nameserver

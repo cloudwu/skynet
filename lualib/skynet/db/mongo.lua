@@ -1,6 +1,6 @@
 local bson = require "bson"
-local socket = require "socket"
-local socketchannel	= require "socketchannel"
+local socket = require "skynet.socket"
+local socketchannel	= require "skynet.socketchannel"
 local skynet = require "skynet"
 local driver = require "mongo.driver"
 local md5 =	require	"md5"

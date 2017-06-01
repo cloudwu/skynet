@@ -1,6 +1,15 @@
 local skynet = require "skynet"
 
-local names = {"cluster", "dns", "mongo", "mysql", "redis", "sharedata", "socket", "sproto"}
+local names = {
+	"cluster",
+	"skynet.db.dns",
+	"skynet.db.mongo",
+	"skynet.db.mysql",
+	"skynet.db.redis",
+	"sharedata",
+	"skynet.socket",
+	"sproto"
+}
 
 -- set sandbox memory limit to 1M, must set here (at start, out of skynet.start)
 skynet.memlimit(1 * 1024 * 1024)
