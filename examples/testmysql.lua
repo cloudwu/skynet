@@ -1,5 +1,8 @@
 local skynet = require "skynet"
 local mysql = require "mysql"
+require "skynet.manager"
+
+local command = {}
 
 local function dump(obj)
     local getIndent, quoteStr, wrapKey, wrapVal, dumpObj
@@ -45,6 +48,26 @@ local function dump(obj)
     return dumpObj(obj, 0)
 end
 
+function command.REGISTER(db,account,pwd)
+	print("db register account=" .. account .. ";pwd=" .. pwd)
+	local sql = string.format("insert into game_users (account,pwd) " .. "values(\'%s\',\'%s\')",account,pwd)
+	print("register sql=" .. sql)
+	local res = db:query(sql)
+end
+
+function command.LOGIN(db,account,pwd)
+	print("db login account=" .. account .. ";pwd=" .. pwd)
+	local sql = string.format("select numid from game_users where account =\"" .. account .. " \" and pwd=\"" .. pwd .. "\"")
+	print("login sql =" .. sql)
+	local ret = db:query(sql)
+	if(ret.errno == nil)then
+		print("login result numid=" .. ret[1].numid)
+		return string.format("numid=%d",ret[1].numid)
+	end
+	return string.format("numid=%d",-1)
+	
+end
+
 local function test2( db)
     local i=1
     while true do
@@ -69,16 +92,16 @@ local function test3( db)
     end
 end
 skynet.start(function()
-
+	local db
 	local function on_connect(db)
 		db:query("set charset utf8");
 	end
 	local db=mysql.connect({
 		host="127.0.0.1",
 		port=3306,
-		database="skynet",
+		database="mobile_game",
 		user="root",
-		password="1",
+		password="111111",
 		max_packet_size = 1024 * 1024,
 		on_connect = on_connect
 	})
@@ -86,46 +109,15 @@ skynet.start(function()
 		print("failed to connect")
 	end
 	print("testmysql success to connect to mysql server")
-
-	local res = db:query("drop table if exists cats")
-	res = db:query("create table cats "
-		               .."(id serial primary key, ".. "name varchar(5))")
-	print( dump( res ) )
-
-	res = db:query("insert into cats (name) "
-                             .. "values (\'Bob\'),(\'\'),(null)")
-	print ( dump( res ) )
-
-	res = db:query("select * from cats order by id asc")
-	print ( dump( res ) )
-
-    -- test in another coroutine
-	skynet.fork( test2, db)
-    skynet.fork( test3, db)
-	-- multiresultset test
-	res = db:query("select * from cats order by id asc ; select * from cats")
-	print ("multiresultset test result=", dump( res ) )
-
-	print ("escape string test result=", mysql.quote_sql_str([[\mysql escape %string test'test"]]) )
-
-	-- bad sql statement
-	local res =  db:query("select * from notexisttable" )
-	print( "bad query test result=" ,dump(res) )
-
-    local i=1
-    while true do
-        local    res = db:query("select * from cats order by id asc")
-        print ( "test1 loop times=" ,i,"\n","query result=",dump( res ) )
-
-        res = db:query("select * from cats order by id asc")
-        print ( "test1 loop times=" ,i,"\n","query result=",dump( res ) )
-
-
-        skynet.sleep(1000)
-        i=i+1
-    end
-
-	--db:disconnect()
-	--skynet.exit()
+	--REQUEST:register(db)
+	skynet.dispatch("lua",function(session, address, cmd, ...)
+			local f= command[string.upper(cmd)]
+			if f then
+				skynet.ret(skynet.pack(f(db,...)))
+			else
+				error(string.format("Unknown command %s", tostring(cmd)))
+			end
+			end)
+	skynet.register "MYSQL"
 end)
 
