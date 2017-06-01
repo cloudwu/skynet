@@ -1,7 +1,7 @@
 local skynet = require "skynet"
 local codecache = require "skynet.codecache"
 local core = require "skynet.core"
-local socket = require "socket"
+local socket = require "skynet.socket"
 local snax = require "snax"
 local memory = require "memory"
 local httpd = require "http.httpd"

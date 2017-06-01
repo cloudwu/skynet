@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local sc = require "socketchannel"
-local socket = require "socket"
+local sc = require "skynet.socketchannel"
+local socket = require "skynet.socket"
 local cluster = require "cluster.core"
 
 local config_name = skynet.getenv "cluster"
