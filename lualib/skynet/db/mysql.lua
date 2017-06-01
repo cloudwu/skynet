@@ -5,8 +5,8 @@
 -- Modified by Cloud Wu (remove bit32 for lua 5.3)
 
 local socketchannel = require "skynet.socketchannel"
-local mysqlaux = require "mysqlaux.c"
-local crypt = require "crypt"
+local mysqlaux = require "skynet.mysqlaux.c"
+local crypt = require "skynet.crypt"
 
 
 local sub = string.sub

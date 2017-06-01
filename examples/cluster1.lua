@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local cluster = require "cluster"
+local cluster = require "skynet.cluster"
 local snax = require "snax"
 
 skynet.start(function()

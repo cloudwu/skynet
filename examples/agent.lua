@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local netpack = require "netpack"
+local netpack = require "skynet.netpack"
 local socket = require "skynet.socket"
 local sproto = require "sproto"
 local sprotoloader = require "sprotoloader"
