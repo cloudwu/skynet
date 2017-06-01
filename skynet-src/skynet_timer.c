@@ -159,7 +159,7 @@ static inline void
 timer_execute(struct timer *T) {
 	int idx = T->time & TIME_NEAR_MASK;
 	
-	while (T->near[idx].head.next) {
+	if (T->near[idx].head.next) {
 		struct timer_node *current = link_clear(&T->near[idx]);
 		SPIN_UNLOCK(T);
 		// dispatch_list don't need lock T
