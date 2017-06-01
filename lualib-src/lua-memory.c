@@ -9,7 +9,7 @@
 static int
 ltotal(lua_State *L) {
 	size_t t = malloc_used_memory();
-	lua_pushinteger(L, (lua_Integer)t);
+	lua_pushnumber(L, t);
 
 	return 1;
 }
@@ -17,7 +17,7 @@ ltotal(lua_State *L) {
 static int
 lblock(lua_State *L) {
 	size_t t = malloc_memory_block();
-	lua_pushinteger(L, (lua_Integer)t);
+	lua_pushnumber(L, t);
 
 	return 1;
 }
