@@ -283,6 +283,7 @@ function COMMANDX.debug(cmd)
 		pcall(forward_cmd)
 		if not stop then	-- block at skynet.call "start"
 			term_co = nil
+		else
 			skynet.wakeup(term_co)
 		end
 	end)
