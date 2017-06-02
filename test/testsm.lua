@@ -30,7 +30,7 @@ else
 -- master
 skynet.start(function()
 	-- register share type schema
-	sharemap.register("./test/sharemap.sp")
+	sharemap.register("./test/sharemap.sproto")
 	local slave = skynet.newservice(SERVICE_NAME, "slave")
 	local writer = sharemap.writer("foobar", { x=0,y=0,s="hello" })
 	skynet.call(slave, "lua", "init", "foobar", writer:copy())
