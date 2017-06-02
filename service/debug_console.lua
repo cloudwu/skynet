@@ -281,12 +281,17 @@ function COMMANDX.debug(cmd)
 	end
 	skynet.fork(function()
 		pcall(forward_cmd)
-		skynet.wakeup(term_co)
+		if not stop then	-- block at skynet.call "start"
+			term_co = nil
+			skynet.wakeup(term_co)
+		end
 	end)
 	local ok, err = skynet.call(agent, "lua", "start", address, cmd.fd)
 	stop = true
-	-- wait for fork coroutine exit.
-	skynet.wait(term_co)
+	if term_co then
+		-- wait for fork coroutine exit.
+		skynet.wait(term_co)
+	end
 
 	if not ok then
 		error(err)
