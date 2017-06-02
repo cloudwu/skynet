@@ -20,14 +20,17 @@ local function monitor(pointer)
 	end)
 end
 
+local function dumpsheet(v)
+	if type(v) == "string" then
+		return v
+	else
+		return dump.dump(v)
+	end
+end
+
 function builder.new(name, v)
 	assert(dataset[name] == nil)
-	local datastring
-	if type(v) == "string" then
-		datastring = v
-	else
-		datastring = dump.dump(v)
-	end
+	local datastring = dumpsheet(v)
 	local pointer = core.stringpointer(datastring)
 	skynet.call(service.address, "lua", "update", name, pointer)
 	cache[datastring] = pointer
@@ -37,13 +40,8 @@ end
 
 function builder.update(name, v)
 	local lastversion = assert(dataset[name])
-	local diff
-	if type(v) == "string" then
-		diff = v
-	else
-		local newversion = dump.dump(v)
-		diff = dump.diff(lastversion, newversion)
-	end
+	local newversion = dumpsheet(v)
+	local diff = dump.diff(lastversion, newversion)
 	local pointer = core.stringpointer(diff)
 	skynet.call(service.address, "lua", "update", name, pointer)
 	cache[diff] = pointer
@@ -55,13 +53,6 @@ end
 
 function builder.compile(v)
 	return dump.dump(v)
-end
-
-function builder.diff(v1,v2)
-	local lastversion = dump.dump(v1)
-	local newversion = dump.dump(v2)
-
-	return dump.diff(lastversion, newversion)
 end
 
 local function datasheet_service()
