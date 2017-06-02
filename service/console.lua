@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local snax   = require "snax"
-local socket = require "socket"
+local snax   = require "skynet.snax"
+local socket = require "skynet.socket"
 
 local function split_cmdline(cmdline)
 	local split = {}

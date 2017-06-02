@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local sharedata = require "sharedata.corelib"
+local sharedata = require "skynet.sharedata.corelib"
 local table = table
 local cache = require "skynet.codecache"
 cache.mode "OFF"	-- turn off codecache, because CMD.new may load data file

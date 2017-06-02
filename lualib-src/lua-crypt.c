@@ -904,7 +904,7 @@ int lsha1(lua_State *L);
 int lhmac_sha1(lua_State *L);
 
 LUAMOD_API int
-luaopen_crypt(lua_State *L) {
+luaopen_skynet_crypt(lua_State *L) {
 	luaL_checkversion(L);
 	static int init = 0;
 	if (!init) {

@@ -1,6 +1,6 @@
 local skynet = require "skynet"
 local httpc = require "http.httpc"
-local dns = require "dns"
+local dns = require "skynet.dns"
 
 local function main()
 	httpc.dns()	-- set dns server
