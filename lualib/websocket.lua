@@ -343,6 +343,7 @@ function ws:start()
         if not message then
             --print('recv eror:', message, err)
             socket.close(self.id)
+            self.handler.on_close(self)
         end
     end
 end
