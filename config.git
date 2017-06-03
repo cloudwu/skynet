@@ -1,0 +1,16 @@
+[user]
+    name = lxz
+    email = 253550465@qq.com
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = https://github.com/cloudwu/skynet
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "master"]
+	remote = origin
+	merge = refs/heads/master
+[submodule "3rd/jemalloc"]
+	url = https://github.com/jemalloc/jemalloc.git
