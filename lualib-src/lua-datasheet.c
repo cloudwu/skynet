@@ -313,22 +313,23 @@ llen(lua_State *L) {
 }
 
 static void
-gen_metatable(lua_State *L) {
+new_weak_table(lua_State *L, const char *mode) {
+	lua_newtable(L);	// NODECACHE { pointer:table }
+
 	lua_createtable(L, 0, 1);	// weak meta table
-	lua_pushstring(L, "kv");
+	lua_pushstring(L, mode);
 	lua_setfield(L, -2, "__mode");
 
-	lua_newtable(L);	// NODECACHE
-	lua_pushvalue(L, -2);
-	lua_setmetatable(L, -2);	// make NODECACGE weak
+	lua_setmetatable(L, -2);	// make NODECACHE weak
+}
+
+static void
+gen_metatable(lua_State *L) {
+	new_weak_table(L, "kv");	// NODECACHE { pointer:table }
 	lua_setfield(L, LUA_REGISTRYINDEX, NODECACHE);
 
-	lua_newtable(L);	// PROXYCACHE
-	lua_pushvalue(L, -2);
-	lua_setmetatable(L, -2);	// make NODECACGE weak
+	new_weak_table(L, "k");	// PROXYCACHE { table:userdata }
 	lua_setfield(L, LUA_REGISTRYINDEX, PROXYCACHE);
-
-	lua_pop(L, 1);	// pop weak meta
 
 	lua_newtable(L);
 	lua_setfield(L, LUA_REGISTRYINDEX, TABLES);
