@@ -1,13 +1,14 @@
 #!/bin/sh
 
-#git add -A --all
+
+timestamp=` ` 
 if [ $# == 1 ]
 then
-   git commit -m "'$1'" 
+	timestamp='$1' 
 else
-   #timestamp=`date +%s` 
    timestamp=`date "+%Y-%m-%d %H:%M:%S"` 
-   git commit -m "$timestamp" 
-   echo "日志名：$timestamp"
 fi
-git push all 
+echo "日志名：$timestamp"
+git add . 
+git commit -m "$timestamp" 
+git push --recurse-submodules=on-demand
