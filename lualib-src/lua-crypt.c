@@ -933,3 +933,8 @@ luaopen_skynet_crypt(lua_State *L) {
 	luaL_newlib(L,l);
 	return 1;
 }
+
+LUAMOD_API int
+luaopen_client_crypt(lua_State *L) {
+	return luaopen_skynet_crypt(L);
+}

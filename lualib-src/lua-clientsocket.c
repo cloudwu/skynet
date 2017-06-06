@@ -186,7 +186,7 @@ lreadstdin(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_clientsocket(lua_State *L) {
+luaopen_client_socket(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "connect", lconnect },
