@@ -1,0 +1,10 @@
+thread = 8
+mqueue = 256
+cpath = "./cservice/?.so"
+logger = nil
+harbor = 2
+address = "127.0.0.1:2527"
+master = "127.0.0.1:2013"
+start = "main_log"
+luaservice ="./service/?.lua;./test/?.lua;./examples/?.lua"
+snax = "./examples/?.lua;./test/?.lua"
