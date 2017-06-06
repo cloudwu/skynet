@@ -32,7 +32,7 @@ lconnect(lua_State *L) {
 	my_addr.sin_family=AF_INET;
 	my_addr.sin_port=htons(port);
 
-	int r = connect(fd,(struct sockaddr *)&my_addr,sizeof(struct sockaddr_in));
+	int r = connect(fd,(struct sockaddr *)&my_addr,sizeof(struct sockaddr));
 
 	if (r == -1) {
 		return luaL_error(L, "Connect %s %d failed", addr, port);
