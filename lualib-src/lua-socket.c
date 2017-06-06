@@ -541,7 +541,7 @@ get_buffer(lua_State *L, int index, int *sz) {
 		*sz = (int)len;
 		break;
 	default:
-		str =  luaL_checklstring(L, index, &len);
+		str = luaL_checklstring(L, index, &len);
 		buffer = skynet_malloc(len);
 		memcpy(buffer, str, len);
 		*sz = (int)len;
