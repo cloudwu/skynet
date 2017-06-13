@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local mc = require "multicast"
-local dc = require "datacenter"
+local mc = require "skynet.multicast"
+local dc = require "skynet.datacenter"
 
 local mode = ...
 
@@ -27,7 +27,7 @@ skynet.start(function()
 	local channel = mc.new()
 	print("New channel", channel)
 	for i=1,10 do
-		local sub = skynet.newservice("testmulticast", "sub")
+		local sub = skynet.newservice(SERVICE_NAME, "sub")
 		skynet.call(sub, "lua", "init", channel.channel)
 	end
 

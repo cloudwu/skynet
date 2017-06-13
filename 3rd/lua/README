@@ -1,3 +1,6 @@
-This is a modify version of lua 5.2.3 (http://www.lua.org/ftp/lua-5.2.3.tar.gz) .
+This is a modify version of lua 5.3.2 (http://www.lua.org/ftp/lua-5.3.2.tar.gz) .
 
-For detail : http://lua-users.org/lists/lua-l/2014-03/msg00489.html
+For detail ,
+  Shared Proto : http://lua-users.org/lists/lua-l/2014-03/msg00489.html
+  Shared short string table : http://blog.codingnow.com/2015/08/lua_vm_share_string.html
+  Signal for debug use : http://blog.codingnow.com/2015/03/skynet_signal.html

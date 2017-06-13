@@ -3,6 +3,7 @@
 #include "skynet_monitor.h"
 #include "skynet_server.h"
 #include "skynet.h"
+#include "atomic.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +31,7 @@ void
 skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t destination) {
 	sm->source = source;
 	sm->destination = destination;
-	__sync_fetch_and_add(&sm->version , 1);
+	ATOM_INC(&sm->version);
 }
 
 void 

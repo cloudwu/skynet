@@ -132,10 +132,15 @@ _ctrl(struct gate * g, const void * msg, int sz) {
 		return;
 	}
 	if (memcmp(command,"start",i) == 0) {
-		skynet_socket_start(ctx, g->listen_id);
+		_parm(tmp, sz, i);
+		int uid = strtol(command , NULL, 10);
+		int id = hashid_lookup(&g->hash, uid);
+		if (id>=0) {
+			skynet_socket_start(ctx, uid);
+		}
 		return;
 	}
-    if (memcmp(command, "close", i) == 0) {
+	if (memcmp(command, "close", i) == 0) {
 		if (g->listen_id >= 0) {
 			skynet_socket_close(ctx, g->listen_id);
 			g->listen_id = -1;
@@ -166,18 +171,18 @@ _forward(struct gate *g, struct connection * c, int size) {
 	if (g->broker) {
 		void * temp = skynet_malloc(size);
 		databuffer_read(&c->buffer,&g->mp,temp, size);
-		skynet_send(ctx, 0, g->broker, g->client_tag | PTYPE_TAG_DONTCOPY, 0, temp, size);
+		skynet_send(ctx, 0, g->broker, g->client_tag | PTYPE_TAG_DONTCOPY, 1, temp, size);
 		return;
 	}
 	if (c->agent) {
 		void * temp = skynet_malloc(size);
 		databuffer_read(&c->buffer,&g->mp,temp, size);
-		skynet_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONTCOPY, 0 , temp, size);
+		skynet_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONTCOPY, 1 , temp, size);
 	} else if (g->watchdog) {
 		char * tmp = skynet_malloc(size + 32);
 		int n = snprintf(tmp,32,"%d data ",c->id);
 		databuffer_read(&c->buffer,&g->mp,tmp+n,size);
-		skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT | PTYPE_TAG_DONTCOPY, 0, tmp, size + n);
+		skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT | PTYPE_TAG_DONTCOPY, 1, tmp, size + n);
 	}
 }
 
@@ -225,10 +230,7 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 			break;
 		}
 		int id = hashid_lookup(&g->hash, message->id);
-		if (id>=0) {
-			struct connection *c = &g->conn[id];
-			_report(g, "%d open %d %s:0",message->id,message->id,c->remote_name);
-		} else {
+		if (id<0) {
 			skynet_error(ctx, "Close unknown connection %d", message->id);
 			skynet_socket_close(ctx, message->id);
 		}
@@ -259,8 +261,12 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 			c->id = message->ud;
 			memcpy(c->remote_name, message+1, sz);
 			c->remote_name[sz] = '\0';
-			skynet_socket_start(ctx, message->ud);
+			_report(g, "%d open %d %s:0",c->id, c->id, c->remote_name);
+			skynet_error(ctx, "socket open: %x", c->id);
 		}
+		break;
+	case SKYNET_SOCKET_TYPE_WARNING:
+		skynet_error(ctx, "fd (%d) send buffer (%d)K", message->id, message->ud);
 		break;
 	}
 }
@@ -292,7 +298,6 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 		}
 	}
 	case PTYPE_SOCKET:
-		assert(source == 0);
 		// recv socket message from skynet_socket
 		dispatch_socket_message(g, msg, (int)(sz-sizeof(struct skynet_socket_message)));
 		break;
@@ -325,6 +330,7 @@ start_listen(struct gate *g, char * listen_addr) {
 	if (g->listen_id < 0) {
 		return 1;
 	}
+	skynet_socket_start(ctx, g->listen_id);
 	return 0;
 }
 
@@ -333,13 +339,12 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 	if (parm == NULL)
 		return 1;
 	int max = 0;
-	int buffer = 0;
 	int sz = strlen(parm)+1;
 	char watchdog[sz];
 	char binding[sz];
 	int client_tag = 0;
 	char header;
-	int n = sscanf(parm, "%c %s %s %d %d %d",&header,watchdog, binding,&client_tag , &max,&buffer);
+	int n = sscanf(parm, "%c %s %s %d %d", &header, watchdog, binding, &client_tag, &max);
 	if (n<4) {
 		skynet_error(ctx, "Invalid gate parm %s",parm);
 		return 1;

@@ -1,40 +1,42 @@
+## Skynet
+
+Skynet is a lightweight online game framework, and it can be used in many other fields.
+
 ## Build
 
-Install autoconf first for jemalloc
+For Linux, install autoconf first for jemalloc:
 
 ```
-git clone git@github.com:cloudwu/skynet.git
+git clone https://github.com/cloudwu/skynet.git
 cd skynet
 make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd now
 ```
 
-Or you can :
+Or you can:
 
 ```
 export PLAT=linux
 make
 ```
 
+For FreeBSD , use gmake instead of make.
+
 ## Test
 
-Run these in different console
+Run these in different consoles:
 
 ```
 ./skynet examples/config	# Launch first skynet node  (Gate server) and a skynet-master (see config for standalone option)
-lua examples/client.lua 	# Launch a client, and try to input some words.
+./3rd/lua/lua examples/client.lua 	# Launch a client, and try to input hello.
 ```
 
-## About Lua
+## About Lua version
 
-Skynet put a modified version of lua 5.2.3 in 3rd/lua , it can share proto type between lua state (http://lua-users.org/lists/lua-l/2014-03/msg00489.html) .
+Skynet now uses a modified version of lua 5.3.3 ( https://github.com/ejoy/lua/tree/skynet ) for multiple lua states.
 
-Each lua file only load once and cache it in memory during skynet start . so if you want to reflush the cache , call skynet.cache.clear() .
+You can also use official Lua versions, just edit the Makefile by yourself.
 
-You can also use the offical lua version , edit the makefile by yourself .
+## How To Use (Sorry, Only in Chinese now)
 
-## Blog (in Chinese)
-
-* http://blog.codingnow.com/2012/09/the_design_of_skynet.html
-* http://blog.codingnow.com/2012/08/skynet.html
-* http://blog.codingnow.com/2012/08/skynet_harbor_rpc.html
-* http://blog.codingnow.com/eo/skynet/
+* Read Wiki for documents https://github.com/cloudwu/skynet/wiki
+* The FAQ in wiki https://github.com/cloudwu/skynet/wiki/FAQ

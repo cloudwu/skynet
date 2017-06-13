@@ -1,16 +1,19 @@
 /*
-** $Id: luac.c,v 1.69 2011/11/29 17:46:33 lhf Exp $
-** Lua compiler (saves bytecodes to files; also list bytecodes)
+** $Id: luac.c,v 1.75 2015/03/12 01:58:27 lhf Exp $
+** Lua compiler (saves bytecodes to files; also lists bytecodes)
 ** See Copyright Notice in lua.h
 */
 
+#define luac_c
+#define LUA_CORE
+
+#include "lprefix.h"
+
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define luac_c
-#define LUA_CORE
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -18,6 +21,7 @@
 #include "lobject.h"
 #include "lstate.h"
 #include "lundump.h"
+#include "lstring.h"
 
 static void PrintFunction(const Proto* f, int full);
 #define luaU_print	PrintFunction
@@ -47,14 +51,14 @@ static void cannot(const char* what)
 static void usage(const char* message)
 {
  if (*message=='-')
-  fprintf(stderr,"%s: unrecognized option " LUA_QS "\n",progname,message);
+  fprintf(stderr,"%s: unrecognized option '%s'\n",progname,message);
  else
   fprintf(stderr,"%s: %s\n",progname,message);
  fprintf(stderr,
   "usage: %s [options] [filenames]\n"
   "Available options are:\n"
   "  -l       list (use -l -l for full listing)\n"
-  "  -o name  output to file " LUA_QL("name") " (default is \"%s\")\n"
+  "  -o name  output to file 'name' (default is \"%s\")\n"
   "  -p       parse only\n"
   "  -s       strip debug information\n"
   "  -v       show version information\n"
@@ -89,7 +93,7 @@ static int doargs(int argc, char* argv[])
   {
    output=argv[++i];
    if (output==NULL || *output==0 || (*output=='-' && output[1]!=0))
-    usage(LUA_QL("-o") " needs argument");
+    usage("'-o' needs argument");
    if (IS("-")) output=NULL;
   }
   else if (IS("-p"))			/* parse only */
@@ -192,6 +196,7 @@ int main(int argc, char* argv[])
  int i=doargs(argc,argv);
  argc-=i; argv+=i;
  if (argc<=0) usage("no input files given");
+ luaS_initshr();
  L=luaL_newstate();
  if (L==NULL) fatal("cannot create state: not enough memory");
  lua_pushcfunction(L,&pmain);
@@ -203,7 +208,7 @@ int main(int argc, char* argv[])
 }
 
 /*
-** $Id: print.c,v 1.69 2013/07/04 01:03:46 lhf Exp $
+** $Id: luac.c,v 1.75 2015/03/12 01:58:27 lhf Exp $
 ** print bytecodes
 ** See Copyright Notice in lua.h
 */
@@ -223,7 +228,7 @@ int main(int argc, char* argv[])
 static void PrintString(const TString* ts)
 {
  const char* s=getstr(ts);
- size_t i,n=ts->tsv.len;
+ size_t i,n=tsslen(ts);
  printf("%c",'"');
  for (i=0; i<n; i++)
  {
@@ -251,7 +256,7 @@ static void PrintString(const TString* ts)
 static void PrintConstant(const Proto* f, int i)
 {
  const TValue* o=&f->k[i];
- switch (ttypenv(o))
+ switch (ttype(o))
  {
   case LUA_TNIL:
 	printf("nil");
@@ -259,11 +264,19 @@ static void PrintConstant(const Proto* f, int i)
   case LUA_TBOOLEAN:
 	printf(bvalue(o) ? "true" : "false");
 	break;
-  case LUA_TNUMBER:
-	printf(LUA_NUMBER_FMT,nvalue(o));
+  case LUA_TNUMFLT:
+	{
+	char buff[100];
+	sprintf(buff,LUA_NUMBER_FMT,fltvalue(o));
+	printf("%s",buff);
+	if (buff[strspn(buff,"-0123456789")]=='\0') printf(".0");
 	break;
-  case LUA_TSTRING:
-	PrintString(rawtsvalue(o));
+	}
+  case LUA_TNUMINT:
+	printf(LUA_INTEGER_FMT,ivalue(o));
+	break;
+  case LUA_TSHRSTR: case LUA_TLNGSTR:
+	PrintString(tsvalue(o));
 	break;
   default:				/* cannot happen */
 	printf("? type=%d",ttype(o));
@@ -276,9 +289,8 @@ static void PrintConstant(const Proto* f, int i)
 
 static void PrintCode(const Proto* f)
 {
- const SharedProto *sp = f->sp;
- const Instruction* code=sp->code;
- int pc,n=sp->sizecode;
+ const Instruction* code=f->sp->code;
+ int pc,n=f->sp->sizecode;
  for (pc=0; pc<n; pc++)
  {
   Instruction i=code[pc];
@@ -338,8 +350,14 @@ static void PrintCode(const Proto* f)
    case OP_ADD:
    case OP_SUB:
    case OP_MUL:
-   case OP_DIV:
    case OP_POW:
+   case OP_DIV:
+   case OP_IDIV:
+   case OP_BAND:
+   case OP_BOR:
+   case OP_BXOR:
+   case OP_SHL:
+   case OP_SHR:
    case OP_EQ:
    case OP_LT:
    case OP_LE:
@@ -415,7 +433,7 @@ static void PrintDebug(const Proto* f)
   printf("\t%d\t%s\t%d\t%d\n",
   i,getstr(sp->locvars[i].varname),sp->locvars[i].startpc+1,sp->locvars[i].endpc+1);
  }
- n=sp->sizeupvalues;
+ n=f->sp->sizeupvalues;
  printf("upvalues (%d) for %p:\n",n,VOID(f));
  for (i=0; i<n; i++)
  {

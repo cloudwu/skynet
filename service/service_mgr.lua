@@ -1,5 +1,6 @@
 local skynet = require "skynet"
-local snax = require "snax"
+require "skynet.manager"	-- import skynet.register
+local snax = require "skynet.snax"
 
 local cmd = {}
 local service = {}
@@ -117,7 +118,6 @@ local function register_global()
 
 	function cmd.REPORT(m)
 		mgr[m] = true
-		skynet.watch(m)
 	end
 
 	local function add_list(all, m)
@@ -142,14 +142,23 @@ local function register_global()
 end
 
 local function register_local()
-	function cmd.GLAUNCH(name, ...)
+	local function waitfor_remote(cmd, name, ...)
 		local global_name = "@" .. name
-		return waitfor(global_name, skynet.call, "SERVICE", "lua", "LAUNCH", global_name, ...)
+		local local_name
+		if name == "snaxd" then
+			local_name = global_name .. "." .. (...)
+		else
+			local_name = global_name
+		end
+		return waitfor(local_name, skynet.call, "SERVICE", "lua", cmd, global_name, ...)
 	end
 
-	function cmd.GQUERY(name, ...)
-		local global_name = "@" .. name
-		return waitfor(global_name, skynet.call, "SERVICE", "lua", "QUERY", global_name, ...)
+	function cmd.GLAUNCH(...)
+		return waitfor_remote("LAUNCH", ...)
+	end
+
+	function cmd.GQUERY(...)
+		return waitfor_remote("QUERY", ...)
 	end
 
 	function cmd.LIST()
@@ -176,7 +185,7 @@ skynet.start(function()
 		end
 	end)
 	local handle = skynet.localname ".service"
-	if  handle ~= 0 then
+	if  handle then
 		skynet.error(".service is already register by ", skynet.address(handle))
 		skynet.exit()
 	else

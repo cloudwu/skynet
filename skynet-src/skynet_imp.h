@@ -4,8 +4,12 @@
 struct skynet_config {
 	int thread;
 	int harbor;
+	int profile;
+	const char * daemon;
 	const char * module_path;
 	const char * bootstrap;
+	const char * logger;
+	const char * logservice;
 };
 
 #define THREAD_WORKER 0

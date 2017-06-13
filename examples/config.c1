@@ -1,0 +1,11 @@
+thread = 8
+logger = nil
+harbor = 0
+start = "cluster1"
+bootstrap = "snlua bootstrap"	-- The service for bootstrap
+luaservice = "./service/?.lua;./test/?.lua;./examples/?.lua"
+lualoader = "lualib/loader.lua"
+cpath = "./cservice/?.so"
+-- use cluster.reload instead, see cluster1.lua
+-- cluster = "./examples/clustername.lua"
+snax = "./test/?.lua"

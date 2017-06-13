@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet_malloc.h"
 
 #include "skynet_socket.h"
@@ -19,6 +21,7 @@
 #define TYPE_ERROR 3
 #define TYPE_OPEN 4
 #define TYPE_CLOSE 5
+#define TYPE_WARNING 6
 
 /*
 	Each package is uint16 + data , uint16 (serialized in big-endian) is the number of bytes comprising the data .
@@ -48,6 +51,7 @@ struct queue {
 static void
 clear_list(struct uncomplete * uc) {
 	while (uc) {
+		skynet_free(uc->pack.buffer);
 		void * tmp = uc;
 		uc = uc->next;
 		skynet_free(tmp);
@@ -210,6 +214,16 @@ push_more(lua_State *L, int fd, uint8_t *buffer, int size) {
 	}
 }
 
+static void
+close_uncomplete(lua_State *L, int fd) {
+	struct queue *q = lua_touserdata(L,1);
+	struct uncomplete * uc = find_uncomplete(q, fd);
+	if (uc) {
+		skynet_free(uc->pack.buffer);
+		skynet_free(uc);
+	}
+}
+
 static int
 filter_data_(lua_State *L, int fd, uint8_t * buffer, int size) {
 	struct queue *q = lua_touserdata(L,1);
@@ -302,9 +316,9 @@ filter_data(lua_State *L, int fd, uint8_t * buffer, int size) {
 }
 
 static void
-pushstring(lua_State *L, const char * msg) {
+pushstring(lua_State *L, const char * msg, int size) {
 	if (msg) {
-		lua_pushstring(L, msg);
+		lua_pushlstring(L, msg, size);
 	} else {
 		lua_pushliteral(L, "");
 	}
@@ -343,6 +357,8 @@ lfilter(lua_State *L) {
 		// ignore listen fd connect
 		return 1;
 	case SKYNET_SOCKET_TYPE_CLOSE:
+		// no more data in fd (message->id)
+		close_uncomplete(L, message->id);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_CLOSE));
 		lua_pushinteger(L, message->id);
 		return 3;
@@ -350,12 +366,19 @@ lfilter(lua_State *L) {
 		lua_pushvalue(L, lua_upvalueindex(TYPE_OPEN));
 		// ignore listen id (message->id);
 		lua_pushinteger(L, message->ud);
-		pushstring(L, buffer);
+		pushstring(L, buffer, size);
 		return 4;
 	case SKYNET_SOCKET_TYPE_ERROR:
+		// no more data in fd (message->id)
+		close_uncomplete(L, message->id);
 		lua_pushvalue(L, lua_upvalueindex(TYPE_ERROR));
 		lua_pushinteger(L, message->id);
-		pushstring(L, buffer);
+		pushstring(L, buffer, size);
+		return 4;
+	case SKYNET_SOCKET_TYPE_WARNING:
+		lua_pushvalue(L, lua_upvalueindex(TYPE_WARNING));
+		lua_pushinteger(L, message->id);
+		lua_pushinteger(L, message->ud);
 		return 4;
 	default:
 		// never get here
@@ -393,13 +416,13 @@ lpop(lua_State *L) {
  */
 
 static const char *
-tolstring(lua_State *L, size_t *sz) {
+tolstring(lua_State *L, size_t *sz, int index) {
 	const char * ptr;
-	if (lua_isuserdata(L,1)) {
-		ptr = (const char *)lua_touserdata(L,1);
-		*sz = (size_t)luaL_checkinteger(L, 2);
+	if (lua_isuserdata(L,index)) {
+		ptr = (const char *)lua_touserdata(L,index);
+		*sz = (size_t)luaL_checkinteger(L, index+1);
 	} else {
-		ptr = luaL_checklstring(L, 1, sz);
+		ptr = luaL_checklstring(L, index, sz);
 	}
 	return ptr;
 }
@@ -413,8 +436,8 @@ write_size(uint8_t * buffer, int len) {
 static int
 lpack(lua_State *L) {
 	size_t len;
-	const char * ptr = tolstring(L, &len);
-	if (len > 0x10000) {
+	const char * ptr = tolstring(L, &len, 1);
+	if (len >= 0x10000) {
 		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
 	}
 
@@ -426,29 +449,6 @@ lpack(lua_State *L) {
 	lua_pushinteger(L, len + 2);
 
 	return 2;
-}
-
-static int
-lpack_string(lua_State *L) {
-	uint8_t tmp[SMALLSTRING+2];
-	size_t len;
-	uint8_t *buffer;
-	const char * ptr = tolstring(L, &len);
-	if (len > 0x10000) {
-		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
-	}
-
-	if (len <= SMALLSTRING) {
-		buffer = tmp;
-	} else {
-		buffer = lua_newuserdata(L, len + 2);
-	}
-
-	write_size(buffer, len);
-	memcpy(buffer+2, ptr, len);
-	lua_pushlstring(L, (const char *)buffer, len+2);
-
-	return 1;
 }
 
 static int
@@ -464,13 +464,12 @@ ltostring(lua_State *L) {
 	return 1;
 }
 
-int
-luaopen_netpack(lua_State *L) {
+LUAMOD_API int
+luaopen_skynet_netpack(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "pop", lpop },
 		{ "pack", lpack },
-		{ "pack_string", lpack_string },
 		{ "clear", lclear },
 		{ "tostring", ltostring },
 		{ NULL, NULL },
@@ -483,8 +482,9 @@ luaopen_netpack(lua_State *L) {
 	lua_pushliteral(L, "error");
 	lua_pushliteral(L, "open");
 	lua_pushliteral(L, "close");
+	lua_pushliteral(L, "warning");
 
-	lua_pushcclosure(L, lfilter, 5);
+	lua_pushcclosure(L, lfilter, 6);
 	lua_setfield(L, -2, "filter");
 
 	return 1;

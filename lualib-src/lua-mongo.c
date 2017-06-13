@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet_malloc.h"
 
 #include <lua.h>
@@ -260,6 +262,13 @@ op_reply(lua_State *L) {
 			lua_pushnil(L);
 			lua_rawseti(L, 2, i);
 		}
+	} else {
+		if (sz >= 4) {
+			sz -= get_length((document)doc);
+		}
+	}
+	if (sz != 0) {
+		return luaL_error(L, "Invalid result bson document");
 	}
 	lua_pushboolean(L,1);
 	lua_pushinteger(L, id);
@@ -499,9 +508,9 @@ op_insert(lua_State *L) {
 		int i;
 		for (i=1;i<=s;i++) {
 			lua_rawgeti(L,3,i);
-			document doc = lua_touserdata(L,3);
+			document doc = lua_touserdata(L,-1);
+			lua_pop(L,1);	// must call lua_pop before luaL_addlstring, because addlstring may change stack top
 			luaL_addlstring(&b, (const char *)doc, get_length(doc));
-			lua_pop(L,1);
 		}
 	}
 
@@ -522,8 +531,8 @@ reply_length(lua_State *L) {
 	return 1;
 }
 
-int
-luaopen_mongo_driver(lua_State *L) {
+LUAMOD_API int
+luaopen_skynet_mongo_driver(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] ={
 		{ "query", op_query },

@@ -1,0 +1,11 @@
+root = "./"
+thread = 8
+logger = nil
+harbor = 0
+start = "main_mysql"	-- main script
+bootstrap = "snlua bootstrap"	-- The service for bootstrap
+luaservice = root.."service/?.lua;"..root.."test/?.lua;"..root.."examples/?.lua"
+lualoader = "lualib/loader.lua"
+snax = root.."examples/?.lua;"..root.."test/?.lua"
+cpath = root.."cservice/?.so"
+-- daemon = "./skynet.pid"

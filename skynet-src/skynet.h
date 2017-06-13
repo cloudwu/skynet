@@ -30,7 +30,7 @@ void skynet_error(struct skynet_context * context, const char *msg, ...);
 const char * skynet_command(struct skynet_context * context, const char * cmd , const char * parm);
 uint32_t skynet_queryname(struct skynet_context * context, const char * name);
 int skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * msg, size_t sz);
-int skynet_sendname(struct skynet_context * context, const char * destination , int type, int session, void * msg, size_t sz);
+int skynet_sendname(struct skynet_context * context, uint32_t source, const char * destination , int type, int session, void * msg, size_t sz);
 
 int skynet_isremote(struct skynet_context *, uint32_t handle, int * harbor);
 
@@ -38,5 +38,7 @@ typedef int (*skynet_cb)(struct skynet_context * context, void *ud, int type, in
 void skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb);
 
 uint32_t skynet_current_handle(void);
+uint64_t skynet_now(void);
+void skynet_debug_memory(const char *info);	// for debug use, output current service memory to stderr
 
 #endif
