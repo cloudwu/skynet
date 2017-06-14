@@ -18,19 +18,20 @@ end
 function service.new(name, mainfunc, ...)
 	local p = get_provider()
 	local addr, booting = skynet.call(p, "lua", "test", name)
+	local address
 	if addr then
-		service.address = addr
+		address = addr
 	else
 		if booting then
-			service.address = skynet.call(p, "lua", "query", name)
+			address = skynet.call(p, "lua", "query", name)
 		else
 			check(mainfunc)
 			local code = string.dump(mainfunc)
-			service.address = skynet.call(p, "lua", "launch", name, code, ...)
+			address = skynet.call(p, "lua", "launch", name, code, ...)
 		end
 	end
-	cache[name] = service.address
-	return service.address
+	cache[name] = address
+	return address
 end
 
 function service.query(name)

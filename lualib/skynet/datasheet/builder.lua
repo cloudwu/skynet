@@ -7,10 +7,10 @@ local builder = {}
 
 local cache = {}
 local dataset = {}
-
+local address
 local function monitor(pointer)
 	skynet.fork(function()
-		skynet.call(service.address, "lua", "collect", pointer)
+		skynet.call(address, "lua", "collect", pointer)
 		for k,v in pairs(cache) do
 			if v == pointer then
 				cache[k] = nil
@@ -32,7 +32,7 @@ function builder.new(name, v)
 	assert(dataset[name] == nil)
 	local datastring = dumpsheet(v)
 	local pointer = core.stringpointer(datastring)
-	skynet.call(service.address, "lua", "update", name, pointer)
+	skynet.call(address, "lua", "update", name, pointer)
 	cache[datastring] = pointer
 	dataset[name] = datastring
 	monitor(pointer)
@@ -43,10 +43,10 @@ function builder.update(name, v)
 	local newversion = dumpsheet(v)
 	local diff = dump.diff(lastversion, newversion)
 	local pointer = core.stringpointer(diff)
-	skynet.call(service.address, "lua", "update", name, pointer)
+	skynet.call(address, "lua", "update", name, pointer)
 	cache[diff] = pointer
 	local lp = assert(cache[lastversion])
-	skynet.send(service.address, "lua", "release", lp)
+	skynet.send(address, "lua", "release", lp)
 	dataset[name] = diff
 	monitor(pointer)
 end
@@ -161,7 +161,7 @@ end)
 end
 
 skynet.init(function()
-	service.new("datasheet", datasheet_service)
+	address=service.new("datasheet", datasheet_service)
 end)
 
 return builder
