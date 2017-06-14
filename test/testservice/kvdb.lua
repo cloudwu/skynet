@@ -3,13 +3,12 @@ local service = require "skynet.service"
 
 local kvdb = {}
 
--- service.address is the default address registered by itself.
-function kvdb.get(key)
-	return skynet.call(service.address, "lua", "get", key)
+function kvdb.get(db,key)
+	return skynet.call(service.query(db), "lua", "get", key)
 end
 
-function kvdb.set(key, value)
-	skynet.call(service.address, "lua", "set", key , value)
+function kvdb.set(db,key, value)
+	skynet.call(service.query(db), "lua", "set", key , value)
 end
 
 -- this function will be injected into an unique service, so don't refer any upvalues
@@ -36,8 +35,8 @@ local function service_mainfunc(...)
 	end)
 end
 
-skynet.init(function()
-	service.new("kvdb", service_mainfunc, "Service Init")
-end)
+function kvdb.new(db)
+	return service.new(db, service_mainfunc, "Service Init")
+end
 
 return kvdb
