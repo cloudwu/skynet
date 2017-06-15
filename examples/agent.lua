@@ -82,6 +82,7 @@ function CMD.start(conf)
 	end)
 
 	client_fd = fd
+	skynet.error("in agent: ".. fd)
 	skynet.call(gate, "lua", "forward", fd)
 end
 

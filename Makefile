@@ -44,7 +44,7 @@ update3rd :
 
 # skynet
 
-CSERVICE = snlua logger gate harbor
+CSERVICE = snlua logger gate harbor package
 LUA_CLIB = skynet socketdriver bson mongo md5 netpack \
   clientsocket memory profile multicast \
   cluster crypt sharedata stm sproto lpeg \
