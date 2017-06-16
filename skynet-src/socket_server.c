@@ -687,6 +687,7 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 		buf->ptr = (char*)so.buffer+s->dw_offset;
 		buf->sz = so.sz - s->dw_offset;
 		buf->buffer = (void *)s->dw_buffer;
+		s->wb_size+=buf->sz;
 		if (s->high.head == NULL) {
 			s->high.head = s->high.tail = buf;
 			buf->next = NULL;
