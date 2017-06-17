@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>skynet WebSocket example</title>
+</head>
+<body>   
+  <script>
+    var ws = new WebSocket('ws://127.0.0.1:8008/ws');
+    ws.onopen = function(){
+     alert("open");
+     ws.send('WebSocket'); 
+    };
+    ws.onmessage = function(ev){
+     alert(ev.data);
+    };
+    ws.onclose = function(ev){
+     alert("close");
+    };
+    ws.onerror = function(ev){
+     alert("error");
+    };
+  </script>
+</body>
+</html>
