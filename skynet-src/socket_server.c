@@ -80,8 +80,9 @@ struct socket {
 	int64_t wb_size;
 	int fd;
 	int id;
-	uint16_t protocol;
-	uint16_t type;
+	uint8_t protocol;
+	uint8_t type;
+	uint16_t udpconnecting;
 	int64_t warn_size;
 	union {
 		int size;
@@ -262,6 +263,9 @@ reserve_id(struct socket_server *ss) {
 		if (s->type == SOCKET_TYPE_INVALID) {
 			if (ATOM_CAS(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
 				s->id = id;
+				// socket_server_udp_connect may inc s->udpconncting directly (from other thread, before new_fd), 
+				// so reset it to 0 here rather than in new_fd.
+				s->udpconnecting = 0;
 				s->fd = -1;
 				return id;
 			} else {
@@ -992,6 +996,7 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 	} else {
 		memcpy(s->p.udp_address, request->address, 1+2+16);	// 1 type, 2 port, 16 ipv6
 	}
+	ATOM_DEC(&s->udpconnecting);
 	return -1;
 }
 
@@ -1400,7 +1405,7 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 
 static inline int
 can_direct_write(struct socket *s, int id) {
-	return s->id == id && send_buffer_empty(s) && s->type == SOCKET_TYPE_CONNECTED && s->dw_buffer == NULL;
+	return s->id == id && send_buffer_empty(s) && s->type == SOCKET_TYPE_CONNECTED && s->dw_buffer == NULL && s->udpconnecting == 0;
 }
 
 // return -1 when error, 0 when success
@@ -1418,7 +1423,14 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 			// send directly
 			struct send_object so;
 			send_object_init(ss, &so, (void *)buffer, sz);
-			ssize_t n = write(s->fd, so.buffer, so.sz);
+			ssize_t n;
+			if (s->protocol == PROTOCOL_TCP) {
+				n = write(s->fd, so.buffer, so.sz);
+			} else {
+				union sockaddr_all sa;
+				socklen_t sasz = udp_socket_address(s, s->p.udp_address, &sa);
+				n = sendto(s->fd, so.buffer, so.sz, 0, &sa.s, sasz);
+			}
 			if (n<0) {
 				// ignore error, let socket thread try again
 				n = 0;
@@ -1436,9 +1448,8 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 			sp_write(ss->event_fd, s->fd, s, true);
 			spinlock_unlock(&s->dw_lock);
 			return 0;
-		} else {
-			spinlock_unlock(&s->dw_lock);
 		}
+		spinlock_unlock(&s->dw_lock);
 	}
 
 	struct request_package request;
@@ -1683,9 +1694,9 @@ socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp
 				so.free_func((void *)buffer);
 				return 0;
 			}
-			spinlock_unlock(&s->dw_lock);
-			// let socket thread try again, udp doesn't care the order
 		}
+		spinlock_unlock(&s->dw_lock);
+		// let socket thread try again, udp doesn't care the order
 	}
 
 	struct request_package request;
@@ -1701,6 +1712,18 @@ socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp
 
 int
 socket_server_udp_connect(struct socket_server *ss, int id, const char * addr, int port) {
+	struct socket * s = &ss->slot[HASH_ID(id)];
+	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
+		return -1;
+	}
+	spinlock_lock(&s->dw_lock);
+	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
+		spinlock_unlock(&s->dw_lock);
+		return -1;
+	}
+	ATOM_INC(&s->udpconnecting);
+	spinlock_unlock(&s->dw_lock);
+
 	int status;
 	struct addrinfo ai_hints;
 	struct addrinfo *ai_list = NULL;
