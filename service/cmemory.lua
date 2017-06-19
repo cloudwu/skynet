@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local memory = require "skynet.memory"
+local memory = require "memory"
 
 memory.dumpinfo()
 --memory.dump()

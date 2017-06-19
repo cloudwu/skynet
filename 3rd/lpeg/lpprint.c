@@ -1,5 +1,5 @@
 /*
-** $Id: lpprint.c,v 1.10 2016/09/13 16:06:03 roberto Exp $
+** $Id: lpprint.c,v 1.9 2015/06/15 16:09:57 roberto Exp $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -37,13 +37,13 @@ void printcharset (const byte *st) {
 }
 
 
-static const char *capkind (int kind) {
+static void printcapkind (int kind) {
   const char *const modes[] = {
     "close", "position", "constant", "backref",
     "argument", "simple", "table", "function",
     "query", "string", "num", "substitution", "fold",
     "runtime", "group"};
-  return modes[kind];
+  printf("%s", modes[kind]);
 }
 
 
@@ -73,12 +73,13 @@ void printinst (const Instruction *op, const Instruction *p) {
       break;
     }
     case IFullCapture: {
-      printf("%s (size = %d)  (idx = %d)",
-             capkind(getkind(p)), getoff(p), p->i.key);
+      printcapkind(getkind(p));
+      printf(" (size = %d)  (idx = %d)", getoff(p), p->i.key);
       break;
     }
     case IOpenCapture: {
-      printf("%s (idx = %d)", capkind(getkind(p)), p->i.key);
+      printcapkind(getkind(p));
+      printf(" (idx = %d)", p->i.key);
       break;
     }
     case ISet: {
@@ -123,8 +124,8 @@ void printpatt (Instruction *p, int n) {
 
 #if defined(LPEG_DEBUG)
 static void printcap (Capture *cap) {
-  printf("%s (idx: %d - size: %d) -> %p\n",
-         capkind(cap->kind), cap->idx, cap->siz, cap->s);
+  printcapkind(cap->kind);
+  printf(" (idx: %d - size: %d) -> %p\n", cap->idx, cap->siz, cap->s);
 }
 
 
@@ -176,8 +177,7 @@ void printtree (TTree *tree, int ident) {
       break;
     }
     case TOpenCall: case TCall: {
-      assert(sib2(tree)->tag == TRule);
-      printf(" key: %d  (rule: %d)\n", tree->key, sib2(tree)->cap);
+      printf(" key: %d\n", tree->key);
       break;
     }
     case TBehind: {
@@ -186,7 +186,7 @@ void printtree (TTree *tree, int ident) {
       break;
     }
     case TCapture: {
-      printf(" kind: '%s'  key: %d\n", capkind(tree->cap), tree->key);
+      printf(" cap: %d  key: %d  n: %d\n", tree->cap, tree->key, tree->u.n);
       printtree(sib1(tree), ident + 2);
       break;
     }

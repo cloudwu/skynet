@@ -1,5 +1,5 @@
 local login = require "snax.loginserver"
-local crypt = require "skynet.crypt"
+local crypt = require "crypt"
 local skynet = require "skynet"
 
 local server = {

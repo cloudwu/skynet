@@ -1,5 +1,3 @@
-#define LUA_LIB
-
 #include "skynet_malloc.h"
 
 #include "skynet_socket.h"
@@ -464,8 +462,8 @@ ltostring(lua_State *L) {
 	return 1;
 }
 
-LUAMOD_API int
-luaopen_skynet_netpack(lua_State *L) {
+int
+luaopen_netpack(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "pop", lpop },

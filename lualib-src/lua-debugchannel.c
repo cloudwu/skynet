@@ -1,5 +1,3 @@
-#define LUA_LIB
-
 // only for debug use
 #include <lua.h>
 #include <lauxlib.h>
@@ -270,8 +268,8 @@ static int db_sethook (lua_State *L) {
   return 0;
 }
 
-LUAMOD_API int
-luaopen_skynet_debugchannel(lua_State *L) {
+int
+luaopen_debugchannel(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "create", lcreate },	// for write
 		{ "connect", lconnect },	// for read

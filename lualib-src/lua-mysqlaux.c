@@ -1,5 +1,9 @@
-#define LUA_LIB
-
+//
+//  lua_mysqlaux.c
+//
+//  Created by changfeng on 6/17/14.
+//  Copyright (c) 2014 changfeng. All rights reserved.
+//
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -158,7 +162,7 @@ static struct luaL_Reg mysqlauxlib[] = {
 };
 
 
-LUAMOD_API int luaopen_skynet_mysqlaux_c (lua_State *L) {
+int luaopen_mysqlaux_c (lua_State *L) {
     lua_newtable(L);
     luaL_setfuncs(L, mysqlauxlib, 0);
     return 1;

@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local mc = require "skynet.multicast.core"
+local mc = require "multicast.core"
 
 local multicastd
 local multicast = {}

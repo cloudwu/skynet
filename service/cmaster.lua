@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local socket = require "skynet.socket"
+local socket = require "socket"
 
 --[[
 	master manage data :

@@ -1,5 +1,5 @@
 /*
-** $Id: lua.c,v 1.230 2017/01/12 17:14:26 roberto Exp $
+** $Id: lua.c,v 1.226 2015/08/14 19:11:20 roberto Exp $
 ** Lua stand-alone interpreter
 ** See Copyright Notice in lua.h
 */
@@ -21,7 +21,6 @@
 #include "lstring.h"
 
 
-
 #if !defined(LUA_PROMPT)
 #define LUA_PROMPT		"> "
 #define LUA_PROMPT2		">> "
@@ -39,7 +38,8 @@
 #define LUA_INIT_VAR		"LUA_INIT"
 #endif
 
-#define LUA_INITVARVERSION	LUA_INIT_VAR LUA_VERSUFFIX
+#define LUA_INITVARVERSION  \
+	LUA_INIT_VAR "_" LUA_VERSION_MAJOR "_" LUA_VERSION_MINOR
 
 
 /*
@@ -56,8 +56,6 @@
 #elif defined(LUA_USE_WINDOWS)	/* }{ */
 
 #include <io.h>
-#include <windows.h>
-
 #define lua_stdin_is_tty()	_isatty(_fileno(stdin))
 
 #else				/* }{ */
@@ -460,7 +458,7 @@ static int handle_script (lua_State *L, char **argv) {
 /*
 ** Traverses all arguments from 'argv', returning a mask with those
 ** needed before running any Lua code (or an error code if it finds
-** any invalid argument). 'first' returns the first not-handled argument
+** any invalid argument). 'first' returns the first not-handled argument 
 ** (either the script name or a bad argument in case of error).
 */
 static int collectargs (char **argv, int *first) {
@@ -484,7 +482,7 @@ static int collectargs (char **argv, int *first) {
         args |= has_E;
         break;
       case 'i':
-        args |= has_i;  /* (-i implies -v) *//* FALLTHROUGH */
+        args |= has_i;  /* (-i implies -v) *//* FALLTHROUGH */ 
       case 'v':
         if (argv[i][2] != '\0')  /* extra characters after 1st? */
           return has_error;  /* invalid option */
@@ -530,7 +528,6 @@ static int runargs (lua_State *L, char **argv, int n) {
   }
   return 1;
 }
-
 
 
 static int handle_luainit (lua_State *L) {

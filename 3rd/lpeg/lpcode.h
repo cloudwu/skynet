@@ -1,5 +1,5 @@
 /*
-** $Id: lpcode.h,v 1.8 2016/09/15 17:46:13 roberto Exp $
+** $Id: lpcode.h,v 1.7 2015/06/12 18:24:45 roberto Exp $
 */
 
 #if !defined(lpcode_h)
@@ -13,7 +13,7 @@
 
 int tocharset (TTree *tree, Charset *cs);
 int checkaux (TTree *tree, int pred);
-int fixedlen (TTree *tree);
+int fixedlenx (TTree *tree, int count, int len);
 int hascaptures (TTree *tree);
 int lp_gc (lua_State *L);
 Instruction *compile (lua_State *L, Pattern *p);
@@ -34,6 +34,8 @@ int sizei (const Instruction *i);
 ** something
 */
 #define nullable(t)	checkaux(t, PEnullable)
+
+#define fixedlen(t)     fixedlenx(t, 0, 0)
 
 
 

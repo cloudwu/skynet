@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local datacenter = require "skynet.datacenter"
+local datacenter = require "datacenter"
 
 local function f1()
 	print("====1==== wait hello")

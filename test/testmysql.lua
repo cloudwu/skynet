@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local mysql = require "skynet.db.mysql"
+local mysql = require "mysql"
 
 local function dump(obj)
     local getIndent, quoteStr, wrapKey, wrapVal, dumpObj

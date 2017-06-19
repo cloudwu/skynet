@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local socket = require "skynet.socket"
+local socket = require "socket"
 local httpd = require "http.httpd"
 local sockethelper = require "http.sockethelper"
 local urllib = require "http.url"

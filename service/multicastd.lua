@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local mc = require "skynet.multicast.core"
-local datacenter = require "skynet.datacenter"
+local mc = require "multicast.core"
+local datacenter = require "datacenter"
 
 local harbor_id = skynet.harbor(skynet.self())
 

@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local sharedata = require "skynet.sharedata"
+local sharedata = require "sharedata"
 
 local mode = ...
 

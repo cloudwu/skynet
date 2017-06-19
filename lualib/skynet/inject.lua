@@ -54,13 +54,12 @@ return function(skynet, source, filename , ...)
 	local env = setmetatable( { print = print , _U = u, _P = p}, { __index = _ENV })
 	local func, err = load(source, filename, "bt", env)
 	if not func then
-		return false, { err }
+		return { err }
 	end
 	local ok, err = skynet.pcall(func)
 	if not ok then
 		table.insert(output, err)
-		return false, output
 	end
 
-	return true, output
+	return output
 end

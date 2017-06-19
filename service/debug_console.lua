@@ -1,26 +1,21 @@
 local skynet = require "skynet"
 local codecache = require "skynet.codecache"
 local core = require "skynet.core"
-local socket = require "skynet.socket"
-local snax = require "skynet.snax"
-local memory = require "skynet.memory"
+local socket = require "socket"
+local snax = require "snax"
+local memory = require "memory"
 local httpd = require "http.httpd"
 local sockethelper = require "http.sockethelper"
 
-local arg = table.pack(...)
-assert(arg.n <= 2)
-local ip = (arg.n == 2 and arg[1] or "127.0.0.1")
-local port = tonumber(arg[arg.n])
-
+local port = tonumber(...)
 local COMMAND = {}
-local COMMANDX = {}
 
 local function format_table(t)
 	local index = {}
 	for k in pairs(t) do
 		table.insert(index, k)
 	end
-	table.sort(index, function(a, b) return tostring(a) < tostring(b) end)
+	table.sort(index)
 	local result = {}
 	for _,v in ipairs(index) do
 		table.insert(result, string.format("%s:%s",v,tostring(t[v])))
@@ -41,10 +36,11 @@ local function dump_list(print, list)
 	for k in pairs(list) do
 		table.insert(index, k)
 	end
-	table.sort(index, function(a, b) return tostring(a) < tostring(b) end)
+	table.sort(index)
 	for _,v in ipairs(index) do
 		dump_line(print, v, list[v])
 	end
+	print("OK")
 end
 
 local function split_cmdline(cmdline)
@@ -61,16 +57,9 @@ local function docmd(cmdline, print, fd)
 	local cmd = COMMAND[command]
 	local ok, list
 	if cmd then
-		ok, list = pcall(cmd, table.unpack(split,2))
+		ok, list = pcall(cmd, fd, select(2,table.unpack(split)))
 	else
-		cmd = COMMANDX[command]
-		if cmd then
-			split.fd = fd
-			split[1] = cmdline
-			ok, list = pcall(cmd, split)
-		else
-			print("Invalid command, type help for command list")
-		end
+		print("Invalid command, type help for command list")
 	end
 
 	if ok then
@@ -80,18 +69,18 @@ local function docmd(cmdline, print, fd)
 			else
 				dump_list(print, list)
 			end
+		else
+			print("OK")
 		end
-		print("<CMD OK>")
 	else
-		print(list)
-		print("<CMD Error>")
+		print("Error:", list)
 	end
 end
 
 local function console_main_loop(stdin, print)
 	print("Welcome to skynet console")
 	skynet.error(stdin, "connected")
-	local ok, err = pcall(function()
+	pcall(function()
 		while true do
 			local cmdline = socket.readline(stdin, "\n")
 			if not cmdline then
@@ -109,16 +98,13 @@ local function console_main_loop(stdin, print)
 			end
 		end
 	end)
-	if not ok then
-		skynet.error(stdin, err)
-	end
 	skynet.error(stdin, "disconnected")
 	socket.close(stdin)
 end
 
 skynet.start(function()
-	local listen_socket = socket.listen (ip, port)
-	skynet.error("Start debug console at " .. ip .. ":" .. port)
+	local listen_socket = socket.listen ("127.0.0.1", port)
+	skynet.error("Start debug console at 127.0.0.1 " .. port)
 	socket.start(listen_socket , function(id, addr)
 		local function print(...)
 			local t = { ... }
@@ -157,7 +143,6 @@ function COMMAND.help()
 		cmem = "Show C memory info",
 		shrtbl = "Show shared short string table info",
 		ping = "ping address",
-		call = "call address ...",
 	}
 end
 
@@ -165,7 +150,7 @@ function COMMAND.clearcache()
 	codecache.clear()
 end
 
-function COMMAND.start(...)
+function COMMAND.start(fd, ...)
 	local ok, addr = pcall(skynet.newservice, ...)
 	if ok then
 		if addr then
@@ -178,7 +163,7 @@ function COMMAND.start(...)
 	end
 end
 
-function COMMAND.log(...)
+function COMMAND.log(fd, ...)
 	local ok, addr = pcall(skynet.call, ".launcher", "lua", "LOGLAUNCH", "snlua", ...)
 	if ok then
 		if addr then
@@ -191,7 +176,7 @@ function COMMAND.log(...)
 	end
 end
 
-function COMMAND.snax(...)
+function COMMAND.snax(fd, ...)
 	local ok, s = pcall(snax.newservice, ...)
 	if ok then
 		local addr = s.handle
@@ -224,7 +209,7 @@ function COMMAND.mem()
 	return skynet.call(".launcher", "lua", "MEM")
 end
 
-function COMMAND.kill(address)
+function COMMAND.kill(fd, address)
 	return skynet.call(".launcher", "lua", "KILL", address)
 end
 
@@ -232,11 +217,11 @@ function COMMAND.gc()
 	return skynet.call(".launcher", "lua", "GC")
 end
 
-function COMMAND.exit(address)
+function COMMAND.exit(fd, address)
 	skynet.send(adjust_address(address), "debug", "EXIT")
 end
 
-function COMMAND.inject(address, filename)
+function COMMAND.inject(fd, address, filename)
 	address = adjust_address(address)
 	local f = io.open(filename, "rb")
 	if not f then
@@ -244,33 +229,26 @@ function COMMAND.inject(address, filename)
 	end
 	local source = f:read "*a"
 	f:close()
-	local ok, output = skynet.call(address, "debug", "RUN", source, filename)
-	if ok == false then
-		error(output)
-	end
-	return output
+	return skynet.call(address, "debug", "RUN", source, filename)
 end
 
-function COMMAND.task(address)
+function COMMAND.task(fd, address)
 	address = adjust_address(address)
 	return skynet.call(address,"debug","TASK")
 end
 
-function COMMAND.info(address, ...)
+function COMMAND.info(fd, address, ...)
 	address = adjust_address(address)
 	return skynet.call(address,"debug","INFO", ...)
 end
 
-function COMMANDX.debug(cmd)
-	local address = adjust_address(cmd[2])
+function COMMAND.debug(fd, address)
+	address = adjust_address(address)
 	local agent = skynet.newservice "debug_agent"
 	local stop
-	local term_co = coroutine.running()
-	local function forward_cmd()
+	skynet.fork(function()
 		repeat
-			-- notice :  It's a bad practice to call socket.readline from two threads (this one and console_main_loop), be careful.
-			skynet.call(agent, "lua", "ping")	-- detect agent alive, if agent exit, raise error
-			local cmdline = socket.readline(cmd.fd, "\n")
+			local cmdline = socket.readline(fd, "\n")
 			cmdline = cmdline and cmdline:gsub("(.*)\r$", "%1")
 			if not cmdline then
 				skynet.send(agent, "lua", "cmd", "cont")
@@ -278,38 +256,22 @@ function COMMANDX.debug(cmd)
 			end
 			skynet.send(agent, "lua", "cmd", cmdline)
 		until stop or cmdline == "cont"
-	end
-	skynet.fork(function()
-		pcall(forward_cmd)
-		if not stop then	-- block at skynet.call "start"
-			term_co = nil
-		else
-			skynet.wakeup(term_co)
-		end
 	end)
-	local ok, err = skynet.call(agent, "lua", "start", address, cmd.fd)
+	skynet.call(agent, "lua", "start", address, fd)
 	stop = true
-	if term_co then
-		-- wait for fork coroutine exit.
-		skynet.wait(term_co)
-	end
-
-	if not ok then
-		error(err)
-	end
 end
 
-function COMMAND.logon(address)
+function COMMAND.logon(fd, address)
 	address = adjust_address(address)
 	core.command("LOGON", skynet.address(address))
 end
 
-function COMMAND.logoff(address)
+function COMMAND.logoff(fd, address)
 	address = adjust_address(address)
 	core.command("LOGOFF", skynet.address(address))
 end
 
-function COMMAND.signal(address, sig)
+function COMMAND.signal(fd, address, sig)
 	address = skynet.address(adjust_address(address))
 	if sig then
 		core.command("SIGNAL", string.format("%s %d",address,sig))
@@ -324,9 +286,6 @@ function COMMAND.cmem()
 	for k,v in pairs(info) do
 		tmp[skynet.address(k)] = v
 	end
-	tmp.total = memory.total()
-	tmp.block = memory.block()
-
 	return tmp
 end
 
@@ -335,22 +294,10 @@ function COMMAND.shrtbl()
 	return { n = n, total = total, longest = longest, space = space }
 end
 
-function COMMAND.ping(address)
+function COMMAND.ping(fd, address)
 	address = adjust_address(address)
 	local ti = skynet.now()
 	skynet.call(address, "debug", "PING")
 	ti = skynet.now() - ti
 	return tostring(ti)
-end
-
-function COMMANDX.call(cmd)
-	local address = adjust_address(cmd[2])
-	local cmdline = assert(cmd[1]:match("%S+%s+%S+%s(.+)") , "need arguments")
-	local args_func = assert(load("return " .. cmdline, "debug console", "t", {}), "Invalid arguments")
-	local args = table.pack(pcall(args_func))
-	if not args[1] then
-		error(args[2])
-	end
-	local rets = table.pack(skynet.call(address, "lua", table.unpack(args, 2, args.n)))
-	return rets
 end

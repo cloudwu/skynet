@@ -1,6 +1,6 @@
 local skynet = require "skynet"
 local queue = require "skynet.queue"
-local snax = require "skynet.snax"
+local snax = require "snax"
 
 local i = 0
 local hello = "hello"

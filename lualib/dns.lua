@@ -65,7 +65,7 @@
 --]]
 
 local skynet = require "skynet"
-local socket = require "skynet.socket"
+local socket = require "socket"
 
 local MAX_DOMAIN_LEN = 1024
 local MAX_LABEL_LEN = 63
@@ -87,7 +87,6 @@ local weak = {__mode = "kv"}
 local CACHE = {}
 
 local dns = {}
-local request_pool = {}
 
 function dns.flush()
 	CACHE[QTYPE.A] = setmetatable({},weak)
@@ -114,21 +113,7 @@ end
 local next_tid = 1
 local function gen_tid()
 	local tid = next_tid
-	if request_pool[tid] then
-		tid = nil
-		for i = 1, 65535 do
-			-- find available tid
-			if not request_pool[i] then
-				tid = i
-				break
-			end
-		end
-		assert(tid)
-	end
-	next_tid = tid + 1
-	if next_tid > 65535 then
-		next_tid = 1
-	end
+	next_tid = next_tid + 1
 	return tid
 end
 
@@ -220,6 +205,7 @@ local function unpack_rdata(qtype, chunk)
 end
 
 local dns_server
+local request_pool = {}
 
 local function resolve(content)
 	if #content < DNS_HEADER_LEN then

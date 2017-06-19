@@ -239,7 +239,7 @@ function host:attach(sp)
 			self.__session[session] = proto.response or true
 		end
 
-		if proto.request then
+		if args then
 			local content = core.encode(proto.request, args)
 			return core.pack(header ..  content)
 		else

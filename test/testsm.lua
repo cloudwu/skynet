@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local sharemap = require "skynet.sharemap"
+local sharemap = require "sharemap"
 
 local mode = ...
 

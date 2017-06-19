@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local socket = require "skynet.socket"
+local socket = require "socket"
 
 local mode , id = ...
 
@@ -9,8 +9,10 @@ local function echo(id)
 	while true do
 		local str = socket.read(id)
 		if str then
-			socket.write(id, str)
+			print(str)
+			socket.write(id, "send socket")
 		else
+			print("clost socket!")
 			socket.close(id)
 			return
 		end
@@ -19,7 +21,7 @@ end
 
 if mode == "agent" then
 	id = tonumber(id)
-
+	print("agent:"..id)
 	skynet.start(function()
 		skynet.fork(function()
 			echo(id)
@@ -46,7 +48,9 @@ else
 			-- 1. skynet.newservice("testsocket", "agent", id)
 			-- 2. skynet.fork(echo, id)
 			-- 3. accept(id)
-			accept(id)
+			--accept(id)
+			--skynet.fork(echo,id)
+			skynet.newservice("testsocket", "agent", id)
 		end)
 	end)
 end

@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local netpack = require "skynet.netpack"
-local socket = require "skynet.socket"
+local netpack = require "netpack"
+local socket = require "socket"
 local sproto = require "sproto"
 local sprotoloader = require "sprotoloader"
 
@@ -82,6 +82,7 @@ function CMD.start(conf)
 	end)
 
 	client_fd = fd
+	skynet.error("in agent: ".. fd)
 	skynet.call(gate, "lua", "forward", fd)
 end
 

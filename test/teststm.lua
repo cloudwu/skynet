@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local stm = require "skynet.stm"
+local stm = require "stm"
 
 local mode = ...
 
