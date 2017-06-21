@@ -11,15 +11,16 @@
 
 static size_t _used_memory = 0;
 static size_t _memory_block = 0;
-typedef struct _mem_data {
+
+struct mem_data {
 	uint32_t handle;
 	ssize_t allocated;
-} mem_data;
+};
 
 #define SLOT_SIZE 0x10000
 #define PREFIX_SIZE sizeof(uint32_t)
 
-static mem_data mem_stats[SLOT_SIZE];
+static struct mem_data mem_stats[SLOT_SIZE];
 
 
 #ifndef NOUSE_JEMALLOC
@@ -33,7 +34,7 @@ static mem_data mem_stats[SLOT_SIZE];
 static ssize_t*
 get_allocated_field(uint32_t handle) {
 	int h = (int)(handle & (SLOT_SIZE - 1));
-	mem_data *data = &mem_stats[h];
+	struct mem_data *data = &mem_stats[h];
 	uint32_t old_handle = data->handle;
 	ssize_t old_alloc = data->allocated;
 	if(old_handle == 0 || old_alloc <= 0) {
@@ -209,7 +210,7 @@ dump_c_mem() {
 	size_t total = 0;
 	skynet_error(NULL, "dump all service mem:");
 	for(i=0; i<SLOT_SIZE; i++) {
-		mem_data* data = &mem_stats[i];
+		struct mem_data* data = &mem_stats[i];
 		if(data->handle != 0 && data->allocated != 0) {
 			total += data->allocated;
 			skynet_error(NULL, "0x%x -> %zdkb", data->handle, data->allocated >> 10);
@@ -241,7 +242,7 @@ dump_mem_lua(lua_State *L) {
 	int i;
 	lua_newtable(L);
 	for(i=0; i<SLOT_SIZE; i++) {
-		mem_data* data = &mem_stats[i];
+		struct mem_data* data = &mem_stats[i];
 		if(data->handle != 0 && data->allocated != 0) {
 			lua_pushinteger(L, data->allocated);
 			lua_rawseti(L, -2, (lua_Integer)data->handle);
@@ -255,7 +256,7 @@ malloc_current_memory(void) {
 	uint32_t handle = skynet_current_handle();
 	int i;
 	for(i=0; i<SLOT_SIZE; i++) {
-		mem_data* data = &mem_stats[i];
+		struct mem_data* data = &mem_stats[i];
 		if(data->handle == (uint32_t)handle && data->allocated != 0) {
 			return (size_t) data->allocated;
 		}
