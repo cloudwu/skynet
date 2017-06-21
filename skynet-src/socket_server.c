@@ -682,7 +682,8 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_message *
 
 static int
 send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *result) {
-	spinlock_lock(&s->dw_lock);
+	if (!spinlock_trylock(&s->dw_lock))
+		return -1;	// blocked by direct write, send later.
 	if (s->dw_buffer) {
 		// add direct write buffer before high.head
 		struct write_buffer * buf = MALLOC(SIZEOF_TCPBUFFER);
@@ -1445,8 +1446,9 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 			s->dw_buffer = buffer;
 			s->dw_size = sz;
 			s->dw_offset = n;
-			sp_write(ss->event_fd, s->fd, s, true);
 			spinlock_unlock(&s->dw_lock);
+
+			sp_write(ss->event_fd, s->fd, s, true);
 			return 0;
 		}
 		spinlock_unlock(&s->dw_lock);
