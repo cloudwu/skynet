@@ -195,6 +195,13 @@ skynet_calloc(size_t nmemb,size_t size) {
 	return fill_prefix(ptr);
 }
 
+void *
+skynet_memalign(size_t alignment, size_t size) {
+	void* ptr = je_memalign(alignment, size + PREFIX_SIZE);
+	if(!ptr) malloc_oom(size);
+	return fill_prefix(ptr);
+}
+
 #else
 
 // for skynet_lalloc use
