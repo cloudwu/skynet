@@ -546,10 +546,8 @@ const uint32_t r[] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22
 // leftrotate function definition
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
 
-// hmac64 use md5 algorithm without padding, and the result is (c^d .. a^b)
 static void
-hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
-	uint32_t w[16];
+digest_md5(uint32_t w[16], uint32_t result[4]) {
 	uint32_t a, b, c, d, f, g, temp;
 	int i;
  
@@ -557,13 +555,6 @@ hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
 	b = 0xefcdab89u;
 	c = 0x98badcfeu;
 	d = 0x10325476u;
-
-	for (i=0;i<16;i+=4) {
-		w[i] = x[1];
-		w[i+1] = x[0];
-		w[i+2] = y[1];
-		w[i+3] = y[0];
-	}
 
 	for(i = 0; i<64; i++) {
 		if (i < 16) {
@@ -585,11 +576,54 @@ hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
 		c = b;
 		b = b + LEFTROTATE((a + f + k[i] + w[g]), r[i]);
 		a = temp;
-
 	}
 
-	result[0] = c^d;
-	result[1] = a^b;
+	result[0] = a;
+	result[1] = b;
+	result[2] = c;
+	result[3] = d;
+}
+
+// hmac64 use md5 algorithm without padding, and the result is (c^d .. a^b)
+static void
+hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
+	uint32_t w[16];
+	uint32_t r[4];
+	int i;
+	for (i=0;i<16;i+=4) {
+		w[i] = x[1];
+		w[i+1] = x[0];
+		w[i+2] = y[1];
+		w[i+3] = y[0];
+	}
+
+	digest_md5(w,r);
+
+	result[0] = r[2]^r[3];
+	result[1] = r[0]^r[1];
+}
+
+static void
+hmac_md5(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
+	uint32_t w[16];
+	uint32_t r[4];
+	int i;
+	for (i=0;i<12;i+=4) {
+		w[i] = x[0];
+		w[i+1] = x[1];
+		w[i+2] = y[0];
+		w[i+3] = y[1];
+	}
+
+	w[12] = 0x80;
+	w[13] = 0;
+	w[14] = 384;
+	w[15] = 0;
+
+	digest_md5(w,r);
+
+	result[0] = (r[0] + 0x67452301u) ^ (r[2] + 0x98badcfeu);
+	result[1] = (r[1] + 0xefcdab89u) ^ (r[3] + 0x10325476u);
 }
 
 static void
@@ -631,6 +665,21 @@ lhmac64(lua_State *L) {
 	read64(L, x, y);
 	uint32_t result[2];
 	hmac(x,y,result);
+	return pushqword(L, result);
+}
+
+/*
+  h1 = crypt.hmac64_md5(a,b)
+  m = md5.sum((a..b):rep(3))
+  h2 = crypt.xor_str(m:sub(1,8), m:sub(9,16))
+  assert(h1 == h2)
+ */
+static int
+lhmac64_md5(lua_State *L) {
+	uint32_t x[2], y[2];
+	read64(L, x, y);
+	uint32_t result[2];
+	hmac_md5(x,y,result);
 	return pushqword(L, result);
 }
 
@@ -921,6 +970,7 @@ luaopen_skynet_crypt(lua_State *L) {
 		{ "hexencode", ltohex },
 		{ "hexdecode", lfromhex },
 		{ "hmac64", lhmac64 },
+		{ "hmac64_md5", lhmac64_md5 },
 		{ "dhexchange", ldhexchange },
 		{ "dhsecret", ldhsecret },
 		{ "base64encode", lb64encode },
