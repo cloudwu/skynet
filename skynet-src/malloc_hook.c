@@ -9,6 +9,12 @@
 #include "skynet.h"
 #include "atomic.h"
 
+// turn on MEMORY_CHECK can do more memory check, such as double free
+// #define MEMORY_CHECK
+
+#define MEMORY_ALLOCTAG 0x20140605
+#define MEMORY_FREETAG 0x0badf00d
+
 static size_t _used_memory = 0;
 static size_t _memory_block = 0;
 
@@ -17,8 +23,15 @@ struct mem_data {
 	ssize_t allocated;
 };
 
+struct mem_cookie {
+	uint32_t handle;
+#ifdef MEMORY_CHECK
+	uint32_t dogtag;
+#endif
+};
+
 #define SLOT_SIZE 0x10000
-#define PREFIX_SIZE sizeof(uint32_t)
+#define PREFIX_SIZE sizeof(struct mem_cookie)
 
 static struct mem_data mem_stats[SLOT_SIZE];
 
@@ -76,9 +89,12 @@ inline static void*
 fill_prefix(char* ptr) {
 	uint32_t handle = skynet_current_handle();
 	size_t size = je_malloc_usable_size(ptr);
-	uint32_t *p = (uint32_t *)(ptr + size - sizeof(uint32_t));
-	memcpy(p, &handle, sizeof(handle));
-
+	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
+	memcpy(&p->handle, &handle, sizeof(handle));
+#ifdef MEMORY_CHECK
+	uint32_t dogtag = MEMORY_ALLOCTAG;
+	memcpy(&p->dogtag, &dogtag, sizeof(dogtag));
+#endif
 	update_xmalloc_stat_alloc(handle, size);
 	return ptr;
 }
@@ -86,9 +102,19 @@ fill_prefix(char* ptr) {
 inline static void*
 clean_prefix(char* ptr) {
 	size_t size = je_malloc_usable_size(ptr);
-	uint32_t *p = (uint32_t *)(ptr + size - sizeof(uint32_t));
+	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
 	uint32_t handle;
-	memcpy(&handle, p, sizeof(handle));
+	memcpy(&handle, &p->handle, sizeof(handle));
+#ifdef MEMORY_CHECK
+	uint32_t dogtag;
+	memcpy(&dogtag, &p->dogtag, sizeof(dogtag));
+	if (dogtag == MEMORY_FREETAG) {
+		fprintf(stderr, "xmalloc: double free in :%08x\n", handle);
+	}
+	assert(dogtag == MEMORY_ALLOCTAG);	// memory out of bounds
+	dogtag = MEMORY_FREETAG;
+	memcpy(&p->dogtag, &dogtag, sizeof(dogtag));
+#endif
 	update_xmalloc_stat_free(handle, size);
 	return ptr;
 }
