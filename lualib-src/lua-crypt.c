@@ -545,7 +545,8 @@ const uint32_t r[] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22
  
 // leftrotate function definition
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
- 
+
+// hmac64 use md5 algorithm without padding, and the result is (c^d .. a^b)
 static void
 hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
 	uint32_t w[16];
