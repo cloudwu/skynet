@@ -50,7 +50,7 @@ lcurrent(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_memory(lua_State *L) {
+luaopen_skynet_memory(lua_State *L) {
 	luaL_checkversion(L);
 
 	luaL_Reg l[] = {

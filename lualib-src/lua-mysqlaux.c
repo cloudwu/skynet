@@ -158,7 +158,7 @@ static struct luaL_Reg mysqlauxlib[] = {
 };
 
 
-LUAMOD_API int luaopen_mysqlaux_c (lua_State *L) {
+LUAMOD_API int luaopen_skynet_mysqlaux_c (lua_State *L) {
     lua_newtable(L);
     luaL_setfuncs(L, mysqlauxlib, 0);
     return 1;

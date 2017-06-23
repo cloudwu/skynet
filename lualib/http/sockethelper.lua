@@ -1,4 +1,4 @@
-local socket = require "socket"
+local socket = require "skynet.socket"
 local skynet = require "skynet"
 
 local readbytes = socket.read

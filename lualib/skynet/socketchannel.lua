@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local socket = require "socket"
-local socketdriver = require "socketdriver"
+local socket = require "skynet.socket"
+local socketdriver = require "skynet.socketdriver"
 
 -- channel support auto reconnect , and capture socket error in request/response transaction
 -- { host = "", port = , auth = function(so) , response = function(so) session, data }

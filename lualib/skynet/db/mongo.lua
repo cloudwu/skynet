@@ -1,10 +1,10 @@
 local bson = require "bson"
-local socket = require "socket"
-local socketchannel	= require "socketchannel"
+local socket = require "skynet.socket"
+local socketchannel	= require "skynet.socketchannel"
 local skynet = require "skynet"
-local driver = require "mongo.driver"
+local driver = require "skynet.mongo.driver"
 local md5 =	require	"md5"
-local crypt = require "crypt"
+local crypt = require "skynet.crypt"
 local rawget = rawget
 local assert = assert
 local table = table

@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local socket = require "socket"
+local socket = require "skynet.socket"
 require "skynet.manager"	-- import skynet.launch, ...
 local table = table
 
