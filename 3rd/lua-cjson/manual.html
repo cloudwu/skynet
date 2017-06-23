@@ -1,0 +1,1332 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="generator" content="AsciiDoc 8.4.5" />
+<title>Lua CJSON 2.1.0 Manual</title>
+<style type="text/css">
+/* Debug borders */
+p, li, dt, dd, div, pre, h1, h2, h3, h4, h5, h6 {
+/*
+  border: 1px solid red;
+*/
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+  color: navy;
+}
+
+strong {
+  font-weight: bold;
+  color: #083194;
+}
+
+tt {
+  color: navy;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  font-family: sans-serif;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+
+div.sectionbody {
+  font-family: serif;
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
+}
+
+pre {
+  padding: 0;
+  margin: 0;
+}
+
+span#author {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+span#email {
+}
+span#revnumber, span#revdate, span#revremark {
+  font-family: sans-serif;
+}
+
+div#footer {
+  font-family: sans-serif;
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+div#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+div#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+div#preamble {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.tableblock, div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid silver;
+  padding: 0.5em;
+}
+
+div.listingblock > div.content {
+  border: 1px solid silver;
+  background: #f4f4f4;
+  padding: 0.5em;
+}
+
+div.quoteblock {
+  padding-left: 2.0em;
+  margin-right: 10%;
+}
+div.quoteblock > div.attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock {
+  padding-left: 2.0em;
+  margin-right: 10%;
+}
+div.verseblock > div.content {
+  white-space: pre;
+}
+div.verseblock > div.attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+/* DEPRECATED: Pre version 8.2.7 verse style literal block. */
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 2px solid silver;
+}
+
+div.exampleblock > div.content {
+  border-left: 2px solid silver;
+  padding: 0.5em;
+}
+
+div.imageblock div.content { padding-left: 0; }
+span.image img { border-style: none; }
+a.image:visited { color: white; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: normal;
+  color: navy;
+}
+dd > *:first-child {
+  margin-top: 0.1em;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+ol.arabic {
+  list-style-type: decimal;
+}
+ol.loweralpha {
+  list-style-type: lower-alpha;
+}
+ol.upperalpha {
+  list-style-type: upper-alpha;
+}
+ol.lowerroman {
+  list-style-type: lower-roman;
+}
+ol.upperroman {
+  list-style-type: upper-roman;
+}
+
+div.compact ul, div.compact ol,
+div.compact p, div.compact p,
+div.compact div, div.compact div {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead {
+  font-family: sans-serif;
+  font-weight: bold;
+}
+tfoot {
+  font-weight: bold;
+}
+td > div.verse {
+  white-space: pre;
+}
+p.table {
+  margin-top: 0;
+}
+/* Because the table frame attribute is overriden by CSS in most browsers. */
+div.tableblock > table[frame="void"] {
+  border-style: none;
+}
+div.tableblock > table[frame="hsides"] {
+  border-left-style: none;
+  border-right-style: none;
+}
+div.tableblock > table[frame="vsides"] {
+  border-top-style: none;
+  border-bottom-style: none;
+}
+
+
+div.hdlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hdlist tr {
+  padding-bottom: 15px;
+}
+dt.hdlist1.strong, td.hdlist1.strong {
+  font-weight: bold;
+}
+td.hdlist1 {
+  vertical-align: top;
+  font-style: normal;
+  padding-right: 0.8em;
+  color: navy;
+}
+td.hdlist2 {
+  vertical-align: top;
+}
+div.hdlist.compact tr {
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.comment {
+  background: yellow;
+}
+
+@media print {
+  div#footer-badges { display: none; }
+}
+
+div#toctitle {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+/* Workarounds for IE6's broken and incomplete CSS2. */
+
+div.sidebar-content {
+  background: #ffffee;
+  border: 1px solid silver;
+  padding: 0.5em;
+}
+div.sidebar-title, div.image-title {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-weight: bold;
+  margin-top: 0.0em;
+  margin-bottom: 0.5em;
+}
+
+div.listingblock div.content {
+  border: 1px solid silver;
+  background: #f4f4f4;
+  padding: 0.5em;
+}
+
+div.quoteblock-attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock-content {
+  white-space: pre;
+}
+div.verseblock-attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+
+div.exampleblock-content {
+  border-left: 2px solid silver;
+  padding-left: 0.5em;
+}
+
+/* IE6 sets dynamically generated links as visited. */
+div#toc a:visited { color: blue; }
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+window.onload = function(){generateToc(2)}
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, October 2006. License: GPL */
+
+function getText(el) {
+  var text = "";
+  for (var i = el.firstChild; i != null; i = i.nextSibling) {
+    if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+      text += i.data;
+    else if (i.firstChild != null)
+      text += getText(i);
+  }
+  return text;
+}
+
+function TocEntry(el, text, toclevel) {
+  this.element = el;
+  this.text = text;
+  this.toclevel = toclevel;
+}
+
+function tocEntries(el, toclevels) {
+  var result = new Array;
+  var re = new RegExp('[hH]([2-'+(toclevels+1)+'])');
+  // Function that scans the DOM tree for header elements (the DOM2
+  // nodeIterator API would be a better technique but not supported by all
+  // browsers).
+  var iterate = function (el) {
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+        var mo = re.exec(i.tagName)
+        if (mo)
+          result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+        iterate(i);
+      }
+    }
+  }
+  iterate(el);
+  return result;
+}
+
+// This function does the work. toclevels = 1..4.
+function generateToc(toclevels) {
+  var toc = document.getElementById("toc");
+  var entries = tocEntries(document.getElementsByTagName("body")[0], toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "toc" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+  if (entries.length == 0)
+    document.getElementById("header").removeChild(toc);
+}
+/*]]>*/
+</script>
+</head>
+<body>
+<div id="header">
+<h1>Lua CJSON 2.1.0 Manual</h1>
+<span id="author">Mark Pulford</span><br />
+<span id="email"><tt>&lt;<a href="mailto:mark@kyne.com.au">mark@kyne.com.au</a>&gt;</tt></span><br />
+<span id="revdate">1st March 2012</span>
+<div id="toc">
+  <div id="toctitle">Table of Contents</div>
+  <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
+</div>
+</div>
+<h2 id="_overview">1. Overview</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The Lua CJSON module provides JSON support for Lua.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>Features</strong>
+</dt>
+<dd>
+<div class="ulist"><ul>
+<li>
+<p>
+Fast, standards compliant encoding/parsing routines
+</p>
+</li>
+<li>
+<p>
+Full support for JSON with UTF-8, including decoding surrogate pairs
+</p>
+</li>
+<li>
+<p>
+Optional run-time support for common exceptions to the JSON
+  specification (infinity, NaN,..)
+</p>
+</li>
+<li>
+<p>
+No dependencies on other libraries
+</p>
+</li>
+</ul></div>
+</dd>
+<dt class="hdlist1">
+<strong>Caveats</strong>
+</dt>
+<dd>
+<div class="ulist"><ul>
+<li>
+<p>
+UTF-16 and UTF-32 are not supported
+</p>
+</li>
+</ul></div>
+</dd>
+</dl></div>
+<div class="paragraph"><p>Lua CJSON is covered by the MIT license. Review the file <tt>LICENSE</tt> for
+details.</p></div>
+<div class="paragraph"><p>The latest version of this software is available from the
+<a href="http://www.kyne.com.au/%7Emark/software/lua-cjson.php">Lua CJSON website</a>.</p></div>
+<div class="paragraph"><p>Feel free to email me if you have any patches, suggestions, or comments.</p></div>
+</div>
+<h2 id="_installation">2. Installation</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Lua CJSON requires either <a href="http://www.lua.org">Lua</a> 5.1, Lua 5.2, or
+<a href="http://www.luajit.org">LuaJIT</a> to build.</p></div>
+<div class="paragraph"><p>The build method can be selected from 4 options:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+Make
+</dt>
+<dd>
+<p>
+Unix (including Linux, BSD, Mac OSX &amp; Solaris), Windows
+</p>
+</dd>
+<dt class="hdlist1">
+CMake
+</dt>
+<dd>
+<p>
+Unix, Windows
+</p>
+</dd>
+<dt class="hdlist1">
+RPM
+</dt>
+<dd>
+<p>
+Linux
+</p>
+</dd>
+<dt class="hdlist1">
+LuaRocks
+</dt>
+<dd>
+<p>
+Unix, Windows
+</p>
+</dd>
+</dl></div>
+<h3 id="_make">2.1. Make</h3><div style="clear:left"></div>
+<div class="paragraph"><p>The included <tt>Makefile</tt> has generic settings.</p></div>
+<div class="paragraph"><p>First, review and update the included makefile to suit your platform (if
+required).</p></div>
+<div class="paragraph"><p>Next, build and install the module:</p></div>
+<div class="exampleblock">
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>make install</tt></pre></div></div>
+<div class="paragraph"><p>Or install manually into your Lua module directory:</p></div>
+<div class="exampleblock">
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>make
+cp cjson<span style="color: #990000">.</span>so <span style="color: #009900">$LUA_MODULE_DIRECTORY</span></tt></pre></div></div>
+<h3 id="_cmake">2.2. CMake</h3><div style="clear:left"></div>
+<div class="paragraph"><p><a href="http://www.cmake.org">CMake</a> can generate build configuration for many
+different platforms (including Unix and Windows).</p></div>
+<div class="paragraph"><p>First, generate the makefile for your platform using CMake. If CMake is
+unable to find Lua, manually set the <tt>LUA_DIR</tt> environment variable to
+the base prefix of your Lua 5.1 installation.</p></div>
+<div class="paragraph"><p>While <tt>cmake</tt> is used in the example below, <tt>ccmake</tt> or <tt>cmake-gui</tt> may
+be used to present an interface for changing the default build options.</p></div>
+<div class="exampleblock">
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>mkdir build
+cd build
+<span style="font-style: italic"><span style="color: #9A1900"># Optional: export LUA_DIR=$LUA51_PREFIX</span></span>
+cmake <span style="color: #990000">..</span></tt></pre></div></div>
+<div class="paragraph"><p>Next, build and install the module:</p></div>
+<div class="exampleblock">
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>make install
+<span style="font-style: italic"><span style="color: #9A1900"># Or:</span></span>
+make
+cp cjson<span style="color: #990000">.</span>so <span style="color: #009900">$LUA_MODULE_DIRECTORY</span></tt></pre></div></div>
+<div class="paragraph"><p>Review the
+<a href="http://www.cmake.org/cmake/help/documentation.html">CMake documentation</a>
+for further details.</p></div>
+<h3 id="_rpm">2.3. RPM</h3><div style="clear:left"></div>
+<div class="paragraph"><p>Linux distributions using <a href="http://rpm.org">RPM</a> can create a package via
+the included RPM spec file. Ensure the <tt>rpm-build</tt> package (or similar)
+has been installed.</p></div>
+<div class="paragraph"><p>Build and install the module via RPM:</p></div>
+<div class="exampleblock">
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>rpmbuild -tb lua-cjson-<span style="color: #993399">2.1</span><span style="color: #990000">.</span><span style="color: #993399">0</span><span style="color: #990000">.</span>tar<span style="color: #990000">.</span>gz
+rpm -Uvh <span style="color: #009900">$LUA_CJSON_RPM</span></tt></pre></div></div>
+<h3 id="_luarocks">2.4. LuaRocks</h3><div style="clear:left"></div>
+<div class="paragraph"><p><a href="http://luarocks.org">LuaRocks</a> can be used to install and manage Lua
+modules on a wide range of platforms (including Windows).</p></div>
+<div class="paragraph"><p>First, extract the Lua CJSON source package.</p></div>
+<div class="paragraph"><p>Next, install the module:</p></div>
+<div class="exampleblock">
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>cd lua-cjson-<span style="color: #993399">2.1</span><span style="color: #990000">.</span><span style="color: #993399">0</span>
+luarocks make</tt></pre></div></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">LuaRocks does not support platform specific configuration for Solaris.
+On Solaris, you may need to manually uncomment <tt>USE_INTERNAL_ISINF</tt> in
+the rockspec before building this module.</td>
+</tr></table>
+</div>
+<div class="paragraph"><p>Review the <a href="http://luarocks.org/en/Documentation">LuaRocks documentation</a>
+for further details.</p></div>
+<h3 id="build_options">2.5. Build Options (#define)</h3><div style="clear:left"></div>
+<div class="paragraph"><p>Lua CJSON offers several <tt>#define</tt> build options to address portability
+issues, and enable non-default features. Some build methods may
+automatically set platform specific options if required. Other features
+should be enabled manually.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+USE_INTERNAL_ISINF
+</dt>
+<dd>
+<p>
+Workaround for Solaris platforms missing <tt>isinf</tt>.
+</p>
+</dd>
+<dt class="hdlist1">
+DISABLE_INVALID_NUMBERS
+</dt>
+<dd>
+<p>
+Recommended on platforms where <tt>strtod</tt> /
+  <tt>sprintf</tt> are not POSIX compliant (eg, Windows MinGW). Prevents
+  <tt>cjson.encode_invalid_numbers</tt> and <tt>cjson.decode_invalid_numbers</tt> from
+  being enabled. However, <tt>cjson.encode_invalid_numbers</tt> may still be
+  set to <tt>"null"</tt>. When using the Lua CJSON built-in floating point
+  conversion this option is unnecessary and is ignored.
+</p>
+</dd>
+</dl></div>
+<h4 id="_built_in_floating_point_conversion">2.5.1. Built-in floating point conversion</h4>
+<div class="paragraph"><p>Lua CJSON may be built with David Gay&#8217;s
+<a href="http://www.netlib.org/fp/">floating point conversion routines</a>. This can
+increase overall performance by up to 50% on some platforms when
+converting a large amount of numeric data. However, this option reduces
+portability and is disabled by default.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+USE_INTERNAL_FPCONV
+</dt>
+<dd>
+<p>
+Enable internal number conversion routines.
+</p>
+</dd>
+<dt class="hdlist1">
+IEEE_BIG_ENDIAN
+</dt>
+<dd>
+<p>
+Must be set on big endian architectures.
+</p>
+</dd>
+<dt class="hdlist1">
+MULTIPLE_THREADS
+</dt>
+<dd>
+<p>
+Must be set if Lua CJSON may be used in a
+  multi-threaded application. Requires the <em>pthreads</em> library.
+</p>
+</dd>
+</dl></div>
+</div>
+<h2 id="_api_functions">3. API (Functions)</h2>
+<div class="sectionbody">
+<h3 id="_synopsis">3.1. Synopsis</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-style: italic"><span style="color: #9A1900">-- Module instantiation</span></span>
+<span style="font-weight: bold"><span style="color: #0000FF">local</span></span> cjson <span style="color: #990000">=</span> require <span style="color: #FF0000">"cjson"</span>
+<span style="font-weight: bold"><span style="color: #0000FF">local</span></span> cjson2 <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">new</span></span><span style="color: #990000">()</span>
+<span style="font-weight: bold"><span style="color: #0000FF">local</span></span> cjson_safe <span style="color: #990000">=</span> require <span style="color: #FF0000">"cjson.safe"</span>
+
+<span style="font-style: italic"><span style="color: #9A1900">-- Translate Lua value to/from JSON</span></span>
+text <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode</span></span><span style="color: #990000">(</span>value<span style="color: #990000">)</span>
+value <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">decode</span></span><span style="color: #990000">(</span>text<span style="color: #990000">)</span>
+
+<span style="font-style: italic"><span style="color: #9A1900">-- Get and/or set Lua CJSON configuration</span></span>
+setting <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">decode_invalid_numbers</span></span><span style="color: #990000">([</span>setting<span style="color: #990000">])</span>
+setting <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_invalid_numbers</span></span><span style="color: #990000">([</span>setting<span style="color: #990000">])</span>
+keep <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_keep_buffer</span></span><span style="color: #990000">([</span>keep<span style="color: #990000">])</span>
+depth <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_max_depth</span></span><span style="color: #990000">([</span>depth<span style="color: #990000">])</span>
+depth <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">decode_max_depth</span></span><span style="color: #990000">([</span>depth<span style="color: #990000">])</span>
+convert<span style="color: #990000">,</span> ratio<span style="color: #990000">,</span> safe <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_sparse_array</span></span><span style="color: #990000">([</span>convert<span style="color: #990000">[,</span> ratio<span style="color: #990000">[,</span> safe<span style="color: #990000">]]])</span></tt></pre></div></div>
+<h3 id="_module_instantiation">3.2. Module Instantiation</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><span style="font-weight: bold"><span style="color: #0000FF">local</span></span> cjson <span style="color: #990000">=</span> require <span style="color: #FF0000">"cjson"</span>
+<span style="font-weight: bold"><span style="color: #0000FF">local</span></span> cjson2 <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">new</span></span><span style="color: #990000">()</span>
+<span style="font-weight: bold"><span style="color: #0000FF">local</span></span> cjson_safe <span style="color: #990000">=</span> require <span style="color: #FF0000">"cjson.safe"</span></tt></pre></div></div>
+<div class="paragraph"><p>Import Lua CJSON via the Lua <tt>require</tt> function. Lua CJSON does not
+register a global module table.</p></div>
+<div class="paragraph"><p>The <tt>cjson</tt> module will throw an error during JSON conversion if any
+invalid data is encountered. Refer to <a href="#cjson_encode"><tt>cjson.encode</tt></a>
+and <a href="#cjson_decode"><tt>cjson.decode</tt></a> for details.</p></div>
+<div class="paragraph"><p>The <tt>cjson.safe</tt> module behaves identically to the <tt>cjson</tt> module,
+except when errors are encountered during JSON conversion. On error, the
+<tt>cjson_safe.encode</tt> and <tt>cjson_safe.decode</tt> functions will return
+<tt>nil</tt> followed by the error message.</p></div>
+<div class="paragraph"><p><tt>cjson.new</tt> can be used to instantiate an independent copy of the Lua
+CJSON module. The new module has a separate persistent encoding buffer,
+and default settings.</p></div>
+<div class="paragraph"><p>Lua CJSON can support Lua implementations using multiple preemptive
+threads within a single Lua state provided the persistent encoding
+buffer is not shared. This can be achieved by one of the following
+methods:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Disabling the persistent encoding buffer with
+  <a href="#encode_keep_buffer"><tt>cjson.encode_keep_buffer</tt></a>
+</p>
+</li>
+<li>
+<p>
+Ensuring each thread calls <a href="#encode"><tt>cjson.encode</tt></a> separately (ie,
+  treat <tt>cjson.encode</tt> as non-reentrant).
+</p>
+</li>
+<li>
+<p>
+Using a separate <tt>cjson</tt> module table per preemptive thread
+  (<tt>cjson.new</tt>)
+</p>
+</li>
+</ul></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">Lua CJSON uses <tt>strtod</tt> and <tt>snprintf</tt> to perform numeric conversion as
+they are usually well supported, fast and bug free. However, these
+functions require a workaround for JSON encoding/parsing under locales
+using a comma decimal separator. Lua CJSON detects the current locale
+during instantiation to determine and automatically implement the
+workaround if required. Lua CJSON should be reinitialised via
+<tt>cjson.new</tt> if the locale of the current process changes. Using a
+different locale per thread is not supported.</td>
+</tr></table>
+</div>
+<h3 id="_decode">3.3. decode</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>value <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">decode</span></span><span style="color: #990000">(</span>json_text<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p><tt>cjson.decode</tt> will deserialise any UTF-8 JSON string into a Lua value
+or table.</p></div>
+<div class="paragraph"><p>UTF-16 and UTF-32 JSON strings are not supported.</p></div>
+<div class="paragraph"><p><tt>cjson.decode</tt> requires that any NULL (ASCII 0) and double quote (ASCII
+34) characters are escaped within strings. All escape codes will be
+decoded and other bytes will be passed transparently. UTF-8 characters
+are not validated during decoding and should be checked elsewhere if
+required.</p></div>
+<div class="paragraph"><p>JSON <tt>null</tt> will be converted to a NULL <tt>lightuserdata</tt> value. This can
+be compared with <tt>cjson.null</tt> for convenience.</p></div>
+<div class="paragraph"><p>By default, numbers incompatible with the JSON specification (infinity,
+NaN, hexadecimal) can be decoded. This default can be changed with
+<a href="#decode_invalid_numbers"><tt>cjson.decode_invalid_numbers</tt></a>.</p></div>
+<div class="exampleblock">
+<div class="title">Example: Decoding</div>
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>json_text <span style="color: #990000">=</span> <span style="color: #FF0000">'[ true, { "foo": "bar" } ]'</span>
+value <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">decode</span></span><span style="color: #990000">(</span>json_text<span style="color: #990000">)</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- Returns: { true, { foo = "bar" } }</span></span></tt></pre></div></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Caution</div>
+</td>
+<td class="content">Care must be taken after decoding JSON objects with numeric keys. Each
+numeric key will be stored as a Lua <tt>string</tt>. Any subsequent code
+assuming type <tt>number</tt> may break.</td>
+</tr></table>
+</div>
+<h3 id="decode_invalid_numbers">3.4. decode_invalid_numbers</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>setting <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">decode_invalid_numbers</span></span><span style="color: #990000">([</span>setting<span style="color: #990000">])</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "setting" must be a boolean. Default: true.</span></span></tt></pre></div></div>
+<div class="paragraph"><p>Lua CJSON may generate an error when trying to decode numbers not
+supported by the JSON specification. <em>Invalid numbers</em> are defined as:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+infinity
+</p>
+</li>
+<li>
+<p>
+not-a-number (NaN)
+</p>
+</li>
+<li>
+<p>
+hexadecimal
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Available settings:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<tt>true</tt>
+</dt>
+<dd>
+<p>
+Accept and decode <em>invalid numbers</em>. This is the default
+  setting.
+</p>
+</dd>
+<dt class="hdlist1">
+<tt>false</tt>
+</dt>
+<dd>
+<p>
+Throw an error when <em>invalid numbers</em> are encountered.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p>The current setting is always returned, and is only updated when an
+argument is provided.</p></div>
+<h3 id="decode_max_depth">3.5. decode_max_depth</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>depth <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">decode_max_depth</span></span><span style="color: #990000">([</span>depth<span style="color: #990000">])</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "depth" must be a positive integer. Default: 1000.</span></span></tt></pre></div></div>
+<div class="paragraph"><p>Lua CJSON will generate an error when parsing deeply nested JSON once
+the maximum array/object depth has been exceeded. This check prevents
+unnecessarily complicated JSON from slowing down the application, or
+crashing the application due to lack of process stack space.</p></div>
+<div class="paragraph"><p>An error may be generated before the depth limit is hit if Lua is unable
+to allocate more objects on the Lua stack.</p></div>
+<div class="paragraph"><p>By default, Lua CJSON will reject JSON with arrays and/or objects nested
+more than 1000 levels deep.</p></div>
+<div class="paragraph"><p>The current setting is always returned, and is only updated when an
+argument is provided.</p></div>
+<h3 id="encode">3.6. encode</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>json_text <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode</span></span><span style="color: #990000">(</span>value<span style="color: #990000">)</span></tt></pre></div></div>
+<div class="paragraph"><p><tt>cjson.encode</tt> will serialise a Lua value into a string containing the
+JSON representation.</p></div>
+<div class="paragraph"><p><tt>cjson.encode</tt> supports the following types:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+<tt>boolean</tt>
+</p>
+</li>
+<li>
+<p>
+<tt>lightuserdata</tt> (NULL value only)
+</p>
+</li>
+<li>
+<p>
+<tt>nil</tt>
+</p>
+</li>
+<li>
+<p>
+<tt>number</tt>
+</p>
+</li>
+<li>
+<p>
+<tt>string</tt>
+</p>
+</li>
+<li>
+<p>
+<tt>table</tt>
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>The remaining Lua types will generate an error:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+<tt>function</tt>
+</p>
+</li>
+<li>
+<p>
+<tt>lightuserdata</tt> (non-NULL values)
+</p>
+</li>
+<li>
+<p>
+<tt>thread</tt>
+</p>
+</li>
+<li>
+<p>
+<tt>userdata</tt>
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>By default, numbers are encoded with 14 significant digits. Refer to
+<a href="#encode_number_precision"><tt>cjson.encode_number_precision</tt></a> for details.</p></div>
+<div class="paragraph"><p>Lua CJSON will escape the following characters within each UTF-8 string:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Control characters (ASCII 0 - 31)
+</p>
+</li>
+<li>
+<p>
+Double quote (ASCII 34)
+</p>
+</li>
+<li>
+<p>
+Forward slash (ASCII 47)
+</p>
+</li>
+<li>
+<p>
+Blackslash (ASCII 92)
+</p>
+</li>
+<li>
+<p>
+Delete (ASCII 127)
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>All other bytes are passed transparently.</p></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Caution</div>
+</td>
+<td class="content">
+<div class="paragraph"><p>Lua CJSON will successfully encode/decode binary strings, but this is
+technically not supported by JSON and may not be compatible with other
+JSON libraries. To ensure the output is valid JSON, applications should
+ensure all Lua strings passed to <tt>cjson.encode</tt> are UTF-8.</p></div>
+<div class="paragraph"><p>Base64 is commonly used to encode binary data as the most efficient
+encoding under UTF-8 can only reduce the encoded size by a further
+&#126;8%. Lua Base64 routines can be found in the
+<a href="http://w3.impa.br/%7Ediego/software/luasocket/">LuaSocket</a> and
+<a href="http://www.tecgraf.puc-rio.br/%7Elhf/ftp/lua/#lbase64">lbase64</a> packages.</p></div>
+</td>
+</tr></table>
+</div>
+<div class="paragraph"><p>Lua CJSON uses a heuristic to determine whether to encode a Lua table as
+a JSON array or an object. A Lua table with only positive integer keys
+of type <tt>number</tt> will be encoded as a JSON array. All other tables will
+be encoded as a JSON object.</p></div>
+<div class="paragraph"><p>Lua CJSON does not use metamethods when serialising tables.</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+<tt>rawget</tt> is used to iterate over Lua arrays
+</p>
+</li>
+<li>
+<p>
+<tt>next</tt> is used to iterate over Lua objects
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Lua arrays with missing entries (<em>sparse arrays</em>) may optionally be
+encoded in several different ways. Refer to
+<a href="#encode_sparse_array"><tt>cjson.encode_sparse_array</tt></a> for details.</p></div>
+<div class="paragraph"><p>JSON object keys are always strings. Hence <tt>cjson.encode</tt> only supports
+table keys which are type <tt>number</tt> or <tt>string</tt>. All other types will
+generate an error.</p></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">Standards compliant JSON must be encapsulated in either an object (<tt>{}</tt>)
+or an array (<tt>[]</tt>). If strictly standards compliant JSON is desired, a
+table must be passed to <tt>cjson.encode</tt>.</td>
+</tr></table>
+</div>
+<div class="paragraph"><p>By default, encoding the following Lua values will generate errors:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Numbers incompatible with the JSON specification (infinity, NaN)
+</p>
+</li>
+<li>
+<p>
+Tables nested more than 1000 levels deep
+</p>
+</li>
+<li>
+<p>
+Excessively sparse Lua arrays
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>These defaults can be changed with:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+<a href="#encode_invalid_numbers"><tt>cjson.encode_invalid_numbers</tt></a>
+</p>
+</li>
+<li>
+<p>
+<a href="#encode_max_depth"><tt>cjson.encode_max_depth</tt></a>
+</p>
+</li>
+<li>
+<p>
+<a href="#encode_sparse_array"><tt>cjson.encode_sparse_array</tt></a>
+</p>
+</li>
+</ul></div>
+<div class="exampleblock">
+<div class="title">Example: Encoding</div>
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>value <span style="color: #990000">=</span> <span style="color: #FF0000">{</span> <span style="font-weight: bold"><span style="color: #0000FF">true</span></span><span style="color: #990000">,</span> <span style="color: #FF0000">{</span> foo <span style="color: #990000">=</span> <span style="color: #FF0000">"bar"</span> <span style="color: #FF0000">}</span> <span style="color: #FF0000">}</span>
+json_text <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode</span></span><span style="color: #990000">(</span>value<span style="color: #990000">)</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- Returns: '[true,{"foo":"bar"}]'</span></span></tt></pre></div></div>
+<h3 id="encode_invalid_numbers">3.7. encode_invalid_numbers</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>setting <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_invalid_numbers</span></span><span style="color: #990000">([</span>setting<span style="color: #990000">])</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "setting" must a boolean or "null". Default: false.</span></span></tt></pre></div></div>
+<div class="paragraph"><p>Lua CJSON may generate an error when encoding floating point numbers not
+supported by the JSON specification (<em>invalid numbers</em>):</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+infinity
+</p>
+</li>
+<li>
+<p>
+not-a-number (NaN)
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Available settings:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<tt>true</tt>
+</dt>
+<dd>
+<p>
+Allow <em>invalid numbers</em> to be encoded. This will generate
+  non-standard JSON, but this output is supported by some libraries.
+</p>
+</dd>
+<dt class="hdlist1">
+<tt>"null"</tt>
+</dt>
+<dd>
+<p>
+Encode <em>invalid numbers</em> as a JSON <tt>null</tt> value. This allows
+  infinity and NaN to be encoded into valid JSON.
+</p>
+</dd>
+<dt class="hdlist1">
+<tt>false</tt>
+</dt>
+<dd>
+<p>
+Throw an error when attempting to encode <em>invalid numbers</em>.
+  This is the default setting.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p>The current setting is always returned, and is only updated when an
+argument is provided.</p></div>
+<h3 id="encode_keep_buffer">3.8. encode_keep_buffer</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>keep <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_keep_buffer</span></span><span style="color: #990000">([</span>keep<span style="color: #990000">])</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "keep" must be a boolean. Default: true.</span></span></tt></pre></div></div>
+<div class="paragraph"><p>Lua CJSON can reuse the JSON encoding buffer to improve performance.</p></div>
+<div class="paragraph"><p>Available settings:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<tt>true</tt>
+</dt>
+<dd>
+<p>
+The buffer will grow to the largest size required and is not
+  freed until the Lua CJSON module is garbage collected. This is the
+  default setting.
+</p>
+</dd>
+<dt class="hdlist1">
+<tt>false</tt>
+</dt>
+<dd>
+<p>
+Free the encode buffer after each call to <tt>cjson.encode</tt>.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p>The current setting is always returned, and is only updated when an
+argument is provided.</p></div>
+<h3 id="encode_max_depth">3.9. encode_max_depth</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>depth <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_max_depth</span></span><span style="color: #990000">([</span>depth<span style="color: #990000">])</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "depth" must be a positive integer. Default: 1000.</span></span></tt></pre></div></div>
+<div class="paragraph"><p>Once the maximum table depth has been exceeded Lua CJSON will generate
+an error. This prevents a deeply nested or recursive data structure from
+crashing the application.</p></div>
+<div class="paragraph"><p>By default, Lua CJSON will generate an error when trying to encode data
+structures with more than 1000 nested tables.</p></div>
+<div class="paragraph"><p>The current setting is always returned, and is only updated when an
+argument is provided.</p></div>
+<div class="exampleblock">
+<div class="title">Example: Recursive Lua table</div>
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>a <span style="color: #990000">=</span> <span style="color: #FF0000">{}</span><span style="color: #990000">;</span> a<span style="color: #990000">[</span><span style="color: #993399">1</span><span style="color: #990000">]</span> <span style="color: #990000">=</span> a</tt></pre></div></div>
+<h3 id="encode_number_precision">3.10. encode_number_precision</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>precision <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_number_precision</span></span><span style="color: #990000">([</span>precision<span style="color: #990000">])</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "precision" must be an integer between 1 and 14. Default: 14.</span></span></tt></pre></div></div>
+<div class="paragraph"><p>The amount of significant digits returned by Lua CJSON when encoding
+numbers can be changed to balance accuracy versus performance. For data
+structures containing many numbers, setting
+<tt>cjson.encode_number_precision</tt> to a smaller integer, for example <tt>3</tt>,
+can improve encoding performance by up to 50%.</p></div>
+<div class="paragraph"><p>By default, Lua CJSON will output 14 significant digits when converting
+a number to text.</p></div>
+<div class="paragraph"><p>The current setting is always returned, and is only updated when an
+argument is provided.</p></div>
+<h3 id="encode_sparse_array">3.11. encode_sparse_array</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>convert<span style="color: #990000">,</span> ratio<span style="color: #990000">,</span> safe <span style="color: #990000">=</span> cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_sparse_array</span></span><span style="color: #990000">([</span>convert<span style="color: #990000">[,</span> ratio<span style="color: #990000">[,</span> safe<span style="color: #990000">]]])</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "convert" must be a boolean. Default: false.</span></span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "ratio" must be a positive integer. Default: 2.</span></span>
+<span style="font-style: italic"><span style="color: #9A1900">-- "safe" must be a positive integer. Default: 10.</span></span></tt></pre></div></div>
+<div class="paragraph"><p>Lua CJSON classifies a Lua table into one of three kinds when encoding a
+JSON array. This is determined by the number of values missing from the
+Lua array as follows:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+Normal
+</dt>
+<dd>
+<p>
+All values are available.
+</p>
+</dd>
+<dt class="hdlist1">
+Sparse
+</dt>
+<dd>
+<p>
+At least 1 value is missing.
+</p>
+</dd>
+<dt class="hdlist1">
+Excessively sparse
+</dt>
+<dd>
+<p>
+The number of values missing exceeds the configured
+  ratio.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p>Lua CJSON encodes sparse Lua arrays as JSON arrays using JSON <tt>null</tt> for
+the missing entries.</p></div>
+<div class="paragraph"><p>An array is excessively sparse when all the following conditions are
+met:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+<tt>ratio</tt> &gt; <tt>0</tt>
+</p>
+</li>
+<li>
+<p>
+<em>maximum_index</em> &gt; <tt>safe</tt>
+</p>
+</li>
+<li>
+<p>
+<em>maximum_index</em> &gt; <em>item_count</em> * <tt>ratio</tt>
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>Lua CJSON will never consider an array to be <em>excessively sparse</em> when
+<tt>ratio</tt> = <tt>0</tt>. The <tt>safe</tt> limit ensures that small Lua arrays are always
+encoded as sparse arrays.</p></div>
+<div class="paragraph"><p>By default, attempting to encode an <em>excessively sparse</em> array will
+generate an error. If <tt>convert</tt> is set to <tt>true</tt>, <em>excessively sparse</em>
+arrays will be converted to a JSON object.</p></div>
+<div class="paragraph"><p>The current settings are always returned. A particular setting is only
+changed when the argument is provided (non-<tt>nil</tt>).</p></div>
+<div class="exampleblock">
+<div class="title">Example: Encoding a sparse array</div>
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode</span></span><span style="color: #990000">(</span><span style="color: #FF0000">{</span> <span style="color: #990000">[</span><span style="color: #993399">3</span><span style="color: #990000">]</span> <span style="color: #990000">=</span> <span style="color: #FF0000">"data"</span> <span style="color: #FF0000">}</span><span style="color: #990000">)</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- Returns: '[null,null,"data"]'</span></span></tt></pre></div></div>
+<div class="exampleblock">
+<div class="title">Example: Enabling conversion to a JSON object</div>
+<div class="exampleblock-content"><!-- Generator: GNU source-highlight 3.1.4
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt>cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode_sparse_array</span></span><span style="color: #990000">(</span><span style="font-weight: bold"><span style="color: #0000FF">true</span></span><span style="color: #990000">)</span>
+cjson<span style="color: #990000">.</span><span style="font-weight: bold"><span style="color: #000000">encode</span></span><span style="color: #990000">(</span><span style="color: #FF0000">{</span> <span style="color: #990000">[</span><span style="color: #993399">1000</span><span style="color: #990000">]</span> <span style="color: #990000">=</span> <span style="color: #FF0000">"excessively sparse"</span> <span style="color: #FF0000">}</span><span style="color: #990000">)</span>
+<span style="font-style: italic"><span style="color: #9A1900">-- Returns: '{"1000":"excessively sparse"}'</span></span></tt></pre></div></div>
+</div>
+<h2 id="_api_variables">4. API (Variables)</h2>
+<div class="sectionbody">
+<h3 id="_name">4.1. _NAME</h3><div style="clear:left"></div>
+<div class="paragraph"><p>The name of the Lua CJSON module (<tt>"cjson"</tt>).</p></div>
+<h3 id="_version">4.2. _VERSION</h3><div style="clear:left"></div>
+<div class="paragraph"><p>The version number of the Lua CJSON module (<tt>"2.1.0"</tt>).</p></div>
+<h3 id="_null">4.3. null</h3><div style="clear:left"></div>
+<div class="paragraph"><p>Lua CJSON decodes JSON <tt>null</tt> as a Lua <tt>lightuserdata</tt> NULL pointer.
+<tt>cjson.null</tt> is provided for comparison.</p></div>
+</div>
+<h2 id="_references">5. References</h2>
+<div class="sectionbody">
+<div class="ulist"><ul>
+<li>
+<p>
+<a href="http://tools.ietf.org/html/rfc4627">RFC 4627</a>
+</p>
+</li>
+<li>
+<p>
+<a href="http://www.json.org/">JSON website</a>
+</p>
+</li>
+</ul></div>
+</div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2012-03-01 22:52:58 CST
+</div>
+</div>
+</body>
+</html>

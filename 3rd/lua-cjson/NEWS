@@ -1,0 +1,44 @@
+Version 2.1.0 (Mar 1 2012)
+* Added cjson.safe module interface which returns nil after an error
+* Improved Makefile compatibility with Solaris make
+
+Version 2.0.0 (Jan 22 2012)
+* Improved platform compatibility for strtod/sprintf locale workaround
+* Added option to build with David Gay's dtoa.c for improved performance
+* Added support for Lua 5.2
+* Added option to encode infinity/NaN as JSON null
+* Fixed encode bug with a raised default limit and deeply nested tables
+* Updated Makefile for compatibility with non-GNU make implementations
+* Added CMake build support
+* Added HTML manual
+* Increased default nesting limit to 1000
+* Added support for re-entrant use of encode and decode
+* Added support for installing lua2json and json2lua utilities
+* Added encode_invalid_numbers() and decode_invalid_numbers()
+* Added decode_max_depth()
+* Removed registration of global cjson module table
+* Removed refuse_invalid_numbers()
+
+Version 1.0.4 (Nov 30 2011)
+* Fixed numeric conversion under locales with a comma decimal separator
+
+Version 1.0.3 (Sep 15 2011)
+* Fixed detection of objects with numeric string keys
+* Provided work around for missing isinf() on Solaris
+
+Version 1.0.2 (May 30 2011)
+* Portability improvements for Windows
+  - No longer links with -lm
+  - Use "socket" instead of "posix" for sub-second timing
+* Removed UTF-8 test dependency on Perl Text::Iconv
+* Added simple CLI commands for testing Lua <-> JSON conversions
+* Added cjson.encode_number_precision()
+
+Version 1.0.1 (May 10 2011)
+* Added build support for OSX
+* Removed unnecessary whitespace from JSON output
+* Added cjson.encode_keep_buffer()
+* Fixed memory leak on Lua stack overflow exception
+
+Version 1.0 (May 9 2011)
+* Initial release
