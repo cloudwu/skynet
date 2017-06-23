@@ -20,6 +20,7 @@ skynet.start(function()
 		maxclient = max_client,
 		nodelay = true,
 	})
+	
 	skynet.error("Watchdog listen on", 8888)
 	skynet.exit()
 end)
