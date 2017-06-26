@@ -31,7 +31,9 @@ if mode == "agent" then
 else
 	local function accept(id)
 		socket.start(id)
+
 		--socket.write(id, "Hello Skynet\n")
+
 		skynet.newservice(SERVICE_NAME, "agent", id)
 		-- notice: Some data on this connection(id) may lost before new service start.
 		-- So, be careful when you want to use start / abandon / start .
