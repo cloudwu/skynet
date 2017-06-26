@@ -13,12 +13,12 @@
 ##### Build defaults #####
 LUA_VERSION =       5.3
 TARGET =            cjson.so
-PREFIX =            /usr/local
+PREFIX =            ../lua
 #CFLAGS =            -g -Wall -pedantic -fno-inline
 CFLAGS =            -O3 -Wall -pedantic -DNDEBUG
 CJSON_CFLAGS =      -fpic
 CJSON_LDFLAGS =     -shared
-LUA_INCLUDE_DIR =   ../skynet/3rd/lua/
+LUA_INCLUDE_DIR =   ../lua/
 LUA_CMODULE_DIR =   $(PREFIX)/lib/lua/$(LUA_VERSION)
 LUA_MODULE_DIR =    $(PREFIX)/share/lua/$(LUA_VERSION)
 LUA_BIN_DIR =       $(PREFIX)/bin
