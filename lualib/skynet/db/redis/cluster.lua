@@ -33,7 +33,7 @@ function _M.new(startup_nodes,opt)
 end
 
 local function nodename(node)
-	return string.format("%s:%s",node.host,node.port)
+	return string.format("%s:%d",node.host,node.port)
 end
 
 function rediscluster:get_redis_link(node)
