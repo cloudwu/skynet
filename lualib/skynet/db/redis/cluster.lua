@@ -74,20 +74,22 @@ function rediscluster:initialize_slots_cache()
 			local conn = self.connections[name] or self:get_redis_link(startup_node)
 			local list = conn:cluster("slots")
 			for _,result in ipairs(list) do
-				local ip,port,runid = table.unpack(result[3])
+				local ip,port = table.unpack(result[3])
+				assert(ip)
+				port = assert(tonumber(port))
 				local master_node = {
 					host = ip,
 					port = port,
-					runid = runid,
 					slaves = {},
 				}
 				self:set_node_name(master_node)
 				for i=4,#result do
-					local ip,port,runid = table.unpack(result[i])
+					local ip,port = table.unpack(result[i])
+					assert(ip)
+					port = assert(tonumber(port))
 					local slave_node = {
 						host = ip,
 						port = port,
-						runid = runid,
 					}
 					self:set_node_name(slave_node)
 					table.insert(master_node.slaves,slave_node)
@@ -184,10 +186,7 @@ function rediscluster:close_all_connection()
 end
 
 function rediscluster:get_connection(node)
-	if type(node) == "string" then
-		local ip,port = string.match(node,"^([^:]+):([^:]+)$")
-		node = {host=ip,port=port}
-	end
+	node.port = assert(tonumber(node.port))
 	local name = node.name or nodename(node)
 	local conn = self.connections[name]
 	if not conn then
@@ -346,9 +345,10 @@ function rediscluster:call(...)
 					end
 					local newslot = tonumber(errlist[2])
 					local node_ip,node_port = string.match(errlist[3],"^([^:]+):([^:]+)$")
+					node_port = assert(tonumber(node_port))
 					local node = {
 						host = node_ip,
-						port = tonumber(node_port),
+						port = node_port,
 					}
 					if not asking then
 						self:set_node_name(node)
