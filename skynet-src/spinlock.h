@@ -1,6 +1,8 @@
 #ifndef SKYNET_SPINLOCK_H
 #define SKYNET_SPINLOCK_H
 
+#include <assert.h>
+
 #define SPIN_INIT(q) spinlock_init(&(q)->lock);
 #define SPIN_LOCK(q) spinlock_lock(&(q)->lock);
 #define SPIN_UNLOCK(q) spinlock_unlock(&(q)->lock);
@@ -74,5 +76,64 @@ spinlock_destroy(struct spinlock *lock) {
 }
 
 #endif
+
+struct spinlock_nested {
+	struct spinlock lock;
+	int thread;
+	int count;
+};
+
+static inline void
+spinlock_nestedinit(struct spinlock_nested *ln) {
+	spinlock_init(&ln->lock);
+	ln->thread = 0;
+	ln->count = 0;
+}
+
+static inline void
+spinlock_nestedlock(struct spinlock_nested *ln, int thread) {
+	if (thread != ln->thread) {
+		spinlock_lock(&ln->lock);
+		assert(ln->count == 0);
+		ln->thread = thread;
+	}
+	++ln->count;
+}
+
+static inline int
+spinlock_nestedtrylock(struct spinlock_nested *ln, int thread) {
+	if (thread != ln->thread) {
+		if (spinlock_trylock(&ln->lock)) {
+			assert(ln->count == 0);
+			ln->thread = thread;
+			++ln->count;
+			return 1;	// lock succ
+		} else {
+			return 0;
+		}
+	} else {
+		// in the same thread
+		++ln->count;
+		return 1;
+	}
+}
+
+static inline void
+spinlock_nestedunlock(struct spinlock_nested *ln, int thread) {
+	assert(thread == ln->thread);
+	--ln->count;
+	if (ln->count > 0) {
+		return;
+	}
+	assert(ln->count == 0);
+	ln->thread = 0;
+	spinlock_unlock(&ln->lock);
+}
+
+static inline void
+spinlock_nesteddestroy(struct spinlock_nested *ln) {
+	assert(ln->thread == 0 && ln->count == 0);
+	spinlock_destroy(&ln->lock);
+}
 
 #endif

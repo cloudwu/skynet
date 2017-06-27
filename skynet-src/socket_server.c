@@ -37,6 +37,9 @@
 #define PRIORITY_HIGH 0
 #define PRIORITY_LOW 1
 
+#define DIRECTWRITE_SOCKETTHREAD 1
+#define DIRECTWRITE_WORKERTHREAD 2
+
 #define HASH_ID(id) (((unsigned)id) % MAX_SOCKET)
 
 #define PROTOCOL_TCP 0
@@ -88,7 +91,7 @@ struct socket {
 		int size;
 		uint8_t udp_address[UDP_ADDRESS_SIZE];
 	} p;
-	struct spinlock dw_lock;
+	struct spinlock_nested dw_lock;
 	int dw_offset;
 	const void * dw_buffer;
 	size_t dw_size;
@@ -362,7 +365,7 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
 		sp_del(ss->event_fd, s->fd);
 	}
-	spinlock_lock(&s->dw_lock);
+	spinlock_nestedlock(&s->dw_lock, DIRECTWRITE_SOCKETTHREAD);
 	if (s->type != SOCKET_TYPE_BIND) {
 		if (close(s->fd) < 0) {
 			perror("close socket:");
@@ -373,7 +376,7 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 		free_buffer(ss, s->dw_buffer, s->dw_size);
 		s->dw_buffer = NULL;
 	}
-	spinlock_unlock(&s->dw_lock);
+	spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_SOCKETTHREAD);
 }
 
 void 
@@ -419,7 +422,7 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 	s->warn_size = 0;
 	check_wb_list(&s->high);
 	check_wb_list(&s->low);
-	spinlock_init(&s->dw_lock);
+	spinlock_nestedinit(&s->dw_lock);
 	s->dw_buffer = NULL;
 	s->dw_size = 0;
 	return s;
@@ -682,7 +685,7 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_message *
 
 static int
 send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *result) {
-	if (!spinlock_trylock(&s->dw_lock))
+	if (!spinlock_nestedtrylock(&s->dw_lock, DIRECTWRITE_SOCKETTHREAD))
 		return -1;	// blocked by direct write, send later.
 	if (s->dw_buffer) {
 		// add direct write buffer before high.head
@@ -703,7 +706,7 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 		s->dw_buffer = NULL;
 	}
 	int r = send_buffer_(ss,s,result);
-	spinlock_unlock(&s->dw_lock);
+	spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_SOCKETTHREAD);
 
 	return r;
 }
@@ -1418,7 +1421,7 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 		return -1;
 	}
 
-	if (can_direct_write(s,id) && spinlock_trylock(&s->dw_lock)) {
+	if (can_direct_write(s,id) && spinlock_nestedtrylock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD)) {
 		// may be we can send directly, double check
 		if (can_direct_write(s,id)) {
 			// send directly
@@ -1438,7 +1441,7 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 			}
 			if (n == so.sz) {
 				// write done
-				spinlock_unlock(&s->dw_lock);
+				spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD);
 				so.free_func((void *)buffer);
 				return 0;
 			}
@@ -1446,12 +1449,14 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 			s->dw_buffer = buffer;
 			s->dw_size = sz;
 			s->dw_offset = n;
-			spinlock_unlock(&s->dw_lock);
 
 			sp_write(ss->event_fd, s->fd, s, true);
+
+			spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD);
+
 			return 0;
 		}
-		spinlock_unlock(&s->dw_lock);
+		spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD);
 	}
 
 	struct request_package request;
@@ -1681,7 +1686,7 @@ socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp
 		return -1;
 	}
 
-	if (can_direct_write(s,id) && spinlock_trylock(&s->dw_lock)) {
+	if (can_direct_write(s,id) && spinlock_nestedtrylock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD)) {
 		// may be we can send directly, double check
 		if (can_direct_write(s,id)) {
 			// send directly
@@ -1692,12 +1697,12 @@ socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp
 			int n = sendto(s->fd, so.buffer, so.sz, 0, &sa.s, sasz);
 			if (n >= 0) {
 				// sendto succ
-				spinlock_unlock(&s->dw_lock);
+				spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD);
 				so.free_func((void *)buffer);
 				return 0;
 			}
 		}
-		spinlock_unlock(&s->dw_lock);
+		spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD);
 		// let socket thread try again, udp doesn't care the order
 	}
 
@@ -1718,13 +1723,13 @@ socket_server_udp_connect(struct socket_server *ss, int id, const char * addr, i
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		return -1;
 	}
-	spinlock_lock(&s->dw_lock);
+	spinlock_nestedlock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD);
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
-		spinlock_unlock(&s->dw_lock);
+		spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD);
 		return -1;
 	}
 	ATOM_INC(&s->udpconnecting);
-	spinlock_unlock(&s->dw_lock);
+	spinlock_nestedunlock(&s->dw_lock, DIRECTWRITE_WORKERTHREAD);
 
 	int status;
 	struct addrinfo ai_hints;
