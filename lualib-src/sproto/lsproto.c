@@ -344,12 +344,12 @@ decode(const struct sproto_arg *args) {
 		// notice: in lua 5.2, 52bit integer support (not 64)
 		if (args->extra) {
 			// lua_Integer is 32bit in small lua.
-			uint64_t v = *(uint64_t*)args->value;
+			int64_t v = *(int64_t*)args->value;
 			lua_Number vn = (lua_Number)v;
 			vn /= args->extra;
 			lua_pushnumber(L, vn);
 		} else {
-			lua_Integer v = *(uint64_t*)args->value;
+			lua_Integer v = *(int64_t*)args->value;
 			lua_pushinteger(L, v);
 		}
 		break;
