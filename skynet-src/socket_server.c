@@ -1446,9 +1446,10 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 			s->dw_buffer = buffer;
 			s->dw_size = sz;
 			s->dw_offset = n;
-			spinlock_unlock(&s->dw_lock);
 
 			sp_write(ss->event_fd, s->fd, s, true);
+
+			spinlock_unlock(&s->dw_lock);
 			return 0;
 		}
 		spinlock_unlock(&s->dw_lock);
