@@ -415,6 +415,8 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz, int depth)
 		append_key(bs, L, BSON_BOOLEAN, key, sz);
 		write_byte(bs, lua_toboolean(L,-1));
 		break;
+	case LUA_TNIL:
+		luaL_error(L, "Bson array has a hole (nil), Use bson.null instead");
 	default:
 		luaL_error(L, "Invalid value type : %s", lua_typename(L,vt));
 	}
@@ -452,12 +454,7 @@ pack_dict_data(lua_State *L, struct bson *b, int depth, int kt) {
 	size_t sz;
 	switch(kt) {
 	case LUA_TNUMBER:
-		// copy key, don't change key type
-		lua_pushvalue(L,-2);
-		lua_insert(L,-2);
-		key = lua_tolstring(L,-2,&sz);
-		append_one(b, L, key, sz, depth);
-		lua_pop(L,2);
+		luaL_error(L, "Bson dictionary's key can't be number");
 		break;
 	case LUA_TSTRING:
 		key = lua_tolstring(L,-2,&sz);
@@ -551,15 +548,17 @@ static void
 pack_ordered_dict(lua_State *L, struct bson *b, int n, int depth) {
 	int length = reserve_length(b);
 	int i;
+	size_t sz;
+	// the first key is at index n
+	const char * key = lua_tolstring(L, n, &sz);
 	for (i=0;i<n;i+=2) {
-		size_t sz;
-		const char * key = lua_tolstring(L, i+1, &sz);
 		if (key == NULL) {
 			luaL_error(L, "Argument %d need a string", i+1);
 		}
-		lua_pushvalue(L, i+2);
+		lua_pushvalue(L, i+1);
 		append_one(b, L, key, sz, depth);
 		lua_pop(L,1);
+		key = lua_tolstring(L, i+2, &sz);	// next key
 	}
 	write_byte(b,0);
 	write_length(b, b->size - length, length);
@@ -939,35 +938,65 @@ bson_meta(lua_State *L) {
 }
 
 static int
+encode_bson(lua_State *L) {
+	struct bson *b = lua_touserdata(L, 2);
+	lua_settop(L, 1);
+	if (luaL_getmetafield(L, -1, "__pairs") != LUA_TNIL) {
+		pack_meta_dict(L, b, 0);
+	} else {
+		pack_simple_dict(L, b, 0);
+	}
+	void * ud = lua_newuserdata(L, b->size);
+	memcpy(ud, b->ptr, b->size);
+	return 1;
+}
+
+static int
 lencode(lua_State *L) {
 	struct bson b;
-	bson_create(&b);
 	lua_settop(L,1);
 	luaL_checktype(L, 1, LUA_TTABLE);
-	if (luaL_getmetafield(L, -1, "__pairs") != LUA_TNIL) {
-		pack_meta_dict(L, &b, 0);
-	} else {
-		pack_simple_dict(L, &b, 0);
+	bson_create(&b);
+	lua_pushcfunction(L, encode_bson);
+	lua_pushvalue(L, 1);
+	lua_pushlightuserdata(L, &b);
+	if (lua_pcall(L, 2, 1, 0) != LUA_OK) {
+		bson_destroy(&b);
+		return lua_error(L);
 	}
-	void * ud = lua_newuserdata(L, b.size);
-	memcpy(ud, b.ptr, b.size);
 	bson_destroy(&b);
 	bson_meta(L);
 	return 1;
 }
 
 static int
+encode_bson_byorder(lua_State *L) {
+	int n = lua_gettop(L);
+	struct bson *b = lua_touserdata(L, n);
+	lua_settop(L, --n);
+	pack_ordered_dict(L, b, n, 0);
+	lua_settop(L,0);
+	void * ud = lua_newuserdata(L, b->size);
+	memcpy(ud, b->ptr, b->size);
+	return 1;
+}
+
+static int
 lencode_order(lua_State *L) {
 	struct bson b;
-	bson_create(&b);
 	int n = lua_gettop(L);
 	if (n%2 != 0) {
 		return luaL_error(L, "Invalid ordered dict");
 	}
-	pack_ordered_dict(L, &b, n, 0);
-	lua_settop(L,1);
-	void * ud = lua_newuserdata(L, b.size);
-	memcpy(ud, b.ptr, b.size);
+	bson_create(&b);
+	lua_pushvalue(L, 1);	// copy the first arg to n
+	lua_pushcfunction(L, encode_bson_byorder);
+	lua_replace(L, 1);
+	lua_pushlightuserdata(L, &b);
+	if (lua_pcall(L, n+1, 1, 0) != LUA_OK) {
+		bson_destroy(&b);
+		return lua_error(L);
+	}
 	bson_destroy(&b);
 	bson_meta(L);
 	return 1;

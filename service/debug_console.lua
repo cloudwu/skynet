@@ -1,9 +1,9 @@
 local skynet = require "skynet"
 local codecache = require "skynet.codecache"
 local core = require "skynet.core"
-local socket = require "socket"
-local snax = require "snax"
-local memory = require "memory"
+local socket = require "skynet.socket"
+local snax = require "skynet.snax"
+local memory = require "skynet.memory"
 local httpd = require "http.httpd"
 local sockethelper = require "http.sockethelper"
 
@@ -269,7 +269,7 @@ function COMMANDX.debug(cmd)
 	local function forward_cmd()
 		repeat
 			-- notice :  It's a bad practice to call socket.readline from two threads (this one and console_main_loop), be careful.
-			skynet.call(agent, "lua", "cmd", "ping")	-- detect agent alive, if agent exit, raise error
+			skynet.call(agent, "lua", "ping")	-- detect agent alive, if agent exit, raise error
 			local cmdline = socket.readline(cmd.fd, "\n")
 			cmdline = cmdline and cmdline:gsub("(.*)\r$", "%1")
 			if not cmdline then
@@ -281,12 +281,18 @@ function COMMANDX.debug(cmd)
 	end
 	skynet.fork(function()
 		pcall(forward_cmd)
-		skynet.wakeup(term_co)
+		if not stop then	-- block at skynet.call "start"
+			term_co = nil
+		else
+			skynet.wakeup(term_co)
+		end
 	end)
 	local ok, err = skynet.call(agent, "lua", "start", address, cmd.fd)
 	stop = true
-	-- wait for fork coroutine exit.
-	skynet.wait(term_co)
+	if term_co then
+		-- wait for fork coroutine exit.
+		skynet.wait(term_co)
+	end
 
 	if not ok then
 		error(err)

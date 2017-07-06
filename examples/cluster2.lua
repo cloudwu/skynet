@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local cluster = require "cluster"
+local cluster = require "skynet.cluster"
 
 skynet.start(function()
 	-- query name "sdb" of cluster db.

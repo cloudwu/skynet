@@ -1,6 +1,13 @@
 local bson = require "bson"
 
-sub = bson.encode_order( "hello", 1, "world", 2 )
+local sub = bson.encode_order( "hello", 1, "world", 2 )
+
+do
+	-- check decode encode_order
+	local d = bson.decode(sub)
+	assert(d.hello == 1 )
+	assert(d.world == 2 )
+end
 
 local function tbl_next(...)
 	print("--- next.a", ...)
@@ -15,9 +22,9 @@ end
 
 local obj_a = {
 	__data = {
-		[1] = 2,
-		[3] = 4,
-		[5] = 6,
+		["1"] = 2,
+		["3"] = 4,
+		["5"] = 6,
 	}
 }
 
@@ -31,9 +38,9 @@ setmetatable(
 
 local obj_b = {
 	__data = {
-		[7] = 8,
-		[9] = 10,
-		[11] = obj_a,
+		["7"] = 8,
+		["9"] = 10,
+		["11"] = obj_a,
 	}
 }
 

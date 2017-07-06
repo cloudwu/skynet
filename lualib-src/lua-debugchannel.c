@@ -271,7 +271,7 @@ static int db_sethook (lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_debugchannel(lua_State *L) {
+luaopen_skynet_debugchannel(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "create", lcreate },	// for write
 		{ "connect", lconnect },	// for read

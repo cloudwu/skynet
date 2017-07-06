@@ -508,7 +508,7 @@ lconcat(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_cluster_core(lua_State *L) {
+luaopen_skynet_cluster_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "packrequest", lpackrequest },
 		{ "packpush", lpackpush },
