@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 
 #include "skynet_socket.h"
+#include "skynet.h"
 
 #define BACKLOG 32
 // 2 ** 12 == 4096
@@ -276,6 +277,10 @@ lreadall(lua_State *L) {
 	luaL_buffinit(L, &b);
 	while(sb->head) {
 		struct buffer_node *current = sb->head;
+		
+		//char buff[500];
+		//sprintf(buff,"readall current size:%d,offset:%d",current->sz,sb->offset);
+		skynet_error(NULL,"readall current size:%d,offset:%d",current->sz,sb->offset);
 		luaL_addlstring(&b, current->msg + sb->offset, current->sz - sb->offset);
 		return_free_node(L,2,sb);
 	}
