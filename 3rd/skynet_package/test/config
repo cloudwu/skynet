@@ -1,0 +1,9 @@
+root = "$HOME/skynet/"
+thread = 8
+harbor = 0
+luaservice = root.."service/?.lua;./service/?.lua;./test/?.lua"
+lualoader = root.."lualib/loader.lua"
+cpath = root.."cservice/?.so"
+lua_path = root.."lualib/?.lua;./lualib/?.lua"
+lua_cpath = root.."luaclib/?.so"
+start = "main"
