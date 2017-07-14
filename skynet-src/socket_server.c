@@ -1307,14 +1307,16 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				int error;
 				socklen_t len = sizeof(error);  
 				int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);  
+				const char * err = NULL;
 				if (code < 0) {
-					result->data = strerror(errno);
+					err = strerror(errno);
 				} else if (error != 0) {
-					result->data = strerror(error);
+					err = strerror(error);
 				} else {
-					result->data = "Unknown error";
+					err = "Unknown error";
 				}
 				force_close(ss, s, result);
+				result->data = (char *)err;
 				return SOCKET_ERR;
 			}
 			break;
