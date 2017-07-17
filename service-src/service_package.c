@@ -290,11 +290,10 @@ socket_message(struct skynet_context *ctx, struct package *P, const struct skyne
 static void
 heartbeat(struct skynet_context *ctx, struct package *P) {
 	//skynet_error(NULL,"1recv:%d,heartbeat:%d",P->recv,P->heartbeat);
-
 	if (P->recv == P->heartbeat) {
 		if (!P->closed) {
 			skynet_socket_shutdown(ctx, P->fd);
-		//	skynet_error(ctx, "11timeout %d", P->fd);
+			skynet_error(ctx, "timeout %d", P->fd);
 		}
 	} else {
 		P->heartbeat = P->recv = 0;
@@ -329,7 +328,6 @@ message_handler(struct skynet_context * ctx, void *ud, int type, int session, ui
 		send_out(ctx, P, msg, sz);
 		break;
 	case PTYPE_RESPONSE:
-		skynet_error(ctx,"PTYPE_RESPONSE!!");
 		// It's timer
 		heartbeat(ctx, P);
 		break;
