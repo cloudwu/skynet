@@ -1,7 +1,7 @@
-root = "$HOME/skynet/"
+root = "./"
 thread = 8
 harbor = 0
-luaservice = root.."service/?.lua;./service/?.lua;./test/?.lua"
+luaservice = root.."service/?.lua;./service/?.lua;./test/?.lua;./3rd/skynet_package/test/?.lua"
 lualoader = root.."lualib/loader.lua"
 cpath = root.."cservice/?.so"
 lua_path = root.."lualib/?.lua;./lualib/?.lua"

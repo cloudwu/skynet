@@ -8,7 +8,7 @@ end
 
 skynet.start(function()
 	skynet.newservice("debug_console",8000)
-	local id = assert(socket.listen("127.0.0.1", 8888))
+	local id = assert(socket.listen("0.0.0.0", 6666))
 	socket.start(id, function (fd, addr)
 		skynet.error(string.format("%s connected as %d" , addr, fd))
 		proxy.subscribe(fd)
@@ -23,6 +23,7 @@ skynet.start(function()
 				break
 			end
 			skynet.error(s)
+			proxy.write(fd, s, #s)
 		end
 	end)
 end)

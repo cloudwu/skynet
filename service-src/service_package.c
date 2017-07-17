@@ -147,6 +147,7 @@ report_info(struct skynet_context *ctx, struct package *P, int session, uint32_t
 	}
 	char tmp[128];
 	int n = sprintf(tmp,"req=%d resp=%d uncomplete=%d/%d", queue_size(&P->request), queue_size(&P->response),uncomplete,uncomplete_sz);
+	//skynet_error(NULL,"report_info");
 	skynet_send(ctx, 0, source, PTYPE_RESPONSE, session, tmp, n);
 }
 
@@ -157,17 +158,20 @@ command(struct skynet_context *ctx, struct package *P, int session, uint32_t sou
 		// request a package
 		if (P->closed) {
 			skynet_send(ctx, 0, source, PTYPE_ERROR, session, NULL, 0);
+		//	skynet_error(NULL,"P->closed");
 			break;
 		}
 		if (!queue_empty(&P->response)) {
 			assert(queue_empty(&P->request));
 			struct response resp;
 			queue_pop(&P->response, &resp);
+		//	skynet_error(NULL,"command R");
 			skynet_send(ctx, 0, source, PTYPE_RESPONSE | PTYPE_TAG_DONTCOPY, session, resp.msg, resp.sz);
 		} else {
 			struct request req;
 			req.source = source;
 			req.session = session;
+		//	skynet_error(NULL,"req.resource:%d,session:%d",req.source,req.session);
 			queue_push(&P->request, &req);
 		}
 		break;
@@ -246,6 +250,8 @@ response(struct skynet_context *ctx, struct package *P) {
 
 static void
 socket_message(struct skynet_context *ctx, struct package *P, const struct skynet_socket_message * smsg) {
+	//skynet_error(ctx, "smsg->type:%d", smsg->type);
+
 	switch (smsg->type) {
 	case SKYNET_SOCKET_TYPE_CONNECT:
 		if (P->init == 0 && smsg->id == P->fd) {
@@ -283,13 +289,16 @@ socket_message(struct skynet_context *ctx, struct package *P, const struct skyne
 
 static void
 heartbeat(struct skynet_context *ctx, struct package *P) {
+	//skynet_error(NULL,"1recv:%d,heartbeat:%d",P->recv,P->heartbeat);
+
 	if (P->recv == P->heartbeat) {
 		if (!P->closed) {
 			skynet_socket_shutdown(ctx, P->fd);
-			skynet_error(ctx, "timeout %d", P->fd);
+		//	skynet_error(ctx, "11timeout %d", P->fd);
 		}
 	} else {
 		P->heartbeat = P->recv = 0;
+		//skynet_error(NULL,"2recv:%d,heartbeat:%d",P->recv,P->heartbeat);
 		skynet_command(ctx, "TIMEOUT", TIMEOUT);
 	}
 }
@@ -309,7 +318,9 @@ send_out(struct skynet_context *ctx, struct package *P, const void *msg, size_t 
 
 static int
 message_handler(struct skynet_context * ctx, void *ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
-	struct package *P = ud;
+	struct package *P = ud;	
+	//skynet_error(ctx, "message_handler type:%d,msg:%s", type,msg);
+
 	switch (type) {
 	case PTYPE_TEXT:
 		command(ctx, P, session, source, msg, sz);
@@ -318,6 +329,7 @@ message_handler(struct skynet_context * ctx, void *ud, int type, int session, ui
 		send_out(ctx, P, msg, sz);
 		break;
 	case PTYPE_RESPONSE:
+		skynet_error(ctx,"PTYPE_RESPONSE!!");
 		// It's timer
 		heartbeat(ctx, P);
 		break;

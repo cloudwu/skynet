@@ -278,9 +278,7 @@ lreadall(lua_State *L) {
 	while(sb->head) {
 		struct buffer_node *current = sb->head;
 		
-		//char buff[500];
-		//sprintf(buff,"readall current size:%d,offset:%d",current->sz,sb->offset);
-		skynet_error(NULL,"readall current size:%d,offset:%d",current->sz,sb->offset);
+		//skynet_error(NULL,"readall current size:%d,offset:%d",current->sz,sb->offset);
 		luaL_addlstring(&b, current->msg + sb->offset, current->sz - sb->offset);
 		return_free_node(L,2,sb);
 	}

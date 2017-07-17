@@ -2,13 +2,17 @@ if _VERSION ~= "Lua 5.3" then
 	error "Use lua 5.3"
 end
 
-package.cpath = (os.getenv "HOME") .. "/skynet/luaclib/?.so"
+package.cpath = "./luaclib/?.so"
 
 local socket = require "clientsocket"
-local fd = assert(socket.connect("127.0.0.1", 8888))
+local fd = assert(socket.connect("127.0.0.1", 6666))
 
 local function send_package(fd, pack)
 	local package = string.pack(">s2", pack)
+	--print(tonumber(package[1]).."  "..tonumber(package[2]))
+	print("package char1: "..string.byte(package,1)
+		  ..",char2: "..string.byte(package,2)
+		  ..",length: "..string.len(package))
 	socket.send(fd, package)
 end
 
@@ -47,28 +51,13 @@ local function dispatch_package()
 	while true do
 		local v
 		v, last = recv_package(last)
+
 		if not v then
 			break
 		end
 
 		print(v)
 	end
-end
-
-local function recv_package(last)
-	local result
-	result, last = unpack_package(last)
-	if result then
-		return result, last
-	end
-	local r = socket.recv(fd)
-	if not r then
-		return nil, last
-	end
-	if r == "" then
-		error "Server closed"
-	end
-	return unpack_package(last .. r)
 end
 
 while true do

@@ -144,7 +144,7 @@ dispatch_list(struct timer_node *current) {
 		message.session = event->session;
 		message.data = NULL;
 		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
-
+		//kynet_error(NULL,"dispatch_list timeout:%d",message.sz);
 		skynet_context_push(event->handle, &message);
 		
 		struct timer_node * temp = current;
