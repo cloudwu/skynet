@@ -57,7 +57,6 @@ struct skynet_context {
 	bool init;
 	bool endless;
 	bool profile;
-
 	CHECKCALLING_DECL
 };
 
@@ -71,11 +70,13 @@ struct skynet_node {
 
 static struct skynet_node G_NODE;
 
+// 此函数主要用来查询已经有多少个service了
 int 
 skynet_context_total() {
 	return G_NODE.total;
 }
 
+// 下面这两个函数不对外
 static void
 context_inc() {
 	ATOM_INC(&G_NODE.total);
@@ -122,26 +123,31 @@ drop_message(struct skynet_message *msg, void *ud) {
 	skynet_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
 }
 
+// 此函数主要初始化三个，skynet_context, skynet_module, handle
 struct skynet_context * 
 skynet_context_new(const char * name, const char *param) {
+	// 看到没有，当我们在lua调用一个skynet.newservice(name)，而这时先创建一个skynet_module
 	struct skynet_module * mod = skynet_module_query(name);
 
+	// 如果这个name没有找到相应的模块，那么只能返回为空了。返回到上层去处理
 	if (mod == NULL)
 		return NULL;
-
+	// 调用你自己写的create函数，返回你自定义的数据结构的实例
 	void *inst = skynet_module_instance_create(mod);
+
+	// 如果是空，那么你实现的模块肯定是有问题的
 	if (inst == NULL)
 		return NULL;
 	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
-	CHECKCALLING_INIT(ctx)
+	CHECKCALLING_INIT(ctx)  // 这里CHECKCALLING，会就初始化一个spinlock
 
 	ctx->mod = mod;
-	ctx->instance = inst;
-	ctx->ref = 2;
+	ctx->instance = inst;   // 这个instance尽然会存你自定义的，那么skynet_module里的那个module会用来存什么
+	ctx->ref = 2;           // 应有计数直接赋值为2
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
-	ctx->session_id = 0;
-	ctx->logfile = NULL;
+	ctx->session_id = 0;    // 发送消息的时候就是用这个session来填充
+	ctx->logfile = NULL;    // 没有日志文件
 
 	ctx->init = false;
 	ctx->endless = false;
@@ -150,13 +156,15 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->cpu_start = 0;
 	ctx->message_count = 0;
 	ctx->profile = G_NODE.profile;
+
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
 	ctx->handle = 0;	
-	ctx->handle = skynet_handle_register(ctx);
-	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
+	ctx->handle = skynet_handle_register(ctx);  // 生成handle，就是地址
+	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);  // 生成一个service的对列
 	// init function maybe use ctx->handle, so it must init at last
 	context_inc();
 
+	// 初始化模块，加锁，r = 0 是成功，如果不是就是失败，你自定义模块的时候要注意
 	CHECKCALLING_BEGIN(ctx)
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
 	CHECKCALLING_END(ctx)
@@ -181,6 +189,7 @@ skynet_context_new(const char * name, const char *param) {
 	}
 }
 
+// 此函数的作用就是通过ctx->session_id这个值加一产生
 int
 skynet_context_newsession(struct skynet_context *ctx) {
 	// session always be a positive number
@@ -226,14 +235,21 @@ skynet_context_release(struct skynet_context *ctx) {
 	return ctx;
 }
 
+
+/*
+ * @breif 发送消息
+ * @param handle目的地的handle
+ * @param message具体消息，skynet_message申明在skynet_mq.h
+ */
 int
 skynet_context_push(uint32_t handle, struct skynet_message *message) {
-	struct skynet_context * ctx = skynet_handle_grab(handle);
+	// 获取到目的地的ctx
+	struct skynet_context * ctx = skynet_handle_grab(handle); // 引用计数+1
 	if (ctx == NULL) {
 		return -1;
 	}
 	skynet_mq_push(ctx->queue, message);
-	skynet_context_release(ctx);
+	skynet_context_release(ctx);                              // 应用计数-1
 
 	return 0;
 }
@@ -293,16 +309,22 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 	}
 }
 
+/*
+ *@breif分发当前服务的，就是去去哪个服务的消息队列，每个线程都去抢
+ *@param sm 当前线程对应的
+ *@parma q 空
+ *@weight 当前线程
+ */
 struct message_queue * 
 skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
 	if (q == NULL) {
-		q = skynet_globalmq_pop();
+		q = skynet_globalmq_pop();  //当前线程去抢出一个service的message_queue
 		if (q==NULL)
 			return NULL;
 	}
 
 	uint32_t handle = skynet_mq_handle(q);
-
+	// 获取当前线程的ctx
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
 		struct drop_t d = { handle };
@@ -314,7 +336,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 	struct skynet_message msg;
 
 	for (i=0;i<n;i++) {
-		if (skynet_mq_pop(q,&msg)) {
+		if (skynet_mq_pop(q,&msg)) {    
 			skynet_context_release(ctx);
 			return skynet_globalmq_pop();
 		} else if (i==0 && weight >= 0) {
@@ -326,12 +348,12 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 			skynet_error(ctx, "May overload, message queue length = %d", overload);
 		}
 
-		skynet_monitor_trigger(sm, msg.source , handle);
+		skynet_monitor_trigger(sm, msg.source , handle);      // 把sm-version+1
 
 		if (ctx->cb == NULL) {
 			skynet_free(msg.data);
 		} else {
-			dispatch_message(ctx, &msg);
+			dispatch_message(ctx, &msg);                     // 真正执行请求消息
 		}
 
 		skynet_monitor_trigger(sm, 0,0);
@@ -799,7 +821,7 @@ skynet_globalinit(void) {
 		exit(1);
 	}
 	// set mainthread's key
-	skynet_initthread(THREAD_MAIN);
+	skynet_initthread(THREAD_MAIN);                        // 标记自己是主线程，记住现在这个函数还是在主线程调用的，在skynet_main.c的main函数调用的，正哥G_NODE也是在这初始化的
 }
 
 void 

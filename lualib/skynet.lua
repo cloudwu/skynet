@@ -260,6 +260,7 @@ function suspend(co, result, command, param, size)
 	dispatch_error_queue()
 end
 
+-- 我发现这里为什么要用命令，原来好通过lua来调用，而不是通过一定的
 function skynet.timeout(ti, func)
 	local session = c.intcommand("TIMEOUT",ti)
 	assert(session)

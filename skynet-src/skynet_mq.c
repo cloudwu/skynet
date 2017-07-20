@@ -1,4 +1,4 @@
-#include "skynet.h"
+﻿#include "skynet.h"
 #include "skynet_mq.h"
 #include "skynet_handle.h"
 #include "spinlock.h"
@@ -44,7 +44,7 @@ void
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q= Q;
 
-	SPIN_LOCK(q)
+	SPIN_LOCK(q)                     // 全球队列也是全球都访问
 	assert(queue->next == NULL);
 	if(q->tail) {
 		q->tail->next = queue;
@@ -186,21 +186,25 @@ expand_queue(struct message_queue *q) {
 	q->queue = new_queue;
 }
 
+/*
+ * @breif 这里是关键地方,把消息message加入目的service的队列
+ * @param 
+ */
 void 
 skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	assert(message);
-	SPIN_LOCK(q)
+	SPIN_LOCK(q)              // 必须加入锁，这里是多线程访问同一个队列，是互斥锁。
 
 	q->queue[q->tail] = *message;
 	if (++ q->tail >= q->cap) {
 		q->tail = 0;
 	}
 
-	if (q->head == q->tail) {
-		expand_queue(q);
+	if (q->head == q->tail) { // 设计此队列的时候，是用标记head与tail是不能相等的，也就是说，相等了，说明容量已经满了。
+		expand_queue(q);      // 然后扩展队列容量
 	}
 
-	if (q->in_global == 0) {
+	if (q->in_global == 0) {  // 如果不在全球队列中，分发的时候只会分发全球的
 		q->in_global = MQ_IN_GLOBAL;
 		skynet_globalmq_push(q);
 	}
