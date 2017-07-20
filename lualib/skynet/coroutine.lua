@@ -25,7 +25,7 @@ end
 
 do -- begin skynetco.resume
 
-	local profile = require "profile"
+	local profile = require "skynet.profile"
 	-- skynet use profile.resume_co/yield_co instead of coroutine.resume/yield
 
 	local skynet_resume = profile.resume_co

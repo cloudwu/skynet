@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <lua.h>
 #include <lauxlib.h>
 
@@ -47,8 +49,8 @@ lcurrent(lua_State *L) {
 	return 1;
 }
 
-int
-luaopen_memory(lua_State *L) {
+LUAMOD_API int
+luaopen_skynet_memory(lua_State *L) {
 	luaL_checkversion(L);
 
 	luaL_Reg l[] = {

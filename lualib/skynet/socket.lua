@@ -1,4 +1,4 @@
-local driver = require "socketdriver"
+local driver = require "skynet.socketdriver"
 local skynet = require "skynet"
 local skynet_core = require "skynet.core"
 local assert = assert
@@ -138,19 +138,17 @@ end
 
 local function default_warning(id, size)
 	local s = socket_pool[id]
-		local last = s.warningsize or 0
-		if last + 64 < size then	-- if size increase 64K
-			s.warningsize = size
-			skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id))
-		end
-		s.warningsize = size
+	if not s then
+		return
+	end
+	skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id))
 end
 
 -- SKYNET_SOCKET_TYPE_WARNING
 socket_message[7] = function(id, size)
 	local s = socket_pool[id]
 	if s then
-		local warning = s.warning or default_warning
+		local warning = s.on_warning or default_warning
 		warning(id, size)
 	end
 end
@@ -442,7 +440,7 @@ socket.udp_address = assert(driver.udp_address)
 function socket.warning(id, callback)
 	local obj = socket_pool[id]
 	assert(obj)
-	obj.warning = callback
+	obj.on_warning = callback
 end
 
 return socket

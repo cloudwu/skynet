@@ -1,5 +1,5 @@
 /*
-** $Id: lpcode.c,v 1.23 2015/06/12 18:36:47 roberto Exp $
+** $Id: lpcode.c,v 1.24 2016/09/15 17:46:13 roberto Exp $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -126,6 +126,27 @@ int tocharset (TTree *tree, Charset *cs) {
 
 
 /*
+** Visit a TCall node taking care to stop recursion. If node not yet
+** visited, return 'f(sib2(tree))', otherwise return 'def' (default
+** value)
+*/
+static int callrecursive (TTree *tree, int f (TTree *t), int def) {
+  int key = tree->key;
+  assert(tree->tag == TCall);
+  assert(sib2(tree)->tag == TRule);
+  if (key == 0)  /* node already visited? */
+    return def;  /* return default value */
+  else {  /* first visit */
+    int result;
+    tree->key = 0;  /* mark call as already visited */
+    result = f(sib2(tree));  /* go to called rule */
+    tree->key = key;  /* restore tree */
+    return result;
+  }
+}
+
+
+/*
 ** Check whether a pattern tree has captures
 */
 int hascaptures (TTree *tree) {
@@ -134,14 +155,17 @@ int hascaptures (TTree *tree) {
     case TCapture: case TRunTime:
       return 1;
     case TCall:
-      tree = sib2(tree); goto tailcall;  /* return hascaptures(sib2(tree)); */
+      return callrecursive(tree, hascaptures, 0);
+    case TRule:  /* do not follow siblings */
+      tree = sib1(tree); goto tailcall;
     case TOpenCall: assert(0);
     default: {
       switch (numsiblings[tree->tag]) {
         case 1:  /* return hascaptures(sib1(tree)); */
           tree = sib1(tree); goto tailcall;
         case 2:
-          if (hascaptures(sib1(tree))) return 1;
+          if (hascaptures(sib1(tree)))
+            return 1;
           /* else return hascaptures(sib2(tree)); */
           tree = sib2(tree); goto tailcall;
         default: assert(numsiblings[tree->tag] == 0); return 0;
@@ -208,9 +232,9 @@ int checkaux (TTree *tree, int pred) {
 
 /*
 ** number of characters to match a pattern (or -1 if variable)
-** ('count' avoids infinite loops for grammars)
 */
-int fixedlenx (TTree *tree, int count, int len) {
+int fixedlen (TTree *tree) {
+  int len = 0;  /* to accumulate in tail calls */
  tailcall:
   switch (tree->tag) {
     case TChar: case TSet: case TAny:
@@ -220,26 +244,29 @@ int fixedlenx (TTree *tree, int count, int len) {
     case TRep: case TRunTime: case TOpenCall:
       return -1;
     case TCapture: case TRule: case TGrammar:
-      /* return fixedlenx(sib1(tree), count); */
+      /* return fixedlen(sib1(tree)); */
       tree = sib1(tree); goto tailcall;
-    case TCall:
-      if (count++ >= MAXRULES)
-        return -1;  /* may be a loop */
-      /* else return fixedlenx(sib2(tree), count); */
-      tree = sib2(tree); goto tailcall;
+    case TCall: {
+      int n1 = callrecursive(tree, fixedlen, -1);
+      if (n1 < 0)
+        return -1;
+      else
+        return len + n1;
+    }
     case TSeq: {
-      len = fixedlenx(sib1(tree), count, len);
-      if (len < 0) return -1;
-      /* else return fixedlenx(sib2(tree), count, len); */
-      tree = sib2(tree); goto tailcall;
+      int n1 = fixedlen(sib1(tree));
+      if (n1 < 0)
+        return -1;
+      /* else return fixedlen(sib2(tree)) + len; */
+      len += n1; tree = sib2(tree); goto tailcall;
     }
     case TChoice: {
-      int n1, n2;
-      n1 = fixedlenx(sib1(tree), count, len);
-      if (n1 < 0) return -1;
-      n2 = fixedlenx(sib2(tree), count, len);
-      if (n1 == n2) return n1;
-      else return -1;
+      int n1 = fixedlen(sib1(tree));
+      int n2 = fixedlen(sib2(tree));
+      if (n1 != n2 || n1 < 0)
+        return -1;
+      else
+        return len + n1;
     }
     default: assert(0); return 0;
   };
@@ -710,9 +737,10 @@ static void codeand (CompileState *compst, TTree *tree, int tt) {
 
 
 /*
-** Captures: if pattern has fixed (and not too big) length, use
-** a single IFullCapture instruction after the match; otherwise,
-** enclose the pattern with OpenCapture - CloseCapture.
+** Captures: if pattern has fixed (and not too big) length, and it
+** has no nested captures, use a single IFullCapture instruction
+** after the match; otherwise, enclose the pattern with OpenCapture -
+** CloseCapture.
 */
 static void codecapture (CompileState *compst, TTree *tree, int tt,
                          const Charset *fl) {

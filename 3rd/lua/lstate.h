@@ -1,5 +1,5 @@
 /*
-** $Id: lstate.h,v 2.128 2015/11/13 12:16:51 roberto Exp $
+** $Id: lstate.h,v 2.133 2016/12/22 13:08:50 roberto Exp $
 ** Global State
 ** See Copyright Notice in lua.h
 */
@@ -23,7 +23,7 @@
 **
 ** 'allgc': all objects not marked for finalization;
 ** 'finobj': all objects marked for finalization;
-** 'tobefnz': all objects ready to be finalized; 
+** 'tobefnz': all objects ready to be finalized;
 ** 'fixedgc': all objects that are not to be collected (currently
 ** only small strings, such as reserved words).
 
@@ -32,6 +32,15 @@
 
 struct lua_longjmp;  /* defined in ldo.c */
 
+
+/*
+** Atomic type (relative to signals) to better ensure that 'lua_sethook'
+** is thread safe
+*/
+#if !defined(l_signalT)
+#include <signal.h>
+#define l_signalT	sig_atomic_t
+#endif
 
 
 /* extra stack space to handle TM calls and some other extras */
@@ -57,7 +66,7 @@ typedef struct stringtable {
 ** Information about a call.
 ** When a thread yields, 'func' is adjusted to pretend that the
 ** top function has only the yielded values in its stack; in that
-** case, the actual 'func' value is saved in field 'extra'. 
+** case, the actual 'func' value is saved in field 'extra'.
 ** When a function calls another with a continuation, 'extra' keeps
 ** the function index so that, in case of errors, the continuation
 ** function can be called with the correct top.
@@ -79,7 +88,7 @@ typedef struct CallInfo {
   } u;
   ptrdiff_t extra;
   short nresults;  /* expected number of results from this function */
-  lu_byte callstatus;
+  unsigned short callstatus;
 } CallInfo;
 
 
@@ -95,6 +104,7 @@ typedef struct CallInfo {
 #define CIST_TAIL	(1<<5)	/* call was tail called */
 #define CIST_HOOKYIELD	(1<<6)	/* last hook called yielded */
 #define CIST_LEQ	(1<<7)  /* using __lt for __le */
+#define CIST_FIN	(1<<8)  /* call is running a finalizer */
 
 #define isLua(ci)	((ci)->callstatus & CIST_LUA)
 
@@ -162,14 +172,14 @@ struct lua_State {
   struct lua_State *twups;  /* list of threads with open upvalues */
   struct lua_longjmp *errorJmp;  /* current error recover point */
   CallInfo base_ci;  /* CallInfo for first level (C calling Lua) */
-  lua_Hook hook;
+  volatile lua_Hook hook;
   ptrdiff_t errfunc;  /* current error handling function (stack index) */
   int stacksize;
   int basehookcount;
   int hookcount;
   unsigned short nny;  /* number of non-yieldable calls in stack */
   unsigned short nCcalls;  /* number of nested C calls */
-  lu_byte hookmask;
+  l_signalT hookmask;
   lu_byte allowhook;
 };
 

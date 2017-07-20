@@ -1,11 +1,13 @@
 local skynet = require "skynet"
 local c = require "skynet.core"
 local snax_interface = require "snax.interface"
-local profile = require "profile"
-local snax = require "snax"
+local profile = require "skynet.profile"
+local snax = require "skynet.snax"
 
 local snax_name = tostring(...)
-local func, pattern = snax_interface(snax_name, _ENV)
+local loaderpath = skynet.getenv"snax_loader"
+local loader = loaderpath and assert(dofile(loaderpath))
+local func, pattern = snax_interface(snax_name, _ENV, loader)
 local snax_path = pattern:sub(1,pattern:find("?", 1, true)-1) .. snax_name ..  "/"
 package.path = snax_path .. "?.lua;" .. package.path
 
@@ -54,6 +56,8 @@ skynet.start(function()
 			if command == "hotfix" then
 				local hotfix = require "snax.hotfix"
 				skynet.ret(skynet.pack(hotfix(func, ...)))
+			elseif command == "profile" then
+				skynet.ret(skynet.pack(profile_table))
 			elseif command == "init" then
 				assert(not init, "Already init")
 				local initfunc = method[4] or function() end

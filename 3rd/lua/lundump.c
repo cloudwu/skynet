@@ -273,7 +273,7 @@ LClosure *luaU_undump(lua_State *L, ZIO *Z, const char *name) {
   luaD_inctop(L);
   cl->p = luaF_newproto(L, NULL);
   LoadFunction(&S, cl->p, NULL);
-  lua_assert(cl->nupvalues == cl->p->sizeupvalues);
+  lua_assert(cl->nupvalues == cl->p->sp->sizeupvalues);
   luai_verifycode(L, buff, cl->p);
   return cl;
 }

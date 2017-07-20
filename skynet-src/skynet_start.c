@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 struct monitor {
 	int count;                   // 多少一个skynet_monitor
@@ -32,7 +33,15 @@ struct worker_parm {
 	int weight;
 };
 
-// 判断skynet_context_total()，用来跳出循环，
+static int SIG = 0;
+
+static void
+handle_hup(int signal) {
+	if (signal == SIGHUP) {
+		SIG = 1;
+	}
+}
+
 #define CHECK_ABORT if (skynet_context_total()==0) break;
 
 static void
@@ -103,6 +112,21 @@ thread_monitor(void *p) {
 	return NULL;
 }
 
+static void
+signal_hup() {
+	// make log file reopen
+
+	struct skynet_message smsg;
+	smsg.source = 0;
+	smsg.session = 0;
+	smsg.data = NULL;
+	smsg.sz = (size_t)PTYPE_SYSTEM << MESSAGE_TYPE_SHIFT;
+	uint32_t logger = skynet_handle_findname("logger");
+	if (logger) {
+		skynet_context_push(logger, &smsg);
+	}
+}
+
 static void *
 thread_timer(void *p) {
 	struct monitor * m = p;
@@ -112,6 +136,10 @@ thread_timer(void *p) {
 		CHECK_ABORT
 		wakeup(m,m->count-1);
 		usleep(2500);
+		if (SIG) {
+			signal_hup();
+			SIG = 0;
+		}
 	}
 	// wakeup socket thread
 	skynet_socket_exit();
@@ -222,7 +250,14 @@ bootstrap(struct skynet_context * logger, const char * cmdline) {
 // 这才是真正的起始函数
 void 
 skynet_start(struct skynet_config * config) {
-	if (config->daemon) {                      // 如果是daemon是真，那么才会有
+	// register SIGHUP for log file reopen
+	struct sigaction sa;
+	sa.sa_handler = &handle_hup;
+	sa.sa_flags = SA_RESTART;
+	sigfillset(&sa.sa_mask);
+	sigaction(SIGHUP, &sa, NULL);
+
+	if (config->daemon) {
 		if (daemon_init(config->daemon)) {
 			exit(1);
 		}
@@ -235,6 +270,7 @@ skynet_start(struct skynet_config * config) {
 	skynet_module_init(config->module_path);    // 初始模块，传入模块的路径，就是那个cservice啦
 	skynet_timer_init();                        // 初始struct timer这个结构体，那些变量主要作用什么
 	skynet_socket_init();
+	skynet_profile_enable(config->profile);
 
 	// 最先创建的service就是logger
 	// 为什么这时就能启动一个服务

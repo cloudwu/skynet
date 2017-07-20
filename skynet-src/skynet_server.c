@@ -10,6 +10,7 @@
 #include "skynet_monitor.h"
 #include "skynet_imp.h"
 #include "skynet_log.h"
+#include "skynet_timer.h"
 #include "spinlock.h"
 #include "atomic.h"
 
@@ -40,27 +41,31 @@
 #endif
 
 struct skynet_context {
-	void * instance;              // 自定义结构,自定义一个服务，那么里面自定义的结构
-	struct skynet_module * mod;   // 对应的skynet_module
-	void * cb_ud;                 // skynet_context_new中不会初始化，mq,handle,skynet_module都不会初始这个值
-	skynet_cb cb;                 // 这就是分发的时候的回掉函数，没有初始化加入
-	struct message_queue *queue;  // skynet_context_new 创建，并且只要handle
-	FILE * logfile;               // 日志文件不知道
-	char result[32];              // 不知道用来干啥
-	uint32_t handle;              // 对应的handle
-	int session_id;               // 这个是用来产生此service的session的
-	int ref;                      // 应用计数，需要原子性
-	bool init;                    // 标记初始化
-	bool endless;                 // 标记，不知道用来干啥
-
+	void * instance;
+	struct skynet_module * mod;
+	void * cb_ud;
+	skynet_cb cb;
+	struct message_queue *queue;
+	FILE * logfile;
+	uint64_t cpu_cost;	// in microsec
+	uint64_t cpu_start;	// in microsec
+	char result[32];
+	uint32_t handle;
+	int session_id;
+	int ref;
+	int message_count;
+	bool init;
+	bool endless;
+	bool profile;
 	CHECKCALLING_DECL
 };
 
 struct skynet_node {
-	int total;                   // 监听着所有节点
-	int init;                    // 1表明已经初始了
-	uint32_t monitor_exit;       // 这个值用来干嘛
-	pthread_key_t handle_key;    // 这是一个全局变量，可是每个线程的值又都是不一样的。用它来标记自己是什么线程
+	int total;
+	int init;
+	uint32_t monitor_exit;
+	pthread_key_t handle_key;
+	bool profile;	// default is off
 };
 
 static struct skynet_node G_NODE;
@@ -144,8 +149,14 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->session_id = 0;    // 发送消息的时候就是用这个session来填充
 	ctx->logfile = NULL;    // 没有日志文件
 
-	ctx->init = false;      // 不知道用来干什么
-	ctx->endless = false;   // 不知道用来干什么
+	ctx->init = false;
+	ctx->endless = false;
+
+	ctx->cpu_cost = 0;
+	ctx->cpu_start = 0;
+	ctx->message_count = 0;
+	ctx->profile = G_NODE.profile;
+
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
 	ctx->handle = 0;	
 	ctx->handle = skynet_handle_register(ctx);  // 生成handle，就是地址
@@ -272,9 +283,19 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	if (ctx->logfile) {
 		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
 	}
-	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {                // 非常重要的的
+	++ctx->message_count;
+	int reserve_msg;
+	if (ctx->profile) {
+		ctx->cpu_start = skynet_thread_time();
+		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
+		uint64_t cost_time = skynet_thread_time() - ctx->cpu_start;
+		ctx->cpu_cost += cost_time;
+	} else {
+		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
+	}
+	if (!reserve_msg) {
 		skynet_free(msg->data);
-	} 
+	}
 	CHECKCALLING_END(ctx)
 }
 
@@ -528,16 +549,6 @@ cmd_starttime(struct skynet_context * context, const char * param) {
 }
 
 static const char *
-cmd_endless(struct skynet_context * context, const char * param) {
-	if (context->endless) {
-		strcpy(context->result, "1");
-		context->endless = false;
-		return context->result;
-	}
-	return NULL;
-}
-
-static const char *
 cmd_abort(struct skynet_context * context, const char * param) {
 	skynet_handle_retireall();
 	return NULL;
@@ -561,9 +572,33 @@ cmd_monitor(struct skynet_context * context, const char * param) {
 }
 
 static const char *
-cmd_mqlen(struct skynet_context * context, const char * param) {
-	int len = skynet_mq_length(context->queue);
-	sprintf(context->result, "%d", len);
+cmd_stat(struct skynet_context * context, const char * param) {
+	if (strcmp(param, "mqlen") == 0) {
+		int len = skynet_mq_length(context->queue);
+		sprintf(context->result, "%d", len);
+	} else if (strcmp(param, "endless") == 0) {
+		if (context->endless) {
+			strcpy(context->result, "1");
+			context->endless = false;
+		} else {
+			strcpy(context->result, "0");
+		}
+	} else if (strcmp(param, "cpu") == 0) {
+		double t = (double)context->cpu_cost / 1000000.0;	// microsec
+		sprintf(context->result, "%lf", t);
+	} else if (strcmp(param, "time") == 0) {
+		if (context->profile) {
+			uint64_t ti = skynet_thread_time() - context->cpu_start;
+			double t = (double)ti / 1000000.0;	// microsec
+			sprintf(context->result, "%lf", t);
+		} else {
+			strcpy(context->result, "0");
+		}
+	} else if (strcmp(param, "message") == 0) {
+		sprintf(context->result, "%d", context->message_count);
+	} else {
+		context->result[0] = '\0';
+	}
 	return context->result;
 }
 
@@ -640,10 +675,9 @@ static struct command_func cmd_funcs[] = {
 	{ "GETENV", cmd_getenv },
 	{ "SETENV", cmd_setenv },
 	{ "STARTTIME", cmd_starttime },
-	{ "ENDLESS", cmd_endless },
 	{ "ABORT", cmd_abort },
 	{ "MONITOR", cmd_monitor },
-	{ "MQLEN", cmd_mqlen },
+	{ "STAT", cmd_stat },
 	{ "LOGON", cmd_logon },
 	{ "LOGOFF", cmd_logoff },
 	{ "SIGNAL", cmd_signal },
@@ -801,3 +835,7 @@ skynet_initthread(int m) {
 	pthread_setspecific(G_NODE.handle_key, (void *)v);
 }
 
+void
+skynet_profile_enable(int enable) {
+	G_NODE.profile = (bool)enable;
+}
