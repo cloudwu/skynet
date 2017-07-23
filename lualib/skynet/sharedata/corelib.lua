@@ -1,7 +1,6 @@
-local core = require "sharedata.core"
+local core = require "skynet.sharedata.core"
 local type = type
-local next = next
-local rawget = rawget
+local rawset = rawset
 
 local conf = {}
 
@@ -71,6 +70,10 @@ local function getcobj(self)
 	return obj
 end
 
+function meta:__newindex(key, value)
+	error ("Error newindex, the key [" .. genkey(self) .. "]")
+end
+
 function meta:__index(key)
 	local obj = getcobj(self)
 	local v = index(obj, key)
@@ -78,7 +81,7 @@ function meta:__index(key)
 		local children = self.__cache
 		if children == nil then
 			children = {}
-			self.__cache = children
+			rawset(self, "__cache", children)
 		end
 		local r = children[key]
 		if r then

@@ -1,5 +1,5 @@
 local msgserver = require "snax.msgserver"
-local crypt = require "crypt"
+local crypt = require "skynet.crypt"
 local skynet = require "skynet"
 
 local loginservice = tonumber(...)

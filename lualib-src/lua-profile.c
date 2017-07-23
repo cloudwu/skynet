@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <stdio.h>
 #include <lua.h>
 #include <lauxlib.h>
@@ -105,7 +107,7 @@ lstop(lua_State *L) {
 	total_time += ti;
 	lua_pushnumber(L, total_time);
 #ifdef DEBUG_LOG
-	fprintf(stderr, "PROFILE [%p] stop (%lf / %lf)\n", L, ti, total_time);
+	fprintf(stderr, "PROFILE [%p] stop (%lf/%lf)\n", lua_tothread(L,1), ti, total_time);
 #endif
 
 	return 1;
@@ -113,18 +115,15 @@ lstop(lua_State *L) {
 
 static int
 timing_resume(lua_State *L) {
-#ifdef DEBUG_LOG
-	lua_State *from = lua_tothread(L, -1);
-#endif
+	lua_pushvalue(L, -1);
 	lua_rawget(L, lua_upvalueindex(2));
 	if (lua_isnil(L, -1)) {		// check total time
-		lua_pop(L,1);
+		lua_pop(L,2);	// pop from coroutine
 	} else {
 		lua_pop(L,1);
-		lua_pushvalue(L,1);
 		double ti = get_time();
 #ifdef DEBUG_LOG
-		fprintf(stderr, "PROFILE [%p] resume\n", from);
+		fprintf(stderr, "PROFILE [%p] resume %lf\n", lua_tothread(L, -1), ti);
 #endif
 		lua_pushnumber(L, ti);
 		lua_rawset(L, lua_upvalueindex(1));	// set start time
@@ -145,7 +144,7 @@ lresume(lua_State *L) {
 static int
 lresume_co(lua_State *L) {
 	luaL_checktype(L, 2, LUA_TTHREAD);
-	lua_rotate(L, 2, -1);
+	lua_rotate(L, 2, -1);	// 'from' coroutine rotate to the top(index -1)
 
 	return timing_resume(L);
 }
@@ -155,14 +154,15 @@ timing_yield(lua_State *L) {
 #ifdef DEBUG_LOG
 	lua_State *from = lua_tothread(L, -1);
 #endif
+	lua_pushvalue(L, -1);
 	lua_rawget(L, lua_upvalueindex(2));	// check total time
 	if (lua_isnil(L, -1)) {
-		lua_pop(L,1);
+		lua_pop(L,2);
 	} else {
 		double ti = lua_tonumber(L, -1);
 		lua_pop(L,1);
 
-		lua_pushthread(L);
+		lua_pushvalue(L, -1);	// push coroutine
 		lua_rawget(L, lua_upvalueindex(1));
 		double starttime = lua_tonumber(L, -1);
 		lua_pop(L,1);
@@ -173,9 +173,10 @@ timing_yield(lua_State *L) {
 		fprintf(stderr, "PROFILE [%p] yield (%lf/%lf)\n", from, diff, ti);
 #endif
 
-		lua_pushthread(L);
+		lua_pushvalue(L, -1);	// push coroutine
 		lua_pushnumber(L, ti);
 		lua_rawset(L, lua_upvalueindex(2));
+		lua_pop(L, 1);	// pop coroutine
 	}
 
 	lua_CFunction co_yield = lua_tocfunction(L, lua_upvalueindex(3));
@@ -198,8 +199,8 @@ lyield_co(lua_State *L) {
 	return timing_yield(L);
 }
 
-int
-luaopen_profile(lua_State *L) {
+LUAMOD_API int
+luaopen_skynet_profile(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "start", lstart },

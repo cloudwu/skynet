@@ -1,7 +1,7 @@
 local skynet = require "skynet"
-local sc = require "socketchannel"
-local socket = require "socket"
-local cluster = require "cluster.core"
+local sc = require "skynet.socketchannel"
+local socket = require "skynet.socket"
+local cluster = require "skynet.cluster.core"
 
 local config_name = skynet.getenv "cluster"
 local node_address = {}
@@ -29,12 +29,16 @@ end
 
 local node_channel = setmetatable({}, { __index = open_channel })
 
-local function loadconfig()
-	local f = assert(io.open(config_name))
-	local source = f:read "*a"
-	f:close()
-	local tmp = {}
-	assert(load(source, "@"..config_name, "t", tmp))()
+local function loadconfig(tmp)
+	if tmp == nil then
+		tmp = {}
+		if config_name then
+			local f = assert(io.open(config_name))
+			local source = f:read "*a"
+			f:close()
+			assert(load(source, "@"..config_name, "t", tmp))()
+		end
+	end
 	for name,address in pairs(tmp) do
 		assert(type(address) == "string")
 		if node_address[name] ~= address then
@@ -47,8 +51,8 @@ local function loadconfig()
 	end
 end
 
-function command.reload()
-	loadconfig()
+function command.reload(source, config)
+	loadconfig(config)
 	skynet.ret(skynet.pack(nil))
 end
 
@@ -87,6 +91,21 @@ function command.req(...)
 	end
 end
 
+function command.push(source, node, addr, msg, sz)
+	local session = node_session[node] or 1
+	local request, new_session, padding = cluster.packpush(addr, session, msg, sz)
+	if padding then	-- is multi push
+		node_session[node] = new_session
+	end
+
+	-- node_channel[node] may yield or throw error
+	local c = node_channel[node]
+
+	c:request(request, nil, padding)
+
+	-- notice: push may fail where the channel is disconnected or broken.
+end
+
 local proxy = {}
 
 function command.proxy(source, node, name)
@@ -117,9 +136,9 @@ local large_request = {}
 function command.socket(source, subcmd, fd, msg)
 	if subcmd == "data" then
 		local sz
-		local addr, session, msg, padding = cluster.unpackrequest(msg)
+		local addr, session, msg, padding, is_push = cluster.unpackrequest(msg)
 		if padding then
-			local req = large_request[session] or { addr = addr }
+			local req = large_request[session] or { addr = addr , is_push = is_push }
 			large_request[session] = req
 			table.insert(req, msg)
 			return
@@ -130,6 +149,7 @@ function command.socket(source, subcmd, fd, msg)
 				table.insert(req, msg)
 				msg,sz = cluster.concat(req)
 				addr = req.addr
+				is_push = req.is_push
 			end
 			if not msg then
 				local response = cluster.packresponse(session, false, "Invalid large req")
@@ -148,6 +168,9 @@ function command.socket(source, subcmd, fd, msg)
 				ok = false
 				msg = "name not found"
 			end
+		elseif is_push then
+			skynet.rawsend(addr, "lua", msg, sz)
+			return	-- no response
 		else
 			ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
 		end

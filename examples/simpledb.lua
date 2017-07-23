@@ -16,7 +16,17 @@ end
 
 skynet.start(function()
 	skynet.dispatch("lua", function(session, address, cmd, ...)
-		local f = command[string.upper(cmd)]
+		cmd = cmd:upper()
+		if cmd == "PING" then
+			assert(session == 0)
+			local str = (...)
+			if #str > 20 then
+				str = str:sub(1,20) .. "...(" .. #str .. ")"
+			end
+			skynet.error(string.format("%s ping %s", skynet.address(address), str))
+			return
+		end
+		local f = command[cmd]
 		if f then
 			skynet.ret(skynet.pack(f(...)))
 		else
