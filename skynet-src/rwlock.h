@@ -17,11 +17,9 @@ rwlock_init(struct rwlock *lock) {
 static inline void
 rwlock_rlock(struct rwlock *lock) {
 	for (;;) {
-		while(lock->write) {
-			__sync_synchronize();
-		}
+		while(__sync_fetch_and_and(&lock->write, 1)) {}
 		__sync_add_and_fetch(&lock->read,1);
-		if (lock->write) {
+		if (__sync_fetch_and_and(&lock->write, 1)) {
 			__sync_sub_and_fetch(&lock->read,1);
 		} else {
 			break;
@@ -32,9 +30,7 @@ rwlock_rlock(struct rwlock *lock) {
 static inline void
 rwlock_wlock(struct rwlock *lock) {
 	while (__sync_lock_test_and_set(&lock->write,1)) {}
-	while(lock->read) {
-		__sync_synchronize();
-	}
+	while(__sync_fetch_and_and(&lock->read, 1)) {}
 }
 
 static inline void
