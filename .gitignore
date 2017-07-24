@@ -5,5 +5,7 @@
 3rd/lua/lua
 3rd/lua/luac
 /cservice
+/luaclib
+*.so
 *.dSYM
 .DS_Store
