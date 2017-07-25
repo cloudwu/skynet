@@ -40,5 +40,3 @@ You can also use official Lua versions, just edit the Makefile by yourself.
 
 * Read Wiki for documents https://github.com/cloudwu/skynet/wiki
 * The FAQ in wiki https://github.com/cloudwu/skynet/wiki/FAQ
-
-test
