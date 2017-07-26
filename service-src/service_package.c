@@ -5,7 +5,7 @@
 #include <string.h>
 #include <assert.h>
 
-#define TIMEOUT "1000"	// 10s
+#define TIMEOUT "3500"	// 10s
 
 struct response {
 	size_t sz;
