@@ -1498,9 +1498,9 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 			s->dw_size = sz;
 			s->dw_offset = n;
 
+			socket_unlock(&l);
 			sp_write(ss->event_fd, s->fd, s, true);
 
-			socket_unlock(&l);
 			return 0;
 		}
 		socket_unlock(&l);
