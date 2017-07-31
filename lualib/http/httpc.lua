@@ -100,21 +100,18 @@ function httpc.request(method, host, url, recvheader, header, content)
 		hostname = dns.resolve(hostname)
 	end
 	local fd = socket.connect(hostname, port, timeout)
-	local finish
+	local ok, statuscode, body
 	if timeout then
-		skynet.timeout(timeout, function()
-			if not finish then
-				local temp = fd
-				fd = nil
-				socket.close(temp)
-			end
+		local co = coroutine.running()
+		skynet.fork(function()
+			ok, statuscode, body = pcall(request, fd, method, host, url, recvheader, header, content)
+			skynet.wakeup(co)
 		end)
+		skynet.sleep(timeout)
+	else
+		ok, statuscode, body = pcall(request, fd,method, host, url, recvheader, header, content)
 	end
-	local ok , statuscode, body = pcall(request, fd,method, host, url, recvheader, header, content)
-	finish = true
-	if fd then	-- may close by skynet.timeout
-		socket.close(fd)
-	end
+	socket.close(fd)
 	if ok then
 		return statuscode, body
 	else
