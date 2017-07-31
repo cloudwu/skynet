@@ -2,7 +2,7 @@ local skynet = require "skynet"
 local socket = require "http.sockethelper"
 local url = require "http.url"
 local internal = require "http.internal"
-local dns = require "dns"
+local dns = require "skynet.dns"
 local string = string
 local table = table
 

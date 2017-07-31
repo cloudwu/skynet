@@ -146,7 +146,7 @@ mc_nextid(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_multicast_core(lua_State *L) {
+luaopen_skynet_multicast_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "pack", mc_packlocal },
 		{ "unpack", mc_unpacklocal },

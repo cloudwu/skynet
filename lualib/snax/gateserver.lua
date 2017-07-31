@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local netpack = require "netpack"
-local socketdriver = require "socketdriver"
+local netpack = require "skynet.netpack"
+local socketdriver = require "skynet.socketdriver"
 
 local gateserver = {}
 
@@ -113,7 +113,7 @@ function gateserver.start(handler)
 	function MSG.error(fd, msg)
 		if fd == socket then
 			socketdriver.close(fd)
-			skynet.error(msg)
+			skynet.error("gateserver close listen socket, accpet error:",msg)
 		else
 			if handler.error then
 				handler.error(fd, msg)

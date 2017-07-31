@@ -30,6 +30,7 @@ int sproto_prototag(const struct sproto *, const char * name);
 const char * sproto_protoname(const struct sproto *, int proto);
 // SPROTO_REQUEST(0) : request, SPROTO_RESPONSE(1): response
 struct sproto_type * sproto_protoquery(const struct sproto *, int proto, int what);
+int sproto_protoresponse(const struct sproto *, int proto);
 
 struct sproto_type * sproto_type(const struct sproto *, const char * type_name);
 

@@ -104,7 +104,13 @@ function convert.protocol(all, obj)
 			typename = obj[1] .. "." .. p[1]
 			all.type[typename] = convert.type(all, { typename, struct })
 		end
-		result[p[1]] = typename
+		if typename == "nil" then
+			if p[1] == "response" then
+				result.confirm = true
+			end
+		else
+			result[p[1]] = typename
+		end
 	end
 	return result
 end
@@ -259,6 +265,7 @@ end
 	tag	1 :	integer
 	request	2 :	integer	# index
 	response 3 : integer # index
+	confirm 4 : boolean # true means response nil
 }
 
 .group {
@@ -366,18 +373,22 @@ local function packproto(name, p, alltypes)
 		"\0\0",	-- name (id=0, ref=0)
 		packvalue(p.tag),	-- tag (tag=1)
 	}
-	if p.request == nil and p.response == nil then
-		tmp[1] = "\2\0"
+	if p.request == nil and p.response == nil and p.confirm == nil then
+		tmp[1] = "\2\0"	-- only two fields
 	else
 		if p.request then
 			table.insert(tmp, packvalue(alltypes[p.request].id)) -- request typename (tag=2)
 		else
-			table.insert(tmp, "\1\0")
+			table.insert(tmp, "\1\0")	-- skip this field (request)
 		end
 		if p.response then
 			table.insert(tmp, packvalue(alltypes[p.response].id)) -- request typename (tag=3)
+		elseif p.confirm then
+			tmp[1] = "\5\0"	-- add confirm field
+			table.insert(tmp, "\1\0")	-- skip this field (response)
+			table.insert(tmp, packvalue(1))	-- confirm = true
 		else
-			tmp[1] = "\3\0"
+			tmp[1] = "\3\0"	-- only three fields
 		end
 	end
 

@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local socket = require "socket"
-local socketdriver = require "socketdriver"
+local socket = require "skynet.socket"
+local socketdriver = require "skynet.socketdriver"
 
 -- channel support auto reconnect , and capture socket error in request/response transaction
 -- { host = "", port = , auth = function(so) , response = function(so) session, data }
@@ -158,7 +158,7 @@ local function dispatch_by_order(self)
 		local func, co = pop_response(self)
 		if not co then
 			-- close signal
-			wakeup_all(self, errmsg)
+			wakeup_all(self, "channel_closed")
 			break
 		end
 		local ok, result_ok, result_data, padding = pcall(func, self.__sock)
@@ -376,6 +376,12 @@ end
 local socket_write = socket.write
 local socket_lwrite = socket.lwrite
 
+local function sock_err(self)
+	close_channel_socket(self)
+	wakeup_all(self)
+	error(socket_error)
+end
+
 function channel:request(request, response, padding)
 	assert(block_connect(self, true))	-- connect once
 	local fd = self.__sock[1]
@@ -383,16 +389,18 @@ function channel:request(request, response, padding)
 	if padding then
 		-- padding may be a table, to support multi part request
 		-- multi part request use low priority socket write
-		-- socket_lwrite returns nothing
-		socket_lwrite(fd , request)
+		-- now socket_lwrite returns as socket_write
+		if not socket_lwrite(fd , request) then
+			sock_err(self)
+		end
 		for _,v in ipairs(padding) do
-			socket_lwrite(fd, v)
+			if not socket_lwrite(fd, v) then
+				sock_err(self)
+			end
 		end
 	else
 		if not socket_write(fd , request) then
-			close_channel_socket(self)
-			wakeup_all(self)
-			error(socket_error)
+			sock_err(self)
 		end
 	end
 
