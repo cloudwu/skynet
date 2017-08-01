@@ -102,4 +102,8 @@ function sockethelper.close(fd)
 	socket.close(fd)
 end
 
+function sockethelper.shutdown(fd)
+	socket.shutdown(fd)
+end
+
 return sockethelper

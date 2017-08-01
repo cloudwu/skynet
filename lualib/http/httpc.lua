@@ -106,7 +106,7 @@ function httpc.request(method, host, url, recvheader, header, content)
 			if not finish then
 				local temp = fd
 				fd = nil
-				socket.close(temp)
+				socket.shutdown(temp)
 			end
 		end)
 	end
