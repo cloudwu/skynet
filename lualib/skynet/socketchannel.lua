@@ -289,6 +289,12 @@ end
 
 local function check_connection(self)
 	if self.__sock then
+		if socket.disconnected(self.__sock[1]) then
+			-- closed by peer
+			skynet.error("socket: disconnect detected ", self.__host, self.__port)
+			close_channel_socket(self)
+			return
+		end
 		local authco = self.__authcoroutine
 		if not authco then
 			return true

@@ -209,20 +209,13 @@ function socket.start(id, func)
 	return connect(id, func)
 end
 
-local function close_fd(id, func)
+function socket.shutdown(id)
 	local s = socket_pool[id]
 	if s then
-		if s.buffer then
-			driver.clear(s.buffer,buffer_pool)
-		end
-		if s.connected then
-			func(id)
-		end
+		driver.clear(s.buffer,buffer_pool)
+		-- the framework would send SKYNET_SOCKET_TYPE_CLOSE , need close(id) later
+		driver.shutdown(id)
 	end
-end
-
-function socket.shutdown(id)
-	close_fd(id, driver.shutdown)
 end
 
 function socket.close_fd(id)
@@ -250,7 +243,7 @@ function socket.close(id)
 		end
 		s.connected = false
 	end
-	close_fd(id)	-- clear the buffer (already close fd)
+	driver.clear(s.buffer,buffer_pool)
 	assert(s.lock == nil or next(s.lock) == nil)
 	socket_pool[id] = nil
 end
@@ -352,6 +345,13 @@ function socket.invalid(id)
 	return socket_pool[id] == nil
 end
 
+function socket.disconnected(id)
+	local s = socket_pool[id]
+	if s then
+		return not(s.connected or s.connecting)
+	end
+end
+
 function socket.listen(host, port, backlog)
 	if port == nil then
 		host, port = string.match(host, "([^:]+):(.+)$")
@@ -392,10 +392,12 @@ end
 -- you must call socket.start(id) later in other service
 function socket.abandon(id)
 	local s = socket_pool[id]
-	if s and s.buffer then
+	if s then
 		driver.clear(s.buffer,buffer_pool)
+		s.connected = false
+		wakeup(s)
+		socket_pool[id] = nil
 	end
-	socket_pool[id] = nil
 end
 
 function socket.limit(id, limit)
