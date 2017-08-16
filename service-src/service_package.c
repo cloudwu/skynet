@@ -228,7 +228,7 @@ new_message(struct package *P, const uint8_t *msg, int sz) {
 			++msg;
 			--sz;
 		}
-		skynet_error(NULL,"P->header 0 :%d,1:%d",P->header[0],P->header[1]);
+		//skynet_error(NULL,"P->header 0 :%d,1:%d",P->header[0],P->header[1]);
 
 		P->uncomplete.sz = P->header[0] * 256 + P->header[1];
 		P->uncomplete.msg = skynet_malloc(P->uncomplete.sz);
