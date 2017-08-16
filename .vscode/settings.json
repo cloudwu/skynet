@@ -40,6 +40,7 @@
         "skynet_harbor.h": "c",
         "c++config.h": "c",
         "stl_iterator.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "system_error": "c"
     }
 }
