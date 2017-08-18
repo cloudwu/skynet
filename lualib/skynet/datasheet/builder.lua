@@ -12,7 +12,7 @@ local address
 local unique_id = 0
 local function unique_string(str)
 	unique_id = unique_id + 1
-	return str .. "." .. tostring(unique_id)
+	return str .. ("." .. tostring(unique_id))
 end
 
 local function monitor(pointer)
