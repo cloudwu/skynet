@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local dc = require "datacenter"
-local mc = require "multicast"
+local dc = require "skynet.datacenter"
+local mc = require "skynet.multicast"
 
 skynet.start(function()
 	print("remote start")

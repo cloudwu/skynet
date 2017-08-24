@@ -1,5 +1,5 @@
 /*
-** $Id: ltable.h,v 2.20 2014/09/04 18:15:29 roberto Exp $
+** $Id: ltable.h,v 2.23 2016/12/22 13:08:50 roberto Exp $
 ** Lua tables (hash)
 ** See Copyright Notice in lua.h
 */
@@ -15,12 +15,24 @@
 #define gnext(n)	((n)->i_key.nk.next)
 
 
-/* 'const' to avoid wrong writings that can mess up field 'next' */ 
+/* 'const' to avoid wrong writings that can mess up field 'next' */
 #define gkey(n)		cast(const TValue*, (&(n)->i_key.tvk))
 
+/*
+** writable version of 'gkey'; allows updates to individual fields,
+** but not to the whole (which has incompatible type)
+*/
 #define wgkey(n)		(&(n)->i_key.nk)
 
 #define invalidateTMcache(t)	((t)->flags = 0)
+
+
+/* true when 't' is using 'dummynode' as its hash part */
+#define isdummy(t)		((t)->lastfree == NULL)
+
+
+/* allocated size for hash nodes */
+#define allocsizenode(t)	(isdummy(t) ? 0 : sizenode(t))
 
 
 /* returns the key, given the value of a table entry */
@@ -31,6 +43,7 @@
 LUAI_FUNC const TValue *luaH_getint (Table *t, lua_Integer key);
 LUAI_FUNC void luaH_setint (lua_State *L, Table *t, lua_Integer key,
                                                     TValue *value);
+LUAI_FUNC const TValue *luaH_getshortstr (Table *t, TString *key);
 LUAI_FUNC const TValue *luaH_getstr (Table *t, TString *key);
 LUAI_FUNC const TValue *luaH_get (Table *t, const TValue *key);
 LUAI_FUNC TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key);
@@ -46,7 +59,7 @@ LUAI_FUNC int luaH_getn (Table *t);
 
 #if defined(LUA_DEBUG)
 LUAI_FUNC Node *luaH_mainposition (const Table *t, const TValue *key);
-LUAI_FUNC int luaH_isdummy (Node *n);
+LUAI_FUNC int luaH_isdummy (const Table *t);
 #endif
 
 

@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local socket = require "socket"
-local socketdriver = require "socketdriver"
+local socket = require "skynet.socket"
+local socketdriver = require "skynet.socketdriver"
 
 -- channel support auto reconnect , and capture socket error in request/response transaction
 -- { host = "", port = , auth = function(so) , response = function(so) session, data }
@@ -68,14 +68,25 @@ local function wakeup_all(self, errmsg)
 		for i = 1, #self.__thread do
 			local co = self.__thread[i]
 			self.__thread[i] = nil
-			self.__result[co] = socket_error
-			self.__result_data[co] = errmsg
-			skynet.wakeup(co)
+			if co then	-- ignore the close signal
+				self.__result[co] = socket_error
+				self.__result_data[co] = errmsg
+				skynet.wakeup(co)
+			end
 		end
 	end
 end
 
-
+local function exit_thread(self)
+	local co = coroutine.running()
+	if self.__dispatch_thread == co then
+		self.__dispatch_thread = nil
+		local connecting = self.__connecting_thread
+		if connecting then
+			skynet.wakeup(connecting)
+		end
+	end
+end
 
 local function dispatch_by_session(self)
 	local response = self.__response
@@ -113,6 +124,7 @@ local function dispatch_by_session(self)
 			wakeup_all(self, errormsg)
 		end
 	end
+	exit_thread(self)
 end
 
 local function pop_response(self)
@@ -144,6 +156,11 @@ end
 local function dispatch_by_order(self)
 	while self.__sock do
 		local func, co = pop_response(self)
+		if not co then
+			-- close signal
+			wakeup_all(self, "channel_closed")
+			break
+		end
 		local ok, result_ok, result_data, padding = pcall(func, self.__sock)
 		if ok then
 			if padding and result_ok then
@@ -173,6 +190,7 @@ local function dispatch_by_order(self)
 			wakeup_all(self, errmsg)
 		end
 	end
+	exit_thread(self)
 end
 
 local function dispatch_function(self)
@@ -221,7 +239,7 @@ local function connect_once(self)
 	end
 
 	self.__sock = setmetatable( {fd} , channel_socket_meta )
-	skynet.fork(dispatch_function(self), self)
+	self.__dispatch_thread = skynet.fork(dispatch_function(self), self)
 
 	if self.__auth then
 		self.__authcoroutine = coroutine.running()
@@ -271,6 +289,12 @@ end
 
 local function check_connection(self)
 	if self.__sock then
+		if socket.disconnected(self.__sock[1]) then
+			-- closed by peer
+			skynet.error("socket: disconnect detected ", self.__host, self.__port)
+			close_channel_socket(self)
+			return
+		end
 		local authco = self.__authcoroutine
 		if not authco then
 			return true
@@ -310,7 +334,8 @@ local function block_connect(self, once)
 
 	r = check_connection(self)
 	if r == nil then
-		error(string.format("Connect to %s:%d failed (%s)", self.__host, self.__port, err))
+		skynet.error(string.format("Connect to %s:%d failed (%s)", self.__host, self.__port, err))
+		error(socket_error)
 	else
 		return r
 	end
@@ -318,6 +343,14 @@ end
 
 function channel:connect(once)
 	if self.__closed then
+		if self.__dispatch_thread then
+			-- closing, wait
+			assert(self.__connecting_thread == nil, "already connecting")
+			local co = coroutine.running()
+			self.__connecting_thread = co
+			skynet.wait(co)
+			self.__connecting_thread = nil
+		end
 		self.__closed = false
 	end
 
@@ -349,6 +382,12 @@ end
 local socket_write = socket.write
 local socket_lwrite = socket.lwrite
 
+local function sock_err(self)
+	close_channel_socket(self)
+	wakeup_all(self)
+	error(socket_error)
+end
+
 function channel:request(request, response, padding)
 	assert(block_connect(self, true))	-- connect once
 	local fd = self.__sock[1]
@@ -356,16 +395,18 @@ function channel:request(request, response, padding)
 	if padding then
 		-- padding may be a table, to support multi part request
 		-- multi part request use low priority socket write
-		-- socket_lwrite returns nothing
-		socket_lwrite(fd , request)
+		-- now socket_lwrite returns as socket_write
+		if not socket_lwrite(fd , request) then
+			sock_err(self)
+		end
 		for _,v in ipairs(padding) do
-			socket_lwrite(fd, v)
+			if not socket_lwrite(fd, v) then
+				sock_err(self)
+			end
 		end
 	else
 		if not socket_write(fd , request) then
-			close_channel_socket(self)
-			wakeup_all(self)
-			error(socket_error)
+			sock_err(self)
 		end
 	end
 
@@ -385,8 +426,13 @@ end
 
 function channel:close()
 	if not self.__closed then
+		local thread = self.__dispatch_thread
 		self.__closed = true
 		close_channel_socket(self)
+		if not self.__response and self.__dispatch_thread == thread and thread then
+			-- dispatch by order, send close signal to dispatch thread
+			push_response(self, true, false)	-- (true, false) is close signal
+		end
 	end
 end
 

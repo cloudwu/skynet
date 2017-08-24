@@ -1,7 +1,6 @@
-local core = require "sharedata.core"
+local core = require "skynet.sharedata.core"
 local type = type
-local next = next
-local rawget = rawget
+local rawset = rawset
 
 local conf = {}
 
@@ -20,6 +19,7 @@ local isdirty = core.isdirty
 local index = core.index
 local needupdate = core.needupdate
 local len = core.len
+local core_nextkey = core.nextkey
 
 local function findroot(self)
 	while self.__parent do
@@ -70,6 +70,10 @@ local function getcobj(self)
 	return obj
 end
 
+function meta:__newindex(key, value)
+	error ("Error newindex, the key [" .. genkey(self) .. "]")
+end
+
 function meta:__index(key)
 	local obj = getcobj(self)
 	local v = index(obj, key)
@@ -77,7 +81,7 @@ function meta:__index(key)
 		local children = self.__cache
 		if children == nil then
 			children = {}
-			self.__cache = children
+			rawset(self, "__cache", children)
 		end
 		local r = children[key]
 		if r then
@@ -106,7 +110,7 @@ end
 
 function conf.next(obj, key)
 	local cobj = getcobj(obj)
-	local nextkey = core.nextkey(cobj, key)
+	local nextkey = core_nextkey(cobj, key)
 	if nextkey then
 		return nextkey, obj[nextkey]
 	end
@@ -126,6 +130,52 @@ function conf.update(self, pointer)
 	local cobj = self.__obj
 	assert(isdirty(cobj), "Only dirty object can be update")
 	core.update(self.__gcobj, pointer, { __gcobj = core.box(pointer) })
+end
+
+function conf.flush(obj)
+	getcobj(obj)
+end
+
+local function clone_table(cobj)
+	local obj = {}
+	local key
+	while true do
+		key = core_nextkey(cobj, key)
+		if key == nil then
+			break
+		end
+		local v = index(cobj, key)
+		if type(v) == "userdata" then
+			v = clone_table(v)
+		end
+		obj[key] = v
+	end
+	return obj
+end
+
+local function find_node(cobj, key, ...)
+	if key == nil then
+		return cobj
+	end
+	local cobj = index(cobj, key)
+	if cobj == nil then
+		return nil
+	end
+	if type(cobj) == "userdata" then
+		return find_node(cobj, ...)
+	end
+	return cobj
+end
+
+function conf.copy(cobj, ...)
+	cobj = find_node(cobj, ...)
+	if cobj then
+		if type(cobj) == "userdata" then
+			return clone_table(cobj)
+		else
+			return cobj
+		end
+	end
 end
 
 return conf
