@@ -202,11 +202,6 @@ skynet_memalign(size_t alignment, size_t size) {
 	return fill_prefix(ptr);
 }
 
-void *
-__libc_memalign(size_t alignment, size_t size) {
-	return skynet_memalign(alignment, size);
-}
-
 #else
 
 // for skynet_lalloc use
