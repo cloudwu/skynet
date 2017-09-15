@@ -257,6 +257,9 @@ static int
 lclearbuffer(lua_State *L) {
 	struct socket_buffer * sb = lua_touserdata(L, 1);
 	if (sb == NULL) {
+		if (lua_isnil(L, 1)) {
+			return 0;
+		}
 		return luaL_error(L, "Need buffer object at param 1");
 	}
 	luaL_checktype(L,2,LUA_TTABLE);

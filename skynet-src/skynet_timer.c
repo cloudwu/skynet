@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #if defined(__APPLE__)
+#include <AvailabilityMacros.h>
 #include <sys/time.h>
 #include <mach/task.h>
 #include <mach/mach.h>
@@ -232,7 +233,7 @@ skynet_timeout(uint32_t handle, int time, int session) {
 // centisecond: 1/100 second
 static void
 systime(uint32_t *sec, uint32_t *cs) {
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_REALTIME, &ti);
 	*sec = (uint32_t)ti.tv_sec;
@@ -248,7 +249,7 @@ systime(uint32_t *sec, uint32_t *cs) {
 static uint64_t
 gettime() {
 	uint64_t t;
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_MONOTONIC, &ti);
 	t = (uint64_t)ti.tv_sec * 100;
@@ -305,7 +306,7 @@ skynet_timer_init(void) {
 
 uint64_t
 skynet_thread_time(void) {
-#if  !defined(__APPLE__)
+#if  !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ti);
 

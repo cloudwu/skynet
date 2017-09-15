@@ -124,7 +124,8 @@ function ctd.dump(root)
 		string.pack("<I4", doc.table_n),
 		table.concat(index),
 		table.concat(doc.table),
-		table.concat(doc.strings, "\0")
+		table.concat(doc.strings, "\0"),
+		"\0",
 	}
 	return table.concat(tmp)
 end
