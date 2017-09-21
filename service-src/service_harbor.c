@@ -420,7 +420,6 @@ push_socket_data(struct harbor *h, const struct skynet_socket_message * message)
 		}
 	}
 	if (s == NULL) {
-		skynet_free(message->buffer);
 		skynet_error(h->ctx, "Invalid socket fd (%d) data", fd);
 		return;
 	}

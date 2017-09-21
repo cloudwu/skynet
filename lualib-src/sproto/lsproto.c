@@ -344,12 +344,12 @@ decode(const struct sproto_arg *args) {
 		// notice: in lua 5.2, 52bit integer support (not 64)
 		if (args->extra) {
 			// lua_Integer is 32bit in small lua.
-			uint64_t v = *(uint64_t*)args->value;
+			int64_t v = *(int64_t*)args->value;
 			lua_Number vn = (lua_Number)v;
 			vn /= args->extra;
 			lua_pushnumber(L, vn);
 		} else {
-			lua_Integer v = *(uint64_t*)args->value;
+			lua_Integer v = *(int64_t*)args->value;
 			lua_pushinteger(L, v);
 		}
 		break;
@@ -621,31 +621,49 @@ lloadproto(lua_State *L) {
 	return 1;
 }
 
+static void
+push_default(const struct sproto_arg *args, int array) {
+	lua_State *L = args->ud;
+	switch(args->type) {
+	case SPROTO_TINTEGER:
+		if (args->extra)
+			lua_pushnumber(L, 0.0);
+		else
+			lua_pushinteger(L, 0);
+		break;
+	case SPROTO_TBOOLEAN:
+		lua_pushboolean(L, 0);
+		break;
+	case SPROTO_TSTRING:
+		lua_pushliteral(L, "");
+		break;
+	case SPROTO_TSTRUCT:
+		if (array) {
+			lua_pushstring(L, sproto_name(args->subtype));
+		} else {
+			lua_createtable(L, 0, 1);
+			lua_pushstring(L, sproto_name(args->subtype));
+			lua_setfield(L, -2, "__type");
+		}
+		break;
+	default:
+		luaL_error(L, "Invalid type %d", args->type);
+		break;
+	}
+}
+
 static int
 encode_default(const struct sproto_arg *args) {
 	lua_State *L = args->ud;
 	lua_pushstring(L, args->tagname);
 	if (args->index > 0) {
 		lua_newtable(L);
+		push_default(args, 1);
+		lua_setfield(L, -2, "__array");
 		lua_rawset(L, -3);
 		return SPROTO_CB_NOARRAY;
 	} else {
-		switch(args->type) {
-		case SPROTO_TINTEGER:
-			lua_pushinteger(L, 0);
-			break;
-		case SPROTO_TBOOLEAN:
-			lua_pushboolean(L, 0);
-			break;
-		case SPROTO_TSTRING:
-			lua_pushliteral(L, "");
-			break;
-		case SPROTO_TSTRUCT:
-			lua_createtable(L, 0, 1);
-			lua_pushstring(L, sproto_name(args->subtype));
-			lua_setfield(L, -2, "__type");
-			break;
-		}
+		push_default(args, 0);
 		lua_rawset(L, -3);
 		return SPROTO_CB_NIL;
 	}

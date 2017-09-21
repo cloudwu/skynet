@@ -32,7 +32,7 @@ Run these in different consoles:
 
 ## About Lua version
 
-Skynet now uses a modified version of lua 5.3.3 ( https://github.com/ejoy/lua/tree/skynet ) for multiple lua states.
+Skynet now uses a modified version of lua 5.3.4 ( https://github.com/ejoy/lua/tree/skynet ) for multiple lua states.
 
 You can also use official Lua versions, just edit the Makefile by yourself.
 
