@@ -698,6 +698,8 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 				raise_uncomplete(s);
 				return -1;
 			}
+			if (s->low.head)
+				return -1;
 		} 
 		// step 4
 		assert(send_buffer_empty(s) && s->wb_size == 0);
