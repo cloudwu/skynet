@@ -100,6 +100,10 @@ function httpc.request(method, host, url, recvheader, header, content)
 		hostname = dns.resolve(hostname)
 	end
 	local fd = socket.connect(hostname, port, timeout)
+	if not fd then
+		error(string.format("http connect error host:%s, port:%s, timeout:%s", hostname, port, timeout))
+		return
+	end
 	local finish
 	if timeout then
 		skynet.timeout(timeout, function()
