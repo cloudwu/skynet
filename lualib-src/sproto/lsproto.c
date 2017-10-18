@@ -44,10 +44,10 @@ LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
 #if LUA_VERSION_NUM < 503
 
 #if LUA_VERSION_NUM < 502
-static lua_Integer lua_tointegerx(lua_State *L, int idx, int *isnum) {
+static int64_t lua_tointegerx(lua_State *L, int idx, int *isnum) {
 	if (lua_isnumber(L, idx)) {
 		if (isnum) *isnum = 1;
-		return lua_tointeger(L, idx);
+		return (int64_t)lua_tointeger(L, idx);
 	}
 	else {
 		if (isnum) *isnum = 0;
@@ -165,13 +165,14 @@ encode(const struct sproto_arg *args) {
 	}
 	switch (args->type) {
 	case SPROTO_TINTEGER: {
-		lua_Integer v;
+		int64_t v;
 		lua_Integer vh;
 		int isnum;
 		if (args->extra) {
 			// It's decimal.
 			lua_Number vn = lua_tonumber(L, -1);
-			v = (lua_Integer)(vn * args->extra + 0.5);
+			// use 64bit integer for 32bit architecture.
+			v = (int64_t)(vn * args->extra + 0.5);
 		} else {
 			v = lua_tointegerx(L, -1, &isnum);
 			if(!isnum) {
@@ -349,7 +350,7 @@ decode(const struct sproto_arg *args) {
 			vn /= args->extra;
 			lua_pushnumber(L, vn);
 		} else {
-			lua_Integer v = *(int64_t*)args->value;
+			int64_t v = *(int64_t*)args->value;
 			lua_pushinteger(L, v);
 		}
 		break;
