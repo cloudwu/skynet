@@ -555,10 +555,10 @@ function mongo_cursor:hasNext()
 		local pack
 		if self.__data == nil then
 			local query = self.__sortquery or self.__query
-			pack = driver.query(request_id, self.__flags, self.__collection.full_name, self.__skip, -self.__limit, query, self.__selector)
+			pack = driver.query(request_id, self.__flags, self.__collection.full_name, self.__skip, self.__limit, query, self.__selector)
 		else
 			if self.__cursor then
-				pack = driver.more(request_id, self.__collection.full_name, -self.__limit, self.__cursor)
+				pack = driver.more(request_id, self.__collection.full_name, self.__limit, self.__cursor)
 			else
 				-- no more
 				self.__document	= nil
