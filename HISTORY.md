@@ -1,3 +1,8 @@
+v1.1.0 (2017-10-31)
+-----------
+* add socket.disconnected()
+* fix bugs : see comments for detail
+
 v1.1.0-rc (2017-7-18)
 -----------
 * config file : support include
