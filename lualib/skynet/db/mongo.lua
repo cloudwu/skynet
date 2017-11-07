@@ -574,10 +574,20 @@ function mongo_cursor:hasNext()
 
 		if ok then
 			if doc then
-				self.__document	= result.result
+				local doc = result.result
+				self.__document	= doc
 				self.__data	= result.data
 				self.__ptr = 1
 				self.__cursor =	cursor
+				local limit = self.__limit
+				if cursor and limit > 0 then
+					limit = limit - #doc
+					if limit <= 0 then
+						-- reach limit
+						self:close()
+					end
+					self.__limit = limit
+				end
 				return true
 			else
 				self.__document	= nil
@@ -615,11 +625,11 @@ function mongo_cursor:next()
 end
 
 function mongo_cursor:close()
-	-- todo: warning hasNext after close
 	if self.__cursor then
 		local sock = self.__collection.connection.__sock
 		local pack = driver.kill(self.__cursor)
 		sock:request(pack)
+		self.__cursor = nil
 	end
 end
 
