@@ -192,6 +192,7 @@ end
 
 function socket.open(addr, port)
 	local id = driver.connect(addr,port)
+	driver.nodelay(id)
 	return connect(id)
 end
 
@@ -357,7 +358,9 @@ function socket.listen(host, port, backlog)
 		host, port = string.match(host, "([^:]+):(.+)$")
 		port = tonumber(port)
 	end
-	return driver.listen(host, port, backlog)
+	local fd = driver.listen(host, port, backlog)
+	driver.nodelay(fd)
+	return fd
 end
 
 function socket.lock(id)
