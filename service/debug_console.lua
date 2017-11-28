@@ -133,32 +133,43 @@ skynet.start(function()
 	end)
 end)
 
+local command_help = {
+	help = "This help message",
+	list = "List all the service",
+	stat = "Dump all stats",
+	info = "info address : get service infomation",
+	exit = "exit address : kill a lua service",
+	kill = "kill address : kill service",
+	mem = "mem : show memory status",
+	gc = "gc : force every lua service do garbage collect",
+	start = "lanuch a new lua service",
+	snax = "lanuch a new snax service",
+	clearcache = "clear lua code cache",
+	service = "List unique service",
+	task = "task address : show service task detail",
+	inject = "inject address luascript.lua",
+	logon = "logon address",
+	logoff = "logoff address",
+	log = "launch a new lua service with log",
+	debug = "debug address : debug a lua service",
+	signal = "signal address sig",
+	cmem = "Show C memory info",
+	shrtbl = "Show shared short string table info",
+	ping = "ping address",
+	call = "call address ...",
+}
+
 function COMMAND.help()
-	return {
-		help = "This help message",
-		list = "List all the service",
-		stat = "Dump all stats",
-		info = "info address : get service infomation",
-		exit = "exit address : kill a lua service",
-		kill = "kill address : kill service",
-		mem = "mem : show memory status",
-		gc = "gc : force every lua service do garbage collect",
-		start = "lanuch a new lua service",
-		snax = "lanuch a new snax service",
-		clearcache = "clear lua code cache",
-		service = "List unique service",
-		task = "task address : show service task detail",
-		inject = "inject address luascript.lua",
-		logon = "logon address",
-		logoff = "logoff address",
-		log = "launch a new lua service with log",
-		debug = "debug address : debug a lua service",
-		signal = "signal address sig",
-		cmem = "Show C memory info",
-		shrtbl = "Show shared short string table info",
-		ping = "ping address",
-		call = "call address ...",
-	}
+	return command_help
+end
+
+function COMMAND.register_help(name, describe)
+	command_help[key] = value
+end
+
+function COMMAND.register_command(name, func_str)
+	local f = load(func_str)
+	COMMAND[name] = f()
 end
 
 function COMMAND.clearcache()
