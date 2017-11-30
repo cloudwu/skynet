@@ -177,14 +177,14 @@ packrequest(lua_State *L, int is_push) {
 	} else {
 		multipak = packreq_string(L, session, msg, sz, is_push);
 	}
-	int current_session = session;
-	if (++session < 0) {
-		session = 1;
+	uint32_t new_session = (uint32_t)session + 1;
+	if (new_session > INT32_MAX) {
+		new_session = 1;
 	}
-	lua_pushinteger(L, session);
+	lua_pushinteger(L, new_session);
 	if (multipak) {
 		lua_createtable(L, multipak, 0);
-		packreq_multi(L, current_session, msg, sz);
+		packreq_multi(L, session, msg, sz);
 		skynet_free(msg);
 		return 3;
 	} else {
