@@ -747,6 +747,8 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_lock *l, s
 			s->high.head = buf;
 		}
 		s->dw_buffer = NULL;
+		// socket locked. Don't need use 'add_sending_ref', just ATOM_INC is ok.
+		ATOM_INC(&s->sending);
 	}
 	int r = send_buffer_(ss,s,l,result);
 	socket_unlock(l);
