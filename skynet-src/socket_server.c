@@ -78,6 +78,7 @@ struct socket {
 	struct wb_list high;
 	struct wb_list low;
 	int64_t wb_size;
+	uint64_t sending;
 	int fd;
 	int id;
 	uint8_t protocol;
@@ -452,6 +453,7 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 
 	s->id = id;
 	s->fd = fd;
+	s->sending = ((uint64_t)id << 32) | 0;
 	s->protocol = protocol;
 	s->p.size = MIN_READ_BUFFER;
 	s->opaque = opaque;
@@ -565,6 +567,8 @@ send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 			}
 			break;
 		}
+		ATOM_DEC(&s->sending);
+		assert((uint32_t)s->sending != (uint32_t)-1);
 		list->head = tmp->next;
 		write_buffer_free(ss,tmp);
 	}
@@ -743,6 +747,8 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_lock *l, s
 			s->high.head = buf;
 		}
 		s->dw_buffer = NULL;
+		// socket locked. Don't need use 'add_sending_ref', just ATOM_INC is ok.
+		ATOM_INC(&s->sending);
 	}
 	int r = send_buffer_(ss,s,l,result);
 	socket_unlock(l);
@@ -881,8 +887,8 @@ _failed:
 }
 
 static inline int
-nomore_send_data(struct socket *s) {
-	return send_buffer_empty(s) && s->dw_buffer == NULL;
+nomore_sending_data(struct socket *s) {
+	return (uint32_t)(s->sending) == 0 && s->dw_buffer == NULL;
 }
 
 static int
@@ -898,13 +904,13 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 	}
 	struct socket_lock l;
 	socket_lock_init(s, &l);
-	if (!nomore_send_data(s)) {
+	if (!nomore_sending_data(s)) {
 		int type = send_buffer(ss,s,&l,result);
-		// type : -1 or SOCKET_WARNING or SOCKET_CLOSE, SOCKET_WARNING means nomore_send_data
+		// type : -1 or SOCKET_WARNING or SOCKET_CLOSE, SOCKET_WARNING means nomore_sending_data
 		if (type != -1 && type != SOCKET_WARNING)
 			return type;
 	}
-	if (request->shutdown || nomore_send_data(s)) {
+	if (request->shutdown || nomore_sending_data(s)) {
 		force_close(ss,s,&l,result);
 		result->id = id;
 		result->opaque = request->opaque;
@@ -1227,7 +1233,7 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_lock *l
 		result->opaque = s->opaque;
 		result->id = s->id;
 		result->ud = 0;
-		if (nomore_send_data(s)) {
+		if (nomore_sending_data(s)) {
 			sp_write(ss->event_fd, s->fd, s, false);
 		}
 		union sockaddr_all u;
@@ -1461,7 +1467,26 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 
 static inline int
 can_direct_write(struct socket *s, int id) {
-	return s->id == id && nomore_send_data(s) && s->type == SOCKET_TYPE_CONNECTED && s->udpconnecting == 0;
+	return s->id == id && nomore_sending_data(s) && s->type == SOCKET_TYPE_CONNECTED && s->udpconnecting == 0;
+}
+
+static inline void
+add_sending_ref(struct socket *s, int id) {
+	if (s->protocol == PROTOCOL_TCP) {
+		// udp don't need order
+		for (;;) {
+			uint64_t sending = s->sending;
+			if ((sending >> 32) == id) {
+				// inc sending only matching the same socket id
+				if (ATOM_CAS(&s->sending, sending, sending + 1))
+					return;
+				// atom inc failed, retry
+			} else {
+				// socket id changed, just return
+				return;
+			}
+		}
+	}
 }
 
 // return -1 when error, 0 when success
@@ -1513,6 +1538,8 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 		socket_unlock(&l);
 	}
 
+	add_sending_ref(s, id);
+
 	struct request_package request;
 	request.u.send.id = id;
 	request.u.send.sz = sz;
@@ -1530,6 +1557,8 @@ socket_server_send_lowpriority(struct socket_server *ss, int id, const void * bu
 		free_buffer(ss, buffer, sz);
 		return -1;
 	}
+
+	add_sending_ref(s, id);
 
 	struct request_package request;
 	request.u.send.id = id;
