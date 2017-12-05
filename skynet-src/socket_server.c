@@ -38,6 +38,7 @@
 #define PRIORITY_LOW 1
 
 #define HASH_ID(id) (((unsigned)id) % MAX_SOCKET)
+#define ID_TAG16(id) ((id>>MAX_SOCKET_P) & 0xffff)
 
 #define PROTOCOL_TCP 0
 #define PROTOCOL_UDP 1
@@ -78,7 +79,7 @@ struct socket {
 	struct wb_list high;
 	struct wb_list low;
 	int64_t wb_size;
-	uint64_t sending;
+	uint32_t sending;
 	int fd;
 	int id;
 	uint8_t protocol;
@@ -453,7 +454,7 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 
 	s->id = id;
 	s->fd = fd;
-	s->sending = ((uint64_t)id << 32) | 0;
+	s->sending = ID_TAG16(id) << 16 | 0;
 	s->protocol = protocol;
 	s->p.size = MIN_READ_BUFFER;
 	s->opaque = opaque;
@@ -567,8 +568,8 @@ send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 			}
 			break;
 		}
+		assert((s->sending & 0xffff) != 0);
 		ATOM_DEC(&s->sending);
-		assert((uint32_t)s->sending != (uint32_t)-1);
 		list->head = tmp->next;
 		write_buffer_free(ss,tmp);
 	}
@@ -888,7 +889,7 @@ _failed:
 
 static inline int
 nomore_sending_data(struct socket *s) {
-	return (uint32_t)(s->sending) == 0 && s->dw_buffer == NULL;
+	return ((s->sending & 0xffff) == 0) && s->dw_buffer == NULL;
 }
 
 static int
@@ -1475,8 +1476,8 @@ add_sending_ref(struct socket *s, int id) {
 	if (s->protocol == PROTOCOL_TCP) {
 		// udp don't need order
 		for (;;) {
-			uint64_t sending = s->sending;
-			if ((sending >> 32) == id) {
+			uint32_t sending = s->sending;
+			if ((sending >> 16) == ID_TAG16(id)) {
 				// inc sending only matching the same socket id
 				if (ATOM_CAS(&s->sending, sending, sending + 1))
 					return;
