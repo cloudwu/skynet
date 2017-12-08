@@ -17,23 +17,29 @@ set(SKYNET_SRC
         skynet_log.c
         )
 
+set(TARGET_EXE skynet)
+
 include_directories(
         ${PROJECT_SOURCE_DIR}/3rd/lua
         ${PROJECT_SOURCE_DIR}/skynet-src
         ${PROJECT_SOURCE_DIR}/3rd/jemalloc/include/jemalloc
-#        /usr/local/include/jemalloc
-
 )
 
-add_executable(skynet ${SKYNET_SRC})
+find_library(JEMALLOC_LIB jemalloc_pic ../3rd/jemalloc/lib)
+IF(NOT JEMALLOC_LIB)
+    message(FATAL_ERROR "jemalloc_pic not found")
+ENDIF(NOT JEMALLOC_LIB)
+message(STATUS "jemalloc_pic found in " ${JEMALLOC_LIB})
+
+add_executable(${TARGET_EXE} ${SKYNET_SRC})
+
 
 link_directories(
         ${PROJECT_SOURCE_DIR}/3rd/lua
-        ${PROJECT_SOURCE_DIR}/3rd/jemalloc/lib
-#        /usr/local/lib
+#        ${PROJECT_SOURCE_DIR}/3rd/jemalloc/lib
 )
 
-target_link_libraries(skynet lua jemalloc_pic)
+target_link_libraries(${TARGET_EXE} lua ${JEMALLOC_LIB})
 
 add_definitions(-Wl,-E)
-target_link_libraries(skynet -lpthread -lm -ldl -lrt)
+target_link_libraries(${TARGET_EXE} -lpthread -lm -ldl -lrt)
