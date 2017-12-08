@@ -13,4 +13,5 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/service-src)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/skynet-src )
 
+add_subdirectory(${PROJECT_SOURCE_DIR}/lualib-src )
 
