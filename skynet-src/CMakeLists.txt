@@ -17,7 +17,7 @@ set(SKYNET_SRC
         skynet_log.c
         )
 
-set(TARGET_EXE skynet)
+set(TARGET_EXE myskynet)
 set(EXECUTABLE_OUTPUT_PATH  ${PROJECT_SOURCE_DIR})#设置可执行文件的生成路径
 
 include_directories(

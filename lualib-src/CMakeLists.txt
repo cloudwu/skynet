@@ -67,4 +67,4 @@ set( lualib_SRC
         )
 
 
-add_library(myskynet SHARED ${lualib_SRC} )
+add_library(skynet SHARED ${lualib_SRC} )
