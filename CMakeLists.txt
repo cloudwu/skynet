@@ -3,12 +3,10 @@ project(skynet)
 
 set(CMAKE_C_STANDARD 99)
 
-set(CMAKE_C_FLAGS  "-std=gnu99 -g -O2 -Wall" )
+set(CMAKE_C_FLAGS  " -O2 -Wall" )
 
 
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
-
-
 
 
 # lua.so
