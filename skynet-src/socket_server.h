@@ -2,13 +2,13 @@
 #define skynet_socket_server_h
 
 #include <stdint.h>
-
-#define SOCKET_DATA 0
-#define SOCKET_CLOSE 1
-#define SOCKET_OPEN 2
-#define SOCKET_ACCEPT 3
-#define SOCKET_ERR 4
-#define SOCKET_EXIT 5
+// socket_server_poll返回的socket消息类型
+#define SOCKET_DATA 0 	// 有数据到来
+#define SOCKET_CLOSE 1	// 连接关闭
+#define SOCKET_OPEN 2	// 连接建立（主动或者被动，并且已加入到epoll）
+#define SOCKET_ACCEPT 3	// 被动连接建立（即accept成功返回已连接套接字）但未加入到epoll
+#define SOCKET_ERR 4	// 发生错误
+#define SOCKET_EXIT 5	// 退出事件
 #define SOCKET_UDP 6
 #define SOCKET_WARNING 7
 
@@ -16,28 +16,28 @@ struct socket_server;
 
 struct socket_message {
 	int id;
-	uintptr_t opaque;
+	uintptr_t opaque; // 在skynet中用于保存服务handle
 	int ud;	// for accept, ud is new connection id ; for data, ud is size of data 
 	char * data;
 };
 
-struct socket_server * socket_server_create();
-void socket_server_release(struct socket_server *);
-int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);
+struct socket_server * socket_server_create();// 创建socket_server
+void socket_server_release(struct socket_server *);// 销毁socket_server
+int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);// 返回事件
 
-void socket_server_exit(struct socket_server *);
-void socket_server_close(struct socket_server *, uintptr_t opaque, int id);
+void socket_server_exit(struct socket_server *);// 退出socket服务器，导致事件循环退出
+void socket_server_close(struct socket_server *, uintptr_t opaque, int id);// 关闭socket
 void socket_server_shutdown(struct socket_server *, uintptr_t opaque, int id);
-void socket_server_start(struct socket_server *, uintptr_t opaque, int id);
+void socket_server_start(struct socket_server *, uintptr_t opaque, int id);// 启动socket，对于监听套接字或者已连接套接字，都要调用该函数，socket才开始工作
 
 // return -1 when error
 int socket_server_send(struct socket_server *, int id, const void * buffer, int sz);
 int socket_server_send_lowpriority(struct socket_server *, int id, const void * buffer, int sz);
 
 // ctrl command below returns id
-int socket_server_listen(struct socket_server *, uintptr_t opaque, const char * addr, int port, int backlog);
-int socket_server_connect(struct socket_server *, uintptr_t opaque, const char * addr, int port);
-int socket_server_bind(struct socket_server *, uintptr_t opaque, int fd);
+int socket_server_listen(struct socket_server *, uintptr_t opaque, const char * addr, int port, int backlog);// socket, bind, listen
+int socket_server_connect(struct socket_server *, uintptr_t opaque, const char * addr, int port);// 非阻塞的方式连接
+int socket_server_bind(struct socket_server *, uintptr_t opaque, int fd);// 并不对应bind函数，而是将stdin、stdout这类IO加入到epoll管理
 
 // for tcp
 void socket_server_nodelay(struct socket_server *, int id);
