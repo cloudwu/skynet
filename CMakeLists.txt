@@ -19,9 +19,9 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/3rd/lua )
 # gate.so harbor.so logger.so snlua.so
 add_subdirectory(${PROJECT_SOURCE_DIR}/service-src)
 
-# skynet
+# executabale myskynet
 add_subdirectory(${PROJECT_SOURCE_DIR}/skynet-src )
 
-# client.so  bson.so  md5.so  sproto.so  lpeg.so  myskynet.so
+# client.so  bson.so  md5.so  sproto.so  lpeg.so  skynet.so
 add_subdirectory(${PROJECT_SOURCE_DIR}/lualib-src )
 
