@@ -10,6 +10,8 @@ include_directories(
 )
 add_definitions(-fPIC)
 
+set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/luaclib)
+
 #client.so
 add_library(client SHARED
         lua-clientsocket.c
@@ -44,7 +46,7 @@ add_library(lpeg SHARED
         ../3rd/lpeg/lpvm.c
         )
 
-
+# myskynet.so
 set( lualib_SRC
     lua-skynet.c
     lua-seri.c

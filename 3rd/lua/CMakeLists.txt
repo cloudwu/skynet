@@ -38,5 +38,6 @@ set(lua_SRCS
         lzio.c
         )
 include_directories(./../../skynet-src)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/3rd/lua)
 add_library(lua ${lua_SRCS})
 target_link_libraries(lua m)

@@ -18,6 +18,7 @@ set(SKYNET_SRC
         )
 
 set(TARGET_EXE skynet)
+set(EXECUTABLE_OUTPUT_PATH  ${PROJECT_SOURCE_DIR})#设置可执行文件的生成路径
 
 include_directories(
         ${PROJECT_SOURCE_DIR}/3rd/lua
@@ -30,6 +31,7 @@ IF(NOT JEMALLOC_LIB)
     message(FATAL_ERROR "jemalloc_pic not found")
 ENDIF(NOT JEMALLOC_LIB)
 message(STATUS "jemalloc_pic found in " ${JEMALLOC_LIB})
+
 
 add_executable(${TARGET_EXE} ${SKYNET_SRC})
 
