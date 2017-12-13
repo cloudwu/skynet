@@ -159,16 +159,16 @@ thread_worker(void *p) {
 	skynet_initthread(THREAD_WORKER);
 	struct message_queue * q = NULL;
 	while (!m->quit) {
-		q = skynet_context_message_dispatch(sm, q, weight);
+		q = skynet_context_message_dispatch(sm, q, weight);     //消息队列的派发和处理
 		if (q == NULL) {
-			if (pthread_mutex_lock(&m->mutex) == 0) {
+			if (pthread_mutex_lock(&m->mutex) == 0) {           //上互斥锁 成功返回0
 				++ m->sleep;
 				// "spurious wakeup" is harmless,
 				// because skynet_context_message_dispatch() can be call at any time.
 				if (!m->quit)
 					pthread_cond_wait(&m->cond, &m->mutex);
 				-- m->sleep;
-				if (pthread_mutex_unlock(&m->mutex)) {
+				if (pthread_mutex_unlock(&m->mutex)) {          //释放互斥锁
 					fprintf(stderr, "unlock mutex error");
 					exit(1);
 				}

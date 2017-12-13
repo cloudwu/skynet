@@ -39,7 +39,7 @@
 #define CHECKCALLING_DECL
 
 #endif
-
+// 一个服务
 struct skynet_context {
 	void * instance;				//模块实例引用
 	struct skynet_module * mod;		//模块引用
@@ -50,7 +50,7 @@ struct skynet_context {
 	uint64_t cpu_cost;	// in microsec
 	uint64_t cpu_start;	// in microsec
 	char result[32];
-	uint32_t handle;
+	uint32_t handle;				//服务的地址
 	int session_id;
 	int ref;						//引用计数
 	int message_count;
@@ -297,7 +297,13 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 		dispatch_message(ctx, &msg);
 	}
 }
-
+/**
+ *不断从【全局队列】取出【消息队列】，处理【消息队列】的消息    dispatch（调度）
+ * @param sm
+ * @param q
+ * @param weight
+ * @return
+ */
 struct message_queue * 
 skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
 	if (q == NULL) {
@@ -306,28 +312,28 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 			return NULL;
 	}
 
-	uint32_t handle = skynet_mq_handle(q);
+	uint32_t handle = skynet_mq_handle(q);//消息队列 =》 句柄号
 
-	struct skynet_context * ctx = skynet_handle_grab(handle);
+	struct skynet_context * ctx = skynet_handle_grab(handle);//句柄号 =》上下文（进程实体）
 	if (ctx == NULL) {
 		struct drop_t d = { handle };
-		skynet_mq_release(q, drop_message, &d);
-		return skynet_globalmq_pop();
+		skynet_mq_release(q, drop_message, &d);     // 释放掉该队列
+		return skynet_globalmq_pop();               // 再从全局队列中pop一个队列出来并返回
 	}
 
 	int i,n=1;
-	struct skynet_message msg;
+	struct skynet_message msg;                      //定义一个skynet消息用于存放收到的消息
 
 	for (i=0;i<n;i++) {
-		if (skynet_mq_pop(q,&msg)) {
-			skynet_context_release(ctx);
-			return skynet_globalmq_pop();
+		if (skynet_mq_pop(q,&msg)) {                //弹出消息
+			skynet_context_release(ctx);            //释放上下文，减少上下文的引用计数 为什么？因为skynet_handle_grab会增加上下文的引用计数
+			return skynet_globalmq_pop();           //再从全局队列中pop一个队列出来并返回
 		} else if (i==0 && weight >= 0) {
 			n = skynet_mq_length(q);
 			n >>= weight;
 		}
-		int overload = skynet_mq_overload(q);
-		if (overload) {
+		int overload = skynet_mq_overload(q);       //获取超载值
+		if (overload) {                             //超载值不为零，代表超载了
 			skynet_error(ctx, "May overload, message queue length = %d", overload);
 		}
 
@@ -336,14 +342,14 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		if (ctx->cb == NULL) {
 			skynet_free(msg.data);
 		} else {
-			dispatch_message(ctx, &msg);
+			dispatch_message(ctx, &msg);            // 处理回调函数
 		}
 
 		skynet_monitor_trigger(sm, 0,0);
 	}
 
 	assert(q == ctx->queue);
-	struct message_queue *nq = skynet_globalmq_pop();
+	struct message_queue *nq = skynet_globalmq_pop();   //再从全局队列pop一个队列出来
 	if (nq) {
 		// If global mq is not empty , push q back, and return next queue (nq)
 		// Else (global mq is empty or block, don't push q back, and return q again (for next dispatch)
@@ -648,7 +654,7 @@ cmd_signal(struct skynet_context * context, const char * param) {
 }
 
 static struct command_func cmd_funcs[] = {
-	{ "TIMEOUT", cmd_timeout },
+	{ "TIMEOUT", cmd_timeout },//{name, func}
 	{ "REG", cmd_reg },
 	{ "QUERY", cmd_query },
 	{ "NAME", cmd_name },
@@ -667,11 +673,18 @@ static struct command_func cmd_funcs[] = {
 	{ NULL, NULL },
 };
 
+/**
+ *
+ * @param context
+ * @param cmd         REG
+ * @param param       .logger
+ * @return
+ */
 const char * 
 skynet_command(struct skynet_context * context, const char * cmd , const char * param) {
 	struct command_func * method = &cmd_funcs[0];
 	while(method->name) {
-		if (strcmp(cmd, method->name) == 0) {
+		if (strcmp(cmd, method->name) == 0) {//直到找到method->name == REG
 			return method->func(context, param);
 		}
 		++method;
@@ -700,7 +713,17 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 
 	*sz |= (size_t)type << MESSAGE_TYPE_SHIFT;
 }
-
+/**
+ *
+ * @param context
+ * @param source
+ * @param destination
+ * @param type  		 区分请求包和回应包
+ * @param session
+ * @param data
+ * @param sz
+ * @return
+ */
 int
 skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
 	if ((sz & MESSAGE_TYPE_MASK) != sz) {
@@ -776,7 +799,12 @@ uint32_t
 skynet_context_handle(struct skynet_context *ctx) {
 	return ctx->handle;
 }
-
+/**
+ *
+ * @param context
+ * @param ud 回调函数的参数
+ * @param cb 回调函数指针
+ */
 void 
 skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb) {
 	context->cb = cb;

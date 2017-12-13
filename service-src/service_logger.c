@@ -65,7 +65,7 @@ logger_init(struct logger * inst, struct skynet_context *ctx, const char * parm)
 	}
 	if (inst->handle) {
 		skynet_callback(ctx, inst, logger_cb); // 注册了一个回调函数，当有消息到来时，这个函数会被调用
-		skynet_command(ctx, "REG", ".logger"); // 注册日志全局名字
+		skynet_command(ctx, "REG", ".logger"); // 调用了cmd_reg()函数  为context命名为logger  (注册日志全局名字)
 		return 0;
 	}
 	return 1;

@@ -143,7 +143,13 @@ launch_cb(struct skynet_context * context, void *ud, int type, int session, uint
 
 	return 0;
 }
-
+/**
+ * skynet_module.c skynet_module_instance_init will call it
+ * @param l
+ * @param ctx
+ * @param args   bootstrap
+ * @return
+ */
 int
 snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	int sz = strlen(args);
@@ -153,7 +159,11 @@ snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	const char * self = skynet_command(ctx, "REG", NULL);
 	uint32_t handle_id = strtoul(self+1, NULL, 16);
 	// it must be first message
-	skynet_send(ctx, 0, handle_id, PTYPE_TAG_DONTCOPY,0, tmp, sz);
+
+	// 向自己发送了一条消息，并附带了一个参数，这个参数就是bootstrap。
+	// 当把消息队列加入到全局队列后，收到的第一条消息就是这条消息。
+	// 收到第一条消息后，调用到callback函数，也就是service_snlua.c里的_launch方法
+	skynet_send(ctx, 0, handle_id, PTYPE_TAG_DONTCOPY,0, tmp, sz);// tmp: bootstrap
 	return 0;
 }
 
