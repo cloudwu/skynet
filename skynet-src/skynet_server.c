@@ -41,8 +41,8 @@
 #endif
 
 struct skynet_context {
-	void * instance;
-	struct skynet_module * mod;
+	void * instance;				//模块实例引用
+	struct skynet_module * mod;		//模块引用
 	void * cb_ud;
 	skynet_cb cb;
 	struct message_queue *queue;
@@ -52,17 +52,17 @@ struct skynet_context {
 	char result[32];
 	uint32_t handle;
 	int session_id;
-	int ref;
+	int ref;						//引用计数
 	int message_count;
 	bool init;
-	bool endless;
+	bool endless;					//消息分发陷入死循环
 	bool profile;
 
 	CHECKCALLING_DECL
 };
 
 struct skynet_node {
-	int total;
+	int total;						//上下文计数器
 	int init;
 	uint32_t monitor_exit;
 	pthread_key_t handle_key;
@@ -121,19 +121,24 @@ drop_message(struct skynet_message *msg, void *ud) {
 	// report error to the message source
 	skynet_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
 }
-
+/**
+ * 创建一个新的上下文
+ * @param name 模块名 加载name的动态库，像snlua.so
+ * @param param 模块初始化时使用的参数
+ * @return
+ */
 struct skynet_context * 
 skynet_context_new(const char * name, const char *param) {
-	struct skynet_module * mod = skynet_module_query(name);
+	struct skynet_module * mod = skynet_module_query(name); 	//1. 根据名字查询模块 根据名字查询模块snlua等
 
 	if (mod == NULL)
 		return NULL;
 
-	void *inst = skynet_module_instance_create(mod);
+	void *inst = skynet_module_instance_create(mod);			//2. 根据模块创建实例 snlua_create()创建lua VM
 	if (inst == NULL)
 		return NULL;
-	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
-	CHECKCALLING_INIT(ctx)
+	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));	//3. 为skynet上下文分配内存
+	CHECKCALLING_INIT(ctx)										//检查调用初始化
 
 	ctx->mod = mod;
 	ctx->instance = inst;
@@ -152,20 +157,20 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->profile = G_NODE.profile;
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
 	ctx->handle = 0;	
-	ctx->handle = skynet_handle_register(ctx);
-	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
+	ctx->handle = skynet_handle_register(ctx);					// 4. 注册分配句柄
+	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);	// 5. 创建队列消息
 	// init function maybe use ctx->handle, so it must init at last
-	context_inc();
+	context_inc();												//上下文计数增加
 
 	CHECKCALLING_BEGIN(ctx)
-	int r = skynet_module_instance_init(mod, inst, ctx, param);
+	int r = skynet_module_instance_init(mod, inst, ctx, param); //执行snlua_init()完成服务的创建 // 6. 调用模块实例的初始化函数
 	CHECKCALLING_END(ctx)
 	if (r == 0) {
-		struct skynet_context * ret = skynet_context_release(ctx);
+		struct skynet_context * ret = skynet_context_release(ctx); //因为上下文的引用计数初始化为2,所以这里调用一次release减1
 		if (ret) {
 			ctx->init = true;
 		}
-		skynet_globalmq_push(queue);
+		skynet_globalmq_push(queue);							//将队列push到全局队列中
 		if (ret) {
 			skynet_error(ret, "LAUNCH %s %s", name, param ? param : "");
 		}

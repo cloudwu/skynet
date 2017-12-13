@@ -247,30 +247,32 @@ void
 skynet_start(struct skynet_config * config) {
 	// register SIGHUP for log file reopen
 	struct sigaction sa;
-	sa.sa_handler = &handle_hup;
-	sa.sa_flags = SA_RESTART;
-	sigfillset(&sa.sa_mask);
-	sigaction(SIGHUP, &sa, NULL);
+	sa.sa_handler = &handle_hup;    // Setup the handler function
+	sa.sa_flags = SA_RESTART;       // Restart the system call, if at all possible
+	sigfillset(&sa.sa_mask);        // Block every signal during the handler
+	sigaction(SIGHUP, &sa, NULL);   // SIGHUP:挂起信号 sa：新的处理函数， NULL：不保留旧的处理函数
 
 	if (config->daemon) {
-		if (daemon_init(config->daemon)) {
+		if (daemon_init(config->daemon)) {  //skynet_daemon.c 初始化守护进程，由配置文件指定是否调用
 			exit(1);
 		}
 	}
-	skynet_harbor_init(config->harbor);
-	skynet_handle_init(config->harbor);
-	skynet_mq_init();
-	skynet_module_init(config->module_path);
-	skynet_timer_init();
-	skynet_socket_init();
+	skynet_harbor_init(config->harbor);         //skynet_harbor.c初始化节点模块，用于集群，转发远程节点消息
+	skynet_handle_init(config->harbor);         //skynet_handle.c初始化句柄模块
+	skynet_mq_init();                           //skynet_mq.c初始化消息队列模块
+	skynet_module_init(config->module_path);    //skynet_module.c初始化服务动态库加载模块, 加载符合skynet服务模块接口的动态链接库
+	skynet_timer_init();                        //skynet_timer.c定时器模块
+	skynet_socket_init();                       //skynet_socket.c网络通信模块
 	skynet_profile_enable(config->profile);
 
-	struct skynet_context *ctx = skynet_context_new(config->logservice, config->logger);
+	struct skynet_context *ctx = skynet_context_new(config->logservice, config->logger);   //skynet_server.c加载日志模块(系统启动的第一个模块)
 	if (ctx == NULL) {
 		fprintf(stderr, "Can't launch %s service\n", config->logservice);
 		exit(1);
 	}
-
+    //启动的服务是bootstrap，但先要加载snlua模块，所有的lua服务都属于snlua模块的实例。
+    //加载引导模块 默认 config->bootstrap = "snlua bootstrap",并使用snlua服务启动bootstrap.lua脚本
+    //不使用snlua也可以直接启动其他服务的动态库
 	bootstrap(ctx, config->bootstrap);
 
 	start(config->thread);

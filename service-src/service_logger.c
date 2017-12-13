@@ -52,7 +52,7 @@ logger_cb(struct skynet_context * context, void *ud, int type, int session, uint
 
 int
 logger_init(struct logger * inst, struct skynet_context *ctx, const char * parm) {
-	if (parm) {
+	if (parm) {								//如果param不为空，则将日志输出到文件
 		inst->handle = fopen(parm,"w");
 		if (inst->handle == NULL) {
 			return 1;
@@ -64,8 +64,8 @@ logger_init(struct logger * inst, struct skynet_context *ctx, const char * parm)
 		inst->handle = stdout;
 	}
 	if (inst->handle) {
-		skynet_callback(ctx, inst, logger_cb);
-		skynet_command(ctx, "REG", ".logger");
+		skynet_callback(ctx, inst, logger_cb); // 注册了一个回调函数，当有消息到来时，这个函数会被调用
+		skynet_command(ctx, "REG", ".logger"); // 注册日志全局名字
 		return 0;
 	}
 	return 1;
