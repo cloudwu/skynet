@@ -645,6 +645,8 @@ function skynet.init_service(start)
 end
 
 function skynet.start(start_func)
+	-- 重新注册一个callback函数，并且指定收到消息时由dispatch_message分发
+	-- 具体如何实现回调方法的注册过程，需要查看c.callback这个C语言方法的底层实现，源码在lualib-src/lua-skynet.c
 	c.callback(skynet.dispatch_message)
 	skynet.timeout(0, function()
 		skynet.init_service(start_func)
