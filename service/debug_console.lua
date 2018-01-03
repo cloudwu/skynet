@@ -131,6 +131,11 @@ skynet.start(function()
 		socket.start(id)
 		skynet.fork(console_main_loop, id , print)
 	end)
+
+	skynet.dispatch("lua", function(session, source, cmd, ...)
+		local f = assert(COMMAND[cmd])
+		skynet.pack(f(...))
+	end)
 end)
 
 local command_help = {
@@ -164,7 +169,7 @@ function COMMAND.help()
 end
 
 function COMMAND.register_help(name, describe)
-	command_help[key] = value
+	command_help[name] = describe
 end
 
 function COMMAND.register_command(name, func_str)
