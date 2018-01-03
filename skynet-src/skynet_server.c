@@ -298,7 +298,7 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 	}
 }
 /**
- *不断从【全局队列】取出【消息队列】，处理【消息队列】的消息    dispatch（调度）
+ *不断从【全局队列】取出【服务消息队列】，处理【服务消息队列】的消息    dispatch（调度）
  * @param sm
  * @param q
  * @param weight
@@ -307,31 +307,32 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 struct message_queue * 
 skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
 	if (q == NULL) {
-		q = skynet_globalmq_pop();
-		if (q==NULL)
+		q = skynet_globalmq_pop();                 // 假如为空则从全局消息队列中获取
+		if (q==NULL)                               // 假如已经拿不到二级队列则返回
 			return NULL;
 	}
 
-	uint32_t handle = skynet_mq_handle(q);//消息队列 =》 句柄号
+	uint32_t handle = skynet_mq_handle(q);          // 获取当前二级队列所属服务的handle句柄
 
-	struct skynet_context * ctx = skynet_handle_grab(handle);//句柄号 =》上下文（进程实体）
-	if (ctx == NULL) {
-		struct drop_t d = { handle };
+	struct skynet_context * ctx = skynet_handle_grab(handle); //通过handle获取服务实例 上下文
+	if (ctx == NULL) {                              // 判断服务实例是否为空
+		struct drop_t d = { handle };               // 将句柄封装在结构体中
 		skynet_mq_release(q, drop_message, &d);     // 释放掉该队列
-		return skynet_globalmq_pop();               // 再从全局队列中pop一个队列出来并返回
+		return skynet_globalmq_pop();               // 再从全局队列中pop一个服务消息队列出来并返回
 	}
 
 	int i,n=1;
 	struct skynet_message msg;                      //定义一个skynet消息用于存放收到的消息
 
 	for (i=0;i<n;i++) {
-		if (skynet_mq_pop(q,&msg)) {                //弹出消息
-			skynet_context_release(ctx);            //释放上下文，减少上下文的引用计数 为什么？因为skynet_handle_grab会增加上下文的引用计数
+		if (skynet_mq_pop(q,&msg)) {                //从 message_queue 中 pop 一个 msg 消息出来
+			skynet_context_release(ctx);            //返回1表示取出失败 释放上下文，减少上下文的引用计数 为什么？因为skynet_handle_grab会增加上下文的引用计数
 			return skynet_globalmq_pop();           //再从全局队列中pop一个队列出来并返回
 		} else if (i==0 && weight >= 0) {
-			n = skynet_mq_length(q);
+			n = skynet_mq_length(q);                //获取消息队列的消息数量
 			n >>= weight;
 		}
+        //成功从[服务消息队列]pop出[skynet_message]
 		int overload = skynet_mq_overload(q);       //获取超载值
 		if (overload) {                             //超载值不为零，代表超载了
 			skynet_error(ctx, "May overload, message queue length = %d", overload);
@@ -339,7 +340,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 
 		skynet_monitor_trigger(sm, msg.source , handle);
 
-		if (ctx->cb == NULL) {
+		if (ctx->cb == NULL) {                      //判断 ctx 服务的 cb 属性是否为空
 			skynet_free(msg.data);
 		} else {
 			dispatch_message(ctx, &msg);            // 处理回调函数
@@ -353,6 +354,8 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 	if (nq) {
 		// If global mq is not empty , push q back, and return next queue (nq)
 		// Else (global mq is empty or block, don't push q back, and return q again (for next dispatch)
+        // 假如全局消息队列不为空，将当前处理的消息队列q放回全局消息队列，并返回下一个消息队列nq
+        // 假如全局消息队列是空的或者阻塞,不将当前处理队列q放回全局消息队列,并再次将 q 返回(提供给下一次 dispatch操作)
 		skynet_globalmq_push(q);
 		q = nq;
 	} 

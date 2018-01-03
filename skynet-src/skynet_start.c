@@ -157,10 +157,10 @@ thread_worker(void *p) {
 	struct monitor *m = wp->m;
 	struct skynet_monitor *sm = m->m[id];
 	skynet_initthread(THREAD_WORKER);
-	struct message_queue * q = NULL;
+	struct message_queue * q = NULL;                            //服务私有消息队列
 	while (!m->quit) {
 		q = skynet_context_message_dispatch(sm, q, weight);     //消息队列的派发和处理
-		if (q == NULL) {
+		if (q == NULL) {                                        //消息队列无消息可执行则挂起当前工作线程
 			if (pthread_mutex_lock(&m->mutex) == 0) {           //上互斥锁 成功返回0
 				++ m->sleep;
 				// "spurious wakeup" is harmless,
@@ -214,6 +214,8 @@ start(int thread) {
 	for (i=0;i<thread;i++) {
 		wp[i].m = m;
 		wp[i].id = i;
+        //第i个线程的weight为：当i小于weight数组长度时，线程weight为weight[i]，否则为0
+        //每个线程一次处理的消息个数由工作线程配置的权重决定。
 		if (i < sizeof(weight)/sizeof(weight[0])) {
 			wp[i].weight= weight[i];
 		} else {
@@ -275,7 +277,7 @@ skynet_start(struct skynet_config * config) {
     //不使用snlua也可以直接启动其他服务的动态库
 	bootstrap(ctx, config->bootstrap);
 
-	start(config->thread);
+	start(config->thread);                       // start worker thread
 
 	// harbor_exit may call socket send, so it should exit before socket_free
 	skynet_harbor_exit();

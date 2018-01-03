@@ -139,17 +139,17 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 	int ret = 1;
 	SPIN_LOCK(q)
 
-	if (q->head != q->tail) {
-		*message = q->queue[q->head++];
+	if (q->head != q->tail) {                          //判断队列是否为空
+		*message = q->queue[q->head++];                //取出队列的取出指针指向的消息，然后队列的取出指针自加1
 		ret = 0;
 		int head = q->head;
 		int tail = q->tail;
 		int cap = q->cap;
 
-		if (head >= cap) {
+		if (head >= cap) {                             //头指针溢出判断
 			q->head = head = 0;
 		}
-		int length = tail - head;
+		int length = tail - head;                      //剩余消息数量统计
 		if (length < 0) {
 			length += cap;
 		}
@@ -159,10 +159,11 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 		}
 	} else {
 		// reset overload_threshold when queue is empty
+		// 当消息队列为空时重置overload_threshold
 		q->overload_threshold = MQ_OVERLOAD;
 	}
 
-	if (ret) {
+	if (ret) {                                         //将空的二级消息队列标记为不在全局消息队列中
 		q->in_global = 0;
 	}
 	
