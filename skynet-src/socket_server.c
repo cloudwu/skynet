@@ -956,7 +956,7 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	}
 	struct socket_lock l;
 	socket_lock_init(s, &l);
-	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
+	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {// accept返回的已连接套接字，但未加入epoll管理 || 监听套接字，未加入epoll管理
 		if (sp_add(ss->event_fd, s->fd, s)) {
 			force_close(ss, s, &l, result);
 			result->data = strerror(errno);
@@ -1009,7 +1009,7 @@ has_cmd(struct socket_server *ss) {
 	int retval;
 
 	FD_SET(ss->recvctrl_fd, &ss->rfds);
-
+    //做好准备的文件描述符的个数
 	retval = select(ss->recvctrl_fd+1, &ss->rfds, NULL, NULL, &tv);
 	if (retval == 1) {
 		return 1;
@@ -1087,10 +1087,10 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	// the length of message is one byte, so 256+8 buffer size is enough.
 	uint8_t buffer[256];
 	uint8_t header[2];
-	block_readpipe(fd, header, sizeof(header));
+	block_readpipe(fd, header, sizeof(header));// 先读取类型和长度 header
 	int type = header[0];
 	int len = header[1];
-	block_readpipe(fd, buffer, len);
+	block_readpipe(fd, buffer, len); //再从管道中读取数据
 	// ctrl command only exist in local fd, so don't worry about endian.
 	switch (type) {
 	case 'S':
@@ -1341,8 +1341,8 @@ int
 socket_server_poll(struct socket_server *ss, struct socket_message * result, int * more) {
 	for (;;) {		// 控制命令的检查没有纳入到epoll管理，目的是为了提高控制命令检查频率
 		if (ss->checkctrl) {
-			if (has_cmd(ss)) {
-				int type = ctrl_cmd(ss, result);
+			if (has_cmd(ss)) { // 检测管道读端是否可读
+				int type = ctrl_cmd(ss, result);//响应控制命令
 				if (type != -1) {
 					clear_closed_event(ss, result, type);
 					return type;
@@ -1366,9 +1366,9 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				}
 				return -1;
 			}
-		}
+		}//ss->ev 新返回的重新赋值
 		struct event *e = &ss->ev[ss->event_index++];
-		struct socket *s = e->s;
+		struct socket *s = e->s;//epoll_event[i].data.ptr;
 		if (s == NULL) {
 			// dispatch pipe message at beginning
 			continue;
@@ -1443,6 +1443,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 // 向管道发送请求
 static void
 send_request(struct socket_server *ss, struct request_package *request, char type, int len) {
+    // 6 bytes dummy, header[0]~header[5]未使用, header[6] for type, header[7] for len, len是指包体长度
 	request->header[6] = (uint8_t)type;
 	request->header[7] = (uint8_t)len;
 	for (;;) {
