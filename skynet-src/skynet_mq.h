@@ -5,10 +5,10 @@
 #include <stdint.h>
 
 struct skynet_message {
-	uint32_t source;
-	int session;
-	void * data;
-	size_t sz;
+	uint32_t source;   //消息所属服务的地址（服务实例的 handle）
+	int session;       //用来做上下文的标识
+	void * data;       //消息地址指针
+	size_t sz;         //消息大小（消息的请求类型定义在高8位）
 };
 
 // type is encoding in skynet_message.sz high 8bit

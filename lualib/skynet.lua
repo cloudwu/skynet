@@ -533,7 +533,10 @@ function skynet.dispatch_message(...)
 	end
 	assert(succ, tostring(err))
 end
-
+-- @param name: 用来创建lua服务的 lua脚本名称
+-- 这些lua脚本存放的目录取决于config配置文件中 luaservice 项的配置信息
+-- 例如配置信息为：luaservice = root.."service.lua;"..root.."test.lua;"..root.."examples.lua"
+-- 表示skynet通过 skynet.newservice 查询与 name 参数匹配的lua脚本会查找 service 、test 和 example 这三个目录下的 .lua 脚本。
 function skynet.newservice(name, ...)
 	return skynet.call(".launcher", "lua" , "LAUNCH", "snlua", name, ...)
 end

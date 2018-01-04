@@ -92,7 +92,7 @@ lcallback(lua_State *L) {
 
 	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
 	lua_State *gL = lua_tothread(L,-1);
-
+	//与 snlua 初始化 snlua_init 中的一致，使用 skynet_callback 来实现回调方法的注册
 	if (forward) {
 		skynet_callback(context, gL, forward_cb);
 	} else {

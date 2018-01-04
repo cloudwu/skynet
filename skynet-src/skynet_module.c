@@ -151,7 +151,7 @@ skynet_module_insert(struct skynet_module *mod) {
 void * 
 skynet_module_instance_create(struct skynet_module *m) {
 	if (m->create) {
-		return m->create();// service_logger.c logger_create()
+		return m->create();// service_logger.c logger_create() or  service_snlua.c snlua_create
 	} else {
 		return (void *)(intptr_t)(~0);
 	}

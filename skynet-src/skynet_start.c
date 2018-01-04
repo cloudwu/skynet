@@ -230,17 +230,21 @@ start(int thread) {
 
 	free_monitor(m);
 }
-
+/**
+ * 	bootstrap(ctx, config->bootstrap);
+ * @param logger
+ * @param cmdline : "snlua bootstrap"
+ */
 static void
 bootstrap(struct skynet_context * logger, const char * cmdline) {
-	int sz = strlen(cmdline);
+	int sz = strlen(cmdline);  //获取字符串长度
 	char name[sz+1];
 	char args[sz+1];
-	sscanf(cmdline, "%s %s", name, args);
-	struct skynet_context *ctx = skynet_context_new(name, args);
-	if (ctx == NULL) {
-		skynet_error(NULL, "Bootstrap error : %s\n", cmdline);
-		skynet_context_dispatchall(logger);
+	sscanf(cmdline, "%s %s", name, args); //将传入的cmdline字符串按照格式分割成两部分，前部分模块名，后部分为模块初始化参数
+	struct skynet_context *ctx = skynet_context_new(name, args);  //skynet_context_new("snlua", "boostrap")创建并启动指定模块的一个服务
+	if (ctx == NULL) {  //假如创建失败
+		skynet_error(NULL, "Bootstrap error : %s\n", cmdline); //通过传入的logger服务接口构建错误信息假如logger消息队列
+		skynet_context_dispatchall(logger);   //输出消息队列中的错误信息
 		exit(1);
 	}
 }
@@ -262,7 +266,7 @@ skynet_start(struct skynet_config * config) {
 	skynet_harbor_init(config->harbor);         //skynet_harbor.c初始化节点模块，用于集群，转发远程节点消息
 	skynet_handle_init(config->harbor);         //skynet_handle.c初始化句柄模块
 	skynet_mq_init();                           //skynet_mq.c初始化消息队列模块
-	skynet_module_init(config->module_path);    //skynet_module.c初始化服务动态库加载模块, 加载符合skynet服务模块接口的动态链接库
+	skynet_module_init(config->module_path);    //skynet_module.c初始化服务动态库加载模块, 加载符合skynet服务模块接口的动态链接库（.so）
 	skynet_timer_init();                        //skynet_timer.c定时器模块
 	skynet_socket_init();                       //skynet_socket.c网络通信模块
 	skynet_profile_enable(config->profile);

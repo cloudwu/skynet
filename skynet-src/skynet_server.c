@@ -122,7 +122,7 @@ drop_message(struct skynet_message *msg, void *ud) {
 	skynet_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
 }
 /**
- * 创建一个新的上下文
+ * 创建一个新的上下文  skynet_context_new(config->logservice, config->logger)
  * @param name 模块名 加载name的动态库，像snlua.so
  * @param param 模块初始化时使用的参数
  * @return
@@ -133,7 +133,8 @@ skynet_context_new(const char * name, const char *param) {
 
 	if (mod == NULL)
 		return NULL;
-
+    // skynet_module_instance_create最后返回的是一个通过 lua_newstate 创建出来的 Lua vm（lua虚拟机），
+	// 也就是一个沙盒环境，这是为了达到让每个 lua服务 都运行在独立的虚拟机中。
 	void *inst = skynet_module_instance_create(mod);			//2. 根据模块创建实例 snlua_create()创建lua VM
 	if (inst == NULL)
 		return NULL;
@@ -170,7 +171,7 @@ skynet_context_new(const char * name, const char *param) {
 		if (ret) {
 			ctx->init = true;
 		}
-		skynet_globalmq_push(queue);							//将队列push到全局队列中
+		skynet_globalmq_push(queue);							//将队列push到全局队列中 这样才能收到消息回调
 		if (ret) {
 			skynet_error(ret, "LAUNCH %s %s", name, param ? param : "");
 		}
@@ -264,26 +265,27 @@ skynet_isremote(struct skynet_context * ctx, uint32_t handle, int * harbor) {
 
 static void
 dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
-	assert(ctx->init);
-	CHECKCALLING_BEGIN(ctx)
+	assert(ctx->init);               //判断服务是否已经初始化过（有则继续执行，否则结束）
+	CHECKCALLING_BEGIN(ctx)          //开启服务锁住状态
 	pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx->handle));
-	int type = msg->sz >> MESSAGE_TYPE_SHIFT;
-	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
-	if (ctx->logfile) {
+	int type = msg->sz >> MESSAGE_TYPE_SHIFT; //从信息的sz字段的高8位获取消息类型信息
+	size_t sz = msg->sz & MESSAGE_TYPE_MASK;  //获得消息的有效数据大小
+	if (ctx->logfile) {    //输出日志到消息所属服务的日志文件中
 		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
 	}
 	++ctx->message_count;
 	int reserve_msg;
-	if (ctx->profile) {
+	if (ctx->profile) {    //判断是否统计单条消息的处理时间标志profile
 		ctx->cpu_start = skynet_thread_time();
-		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
-		uint64_t cost_time = skynet_thread_time() - ctx->cpu_start;
+        //开始处理回调函数cb,并将执行结果保存到reserve
+		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);  //调用服务里的回调函数
+		uint64_t cost_time = skynet_thread_time() - ctx->cpu_start; //CPU耗时统计
 		ctx->cpu_cost += cost_time;
-	} else {
+	} else {               //不统计耗时则直接执行回调函数
 		reserve_msg = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
 	}
-	if (!reserve_msg) {
-		skynet_free(msg->data);
+	if (!reserve_msg) {    //回调函数执行结果部位空则表示执行成功
+		skynet_free(msg->data);               //释放消息数据
 	}
 	CHECKCALLING_END(ctx)
 }

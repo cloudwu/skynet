@@ -170,11 +170,11 @@ launch_cb(struct skynet_context * context, void *ud, int type, int session, uint
 int
 snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	int sz = strlen(args);
-	char * tmp = skynet_malloc(sz);
+	char * tmp = skynet_malloc(sz);  //在内存中准备一个空间（动态内存分配）
 	memcpy(tmp, args, sz);
 	skynet_callback(ctx, l , launch_cb);//1. 给当前服务实例注册绑定了launch_cb，有消息传入时会调用回调函数并处理
 	const char * self = skynet_command(ctx, "REG", NULL);
-	uint32_t handle_id = strtoul(self+1, NULL, 16);
+	uint32_t handle_id = strtoul(self+1, NULL, 16);  //当前lua实例自己的句柄id（转为无符号长整型）
 	// it must be first message
 
 	// 向自己发送了一条消息，并附带了一个参数，这个参数就是bootstrap。
@@ -210,7 +210,7 @@ snlua_create(void) {
 	memset(l,0,sizeof(*l));
 	l->mem_report = MEMORY_WARNING_REPORT;
 	l->mem_limit = 0;
-	l->L = lua_newstate(lalloc, l);
+	l->L = lua_newstate(lalloc, l); //创建一个lua虚拟机（Lua State）
 	return l;
 }
 
