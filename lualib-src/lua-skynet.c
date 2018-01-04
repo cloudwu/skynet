@@ -215,7 +215,7 @@ send_message(lua_State *L, int source, int idx_type) {
 		void * msg = lua_touserdata(L,idx_type+2);
         //获取第五个形参
 		int size = luaL_checkinteger(L,idx_type+3);
-		if (dest_string) {
+		if (dest_string) {// tag : don't copy
 			session = skynet_sendname(context, source, dest_string, type | PTYPE_TAG_DONTCOPY, session, msg, size);
 		} else {
 			session = skynet_send(context, source, dest, type | PTYPE_TAG_DONTCOPY, session, msg, size);
