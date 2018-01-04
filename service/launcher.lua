@@ -74,6 +74,9 @@ function command.REMOVE(_, handle, kill)
 	return NORET
 end
 
+-- skynet.newservice(name,...)通过调用 skynet.call 接口，向 laucher 服务（源码是laucher.lua）发送一个 LAUNCH 消息，
+-- 从而调用launch_service(service, ...)
+-- 所有创建skynet服务（除了laucher 服务自身）的操作都由 laucher 服务统一实现和管理的
 local function launch_service(service, ...)
 	local param = table.concat({...}, " ")
 	local inst = skynet.launch(service, param)

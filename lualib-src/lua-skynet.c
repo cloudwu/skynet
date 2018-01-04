@@ -177,6 +177,7 @@ get_dest_string(lua_State *L, int index) {
 static int
 send_message(lua_State *L, int source, int idx_type) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+    //获取第一个形参（uint32或string）
 	uint32_t dest = (uint32_t)lua_tointeger(L, 1);
 	const char * dest_string = NULL;
 	if (dest == 0) {
@@ -185,15 +186,16 @@ send_message(lua_State *L, int source, int idx_type) {
 		}
 		dest_string = get_dest_string(L, 1);
 	}
-
+    //获取第二个形参
 	int type = luaL_checkinteger(L, idx_type+0);
 	int session = 0;
 	if (lua_isnil(L,idx_type+1)) {
 		type |= PTYPE_TAG_ALLOCSESSION;
 	} else {
+        //获取第三个形参
 		session = luaL_checkinteger(L,idx_type+1);
 	}
-
+    //获取第四个形参
 	int mtype = lua_type(L,idx_type+2);
 	switch (mtype) {
 	case LUA_TSTRING: {
@@ -211,6 +213,7 @@ send_message(lua_State *L, int source, int idx_type) {
 	}
 	case LUA_TLIGHTUSERDATA: {
 		void * msg = lua_touserdata(L,idx_type+2);
+        //获取第五个形参
 		int size = luaL_checkinteger(L,idx_type+3);
 		if (dest_string) {
 			session = skynet_sendname(context, source, dest_string, type | PTYPE_TAG_DONTCOPY, session, msg, size);
