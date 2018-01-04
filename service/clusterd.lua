@@ -26,7 +26,16 @@ local function open_channel(t, key)
 	end
 	ct = {}
 	connecting[key] = ct
-	local host, port = string.match(node_address[key], "([^:]+):(.*)$")
+	local address = node_address[key]
+	if address == nil then
+		local co = coroutine.running()
+		assert(ct.namequery == nil)
+		ct.namequery = co
+		skynet.error("Wating for cluster node [".. key.."]")
+		skynet.wait(co)
+		address = assert(node_address[key])
+	end
+	local host, port = string.match(address, "([^:]+):(.*)$")
 	local c = sc.channel {
 		host = host,
 		port = tonumber(port),
@@ -66,6 +75,11 @@ local function loadconfig(tmp)
 				node_channel[name] = nil	-- reset connection
 			end
 			node_address[name] = address
+		end
+		local ct = connecting[name]
+		if ct and ct.namequery then
+			skynet.error(string.format("Cluster node [%s] resloved : %s", name, address))
+			skynet.wakeup(ct.namequery)
 		end
 	end
 end

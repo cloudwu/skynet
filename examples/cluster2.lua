@@ -18,6 +18,11 @@ skynet.start(function()
 	cluster.send("db2", sdb, "PING", "db2:longstring" .. largevalue)
 
 	-- test snax service
-	local pingserver = cluster.snax("db", "pingserver")
+	skynet.timeout(300,function()
+		cluster.reload {
+			db3 = "127.0.0.1:2529"
+		}
+	end)
+	local pingserver = cluster.snax("db3", "pingserver")
 	print(pingserver.req.ping "hello")
 end)
