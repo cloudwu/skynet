@@ -51,7 +51,7 @@ _try_open(struct modules *m, const char * name) {
 			fprintf(stderr,"Invalid C service path\n");
 			exit(1);
 		}
-		dl = dlopen(tmp, RTLD_NOW | RTLD_GLOBAL);
+		dl = dlopen(tmp, RTLD_NOW | RTLD_GLOBAL);//以指定模式打开指定的动态链接库文件，并返回一个句柄给dlsym（）的调用进程
 		path = l;
 	}while(dl == NULL);
 
@@ -73,6 +73,12 @@ _query(const char * name) {
 	return NULL;
 }
 
+/**
+ *  构造模块的函数create init release signal
+ * @param mod       logger
+ * @param api_name      _create
+ * @return
+ */
 static void *
 get_api(struct skynet_module *mod, const char *api_name) {
 	size_t name_size = strlen(mod->name);
@@ -86,12 +92,12 @@ get_api(struct skynet_module *mod, const char *api_name) {
 	} else {
 		ptr = ptr + 1;
 	}
-	return dlsym(mod->module, ptr);
+	return dlsym(mod->module, ptr);// 根据动态链接库操作句柄与符号，返回符号对应的地址，不但可以获取函数地址，也可以获取变量地址
 }
 
 static int
 open_sym(struct skynet_module *mod) {
-	mod->create = get_api(mod, "_create");
+	mod->create = get_api(mod, "_create");// logger_create
 	mod->init = get_api(mod, "_init");
 	mod->release = get_api(mod, "_release");
 	mod->signal = get_api(mod, "_signal");
@@ -145,7 +151,7 @@ skynet_module_insert(struct skynet_module *mod) {
 void * 
 skynet_module_instance_create(struct skynet_module *m) {
 	if (m->create) {
-		return m->create();
+		return m->create();// service_logger.c logger_create() or  service_snlua.c snlua_create
 	} else {
 		return (void *)(intptr_t)(~0);
 	}
@@ -153,7 +159,7 @@ skynet_module_instance_create(struct skynet_module *m) {
 
 int
 skynet_module_instance_init(struct skynet_module *m, void * inst, struct skynet_context *ctx, const char * parm) {
-	return m->init(inst, ctx, parm);
+	return m->init(inst, ctx, parm);// service_logger.c logger_init()
 }
 
 void 

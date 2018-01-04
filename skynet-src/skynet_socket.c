@@ -70,6 +70,18 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	}
 }
 
+/**
+#define SOCKET_DATA 0 	// 有数据到来
+#define SOCKET_CLOSE 1	// 连接关闭
+#define SOCKET_OPEN 2	// 连接建立（主动或者被动，并且已加入到epoll）
+#define SOCKET_ACCEPT 3	// 被动连接建立（即accept成功返回已连接套接字）但未加入到epoll
+#define SOCKET_ERR 4	// 发生错误
+#define SOCKET_EXIT 5	// 退出事件
+#define SOCKET_UDP 6
+#define SOCKET_WARNING 7
+ * @return
+ */
+
 int 
 skynet_socket_poll() {
 	struct socket_server *ss = SOCKET_SERVER;

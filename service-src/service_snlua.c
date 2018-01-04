@@ -71,7 +71,14 @@ optstring(struct skynet_context *ctx, const char *key, const char * str) {
 	}
 	return ret;
 }
-
+/**
+ * 设置了一些虚拟机环境变量（主要是资源路径类的）
+ * @param l
+ * @param ctx
+ * @param args
+ * @param sz
+ * @return
+ */
 static int
 init_cb(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz) {
 	lua_State *L = l->L;
@@ -100,8 +107,8 @@ init_cb(struct snlua *l, struct skynet_context *ctx, const char * args, size_t s
 
 	lua_pushcfunction(L, traceback);
 	assert(lua_gettop(L) == 1);
-
-	const char * loader = optstring(ctx, "lualoader", "./lualib/loader.lua");
+	//loader的作用是以cml参数为名去各项代码目录查找lua文件，找到后loadfile并执行(等效于dofile)
+	const char * loader = optstring(ctx, "lualoader", "./lualib/loader.lua");//加载执行了lualib/loader.lua文件
 
 	int r = luaL_loadfile(L,loader);
 	if (r != LUA_OK) {
@@ -109,7 +116,7 @@ init_cb(struct snlua *l, struct skynet_context *ctx, const char * args, size_t s
 		report_launcher_error(ctx);
 		return 1;
 	}
-	lua_pushlstring(L, args, sz);
+	lua_pushlstring(L, args, sz);//同时把真正要加载的文件（此时是bootstrap.lua）作为参数传给它，最终bootstrap.lua脚本会被加载并执行脚本中的逻辑，　控制权就开始转到lua层。
 	r = lua_pcall(L,1,0,1);
 	if (r != LUA_OK) {
 		skynet_error(ctx, "lua loader error : %s", lua_tostring(L, -1));
@@ -130,30 +137,50 @@ init_cb(struct snlua *l, struct skynet_context *ctx, const char * args, size_t s
 
 	return 0;
 }
-
+/**
+ * 当此服务的消息队列被push进全局的消息队列后，本服务收到的第一条消息就是上述在初始化中给自己发送的那条消息，此时便会调用回调函数launch_cb并执行处理逻辑
+ * @param context
+ * @param ud
+ * @param type
+ * @param session
+ * @param source
+ * @param msg
+ * @param sz
+ * @return
+ */
 static int
 launch_cb(struct skynet_context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz) {
 	assert(type == 0 && session == 0);
 	struct snlua *l = ud;
-	skynet_callback(context, NULL, NULL);
-	int err = init_cb(l, context, msg, sz);
+	skynet_callback(context, NULL, NULL);//将服务服务自己在C语言层面的回调函数给注销了，使它不再接收消息，目的是：在lua层重新注册它，把消息通过lua接口来接收。
+	int err = init_cb(l, context, msg, sz);//设置各项资源路径参数，并加载loader.lua
 	if (err) {
 		skynet_command(context, "EXIT", NULL);
 	}
 
 	return 0;
 }
-
+/**
+ * skynet_module.c skynet_module_instance_init will call it
+ * @param l
+ * @param ctx
+ * @param args   bootstrap
+ * @return
+ */
 int
 snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
 	int sz = strlen(args);
-	char * tmp = skynet_malloc(sz);
+	char * tmp = skynet_malloc(sz);  //在内存中准备一个空间（动态内存分配）
 	memcpy(tmp, args, sz);
-	skynet_callback(ctx, l , launch_cb);
+	skynet_callback(ctx, l , launch_cb);//1. 给当前服务实例注册绑定了launch_cb，有消息传入时会调用回调函数并处理
 	const char * self = skynet_command(ctx, "REG", NULL);
-	uint32_t handle_id = strtoul(self+1, NULL, 16);
+	uint32_t handle_id = strtoul(self+1, NULL, 16);  //当前lua实例自己的句柄id（转为无符号长整型）
 	// it must be first message
-	skynet_send(ctx, 0, handle_id, PTYPE_TAG_DONTCOPY,0, tmp, sz);
+
+	// 向自己发送了一条消息，并附带了一个参数，这个参数就是bootstrap。
+	// 当把消息队列加入到全局队列后，收到的第一条消息就是这条消息。
+	// 收到第一条消息后，调用到callback函数，也就是service_snlua.c里的_launch方法
+	skynet_send(ctx, 0, handle_id, PTYPE_TAG_DONTCOPY,0, tmp, sz);//2. 给本服务发送一条消息，内容就是之前传入的参数args = tmp: bootstrap
 	return 0;
 }
 
@@ -183,7 +210,7 @@ snlua_create(void) {
 	memset(l,0,sizeof(*l));
 	l->mem_report = MEMORY_WARNING_REPORT;
 	l->mem_limit = 0;
-	l->L = lua_newstate(lalloc, l);
+	l->L = lua_newstate(lalloc, l); //创建一个lua虚拟机（Lua State）
 	return l;
 }
 

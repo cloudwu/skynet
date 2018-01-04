@@ -393,9 +393,13 @@ local function yield_call(service, session)
 	return msg,sz
 end
 
+
 function skynet.call(addr, typename, ...)
-	local p = proto[typename]
-	local session = c.send(addr, p.id , nil , p.pack(...))
+	local p = proto[typename]  -- 先在 proto 进程管理器字典中获取指定服务类型 typename 对应的进程
+	-- c 是一个C模块：local c = require "skynet.core" ，即 skynet.core 模块
+    -- addr 是服务的地址
+	-- p 是处理 addr 对应服务的进程
+	local session = c.send(addr, p.id , nil , p.pack(...))  -- 再通过skynet.core这个C模块的send功能(lualib-src/lua-skynet.c)，向指定服务发送数据
 	if session == nil then
 		error("call to invalid address " .. skynet.address(addr))
 	end
@@ -534,10 +538,24 @@ function skynet.dispatch_message(...)
 	assert(succ, tostring(err))
 end
 
+
+-- 关于全局服务的创建，其实也跟普通服务一样，是用 skynet.call (异步变同步)的方式让 service_mgr 服务创建目标服务(类似于通知 launch 服创建服务一样)。
+-- 区别在于创建全局服务时，假如 service_mgr 这边如已创建则直接返回服务地址；如没则创建；如正在创建则等结果。
+
+
+
+-- @param name: 用来创建lua服务的 lua脚本名称
+-- 这些lua脚本存放的目录取决于config配置文件中 luaservice 项的配置信息
+-- 例如配置信息为：luaservice = root.."service.lua;"..root.."test.lua;"..root.."examples.lua"
+-- 表示skynet通过 skynet.newservice 查询与 name 参数匹配的lua脚本会查找 service 、test 和 example 这三个目录下的 .lua 脚本。
+-- 每调用一次创建接口就会创建出一个对应的服务实例，可以同时创建成千上万个，用唯一的id来区分每个服务实例
 function skynet.newservice(name, ...)
+	-- 通过调用 skynet.call 接口，向 laucher 服务（源码是laucher.lua）发送一个 LAUNCH 消息
 	return skynet.call(".launcher", "lua" , "LAUNCH", "snlua", name, ...)
 end
 
+-- 全局唯一的服务等同于单例，即不管调用多少次创建接口，最后都只会创建一个此类型的服务实例且全局唯一
+-- 当参数 global=true 时，则表示此服务在所有节点之间是唯一的
 function skynet.uniqueservice(global, ...)
 	if global == true then
 		return assert(skynet.call(".service", "lua", "GLAUNCH", ...))
@@ -546,6 +564,8 @@ function skynet.uniqueservice(global, ...)
 	end
 end
 
+-- 假如不清楚当前创建了此全局服务没有，可以通过以下接口来查询
+-- global=true 时如果还没有创建过目标服务则一直等下去，直到目标服务被(其他服务触发而)创建
 function skynet.queryservice(global, ...)
 	if global == true then
 		return assert(skynet.call(".service", "lua", "GQUERY", ...))
@@ -645,6 +665,8 @@ function skynet.init_service(start)
 end
 
 function skynet.start(start_func)
+	-- 重新注册一个callback函数，并且指定收到消息时由dispatch_message分发
+	-- 具体如何实现回调方法的注册过程，需要查看c.callback这个C语言方法的底层实现，源码在lualib-src/lua-skynet.c
 	c.callback(skynet.dispatch_message)
 	skynet.timeout(0, function()
 		skynet.init_service(start_func)

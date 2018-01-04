@@ -9,11 +9,11 @@ typedef void (*skynet_dl_release)(void * inst);
 typedef void (*skynet_dl_signal)(void * inst, int signal);
 
 struct skynet_module {
-	const char * name;
-	void * module;
-	skynet_dl_create create;
-	skynet_dl_init init;
-	skynet_dl_release release;
+	const char * name;          //模块名
+	void * module;              //模块句柄 此句柄不是skynet中handle
+	skynet_dl_create create;    //创建函数
+	skynet_dl_init init;        //初始化函数
+	skynet_dl_release release;  //销毁函数
 	skynet_dl_signal signal;
 };
 

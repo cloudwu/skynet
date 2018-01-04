@@ -17,25 +17,25 @@
 
 #define MQ_IN_GLOBAL 1
 #define MQ_OVERLOAD 1024
-
+//消息队列数据结构定义
 struct message_queue {
 	struct spinlock lock;
 	uint32_t handle;
-	int cap;
+	int cap;					//容量
 	int head;
 	int tail;
-	int release;
+	int release;				//消息队列释放标记，当要释放一个服务的时候 清理标记
 	int in_global;
 	int overload;
 	int overload_threshold;
 	struct skynet_message *queue;
 	struct message_queue *next;
 };
-
+//全局队列数据结构定义
 struct global_queue {
-	struct message_queue *head;
-	struct message_queue *tail;
-	struct spinlock lock;
+	struct message_queue *head;	//消息队列头指针
+	struct message_queue *tail;	//消息队列尾指针
+	struct spinlock lock;		//锁
 };
 
 static struct global_queue *Q = NULL;
@@ -139,17 +139,17 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 	int ret = 1;
 	SPIN_LOCK(q)
 
-	if (q->head != q->tail) {
-		*message = q->queue[q->head++];
+	if (q->head != q->tail) {                          //判断队列是否为空
+		*message = q->queue[q->head++];                //取出队列的取出指针指向的消息，然后队列的取出指针自加1
 		ret = 0;
 		int head = q->head;
 		int tail = q->tail;
 		int cap = q->cap;
 
-		if (head >= cap) {
+		if (head >= cap) {                             //头指针溢出判断
 			q->head = head = 0;
 		}
-		int length = tail - head;
+		int length = tail - head;                      //剩余消息数量统计
 		if (length < 0) {
 			length += cap;
 		}
@@ -159,10 +159,11 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 		}
 	} else {
 		// reset overload_threshold when queue is empty
+		// 当消息队列为空时重置overload_threshold
 		q->overload_threshold = MQ_OVERLOAD;
 	}
 
-	if (ret) {
+	if (ret) {                                         //将空的二级消息队列标记为不在全局消息队列中
 		q->in_global = 0;
 	}
 	

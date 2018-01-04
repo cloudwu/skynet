@@ -6,9 +6,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define PTYPE_TEXT 0
-#define PTYPE_RESPONSE 1
-#define PTYPE_MULTICAST 2
+#define PTYPE_TEXT 0            // 内部服务最为常用的文本消息类型
+#define PTYPE_RESPONSE 1        // 表示这是一个回应包，应该依据对方的规范来解码
+#define PTYPE_MULTICAST 2       // 组播
 #define PTYPE_CLIENT 3
 #define PTYPE_SYSTEM 4
 #define PTYPE_HARBOR 5

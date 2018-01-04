@@ -38,7 +38,7 @@ sp_add(int efd, int sock, void *ud) {
 
 static void 
 sp_del(int efd, int sock) {
-	epoll_ctl(efd, EPOLL_CTL_DEL, sock , NULL);
+	epoll_ctl(efd, EPOLL_CTL_DEL, sock , NULL); //将该文件描述符sock从红黑树上摘除
 }
 
 static void 
@@ -55,8 +55,8 @@ sp_wait(int efd, struct event *e, int max) {
 	int n = epoll_wait(efd , ev, max, -1);
 	int i;
 	for (i=0;i<n;i++) {
-		e[i].s = ev[i].data.ptr;
-		unsigned flag = ev[i].events;
+		e[i].s = ev[i].data.ptr;// sp_add往ev注册了ev.data.ptr = ud
+		unsigned flag = ev[i].events;// sp_add往ev注册了ev.events = EPOLLIN or ...
 		e[i].write = (flag & EPOLLOUT) != 0;
 		e[i].read = (flag & (EPOLLIN | EPOLLHUP)) != 0;
 		e[i].error = (flag & EPOLLERR) != 0;
