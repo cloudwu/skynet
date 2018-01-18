@@ -79,7 +79,7 @@ struct socket {
 	struct wb_list high;
 	struct wb_list low;
 	int64_t wb_size;
-	uint32_t sending;
+	volatile uint32_t sending;
 	int fd;
 	int id;
 	uint8_t protocol;
@@ -568,8 +568,6 @@ send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 			}
 			break;
 		}
-		assert((s->sending & 0xffff) != 0);
-		ATOM_DEC(&s->sending);
 		list->head = tmp->next;
 		write_buffer_free(ss,tmp);
 	}
@@ -748,8 +746,6 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_lock *l, s
 			s->high.head = buf;
 		}
 		s->dw_buffer = NULL;
-		// socket locked. Don't need use 'add_sending_ref', just ATOM_INC is ok.
-		ATOM_INC(&s->sending);
 	}
 	int r = send_buffer_(ss,s,l,result);
 	socket_unlock(l);
@@ -889,7 +885,7 @@ _failed:
 
 static inline int
 nomore_sending_data(struct socket *s) {
-	return ((s->sending & 0xffff) == 0) && s->dw_buffer == NULL;
+	return send_buffer_empty(s) && s->dw_buffer == NULL && (s->sending & 0xffff) == 0;
 }
 
 static int
@@ -1059,6 +1055,35 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 	return -1;
 }
 
+static inline void
+inc_sending_ref(struct socket *s, int id) {
+	for (;;) {
+		uint32_t sending = s->sending;
+		if ((sending >> 16) == ID_TAG16(id)) {
+			if ((sending & 0xffff) == 0xffff) {
+				// s->sending may overflow (rarely), so busy waiting here for socket thread dec it. see issue #794
+				continue;
+			}
+			// inc sending only matching the same socket id
+			if (ATOM_CAS(&s->sending, sending, sending + 1))
+				return;
+			// atom inc failed, retry
+		} else {
+			// socket id changed, just return
+			return;
+		}
+	}
+}
+
+static inline void
+dec_sending_ref(struct socket_server *ss, int id) {
+	struct socket * s = &ss->slot[HASH_ID(id)];
+	if (s->id == id) {
+		assert((s->sending & 0xffff) != 0);
+		ATOM_DEC(&s->sending);
+	}
+}
+
 // return type
 static int
 ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
@@ -1089,9 +1114,13 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 		result->data = NULL;
 		return SOCKET_EXIT;
 	case 'D':
-		return send_socket(ss, (struct request_send *)buffer, result, PRIORITY_HIGH, NULL);
-	case 'P':
-		return send_socket(ss, (struct request_send *)buffer, result, PRIORITY_LOW, NULL);
+	case 'P': {
+		int priority = (type == 'D') ? PRIORITY_HIGH : PRIORITY_LOW;
+		struct request_send * request = (struct request_send *) buffer;
+		int ret = send_socket(ss, request, result, priority, NULL);
+		dec_sending_ref(ss, request->id);
+		return ret;
+	}
 	case 'A': {
 		struct request_send_udp * rsu = (struct request_send_udp *)buffer;
 		return send_socket(ss, &rsu->send, result, PRIORITY_HIGH, rsu->address);
@@ -1471,25 +1500,6 @@ can_direct_write(struct socket *s, int id) {
 	return s->id == id && nomore_sending_data(s) && s->type == SOCKET_TYPE_CONNECTED && s->udpconnecting == 0;
 }
 
-static inline void
-add_sending_ref(struct socket *s, int id) {
-	if (s->protocol == PROTOCOL_TCP) {
-		// udp don't need order
-		for (;;) {
-			uint32_t sending = s->sending;
-			if ((sending >> 16) == ID_TAG16(id)) {
-				// inc sending only matching the same socket id
-				if (ATOM_CAS(&s->sending, sending, sending + 1))
-					return;
-				// atom inc failed, retry
-			} else {
-				// socket id changed, just return
-				return;
-			}
-		}
-	}
-}
-
 // return -1 when error, 0 when success
 int 
 socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz) {
@@ -1539,7 +1549,7 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 		socket_unlock(&l);
 	}
 
-	add_sending_ref(s, id);
+	inc_sending_ref(s, id);
 
 	struct request_package request;
 	request.u.send.id = id;
@@ -1559,7 +1569,7 @@ socket_server_send_lowpriority(struct socket_server *ss, int id, const void * bu
 		return -1;
 	}
 
-	add_sending_ref(s, id);
+	inc_sending_ref(s, id);
 
 	struct request_package request;
 	request.u.send.id = id;
