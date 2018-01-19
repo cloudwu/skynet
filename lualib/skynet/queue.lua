@@ -21,7 +21,7 @@ function skynet.queue()
 		return ...
 	end
 
-	return function(f, ...)
+	local function queue_call(f, ...)
 		local thread = coroutine.running()
 		if current_thread and current_thread ~= thread then
 			table.insert(thread_queue, thread)
@@ -33,6 +33,12 @@ function skynet.queue()
 		ref = ref + 1
 		return xpcall_ret(xpcall(f, traceback, ...))
 	end
+
+	local function queue_empty()
+        return not next(thread_queue)
+    end
+
+	return queue_call, queue_empty
 end
 
 return skynet.queue
