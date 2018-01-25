@@ -43,6 +43,7 @@
 #define PROTOCOL_TCP 0
 #define PROTOCOL_UDP 1
 #define PROTOCOL_UDPv6 2
+#define PROTOCOL_UNKNOWN 255
 
 #define UDP_ADDRESS_SIZE 19	// ipv6 128bit + port 16bit + 1 byte type
 
@@ -303,6 +304,7 @@ reserve_id(struct socket_server *ss) {
 		if (s->type == SOCKET_TYPE_INVALID) {
 			if (ATOM_CAS(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
 				s->id = id;
+				s->protocol = PROTOCOL_UNKNOWN;
 				// socket_server_udp_connect may inc s->udpconncting directly (from other thread, before new_fd), 
 				// so reset it to 0 here rather than in new_fd.
 				s->udpconnecting = 0;
@@ -1057,6 +1059,8 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 
 static inline void
 inc_sending_ref(struct socket *s, int id) {
+	if (s->protocol != PROTOCOL_TCP)
+		return;
 	for (;;) {
 		uint32_t sending = s->sending;
 		if ((sending >> 16) == ID_TAG16(id)) {
@@ -1078,7 +1082,8 @@ inc_sending_ref(struct socket *s, int id) {
 static inline void
 dec_sending_ref(struct socket_server *ss, int id) {
 	struct socket * s = &ss->slot[HASH_ID(id)];
-	if (s->id == id) {
+	// Notice: udp may inc sending while type == SOCKET_TYPE_RESERVE
+	if (s->id == id && s->protocol == PROTOCOL_TCP) {
 		assert((s->sending & 0xffff) != 0);
 		ATOM_DEC(&s->sending);
 	}
