@@ -415,6 +415,8 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz, int depth)
 		append_key(bs, L, BSON_BOOLEAN, key, sz);
 		write_byte(bs, lua_toboolean(L,-1));
 		break;
+	case LUA_TNIL:
+		luaL_error(L, "Bson array has a hole (nil), Use bson.null instead");
 	default:
 		luaL_error(L, "Invalid value type : %s", lua_typename(L,vt));
 	}
@@ -452,12 +454,7 @@ pack_dict_data(lua_State *L, struct bson *b, int depth, int kt) {
 	size_t sz;
 	switch(kt) {
 	case LUA_TNUMBER:
-		// copy key, don't change key type
-		lua_pushvalue(L,-2);
-		lua_insert(L,-2);
-		key = lua_tolstring(L,-2,&sz);
-		append_one(b, L, key, sz, depth);
-		lua_pop(L,2);
+		luaL_error(L, "Bson dictionary's key can't be number");
 		break;
 	case LUA_TSTRING:
 		key = lua_tolstring(L,-2,&sz);

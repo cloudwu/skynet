@@ -164,7 +164,7 @@ local function _recv_packet(self,sock)
         typ = "ERR"
     elseif field_count == 0xfe then
         typ = "EOF"
-    elseif field_count <= 250 then
+    else
         typ = "DATA"
     end
 

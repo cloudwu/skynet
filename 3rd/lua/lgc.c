@@ -654,8 +654,9 @@ static void clearkeys (global_State *g, GCObject *l, GCObject *f) {
     for (n = gnode(h, 0); n < limit; n++) {
       if (!ttisnil(gval(n)) && (iscleared(g, gkey(n)))) {
         setnilvalue(gval(n));  /* remove value ... */
-        removeentry(n);  /* and remove entry from table */
       }
+      if (ttisnil(gval(n)))  /* is entry empty? */
+        removeentry(n);  /* remove entry from table */
     }
   }
 }

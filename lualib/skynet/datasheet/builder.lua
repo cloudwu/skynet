@@ -8,6 +8,13 @@ local builder = {}
 local cache = {}
 local dataset = {}
 local address
+
+local unique_id = 0
+local function unique_string(str)
+	unique_id = unique_id + 1
+	return str .. tostring(unique_id)
+end
+
 local function monitor(pointer)
 	skynet.fork(function()
 		skynet.call(address, "lua", "collect", pointer)
@@ -30,7 +37,7 @@ end
 
 function builder.new(name, v)
 	assert(dataset[name] == nil)
-	local datastring = dumpsheet(v)
+	local datastring = unique_string(dumpsheet(v))
 	local pointer = core.stringpointer(datastring)
 	skynet.call(address, "lua", "update", name, pointer)
 	cache[datastring] = pointer
@@ -41,7 +48,7 @@ end
 function builder.update(name, v)
 	local lastversion = assert(dataset[name])
 	local newversion = dumpsheet(v)
-	local diff = dump.diff(lastversion, newversion)
+	local diff = unique_string(dump.diff(lastversion, newversion))
 	local pointer = core.stringpointer(diff)
 	skynet.call(address, "lua", "update", name, pointer)
 	cache[diff] = pointer

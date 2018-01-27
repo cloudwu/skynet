@@ -357,6 +357,7 @@ function skynet.getenv(key)
 end
 
 function skynet.setenv(key, value)
+	assert(c.command("GETENV",key) == nil, "Can't setenv exist key : " .. key)
 	c.command("SETENV",key .. " " ..value)
 end
 

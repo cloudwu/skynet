@@ -252,7 +252,7 @@ If n is odd, that means the tags is not continuous, and we should add current ta
 
 Arrays are always encode in data part, 4 bytes header for the size, and the following bytes is the contents. See the example 2 for the struct array; example 3/4 for the integer array ; example 5 for the boolean array.
 
-Fot integer array, an additional byte (4 or 8) to indicate the value is 32bit or 64bit.
+For integer array, an additional byte (4 or 8) to indicate the value is 32bit or 64bit.
 
 Read the examples below to see more details.
 

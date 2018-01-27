@@ -11,6 +11,8 @@
 #define SIZEOF_LENGTH 4
 #define SIZEOF_HEADER 2
 #define SIZEOF_FIELD 2
+#define SIZEOF_INT64 ((int)sizeof(uint64_t))
+#define SIZEOF_INT32 ((int)sizeof(uint32_t))
 
 struct field {
 	int tag;
@@ -758,7 +760,7 @@ encode_integer_array(sproto_callback cb, struct sproto_arg *args, uint8_t *buffe
 		return NULL;
 	buffer++;
 	size--;
-	intlen = sizeof(uint32_t);
+	intlen = SIZEOF_INT32;
 	index = 1;
 	*noarray = 0;
 
@@ -781,36 +783,38 @@ encode_integer_array(sproto_callback cb, struct sproto_arg *args, uint8_t *buffe
 			}
 			return NULL;	// sz == SPROTO_CB_ERROR
 		}
-		if (size < sizeof(uint64_t))
+		// notice: sizeof(uint64_t) is size_t (unsigned) , size may be negative. See issue #75
+		// so use MACRO SIZOF_INT64 instead
+		if (size < SIZEOF_INT64)
 			return NULL;
-		if (sz == sizeof(uint32_t)) {
+		if (sz == SIZEOF_INT32) {
 			uint32_t v = u.u32;
 			buffer[0] = v & 0xff;
 			buffer[1] = (v >> 8) & 0xff;
 			buffer[2] = (v >> 16) & 0xff;
 			buffer[3] = (v >> 24) & 0xff;
 
-			if (intlen == sizeof(uint64_t)) {
+			if (intlen == SIZEOF_INT64) {
 				uint32_to_uint64(v & 0x80000000, buffer);
 			}
 		} else {
 			uint64_t v;
-			if (sz != sizeof(uint64_t))
+			if (sz != SIZEOF_INT64)
 				return NULL;
-			if (intlen == sizeof(uint32_t)) {
+			if (intlen == SIZEOF_INT32) {
 				int i;
 				// rearrange
-				size -= (index-1) * sizeof(uint32_t);
-				if (size < sizeof(uint64_t))
+				size -= (index-1) * SIZEOF_INT32;
+				if (size < SIZEOF_INT64)
 					return NULL;
-				buffer += (index-1) * sizeof(uint32_t);
+				buffer += (index-1) * SIZEOF_INT32;
 				for (i=index-2;i>=0;i--) {
 					int negative;
-					memcpy(header+1+i*sizeof(uint64_t), header+1+i*sizeof(uint32_t), sizeof(uint32_t));
-					negative = header[1+i*sizeof(uint64_t)+3] & 0x80;
-					uint32_to_uint64(negative, header+1+i*sizeof(uint64_t));
+					memcpy(header+1+i*SIZEOF_INT64, header+1+i*SIZEOF_INT32, SIZEOF_INT32);
+					negative = header[1+i*SIZEOF_INT64+3] & 0x80;
+					uint32_to_uint64(negative, header+1+i*SIZEOF_INT64);
 				}
-				intlen = sizeof(uint64_t);
+				intlen = SIZEOF_INT64;
 			}
 
 			v = u.u64;
@@ -956,14 +960,14 @@ sproto_encode(const struct sproto_type *st, void * buffer, int size, sproto_call
 						return 0;
 					return -1;	// sz == SPROTO_CB_ERROR
 				}
-				if (sz == sizeof(uint32_t)) {
+				if (sz == SIZEOF_INT32) {
 					if (u.u32 < 0x7fff) {
 						value = (u.u32+1) * 2;
 						sz = 2; // sz can be any number > 0
 					} else {
 						sz = encode_integer(u.u32, data, size);
 					}
-				} else if (sz == sizeof(uint64_t)) {
+				} else if (sz == SIZEOF_INT64) {
 					sz= encode_uint64(u.u64, data, size);
 				} else {
 					return -1;
@@ -1066,22 +1070,22 @@ decode_array(sproto_callback cb, struct sproto_arg *args, uint8_t * stream) {
 		int len = *stream;
 		++stream;
 		--sz;
-		if (len == sizeof(uint32_t)) {
-			if (sz % sizeof(uint32_t) != 0)
+		if (len == SIZEOF_INT32) {
+			if (sz % SIZEOF_INT32 != 0)
 				return -1;
-			for (i=0;i<sz/sizeof(uint32_t);i++) {
-				uint64_t value = expand64(todword(stream + i*sizeof(uint32_t)));
+			for (i=0;i<sz/SIZEOF_INT32;i++) {
+				uint64_t value = expand64(todword(stream + i*SIZEOF_INT32));
 				args->index = i+1;
 				args->value = &value;
 				args->length = sizeof(value);
 				cb(args);
 			}
-		} else if (len == sizeof(uint64_t)) {
-			if (sz % sizeof(uint64_t) != 0)
+		} else if (len == SIZEOF_INT64) {
+			if (sz % SIZEOF_INT64 != 0)
 				return -1;
-			for (i=0;i<sz/sizeof(uint64_t);i++) {
-				uint64_t low = todword(stream + i*sizeof(uint64_t));
-				uint64_t hi = todword(stream + i*sizeof(uint64_t) + sizeof(uint32_t));
+			for (i=0;i<sz/SIZEOF_INT64;i++) {
+				uint64_t low = todword(stream + i*SIZEOF_INT64);
+				uint64_t hi = todword(stream + i*SIZEOF_INT64 + SIZEOF_INT32);
 				uint64_t value = low | hi << 32;
 				args->index = i+1;
 				args->value = &value;
@@ -1175,16 +1179,16 @@ sproto_decode(const struct sproto_type *st, const void * data, int size, sproto_
 				switch (f->type) {
 				case SPROTO_TINTEGER: {
 					uint32_t sz = todword(currentdata);
-					if (sz == sizeof(uint32_t)) {
+					if (sz == SIZEOF_INT32) {
 						uint64_t v = expand64(todword(currentdata + SIZEOF_LENGTH));
 						args.value = &v;
 						args.length = sizeof(v);
 						cb(&args);
-					} else if (sz != sizeof(uint64_t)) {
+					} else if (sz != SIZEOF_INT64) {
 						return -1;
 					} else {
 						uint32_t low = todword(currentdata + SIZEOF_LENGTH);
-						uint32_t hi = todword(currentdata + SIZEOF_LENGTH + sizeof(uint32_t));
+						uint32_t hi = todword(currentdata + SIZEOF_LENGTH + SIZEOF_INT32);
 						uint64_t v = (uint64_t)low | (uint64_t) hi << 32;
 						args.value = &v;
 						args.length = sizeof(v);
