@@ -121,7 +121,7 @@ function datasheet.monitor(source, handle)
 	else
 		h.ref = h.ref + 1
 		assert(not t.monitor[source])
-		t.monitor[source]=handle
+		t.monitor[source]=skynet.response()
 	end
 end
 
