@@ -82,13 +82,15 @@ end
 
 local function register_collector(name)
 	local function collect()
-		local m = dataset[name].monitor
+		local t = dataset[name]
+		local m = t.monitor
 		local i = 1
 		while m[i] do
 			if not m[i] "TEST" then
 				local n = #m
 				m[i] = m[n]
 				m[n] = nil
+				releasehandle(t.handle)
 			else
 				i = i + 1
 			end
@@ -108,14 +110,24 @@ function datasheet.update(name, handle)
 		handles[handle] = { ref = 1, name = name }
 		register_collector(name)
 	else
+		local old_handle = t.handle
 		t.handle = handle
 		-- report update to customers
-		handles[handle] = { ref = 1 + #t.monitor, name = name }
+		handles[handle] = {
+			ref = nil,
+			name = name
+		}
+		local ref = 1
 
 		for k,v in ipairs(t.monitor) do
-			v(true, handle)
+			if v(true, handle) then
+				ref = ref + 1
+			else
+				releasehandle(old_handle)
+			end
 			t.monitor[k] = nil
 		end
+		handles[handle].ref = ref
 	end
 	skynet.ret()
 end
