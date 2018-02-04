@@ -80,6 +80,24 @@ local function releasehandle(handle)
 	end
 end
 
+local function register_collector(name)
+	local function collect()
+		local m = dataset[name].monitor
+		local i = 1
+		while m[i] do
+			if not m[i] "TEST" then
+				local n = #m
+				m[i] = m[n]
+				m[n] = nil
+			else
+				i = i + 1
+			end
+		end
+		skynet.timeout(10 * 60 * 100, collect)	-- 10 mins
+	end
+	collect()
+end
+
 -- from builder, create or update handle
 function datasheet.update(name, handle)
 	local t = dataset[name]
@@ -88,6 +106,7 @@ function datasheet.update(name, handle)
 		t = { handle = handle, monitor = {} }
 		dataset[name] = t
 		handles[handle] = { ref = 1, name = name }
+		register_collector(name)
 	else
 		t.handle = handle
 		-- report update to customers
