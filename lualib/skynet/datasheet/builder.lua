@@ -119,7 +119,6 @@ function datasheet.monitor(source, handle)
 	if t.handle ~= handle then	-- already changes
 		skynet.ret(skynet.pack(t.handle))
 	else
-		h.ref = h.ref + 1
 		assert(not t.monitor[source])
 		t.monitor[source]=skynet.response()
 	end
