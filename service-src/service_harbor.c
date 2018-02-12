@@ -707,7 +707,7 @@ mainloop(struct skynet_context * context, void * ud, int type, int session, uint
 	}
 	default:
 		skynet_error(context, "recv invalid message from %x,  type = %d", source, type);
-		if (session != 0) {
+		if (session != 0 && type != PTYPE_ERROR) {
 			skynet_send(context,0,source,PTYPE_ERROR, session, NULL, 0);
 		}
 		return 0;
