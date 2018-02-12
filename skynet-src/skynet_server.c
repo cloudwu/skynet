@@ -718,7 +718,8 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 		struct remote_message * rmsg = skynet_malloc(sizeof(*rmsg));
 		rmsg->destination.handle = destination;
 		rmsg->message = data;
-		rmsg->sz = sz;
+		rmsg->sz = sz & MESSAGE_TYPE_MASK;
+		rmsg->type = sz >> MESSAGE_TYPE_SHIFT;
 		skynet_harbor_send(rmsg, source, session);
 	} else {
 		struct skynet_message smsg;
@@ -758,7 +759,8 @@ skynet_sendname(struct skynet_context * context, uint32_t source, const char * a
 		copy_name(rmsg->destination.name, addr);
 		rmsg->destination.handle = 0;
 		rmsg->message = data;
-		rmsg->sz = sz;
+		rmsg->sz = sz & MESSAGE_TYPE_MASK;
+		rmsg->type = sz >> MESSAGE_TYPE_SHIFT;
 
 		skynet_harbor_send(rmsg, source, session);
 		return session;
