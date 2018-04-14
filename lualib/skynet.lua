@@ -295,20 +295,12 @@ function skynet.wait(co)
 	session_id_coroutine[session] = nil
 end
 
-local self_handle
 function skynet.self()
-	if self_handle then
-		return self_handle
-	end
-	self_handle = string_to_handle(c.command("REG"))
-	return self_handle
+	return c.addresscommand "REG"
 end
 
 function skynet.localname(name)
-	local addr = c.command("QUERY", name)
-	if addr then
-		return string_to_handle(addr)
-	end
+	return c.addresscommand("QUERY", name)
 end
 
 skynet.now = c.now
