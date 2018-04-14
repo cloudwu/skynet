@@ -246,7 +246,7 @@ dump_c_mem() {
 		struct mem_data* data = &mem_stats[i];
 		if(data->handle != 0 && data->allocated != 0) {
 			total += data->allocated;
-			skynet_error(NULL, "0x%x -> %zdkb", data->handle, data->allocated >> 10);
+			skynet_error(NULL, ":%08x -> %zdkb %db", data->handle, data->allocated >> 10, (int)(data->allocated % 1024));
 		}
 	}
 	skynet_error(NULL, "+total: %zdkb",total >> 10);
