@@ -11,18 +11,17 @@ fd = tonumber(fd)
 local large_request = {}
 local register_name = {}
 
-local function dispatch_request(_,_,addr, session, msg, padding, is_push)
-	local sz
+local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 	if padding then
 		local req = large_request[session] or { addr = addr , is_push = is_push }
 		large_request[session] = req
-		table.insert(req, msg)
+		cluster.append(req, msg, sz)
 		return
 	else
 		local req = large_request[session]
 		if req then
 			large_request[session] = nil
-			table.insert(req, msg)
+			cluster.append(req, msg, sz)
 			msg,sz = cluster.concat(req)
 			addr = req.addr
 			is_push = req.is_push
@@ -36,6 +35,7 @@ local function dispatch_request(_,_,addr, session, msg, padding, is_push)
 	local ok, response
 	if addr == 0 then
 		local name = skynet.unpack(msg, sz)
+		skynet.trash(msg, sz)
 		local addr = register_name[name]
 		if addr == nil then
 			addr = skynet.call(clusterd, "lua", "queryname", name)

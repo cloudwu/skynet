@@ -208,13 +208,23 @@ lpackpush(lua_State *L) {
 	return 	
 		uint32_t or string addr
 		int session
-		string msg
+		lightuserdata msg
+		int sz
 		boolean padding
+		boolean is_push
  */
 
 static inline uint32_t
 unpack_uint32(const uint8_t * buf) {
 	return buf[0] | buf[1]<<8 | buf[2]<<16 | buf[3]<<24;
+}
+
+static void
+return_buffer(lua_State *L, const char * buffer, int sz) {
+	void * ptr = skynet_malloc(sz);
+	memcpy(ptr, buffer, sz);
+	lua_pushlightuserdata(L, ptr);
+	lua_pushinteger(L, sz);
 }
 
 static int
@@ -226,14 +236,15 @@ unpackreq_number(lua_State *L, const uint8_t * buf, int sz) {
 	uint32_t session = unpack_uint32(buf+5);
 	lua_pushinteger(L, address);
 	lua_pushinteger(L, session);
-	lua_pushlstring(L, (const char *)buf+9, sz-9);
+
+	return_buffer(L, (const char *)buf+9, sz-9);
 	if (session == 0) {
 		lua_pushnil(L);
 		lua_pushboolean(L,1);	// is_push, no reponse
-		return 5;
+		return 6;
 	}
 
-	return 3;
+	return 4;
 }
 
 static int
@@ -246,11 +257,12 @@ unpackmreq_number(lua_State *L, const uint8_t * buf, int sz, int is_push) {
 	uint32_t size = unpack_uint32(buf+9);
 	lua_pushinteger(L, address);
 	lua_pushinteger(L, session);
+	lua_pushnil(L);
 	lua_pushinteger(L, size);
 	lua_pushboolean(L, 1);	// padding multi part
 	lua_pushboolean(L, is_push);
 
-	return 5;
+	return 6;
 }
 
 static int
@@ -262,10 +274,10 @@ unpackmreq_part(lua_State *L, const uint8_t * buf, int sz) {
 	uint32_t session = unpack_uint32(buf+1);
 	lua_pushboolean(L, 0);	// no address
 	lua_pushinteger(L, session);
-	lua_pushlstring(L, (const char *)buf+5, sz-5);
+	return_buffer(L, (const char *)buf+5, sz-5);
 	lua_pushboolean(L, padding);
 
-	return 4;
+	return 5;
 }
 
 static int
@@ -280,14 +292,14 @@ unpackreq_string(lua_State *L, const uint8_t * buf, int sz) {
 	lua_pushlstring(L, (const char *)buf+2, namesz);
 	uint32_t session = unpack_uint32(buf + namesz + 2);
 	lua_pushinteger(L, (uint32_t)session);
-	lua_pushlstring(L, (const char *)buf+2+namesz+4, sz - namesz - 6);
+	return_buffer(L, (const char *)buf+2+namesz+4, sz - namesz - 6);
 	if (session == 0) {
 		lua_pushnil(L);
 		lua_pushboolean(L,1);	// is_push, no reponse
-		return 5;
+		return 6;
 	}
 
-	return 3;
+	return 4;
 }
 
 static int
@@ -303,11 +315,12 @@ unpackmreq_string(lua_State *L, const uint8_t * buf, int sz, int is_push) {
 	uint32_t session = unpack_uint32(buf + namesz + 2);
 	uint32_t size = unpack_uint32(buf + namesz + 6);
 	lua_pushinteger(L, session);
+	lua_pushnil(L);
 	lua_pushinteger(L, size);
 	lua_pushboolean(L, 1);	// padding multipart
 	lua_pushboolean(L, is_push);
 
-	return 5;
+	return 6;
 }
 
 static int
@@ -481,6 +494,32 @@ lunpackresponse(lua_State *L) {
 	}
 }
 
+/*
+	table
+	pointer
+	sz
+
+	push (pointer/sz) as string into table, and free pointer
+ */
+static int
+lappend(lua_State *L) {
+	luaL_checktype(L, 1, LUA_TTABLE);
+	int n = lua_rawlen(L, 1);
+	if (lua_isnil(L, 2)) {
+		lua_settop(L, 3);
+		lua_seti(L, 1, n + 1);
+		return 0;
+	}
+	void * buffer = lua_touserdata(L, 2);
+	if (buffer == NULL)
+		return luaL_error(L, "Need lightuserdata");
+	int sz = luaL_checkinteger(L, 3);
+	lua_pushlstring(L, (const char *)buffer, sz);
+	skynet_free((void *)buffer);
+	lua_seti(L, 1, n+1);
+	return 0;
+}
+
 static int
 lconcat(lua_State *L) {
 	if (!lua_istable(L,1))
@@ -522,6 +561,7 @@ luaopen_skynet_cluster_core(lua_State *L) {
 		{ "unpackrequest", lunpackrequest },
 		{ "packresponse", lpackresponse },
 		{ "unpackresponse", lunpackresponse },
+		{ "append", lappend },
 		{ "concat", lconcat },
 		{ NULL, NULL },
 	};
