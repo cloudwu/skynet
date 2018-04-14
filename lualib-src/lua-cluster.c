@@ -312,9 +312,16 @@ unpackmreq_string(lua_State *L, const uint8_t * buf, int sz, int is_push) {
 
 static int
 lunpackrequest(lua_State *L) {
-	size_t ssz;
-	const char *msg = luaL_checklstring(L,1,&ssz);
-	int sz = (int)ssz;
+	int sz;
+	const char *msg;
+	if (lua_type(L, 1) == LUA_TLIGHTUSERDATA) {
+		msg = (const char *)lua_touserdata(L, 1);
+		sz = luaL_checkinteger(L, 2);
+	} else {
+		size_t ssz;
+		msg = luaL_checklstring(L,1,&ssz);
+		sz = (int)ssz;
+	}
 	switch (msg[0]) {
 	case 0:
 		return unpackreq_number(L, (const uint8_t *)msg, sz);
