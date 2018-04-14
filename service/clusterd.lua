@@ -156,7 +156,16 @@ function command.proxy(source, node, name)
 	skynet.ret(skynet.pack(proxy[fullname]))
 end
 
+local cluster_agent = {}	-- fd:service
 local register_name = {}
+
+local function clearnamecache()
+	for fd, service in pairs(cluster_agent) do
+		if type(service) == "number" then
+			skynet.send(service, "lua", "namechange")
+		end
+	end
+end
 
 function command.register(source, name, addr)
 	assert(register_name[name] == nil)
@@ -164,6 +173,7 @@ function command.register(source, name, addr)
 	local old_name = register_name[addr]
 	if old_name then
 		register_name[old_name] = nil
+		clearnamecache()
 	end
 	register_name[addr] = name
 	register_name[name] = addr
@@ -171,76 +181,35 @@ function command.register(source, name, addr)
 	skynet.error(string.format("Register [%s] :%08x", name, addr))
 end
 
-local large_request = {}
+function command.queryname(source, name)
+	skynet.ret(skynet.pack(register_name[name]))
+end
 
 function command.socket(source, subcmd, fd, msg)
-	if subcmd == "data" then
-		local sz
-		local addr, session, msg, padding, is_push = cluster.unpackrequest(msg)
-		if padding then
-			local requests = large_request[fd]
-			if requests == nil then
-				requests = {}
-				large_request[fd] = requests
-			end
-			local req = requests[session] or { addr = addr , is_push = is_push }
-			requests[session] = req
-			table.insert(req, msg)
-			return
-		else
-			local requests = large_request[fd]
-			if requests then
-				local req = requests[session]
-				if req then
-					requests[session] = nil
-					table.insert(req, msg)
-					msg,sz = cluster.concat(req)
-					addr = req.addr
-					is_push = req.is_push
-				end
-			end
-			if not msg then
-				local response = cluster.packresponse(session, false, "Invalid large req")
-				socket.write(fd, response)
-				return
-			end
-		end
-		local ok, response
-		if addr == 0 then
-			local name = skynet.unpack(msg, sz)
-			local addr = register_name[name]
-			if addr then
-				ok = true
-				msg, sz = skynet.pack(addr)
-			else
-				ok = false
-				msg = "name not found"
-			end
-		elseif is_push then
-			skynet.rawsend(addr, "lua", msg, sz)
-			return	-- no response
-		else
-			ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
-		end
-		if ok then
-			response = cluster.packresponse(session, true, msg, sz)
-			if type(response) == "table" then
-				for _, v in ipairs(response) do
-					socket.lwrite(fd, v)
-				end
-			else
-				socket.write(fd, response)
-			end
-		else
-			response = cluster.packresponse(session, false, msg)
-			socket.write(fd, response)
-		end
-	elseif subcmd == "open" then
+	if subcmd == "open" then
 		skynet.error(string.format("socket accept from %s", msg))
-		skynet.call(source, "lua", "accept", fd)
+		-- new cluster agent
+		cluster_agent[fd] = false
+		local agent = skynet.newservice("clusteragent", skynet.self(), source, fd)
+		local closed = cluster_agent[fd]
+		cluster_agent[fd] = agent
+		if closed then
+			skynet.send(agent, "lua", "exit")
+			cluster_agent[fd] = nil
+		end
 	else
-		large_request[fd] = nil
-		skynet.error(string.format("socket %s %d %s", subcmd, fd, msg or ""))
+		if subcmd == "close" or subcmd == "error" then
+			-- close cluster agent
+			local agent = cluster_agent[fd]
+			if type(agent) == "boolean" then
+				cluster_agent[fd] = true
+			else
+				skynet.send(agent, "lua", "exit")
+				cluster_agent[fd] = nil
+			end
+		else
+			skynet.error(string.format("socket %s %d %s", subcmd, fd, msg or ""))
+		end
 	end
 end
 
