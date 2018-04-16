@@ -118,7 +118,7 @@ local function send_request(source, node, addr, msg, sz)
 end
 
 function command.req(...)
-	local ok, msg, sz = pcall(send_request, ...)
+	local ok, msg = pcall(send_request, ...)
 	if ok then
 		if type(msg) == "table" then
 			skynet.ret(cluster.concat(msg))
