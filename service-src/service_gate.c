@@ -168,21 +168,26 @@ _report(struct gate * g, const char * data, ...) {
 static void
 _forward(struct gate *g, struct connection * c, int size) {
 	struct skynet_context * ctx = g->ctx;
+	int fd = c->id;
+	if (fd <= 0) {
+		// socket error
+		return;
+	}
 	if (g->broker) {
 		void * temp = skynet_malloc(size);
 		databuffer_read(&c->buffer,&g->mp,temp, size);
-		skynet_send(ctx, 0, g->broker, g->client_tag | PTYPE_TAG_DONTCOPY, 1, temp, size);
+		skynet_send(ctx, 0, g->broker, g->client_tag | PTYPE_TAG_DONTCOPY, fd, temp, size);
 		return;
 	}
 	if (c->agent) {
 		void * temp = skynet_malloc(size);
 		databuffer_read(&c->buffer,&g->mp,temp, size);
-		skynet_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONTCOPY, 1 , temp, size);
+		skynet_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONTCOPY, fd , temp, size);
 	} else if (g->watchdog) {
 		char * tmp = skynet_malloc(size + 32);
 		int n = snprintf(tmp,32,"%d data ",c->id);
 		databuffer_read(&c->buffer,&g->mp,tmp+n,size);
-		skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT | PTYPE_TAG_DONTCOPY, 1, tmp, size + n);
+		skynet_send(ctx, 0, g->watchdog, PTYPE_TEXT | PTYPE_TAG_DONTCOPY, fd, tmp, size + n);
 	}
 }
 
