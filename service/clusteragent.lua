@@ -11,6 +11,16 @@ fd = tonumber(fd)
 local large_request = {}
 local register_name = {}
 
+setmetatable(register_name, { __index =
+	function(self, name)
+		local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
+		if addr then
+			self[name] = addr
+		end
+		return addr
+	end
+})
+
 local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 	if padding then
 		local req = large_request[session] or { addr = addr , is_push = is_push }
@@ -36,11 +46,7 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 	if addr == 0 then
 		local name = skynet.unpack(msg, sz)
 		skynet.trash(msg, sz)
-		local addr = register_name[name]
-		if addr == nil then
-			addr = skynet.call(clusterd, "lua", "queryname", name)
-			register_name[name] = addr
-		end
+		local addr = register_name["@" .. name]
 		if addr then
 			ok = true
 			msg, sz = skynet.pack(addr)
@@ -48,11 +54,21 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 			ok = false
 			msg = "name not found"
 		end
-	elseif is_push then
-		skynet.rawsend(addr, "lua", msg, sz)
-		return	-- no response
 	else
-		ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
+		if cluster.isname(addr) then
+			addr = register_name[addr]
+		end
+		if addr then
+			if is_push then
+				skynet.rawsend(addr, "lua", msg, sz)
+				return	-- no response
+			else
+				ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
+			end
+		else
+			ok = false
+			msg = "Invalid name"
+		end
 	end
 	if ok then
 		response = cluster.packresponse(session, true, msg, sz)
