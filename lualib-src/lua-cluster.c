@@ -553,6 +553,16 @@ lconcat(lua_State *L) {
 	return 2;
 }
 
+static int
+lisname(lua_State *L) {
+	const char * name = lua_tostring(L, 1);
+	if (name && name[0] == '@') {
+		lua_pushboolean(L, 1);
+		return 1;
+	}
+	return 0;
+}
+
 LUAMOD_API int
 luaopen_skynet_cluster_core(lua_State *L) {
 	luaL_Reg l[] = {
@@ -563,6 +573,7 @@ luaopen_skynet_cluster_core(lua_State *L) {
 		{ "unpackresponse", lunpackresponse },
 		{ "append", lappend },
 		{ "concat", lconcat },
+		{ "isname", lisname },
 		{ NULL, NULL },
 	};
 	luaL_checkversion(L);

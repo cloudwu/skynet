@@ -149,6 +149,12 @@ end
 local proxy = {}
 
 function command.proxy(source, node, name)
+	if name == nil then
+		node, name = node:match "^([^@.]+)([@.].+)"
+		if name == nil then
+			error ("Invalid name " .. tostring(node))
+		end
+	end
 	local fullname = node .. "." .. name
 	if proxy[fullname] == nil then
 		proxy[fullname] = skynet.newservice("clusterproxy", node, name)
