@@ -303,6 +303,13 @@ function skynet.localname(name)
 	return c.addresscommand("QUERY", name)
 end
 
+function skynet.getpid()
+	if not skynet.pid then
+		skynet.pid = c.pid()
+	end
+	return skynet.pid
+end
+
 skynet.now = c.now
 
 local starttime

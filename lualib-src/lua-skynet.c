@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 struct snlua {
 	lua_State * L;
@@ -378,6 +379,12 @@ lnow(lua_State *L) {
 	return 1;
 }
 
+static int
+lpid(lua_State *L) {
+	lua_pushinteger(L,getpid());
+	return 1;
+}
+
 LUAMOD_API int
 luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
@@ -398,6 +405,7 @@ luaopen_skynet_core(lua_State *L) {
 		{ "trash" , ltrash },
 		{ "callback", lcallback },
 		{ "now", lnow },
+		{ "pid", lpid },
 		{ NULL, NULL },
 	};
 
