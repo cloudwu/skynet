@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local socket = require "socket"
-local socketchannel = require "socketchannel"
+local socket = require "skynet.socket"
+local socketchannel = require "skynet.socketchannel"
 
 local table = table
 local string = string

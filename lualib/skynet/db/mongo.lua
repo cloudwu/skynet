@@ -1,12 +1,13 @@
 local bson = require "bson"
-local socket = require "socket"
-local socketchannel	= require "socketchannel"
+local socket = require "skynet.socket"
+local socketchannel	= require "skynet.socketchannel"
 local skynet = require "skynet"
-local driver = require "mongo.driver"
+local driver = require "skynet.mongo.driver"
 local md5 =	require	"md5"
-local crypt = require "crypt"
+local crypt = require "skynet.crypt"
 local rawget = rawget
 local assert = assert
+local table = table
 
 local bson_encode =	bson.encode
 local bson_encode_order	= bson.encode_order
@@ -105,12 +106,38 @@ local function mongo_auth(mongoc)
 				mongoc.__sock:changebackup(backup)
 			end
 			if rs_data.ismaster	then
+				if rawget(mongoc, "__pickserver") then
+					rawset(mongoc, "__pickserver", nil)
+				end
 				return
 			else
-				local host,	port = __parse_addr(rs_data.primary)
-				mongoc.host	= host
-				mongoc.port	= port
-				mongoc.__sock:changehost(host, port)
+				if rs_data.primary then
+					local host,	port = __parse_addr(rs_data.primary)
+					mongoc.host	= host
+					mongoc.port	= port
+					mongoc.__sock:changehost(host, port)
+				else
+					skynet.error("WARNING: NO PRIMARY RETURN " .. rs_data.me)
+					-- determine the primary db using hosts
+					local pickserver = {}
+					if rawget(mongoc, "__pickserver") == nil then
+						for _, v in ipairs(rs_data.hosts) do
+							if v ~= rs_data.me then
+								table.insert(pickserver, v)
+							end
+							rawset(mongoc, "__pickserver", pickserver)
+						end
+					end
+					if #mongoc.__pickserver <= 0 then
+						error("CAN NOT DETERMINE THE PRIMARY DB")
+					end
+					skynet.error("INFO: TRY TO CONNECT " .. mongoc.__pickserver[1])
+					local host, port = __parse_addr(mongoc.__pickserver[1])
+					table.remove(mongoc.__pickserver, 1)
+					mongoc.host	= host
+					mongoc.port	= port
+					mongoc.__sock:changehost(host, port)
+				end
 			end
 		end
 	end
@@ -313,8 +340,23 @@ function mongo_collection:insert(doc)
 	sock:request(pack)
 end
 
+local function werror(r)
+	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError)
+
+	local err
+	if not ok then
+		if r.writeErrors then
+			err = r.writeErrors[1].errmsg
+		else
+			err = r.writeConcernError.errmsg
+		end
+	end
+	return ok, err, r
+end
+
 function mongo_collection:safe_insert(doc)
-	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
+	local r = self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
+	return werror(r)
 end
 
 function mongo_collection:batch_insert(docs)
@@ -336,10 +378,28 @@ function mongo_collection:update(selector,update,upsert,multi)
 	sock:request(pack)
 end
 
+function mongo_collection:safe_update(selector, update, upsert, multi)
+	local r = self.database:runCommand("update", self.name, "updates", {bson_encode({
+		q = selector,
+		u = update,
+		upsert = upsert,
+		multi = multi,
+	})})
+	return werror(r)
+end
+
 function mongo_collection:delete(selector, single)
 	local sock = self.connection.__sock
 	local pack = driver.delete(self.full_name, single, bson_encode(selector))
 	sock:request(pack)
+end
+
+function mongo_collection:safe_delete(selector, single)
+	local r = self.database:runCommand("delete", self.name, "deletes", {bson_encode({
+		q = selector,
+		limit = single and 1 or 0,
+	})})
+	return werror(r)
 end
 
 function mongo_collection:findOne(query, selector)
@@ -369,8 +429,24 @@ function mongo_collection:find(query, selector)
 	} ,	cursor_meta)
 end
 
-function mongo_cursor:sort(key_list)
-	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key_list}
+local function unfold(list, key, ...)
+	if key == nil then
+		return list
+	end
+	local next_func, t = pairs(key)
+	local k, v = next_func(t)	-- The first key pair
+	table.insert(list, k)
+	table.insert(list, v)
+	return unfold(list, ...)
+end
+
+-- cursor:sort { key = 1 } or cursor:sort( {key1 = 1}, {key2 = -1})
+function mongo_cursor:sort(key, key_v, ...)
+	if key_v then
+		local key_list = unfold({}, key, key_v , ...)
+		key = bson_encode_order(table.unpack(key_list))
+	end
+	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key}
 	return self
 end
 
@@ -512,10 +588,10 @@ function mongo_cursor:hasNext()
 		local pack
 		if self.__data == nil then
 			local query = self.__sortquery or self.__query
-			pack = driver.query(request_id, self.__flags, self.__collection.full_name, self.__skip, -self.__limit, query, self.__selector)
+			pack = driver.query(request_id, self.__flags, self.__collection.full_name, self.__skip, self.__limit, query, self.__selector)
 		else
 			if self.__cursor then
-				pack = driver.more(request_id, self.__collection.full_name, -self.__limit, self.__cursor)
+				pack = driver.more(request_id, self.__collection.full_name, self.__limit, self.__cursor)
 			else
 				-- no more
 				self.__document	= nil
@@ -531,10 +607,20 @@ function mongo_cursor:hasNext()
 
 		if ok then
 			if doc then
-				self.__document	= result.result
+				local doc = result.result
+				self.__document	= doc
 				self.__data	= result.data
 				self.__ptr = 1
 				self.__cursor =	cursor
+				local limit = self.__limit
+				if cursor and limit > 0 then
+					limit = limit - #doc
+					if limit <= 0 then
+						-- reach limit
+						self:close()
+					end
+					self.__limit = limit
+				end
 				return true
 			else
 				self.__document	= nil
@@ -572,11 +658,11 @@ function mongo_cursor:next()
 end
 
 function mongo_cursor:close()
-	-- todo: warning hasNext after close
 	if self.__cursor then
 		local sock = self.__collection.connection.__sock
 		local pack = driver.kill(self.__cursor)
 		sock:request(pack)
+		self.__cursor = nil
 	end
 end
 

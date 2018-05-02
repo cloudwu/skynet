@@ -65,7 +65,7 @@
 --]]
 
 local skynet = require "skynet"
-local socket = require "socket"
+local socket = require "skynet.socket"
 
 local MAX_DOMAIN_LEN = 1024
 local MAX_LABEL_LEN = 63
@@ -87,6 +87,7 @@ local weak = {__mode = "kv"}
 local CACHE = {}
 
 local dns = {}
+local request_pool = {}
 
 function dns.flush()
 	CACHE[QTYPE.A] = setmetatable({},weak)
@@ -113,7 +114,21 @@ end
 local next_tid = 1
 local function gen_tid()
 	local tid = next_tid
-	next_tid = next_tid + 1
+	if request_pool[tid] then
+		tid = nil
+		for i = 1, 65535 do
+			-- find available tid
+			if not request_pool[i] then
+				tid = i
+				break
+			end
+		end
+		assert(tid)
+	end
+	next_tid = tid + 1
+	if next_tid > 65535 then
+		next_tid = 1
+	end
 	return tid
 end
 
@@ -204,8 +219,12 @@ local function unpack_rdata(qtype, chunk)
 	end
 end
 
-local dns_server
-local request_pool = {}
+local dns_server = {
+	fd = nil,
+	address = nil,
+	port = nil,
+	retire = nil,
+}
 
 local function resolve(content)
 	if #content < DNS_HEADER_LEN then
@@ -267,6 +286,33 @@ local function resolve(content)
 	skynet.wakeup(resp.co)
 end
 
+local DNS_SERVER_RETIRE = 60 * 100
+local function touch_server()
+	dns_server.retire = skynet.now()
+	if dns_server.fd then
+		return
+	end
+	dns_server.fd = socket.udp(function(str, from)
+		resolve(str)
+	end)
+	skynet.error(string.format("Udp server open %s:%s (%d)", dns_server.address, dns_server.port, dns_server.fd))
+	socket.udp_connect(dns_server.fd, dns_server.address, dns_server.port)
+	local function check_alive()
+		if skynet.now() > dns_server.retire + DNS_SERVER_RETIRE then
+			local fd = dns_server.fd
+			if fd then
+				dns_server.fd = nil
+				socket.close(fd)
+				skynet.error(string.format("Udp server close %s:%s (%d)", dns_server.address, dns_server.port, fd))
+			end
+		else
+			skynet.timeout( 2 * DNS_SERVER_RETIRE, check_alive)
+		end
+	end
+
+	skynet.timeout( 2 * DNS_SERVER_RETIRE, check_alive)
+end
+
 function dns.server(server, port)
 	if not server then
 		local f = assert(io.open "/etc/resolv.conf")
@@ -279,11 +325,11 @@ function dns.server(server, port)
 		f:close()
 		assert(server, "Can't get nameserver")
 	end
-	dns_server = socket.udp(function(str, from)
-		resolve(str)
-	end)
-	socket.udp_connect(dns_server, server, port or 53)
-	return server
+	assert(dns_server.fd == nil)	-- only set dns.server once
+	dns_server.address = server
+	dns_server.port = port or 53
+	touch_server()
+	return dns_server.address
 end
 
 local function lookup_cache(name, qtype, ignorettl)
@@ -340,8 +386,9 @@ function dns.resolve(name, ipv6)
 		qdcount = 1,
 	}
 	local req = pack_header(question_header) .. pack_question(name, qtype, QCLASS.IN)
-	assert(dns_server, "Call dns.server first")
-	socket.write(dns_server, req)
+	assert(dns_server.address, "Call dns.server first")
+	touch_server()
+	socket.write(dns_server.fd, req)
 	return suspend(question_header.tid, name, qtype)
 end
 

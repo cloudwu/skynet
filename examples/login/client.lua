@@ -1,7 +1,7 @@
 package.cpath = "luaclib/?.so"
 
-local socket = require "clientsocket"
-local crypt = require "crypt"
+local socket = require "client.socket"
+local crypt = require "client.crypt"
 
 if _VERSION ~= "Lua 5.3" then
 	error "Use lua 5.3"

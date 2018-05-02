@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <stdint.h>
@@ -762,8 +764,8 @@ lupdate(lua_State *L) {
 	return 0;
 }
 
-int
-luaopen_sharedata_core(lua_State *L) {
+LUAMOD_API int
+luaopen_skynet_sharedata_core(lua_State *L) {
 	luaL_Reg l[] = {
 		// used by host
 		{ "new", lnewconf },

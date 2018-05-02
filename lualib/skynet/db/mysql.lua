@@ -4,9 +4,9 @@
 -- The license is under the BSD license.
 -- Modified by Cloud Wu (remove bit32 for lua 5.3)
 
-local socketchannel = require "socketchannel"
-local mysqlaux = require "mysqlaux.c"
-local crypt = require "crypt"
+local socketchannel = require "skynet.socketchannel"
+local mysqlaux = require "skynet.mysqlaux.c"
+local crypt = require "skynet.crypt"
 
 
 local sub = string.sub
@@ -164,7 +164,7 @@ local function _recv_packet(self,sock)
         typ = "ERR"
     elseif field_count == 0xfe then
         typ = "EOF"
-    elseif field_count <= 250 then
+    else
         typ = "DATA"
     end
 

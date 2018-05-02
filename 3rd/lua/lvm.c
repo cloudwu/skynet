@@ -1201,6 +1201,7 @@ void luaV_execute (lua_State *L) {
         }
       }
       vmcase(OP_FORLOOP) {
+        lua_checksig(L);
         if (ttisinteger(ra)) {  /* integer loop? */
           lua_Integer step = ivalue(ra + 2);
           lua_Integer idx = intop(+, ivalue(ra), step); /* increment index */

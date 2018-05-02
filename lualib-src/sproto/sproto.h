@@ -9,10 +9,15 @@ struct sproto_type;
 #define SPROTO_REQUEST 0
 #define SPROTO_RESPONSE 1
 
+// type (sproto_arg.type)
 #define SPROTO_TINTEGER 0
 #define SPROTO_TBOOLEAN 1
 #define SPROTO_TSTRING 2
 #define SPROTO_TSTRUCT 3
+
+// sub type of string (sproto_arg.extra)
+#define SPROTO_TSTRING_STRING 0
+#define SPROTO_TSTRING_BINARY 1
 
 #define SPROTO_CB_ERROR -1
 #define SPROTO_CB_NIL -2
@@ -25,6 +30,7 @@ int sproto_prototag(const struct sproto *, const char * name);
 const char * sproto_protoname(const struct sproto *, int proto);
 // SPROTO_REQUEST(0) : request, SPROTO_RESPONSE(1): response
 struct sproto_type * sproto_protoquery(const struct sproto *, int proto, int what);
+int sproto_protoresponse(const struct sproto *, int proto);
 
 struct sproto_type * sproto_type(const struct sproto *, const char * type_name);
 
@@ -41,6 +47,7 @@ struct sproto_arg {
 	int length;
 	int index;	// array base 1
 	int mainindex;	// for map
+	int extra; // SPROTO_TINTEGER: decimal ; SPROTO_TSTRING 0:utf8 string 1:binary
 };
 
 typedef int (*sproto_callback)(const struct sproto_arg *args);
