@@ -340,8 +340,23 @@ function mongo_collection:insert(doc)
 	sock:request(pack)
 end
 
+local function werror(r)
+	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError)
+
+	local err
+	if not ok then
+		if r.writeErrors then
+			err = r.writeErrors[1].errmsg
+		else
+			err = r.writeConcernError.errmsg
+		end
+	end
+	return ok, err, r
+end
+
 function mongo_collection:safe_insert(doc)
-	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
+	local r = self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
+	return werror(r)
 end
 
 function mongo_collection:batch_insert(docs)
@@ -363,10 +378,28 @@ function mongo_collection:update(selector,update,upsert,multi)
 	sock:request(pack)
 end
 
+function mongo_collection:safe_update(selector, update, upsert, multi)
+	local r = self.database:runCommand("update", self.name, "updates", {bson_encode({
+		q = selector,
+		u = update,
+		upsert = upsert,
+		multi = multi,
+	})})
+	return werror(r)
+end
+
 function mongo_collection:delete(selector, single)
 	local sock = self.connection.__sock
 	local pack = driver.delete(self.full_name, single, bson_encode(selector))
 	sock:request(pack)
+end
+
+function mongo_collection:safe_delete(selector, single)
+	local r = self.database:runCommand("delete", self.name, "deletes", {bson_encode({
+		q = selector,
+		limit = single and 1 or 0,
+	})})
+	return werror(r)
 end
 
 function mongo_collection:findOne(query, selector)
