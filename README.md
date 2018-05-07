@@ -1,4 +1,4 @@
-## ![skynet logo](https://github.com/cloudwu/skynet/wiki/image/skynet_metro.jpg)
+##  ![skynet logo](https://github.com/cloudwu/skynet/wiki/image/skynet_metro.jpg)
 
 Skynet is a lightweight online game framework, and it can be used in many other fields.
 
