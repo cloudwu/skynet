@@ -153,6 +153,25 @@ local function push_response(self, response, co)
 	end
 end
 
+local function get_response(func, sock)
+	local result_ok, result_data, padding = func(sock)
+	if result_ok and padding then
+		local result = { result_data }
+		local index = 2
+		repeat
+			result_ok, result_data, padding = func(sock)
+			if not result_ok then
+				return result_ok, result_data
+			end
+			result[index] = result_data
+			index = index + 1
+		until not padding
+		return true, result
+	else
+		return result_ok, result_data
+	end
+end
+
 local function dispatch_by_order(self)
 	while self.__sock do
 		local func, co = pop_response(self)
@@ -161,23 +180,15 @@ local function dispatch_by_order(self)
 			wakeup_all(self, "channel_closed")
 			break
 		end
-		local ok, result_ok, result_data, padding = pcall(func, self.__sock)
+		local ok, result_ok, result_data = pcall(get_response, func, self.__sock)
 		if ok then
-			if padding and result_ok then
-				-- if padding is true, wait for next result_data
-				-- self.__result_data[co] is a table
-				local result = self.__result_data[co] or {}
-				self.__result_data[co] = result
-				table.insert(result, result_data)
+			self.__result[co] = result_ok
+			if result_ok and self.__result_data[co] then
+				table.insert(self.__result_data[co], result_data)
 			else
-				self.__result[co] = result_ok
-				if result_ok and self.__result_data[co] then
-					table.insert(self.__result_data[co], result_data)
-				else
-					self.__result_data[co] = result_data
-				end
-				skynet.wakeup(co)
+				self.__result_data[co] = result_data
 			end
+			skynet.wakeup(co)
 		else
 			close_channel_socket(self)
 			local errmsg
