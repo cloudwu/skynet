@@ -7,6 +7,7 @@ local config_name = skynet.getenv "cluster"
 local node_address = {}
 local node_session = {}
 local command = {}
+local config = {}
 
 local function read_response(sock)
 	local sz = socket.header(sock:read(2))
@@ -27,14 +28,14 @@ local function open_channel(t, key)
 	ct = {}
 	connecting[key] = ct
 	local address = node_address[key]
-	if address == nil then
+	if address == nil and not config.nowaiting then
 		local co = coroutine.running()
 		assert(ct.namequery == nil)
 		ct.namequery = co
-		skynet.error("Wating for cluster node [".. key.."]")
+		skynet.error("Waiting for cluster node [".. key.."]")
 		skynet.wait(co)
 		address = node_address[key]
-		assert(address ~= nil)
+		assert(address ~= nil or config.nowaiting)
 	end
 	local succ, err, c
 	if address then
@@ -51,7 +52,7 @@ local function open_channel(t, key)
 			ct.channel = c
 		end
 	else
-		err = "cluster node [" .. key .. "] is down."
+		err = string.format("cluster node [%s] is %s.", key,  address == false and "down" or "absent")
 	end
 	connecting[key] = nil
 	for _, co in ipairs(ct) do
@@ -74,18 +75,32 @@ local function loadconfig(tmp)
 		end
 	end
 	for name,address in pairs(tmp) do
-		assert(address == false or type(address) == "string")
-		if node_address[name] ~= address then
-			-- address changed
-			if rawget(node_channel, name) then
-				node_channel[name] = nil	-- reset connection
+		if name:sub(1,2) == "__" then
+			name = name:sub(3)
+			config[name] = address
+			skynet.error(string.format("Config %s = %s", name, address))
+		else
+			assert(address == false or type(address) == "string")
+			if node_address[name] ~= address then
+				-- address changed
+				if rawget(node_channel, name) then
+					node_channel[name] = nil	-- reset connection
+				end
+				node_address[name] = address
 			end
-			node_address[name] = address
+			local ct = connecting[name]
+			if ct and ct.namequery and not config.nowaiting then
+				skynet.error(string.format("Cluster node [%s] resloved : %s", name, address))
+				skynet.wakeup(ct.namequery)
+			end
 		end
-		local ct = connecting[name]
-		if ct and ct.namequery then
-			skynet.error(string.format("Cluster node [%s] resloved : %s", name, address))
-			skynet.wakeup(ct.namequery)
+	end
+	if config.nowaiting then
+		-- wakeup all connecting request
+		for name, ct in pairs(connecting) do
+			if ct.namequery then
+				skynet.wakeup(ct.namequery)
+			end
 		end
 	end
 end

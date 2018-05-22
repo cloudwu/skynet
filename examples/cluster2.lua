@@ -22,6 +22,7 @@ skynet.start(function()
 		}
 		print(pcall(cluster.call, "db", "@sdb", "GET", "a"))	-- db is down
 	end)
+	cluster.reload { __nowaiting = false }
 	local pingserver = cluster.snax("db3", "pingserver")
 	print(pingserver.req.ping "hello")
 end)
