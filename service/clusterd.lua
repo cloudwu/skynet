@@ -35,7 +35,6 @@ local function open_channel(t, key)
 		skynet.error("Waiting for cluster node [".. key.."]")
 		skynet.wait(co)
 		address = node_address[key]
-		assert(address ~= nil or config.nowaiting)
 	end
 	local succ, err, c
 	if address then
