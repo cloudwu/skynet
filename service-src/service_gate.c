@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#define BACKLOG 32
+#define BACKLOG 128
 
 struct connection {
 	int id;	// skynet_socket id
