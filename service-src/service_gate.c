@@ -313,7 +313,7 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 static int
 start_listen(struct gate *g, char * listen_addr) {
 	struct skynet_context * ctx = g->ctx;
-	char * portstr = strchr(listen_addr,':');
+	char * portstr = strrchr(listen_addr,':');
 	const char * host = "";
 	int port;
 	if (portstr == NULL) {
