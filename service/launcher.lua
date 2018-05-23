@@ -28,6 +28,7 @@ function command.STAT()
 		if not ok then
 			stat = string.format("ERROR (%s)",v)
 		end
+		stat[" "] = v
 		list[skynet.address(k)] = stat
 	end
 	return list
