@@ -45,7 +45,6 @@ end
 local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
-local session_response = {}
 local unresponse = {}
 
 local wakeup_queue = {}
@@ -76,6 +75,7 @@ local function dispatch_error_queue()
 end
 
 local function _error_dispatch(error_session, error_source)
+	skynet.ignoreret()	-- don't return for error
 	if error_session == 0 then
 		-- service is down
 		--  Don't remove from watching_service , because user may call dead service
@@ -105,6 +105,14 @@ local function co_create(f)
 		co = coroutine.create(function(...)
 			f(...)
 			while true do
+				local session = session_coroutine_id[co]
+				if session and session ~= 0 then
+					local source = debug.getinfo(f,"S")
+					skynet.error(string.format("Maybe forgot response session %s from %s : %s:%d",
+						session,
+						skynet.address(session_coroutine_address[co]),
+						source.source, source.linedefined))
+				end
 				f = nil
 				coroutine_pool[#coroutine_pool+1] = co
 				f = coroutine_yield "EXIT"
@@ -162,6 +170,7 @@ function suspend(co, result, command, param, size)
 		sleep_session[co] = param
 	elseif command == "RETURN" then
 		local co_session = session_coroutine_id[co]
+		session_coroutine_id[co] = nil
 		if co_session == 0 then
 			if size ~= nil then
 				c.trash(param, size)
@@ -169,10 +178,9 @@ function suspend(co, result, command, param, size)
 			return suspend(co, coroutine_resume(co, false))	-- send don't need ret
 		end
 		local co_address = session_coroutine_address[co]
-		if param == nil or session_response[co] then
+		if param == nil or not co_session then
 			error(debug.traceback(co))
 		end
-		session_response[co] = true
 		local ret
 		if not dead_service[co_address] then
 			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) ~= nil
@@ -187,10 +195,11 @@ function suspend(co, result, command, param, size)
 		return suspend(co, coroutine_resume(co, ret))
 	elseif command == "RESPONSE" then
 		local co_session = session_coroutine_id[co]
-		local co_address = session_coroutine_address[co]
-		if session_response[co] then
+		if not co_session then
 			error(debug.traceback(co))
 		end
+		session_coroutine_id[co] = nil
+		local co_address = session_coroutine_address[co]
 		local f = param
 		local function response(ok, ...)
 			if ok == "TEST" then
@@ -232,7 +241,6 @@ function suspend(co, result, command, param, size)
 			return ret
 		end
 		watching_service[co_address] = watching_service[co_address] + 1
-		session_response[co] = true
 		unresponse[response] = true
 		return suspend(co, coroutine_resume(co, response))
 	elseif command == "EXIT" then
@@ -242,7 +250,6 @@ function suspend(co, result, command, param, size)
 			release_watching(address)
 			session_coroutine_id[co] = nil
 			session_coroutine_address[co] = nil
-			session_response[co] = nil
 		end
 	elseif command == "QUIT" then
 		-- service exit
@@ -250,6 +257,10 @@ function suspend(co, result, command, param, size)
 	elseif command == "USER" then
 		-- See skynet.coutine for detail
 		error("Call skynet.coroutine.yield out of skynet.coroutine.resume\n" .. debug.traceback(co))
+	elseif command == "IGNORERET" then
+		-- We use session for other uses
+		session_coroutine_id[co] = nil
+		return suspend(co, coroutine_resume(co))
 	elseif command == nil then
 		-- debug trace
 		return
@@ -403,6 +414,10 @@ end
 function skynet.ret(msg, sz)
 	msg = msg or ""
 	return coroutine_yield("RETURN", msg, sz)
+end
+
+function skynet.ignoreret()
+	coroutine_yield "IGNORERET"
 end
 
 function skynet.response(pack)
