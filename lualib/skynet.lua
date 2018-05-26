@@ -265,6 +265,8 @@ function suspend(co, result, command, param, param2)
 		return suspend(co, coroutine_resume(co, response))
 	elseif command == "EXIT" then
 		-- coroutine exit
+		local tag = session_coroutine_tracetag[co]
+		if tag then c.trace(tag, "end") end
 		local address = session_coroutine_address[co]
 		if address then
 			release_watching(address)
