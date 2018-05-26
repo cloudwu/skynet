@@ -153,14 +153,14 @@ end
 
 -- suspend is local function
 function suspend(co, result, command, param, param2)
-	local tag = session_coroutine_tracetag[co]
 	if not result then
 		local session = session_coroutine_id[co]
 		if session then -- coroutine may fork by others (session is nil)
 			local addr = session_coroutine_address[co]
 			if session ~= 0 then
 				-- only call response error
-				if tag then c.trace(tag, "error", co) end
+				local tag = session_coroutine_tracetag[co]
+				if tag then c.trace(tag, "error") end
 				c.send(addr, skynet.PTYPE_ERROR, session, "")
 			end
 			session_coroutine_id[co] = nil
@@ -169,20 +169,25 @@ function suspend(co, result, command, param, param2)
 		end
 		error(debug.traceback(co,tostring(command)))
 	end
-	if command == "CALL" then
+	if command == "CALLTRACE" then
+		local tag = session_coroutine_tracetag[co]
 		if tag then
-			c.trace(tag, "call", co)
-			c.send(param2, skynet.PTYPE_TRACE, 0, tag)
+			c.trace(tag, "call", co, 2)
+			c.send(param, skynet.PTYPE_TRACE, 0, tag)
 		end
+		return suspend(co, coroutine_resume(co))
+	elseif command == "CALL" then
 		session_id_coroutine[param] = co
 	elseif command == "SLEEP" then
-		if tag then c.trace(tag, "sleep", co) end
+		local tag = session_coroutine_tracetag[co]
+		if tag then c.trace(tag, "sleep", co, 2) end
 		session_id_coroutine[param] = co
 		if sleep_session[param2] then
 			error(debug.traceback(co, "token duplicative"))
 		end
 		sleep_session[param2] = param
 	elseif command == "RETURN" then
+		local tag = session_coroutine_tracetag[co]
 		if tag then c.trace(tag, "response") end
 		local co_session = session_coroutine_id[co]
 		session_coroutine_id[co] = nil
@@ -416,7 +421,7 @@ skynet.trash = assert(c.trash)
 
 local function yield_call(service, session)
 	watching_session[session] = service
-	local succ, msg, sz = coroutine_yield("CALL", session, service)
+	local succ, msg, sz = coroutine_yield("CALL", session)
 	watching_session[session] = nil
 	if not succ then
 		error "call failed"
@@ -425,6 +430,7 @@ local function yield_call(service, session)
 end
 
 function skynet.call(addr, typename, ...)
+	coroutine_yield("CALLTRACE", addr)
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , p.pack(...))
 	if session == nil then
@@ -434,6 +440,7 @@ function skynet.call(addr, typename, ...)
 end
 
 function skynet.rawcall(addr, typename, msg, sz)
+	coroutine_yield("CALLTRACE", addr)
 	local p = proto[typename]
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
 	return yield_call(addr, session)
@@ -525,12 +532,8 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 	else
 		local tag = trace_source[source]
 		if tag then
-			if session ~= 0 then
-				c.trace(tag, "request")
-				trace_source[source] = nil
-			else
-				tag = nil
-			end
+			c.trace(tag, "request")
+			trace_source[source] = nil
 		end
 		local p = proto[prototype]
 		if p == nil then

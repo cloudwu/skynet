@@ -407,11 +407,18 @@ lhpc(lua_State *L) {
 	return 1;
 }
 
+#define MAX_LEVEL 3
+
+struct source_info {
+	const char * source;
+	int line;
+};
+
 /*
 	string tag
 	string userstring
 	thread co (default nil)
-	integer level (default is 3)
+	integer level
  */
 static int
 ltrace(lua_State *L) {
@@ -420,15 +427,41 @@ ltrace(lua_State *L) {
 	const char * user = luaL_checkstring(L, 2);
 	if (lua_isthread(L, 3)) {
 		lua_State * co = lua_tothread (L, 3);
+		struct source_info si[MAX_LEVEL];
 		lua_Debug d;
-		int level = luaL_optinteger(L, 4, 3);
+		int level = luaL_checkinteger(L, 4);
+		int index = 0;
 		do {
 			if (!lua_getstack(co, level, &d))
 				break;
 			lua_getinfo(co, "Sl", &d);
 			level++;
-		} while (d.currentline < 0);
-		skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d", tag, get_time(), user, d.short_src, d.currentline);
+			si[index].source = d.source;
+			si[index].line = d.currentline;
+			if (d.currentline >= 0)
+				++index;
+		} while (index < MAX_LEVEL);
+		switch (index) {
+		case 1:
+			skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d", tag, get_time(), user, si[0].source, si[0].line);
+			break;
+		case 2:
+			skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d %s:%d", tag, get_time(), user, 
+				si[0].source, si[0].line,
+				si[1].source, si[1].line
+				);
+			break;
+		case 3:
+			skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d %s:%d %s:%d", tag, get_time(), user, 
+				si[0].source, si[0].line,
+				si[1].source, si[1].line,
+				si[2].source, si[2].line
+				);
+			break;
+		default:
+			skynet_error(context, "<TRACE %s> %" PRId64 " %s", tag, get_time(), user);
+			break;
+		}
 		return 0;
 	}
 	skynet_error(context, "<TRACE %s> %" PRId64 " %s", tag, get_time(), user);
