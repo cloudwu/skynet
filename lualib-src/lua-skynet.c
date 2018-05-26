@@ -11,6 +11,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <inttypes.h>
+
+#include <time.h>
+
+#if defined(__APPLE__)
+#include <sys/time.h>
+#endif
+
+#include "skynet.h"
+
+// return nsec
+static int64_t
+get_time() {
+#if !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
+	struct timespec ti;
+	clock_gettime(CLOCK_MONOTONIC, &ti);
+	return (int64_t)1000000000 * ti.tv_sec + ti.tv_nsec;
+#else
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (int64_t)1000000000 * tv.tv_sec + tv.tv_usec * 1000;
+#endif
+}
 
 struct snlua {
 	lua_State * L;
@@ -378,6 +401,40 @@ lnow(lua_State *L) {
 	return 1;
 }
 
+static int
+lhpc(lua_State *L) {
+	lua_pushinteger(L, get_time());
+	return 1;
+}
+
+/*
+	string tag
+	string userstring
+	thread co (default nil)
+	integer level (default is 3)
+ */
+static int
+ltrace(lua_State *L) {
+	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+	const char * tag = luaL_checkstring(L, 1);
+	const char * user = luaL_checkstring(L, 2);
+	if (lua_isthread(L, 3)) {
+		lua_State * co = lua_tothread (L, 3);
+		lua_Debug d;
+		int level = luaL_optinteger(L, 4, 3);
+		do {
+			if (!lua_getstack(co, level, &d))
+				break;
+			lua_getinfo(co, "Sl", &d);
+			level++;
+		} while (d.currentline < 0);
+		skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d", tag, get_time(), user, d.short_src, d.currentline);
+		return 0;
+	}
+	skynet_error(context, "<TRACE %s> %" PRId64 " %s", tag, get_time(), user);
+	return 0;
+}
+
 LUAMOD_API int
 luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
@@ -390,18 +447,25 @@ luaopen_skynet_core(lua_State *L) {
 		{ "intcommand", lintcommand },
 		{ "addresscommand", laddresscommand },
 		{ "error", lerror },
-		{ "tostring", ltostring },
 		{ "harbor", lharbor },
+		{ "callback", lcallback },
+		{ "trace", ltrace },
+		{ NULL, NULL },
+	};
+
+	// functions without skynet_context
+	luaL_Reg l2[] = {
+		{ "tostring", ltostring },
 		{ "pack", luaseri_pack },
 		{ "unpack", luaseri_unpack },
 		{ "packstring", lpackstring },
 		{ "trash" , ltrash },
-		{ "callback", lcallback },
 		{ "now", lnow },
+		{ "hpc", lhpc },	// getHPCounter
 		{ NULL, NULL },
 	};
 
-	luaL_newlibtable(L, l);
+	lua_createtable(L, 0, sizeof(l)/sizeof(l[0]) + sizeof(l2)/sizeof(l2[0]) -2);
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
 	struct skynet_context *ctx = lua_touserdata(L,-1);
@@ -409,7 +473,10 @@ luaopen_skynet_core(lua_State *L) {
 		return luaL_error(L, "Init skynet context first");
 	}
 
+
 	luaL_setfuncs(L,l,1);
+
+	luaL_setfuncs(L,l2,0);
 
 	return 1;
 }
