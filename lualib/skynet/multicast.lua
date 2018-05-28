@@ -73,6 +73,8 @@ function chan:unsubscribe()
 end
 
 local function dispatch_subscribe(channel, source, pack, msg, sz)
+	-- channel as session, do need response
+	skynet.ignoreret()
 	local self = dispatch[channel]
 	if not self then
 		mc.close(pack)
