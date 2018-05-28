@@ -2,6 +2,7 @@ local skynet = require "skynet"
 local sc = require "skynet.socketchannel"
 local socket = require "skynet.socket"
 local cluster = require "skynet.cluster.core"
+local ignoreret = skynet.ignoreret
 
 local clusterd, gate, fd = ...
 clusterd = tonumber(clusterd)
@@ -22,6 +23,7 @@ setmetatable(register_name, { __index =
 })
 
 local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
+	ignoreret()	-- session is fd, don't call skynet.ret
 	if padding then
 		local req = large_request[session] or { addr = addr , is_push = is_push }
 		large_request[session] = req
