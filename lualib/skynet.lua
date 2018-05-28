@@ -133,6 +133,8 @@ local function dispatch_wakeup()
 		local session = sleep_session[token]
 		if session then
 			local co = session_id_coroutine[session]
+			local tag = session_coroutine_tracetag[co]
+			if tag then c.trace(tag, "resume") end
 			session_id_coroutine[session] = "BREAK"
 			return suspend(co, coroutine_resume(co, false, "BREAK"))
 		end
