@@ -11,7 +11,7 @@ skynet.start(function()
 	skynet.send(proxy, "lua", "PING", "proxy")
 
 	skynet.fork(function()
-		skynet.trace()
+		skynet.trace("cluster")
 		print(cluster.call("db", "@sdb", "GET", "a"))
 		print(cluster.call("db2", "@sdb", "GET", "b"))
 		cluster.send("db2", "@sdb", "PING", "db2:longstring" .. largevalue)

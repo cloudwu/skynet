@@ -289,7 +289,11 @@ function suspend(co, result, command, param, param2)
 	elseif command == "TRACE" then
 		if param then
 			session_coroutine_tracetag[co] = param
-			c.trace(param, "trace on")
+			if param2 then
+				c.trace(param, "trace " .. param2)
+			else
+				c.trace(param, "trace")
+			end
 		else
 			param = session_coroutine_tracetag[co]
 		end
@@ -352,9 +356,9 @@ skynet.now = c.now
 skynet.hpc = c.hpc	-- high performance counter
 
 local traceid = 0
-function skynet.trace()
+function skynet.trace(info)
 	traceid = traceid + 1
-	coroutine_yield("TRACE", string.format(":%08x-%d",skynet.self(), traceid))
+	coroutine_yield("TRACE", string.format(":%08x-%d",skynet.self(), traceid), info)
 end
 
 function skynet.tracetag()
@@ -459,12 +463,12 @@ function skynet.rawcall(addr, typename, msg, sz)
 end
 
 function skynet.tracecall(tag, addr, typename, msg, sz)
-	c.trace(tag, "trace begin")
+	c.trace(tag, "tracecall begin")
 	c.send(addr, skynet.PTYPE_TRACE, 0, tag)
 	local p = proto[typename]
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
 	local msg, sz = yield_call(addr, session)
-	c.trace(tag, "trace end")
+	c.trace(tag, "tracecall end")
 	return msg, sz
 end
 
