@@ -133,7 +133,9 @@ local function send_request(source, node, addr, msg, sz)
 	if tracetag then
 		if tracetag:sub(1,1) ~= "(" then
 			-- add nodename
-			tracetag = string.format("(%s-%s-%d)%s", nodename, node, session, tracetag)
+			local newtag = string.format("(%s-%s-%d)%s", nodename, node, session, tracetag)
+			skynet.tracelog(tracetag, string.format("session %s", newtag))
+			tracetag = newtag
 		end
 		skynet.tracelog(tracetag, string.format("cluster %s", node))
 		c:request(cluster.packtrace(tracetag))
