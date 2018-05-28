@@ -8,6 +8,7 @@ local node_address = {}
 local node_session = {}
 local command = {}
 local config = {}
+local nodename = cluster.nodename()
 
 local function read_response(sock)
 	local sz = socket.header(sock:read(2))
@@ -128,6 +129,11 @@ local function send_request(source, node, addr, msg, sz)
 	-- node_channel[node] may yield or throw error
 	local c = node_channel[node]
 
+	local tracetag = skynet.tracetag()
+	if tracetag then
+		skynet.tracelog(tracetag, string.format("cluster %s-%s(%d)", nodename, node, session))
+		c:request(cluster.packtrace(string.format("%s-%s(%d)%s", nodename, node, session, tracetag)))
+	end
 	return c:request(request, session, padding)
 end
 

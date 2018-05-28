@@ -4,6 +4,7 @@
 #include <lauxlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "skynet.h"
 
@@ -73,6 +74,11 @@ fill_header(lua_State *L, uint8_t *buf, int sz) {
 		BYTE 2/3 ; 2:multipart, 3:multipart end
 		DWORD SESSION
 		PADDING msgpart(sz)
+
+	trace
+		WORD stringsz + 1
+		BYTE 4
+		STRING tag
  */
 static int
 packreq_number(lua_State *L, int session, void * msg, uint32_t sz, int is_push) {
@@ -203,6 +209,21 @@ lpackpush(lua_State *L) {
 	return packrequest(L, 1);
 }
 
+static int
+lpacktrace(lua_State *L) {
+	size_t sz;
+	const char * tag = luaL_checklstring(L, 1, &sz);
+	if (sz > 0x8000) {
+		return luaL_error(L, "trace tag is too long : %d", (int) sz);
+	}
+	uint8_t buf[TEMP_LENGTH];
+	buf[2] = 4;
+	fill_header(L, buf, sz+1);
+	memcpy(buf+3, tag, sz);
+	lua_pushlstring(L, (const char *)buf, sz+3);
+	return 1;
+}
+
 /*
 	string packed message
 	return 	
@@ -281,6 +302,12 @@ unpackmreq_part(lua_State *L, const uint8_t * buf, int sz) {
 }
 
 static int
+unpacktrace(lua_State *L, const char * buf, int sz) {
+	lua_pushlstring(L, buf + 1, sz - 1);
+	return 1;
+}
+
+static int
 unpackreq_string(lua_State *L, const uint8_t * buf, int sz) {
 	if (sz < 2) {
 		return luaL_error(L, "Invalid cluster message (size=%d)", sz);
@@ -345,6 +372,8 @@ lunpackrequest(lua_State *L) {
 	case 2:
 	case 3:
 		return unpackmreq_part(L, (const uint8_t *)msg, sz);
+	case 4:
+		return unpacktrace(L, msg, sz);
 	case '\x80':
 		return unpackreq_string(L, (const uint8_t *)msg, sz);
 	case '\x81':
@@ -563,17 +592,31 @@ lisname(lua_State *L) {
 	return 0;
 }
 
+static int
+lnodename(lua_State *L) {
+	pid_t pid = getpid();
+	char hostname[256];
+	if (gethostname(hostname, sizeof(hostname))==0) {
+		lua_pushfstring(L, "%s%d", hostname, (int)pid);
+	} else {
+		lua_pushfstring(L, "noname%d", (int)pid);
+	}
+	return 1;
+}
+
 LUAMOD_API int
 luaopen_skynet_cluster_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "packrequest", lpackrequest },
 		{ "packpush", lpackpush },
+		{ "packtrace", lpacktrace },
 		{ "unpackrequest", lunpackrequest },
 		{ "packresponse", lpackresponse },
 		{ "unpackresponse", lunpackresponse },
 		{ "append", lappend },
 		{ "concat", lconcat },
 		{ "isname", lisname },
+		{ "nodename", lnodename },
 		{ NULL, NULL },
 	};
 	luaL_checkversion(L);

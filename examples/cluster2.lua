@@ -10,9 +10,12 @@ skynet.start(function()
 	assert(largevalue == v)
 	skynet.send(proxy, "lua", "PING", "proxy")
 
-	print(cluster.call("db", "@sdb", "GET", "a"))
-	print(cluster.call("db2", "@sdb", "GET", "b"))
-	cluster.send("db2", "@sdb", "PING", "db2:longstring" .. largevalue)
+	skynet.fork(function()
+		skynet.trace()
+		print(cluster.call("db", "@sdb", "GET", "a"))
+		print(cluster.call("db2", "@sdb", "GET", "b"))
+		cluster.send("db2", "@sdb", "PING", "db2:longstring" .. largevalue)
+	end)
 
 	-- test snax service
 	skynet.timeout(300,function()

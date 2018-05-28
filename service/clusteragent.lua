@@ -22,16 +22,25 @@ setmetatable(register_name, { __index =
 	end
 })
 
+local tracetag
+
 local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 	ignoreret()	-- session is fd, don't call skynet.ret
+	if session == nil then
+		-- trace
+		tracetag = addr
+		return
+	end
 	if padding then
-		local req = large_request[session] or { addr = addr , is_push = is_push }
+		local req = large_request[session] or { addr = addr , is_push = is_push, tracetag = tracetag }
+		tracetag = nil
 		large_request[session] = req
 		cluster.append(req, msg, sz)
 		return
 	else
 		local req = large_request[session]
 		if req then
+			tracetag = req.tracetag
 			large_request[session] = nil
 			cluster.append(req, msg, sz)
 			msg,sz = cluster.concat(req)
@@ -39,6 +48,7 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 			is_push = req.is_push
 		end
 		if not msg then
+			tracetag = nil
 			local response = cluster.packresponse(session, false, "Invalid large req")
 			socket.write(fd, response)
 			return
@@ -65,7 +75,12 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 				skynet.rawsend(addr, "lua", msg, sz)
 				return	-- no response
 			else
-				ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
+				if tracetag then
+					ok , msg, sz = pcall(skynet.tracecall, tracetag, addr, "lua", msg, sz)
+					tracetag = nil
+				else
+					ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
+				end
 			end
 		else
 			ok = false

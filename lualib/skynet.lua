@@ -285,9 +285,13 @@ function suspend(co, result, command, param, param2)
 		session_coroutine_id[co] = nil
 		return suspend(co, coroutine_resume(co))
 	elseif command == "TRACE" then
-		session_coroutine_tracetag[co] = param
-		c.trace(param, "trace")
-		return suspend(co, coroutine_resume(co))
+		if param then
+			session_coroutine_tracetag[co] = param
+			c.trace(param, "trace on")
+		else
+			param = session_coroutine_tracetag[co]
+		end
+		return suspend(co, coroutine_resume(co, param))
 	elseif command == nil then
 		-- debug trace
 		return
@@ -349,6 +353,10 @@ local traceid = 0
 function skynet.trace()
 	traceid = traceid + 1
 	coroutine_yield("TRACE", string.format(":%08x-%d",skynet.self(), traceid))
+end
+
+function skynet.tracetag()
+	return coroutine_yield "TRACE"
 end
 
 local starttime
@@ -446,6 +454,16 @@ function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
 	return yield_call(addr, session)
+end
+
+function skynet.tracecall(tag, addr, typename, msg, sz)
+	c.trace(tag, "trace begin")
+	c.send(addr, skynet.PTYPE_TRACE, 0, tag)
+	local p = proto[typename]
+	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
+	local msg, sz = yield_call(addr, session)
+	c.trace(tag, "trace end")
+	return msg, sz
 end
 
 function skynet.ret(msg, sz)
@@ -624,6 +642,7 @@ function skynet.harbor(addr)
 end
 
 skynet.error = c.error
+skynet.tracelog = c.trace
 
 ----- register protocol
 do
