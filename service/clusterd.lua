@@ -121,6 +121,7 @@ function command.listen(source, addr, port)
 end
 
 local function send_request(source, node, addr, msg, sz)
+	assert(node_address[node], "wrong node: " .. node)
 	local session = node_session[node] or 1
 	-- msg is a local pointer, cluster.packrequest will free it
 	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
@@ -158,6 +159,7 @@ function command.req(...)
 end
 
 function command.push(source, node, addr, msg, sz)
+	assert(node_address[node], "wrong node: " .. node)
 	local session = node_session[node] or 1
 	local request, new_session, padding = cluster.packpush(addr, session, msg, sz)
 	if padding then	-- is multi push
