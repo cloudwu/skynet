@@ -40,7 +40,7 @@ write_pid(const char *pidfile) {
 	f = fdopen(fd, "r+");
 	if (f == NULL) {
 		fprintf(stderr, "Can't open pidfile [%s].\n", pidfile);
-                close(fd);
+		close(fd);
 		return 0;
 	}
 
@@ -58,10 +58,10 @@ write_pid(const char *pidfile) {
 	pid = getpid();
 	if (!fprintf(f,"%d\n", pid)) {
 		fprintf(stderr, "Can't write pid.\n");
-                fclose(f);
+		fclose(f);
 		return 0;
 	}
-        fflush(f);
+	fflush(f);
 
 	return pid;
 }
