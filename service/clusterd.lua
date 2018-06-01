@@ -71,7 +71,7 @@ local function loadconfig(tmp)
 			local f = assert(io.open(config_name))
 			local source = f:read "*a"
 			f:close()
-			assert(load(source, "@"..config_name, "t", tmp))()
+			assert(load(source, "@"..config_name, "bt", tmp))()
 		end
 	end
 	for name,address in pairs(tmp) do
