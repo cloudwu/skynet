@@ -134,8 +134,6 @@ local function co_create(f)
 						skynet.address(session_coroutine_address[co]),
 						source.source, source.linedefined))
 				end
-				f = nil
-				coroutine_pool[#coroutine_pool+1] = co
 				-- coroutine exit
 				local tag = session_coroutine_tracetag[co]
 				if tag then
@@ -148,12 +146,19 @@ local function co_create(f)
 					session_coroutine_id[co] = nil
 				end
 
+				-- recycle co into pool
+				f = nil
+				coroutine_pool[#coroutine_pool+1] = co
+				-- recv new main function f
 				f = coroutine_yield "SUSPEND"
 				f(coroutine_yield())
 			end
 		end)
 	else
+		-- pass the main function f to coroutine, and restore running thread
+		local running = running_thread
 		coroutine_resume(co, f)
+		running_thread = running
 	end
 	return co
 end
