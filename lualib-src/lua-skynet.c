@@ -417,19 +417,25 @@ struct source_info {
 /*
 	string tag
 	string userstring
-	thread co (default nil)
-	integer level
+	thread co (default nil/current L)
+	integer level (default nil)
  */
 static int
 ltrace(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	const char * tag = luaL_checkstring(L, 1);
 	const char * user = luaL_checkstring(L, 2);
-	if (lua_isthread(L, 3)) {
-		lua_State * co = lua_tothread (L, 3);
+	if (!lua_isnoneornil(L, 3)) {
+		lua_State * co = L;
+		int level;
+		if (lua_isthread(L, 3)) {
+			co = lua_tothread (L, 3);
+			level = luaL_optinteger(L, 4, 1);
+		} else {
+			level = luaL_optinteger(L, 3, 1);
+		}
 		struct source_info si[MAX_LEVEL];
 		lua_Debug d;
-		int level = luaL_checkinteger(L, 4);
 		int index = 0;
 		do {
 			if (!lua_getstack(co, level, &d))

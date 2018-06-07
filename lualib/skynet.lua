@@ -10,8 +10,15 @@ local table = table
 
 local profile = require "skynet.profile"
 
-local coroutine_resume = profile.resume
+local cresume = profile.resume
+local running_thread = nil
+
+local function coroutine_resume(co, ...)
+	running_thread = co
+	return cresume(co, ...)
+end
 local coroutine_yield = profile.yield
+local coroutine_create = coroutine.create
 
 local proto = {}
 local skynet = {
@@ -97,6 +104,18 @@ local function _error_dispatch(error_session, error_source)
 	end
 end
 
+local function release_watching(address)
+	local ref = watching_service[address]
+	if ref then
+		ref = ref - 1
+		if ref > 0 then
+			watching_service[address] = ref
+		else
+			watching_service[address] = nil
+		end
+	end
+end
+
 -- coroutine reuse
 
 local coroutine_pool = setmetatable({}, { __mode = "kv" })
@@ -104,7 +123,7 @@ local coroutine_pool = setmetatable({}, { __mode = "kv" })
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
 	if co == nil then
-		co = coroutine.create(function(...)
+		co = coroutine_create(function(...)
 			f(...)
 			while true do
 				local session = session_coroutine_id[co]
@@ -117,7 +136,19 @@ local function co_create(f)
 				end
 				f = nil
 				coroutine_pool[#coroutine_pool+1] = co
-				f = coroutine_yield "EXIT"
+				-- coroutine exit
+				local tag = session_coroutine_tracetag[co]
+				if tag then
+					c.trace(tag, "end")
+					session_coroutine_tracetag[co] = nil
+				end
+				local address = session_coroutine_address[co]
+				if address then
+					release_watching(address)
+					session_coroutine_id[co] = nil
+				end
+
+				f = coroutine_yield "SUSPEND"
 				f(coroutine_yield())
 			end
 		end)
@@ -141,18 +172,6 @@ local function dispatch_wakeup()
 	end
 end
 
-local function release_watching(address)
-	local ref = watching_service[address]
-	if ref then
-		ref = ref - 1
-		if ref > 0 then
-			watching_service[address] = ref
-		else
-			watching_service[address] = nil
-		end
-	end
-end
-
 -- suspend is local function
 function suspend(co, result, command, param, param2)
 	if not result then
@@ -171,141 +190,21 @@ function suspend(co, result, command, param, param2)
 		end
 		error(debug.traceback(co,tostring(command)))
 	end
-	if command == "CALLTRACE" then
-		local tag = session_coroutine_tracetag[co]
-		if tag then
-			c.trace(tag, "call", co, 2)
-			c.send(param, skynet.PTYPE_TRACE, 0, tag)
-		end
-		return suspend(co, coroutine_resume(co))
-	elseif command == "CALL" then
-		session_id_coroutine[param] = co
-	elseif command == "SLEEP" then
-		local tag = session_coroutine_tracetag[co]
-		if tag then c.trace(tag, "sleep", co, 2) end
-		session_id_coroutine[param] = co
-		if sleep_session[param2] then
-			error(debug.traceback(co, "token duplicative"))
-		end
-		sleep_session[param2] = param
-	elseif command == "RETURN" then
-		local tag = session_coroutine_tracetag[co]
-		if tag then c.trace(tag, "response") end
-		local co_session = session_coroutine_id[co]
-		session_coroutine_id[co] = nil
-		if co_session == 0 then
-			if param2 ~= nil then
-				c.trash(param, param2)
-			end
-			return suspend(co, coroutine_resume(co, false))	-- send don't need ret
-		end
-		local co_address = session_coroutine_address[co]
-		if param == nil or not co_session then
-			error(debug.traceback(co))
-		end
-		local ret
-		if not dead_service[co_address] then
-			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, param2) ~= nil
-			if not ret then
-				-- If the package is too large, returns nil. so we should report error back
-				c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
-			end
-		elseif param2 ~= nil then
-			c.trash(param, param2)
-			ret = false
-		end
-		return suspend(co, coroutine_resume(co, ret))
-	elseif command == "RESPONSE" then
-		local co_session = session_coroutine_id[co]
-		if not co_session then
-			error(debug.traceback(co))
-		end
-		session_coroutine_id[co] = nil
-		local co_address = session_coroutine_address[co]
-		local f = param
-		local function response(ok, ...)
-			if ok == "TEST" then
-				if dead_service[co_address] then
-					release_watching(co_address)
-					unresponse[response] = nil
-					f = false
-					return false
-				else
-					return true
-				end
-			end
-			if not f then
-				if f == false then
-					f = nil
-					return false
-				end
-				error "Can't response more than once"
-			end
-
-			local ret
-			-- do not response when session == 0 (send)
-			if co_session ~= 0 and not dead_service[co_address] then
-				if ok then
-					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) ~= nil
-					if not ret then
-						-- If the package is too large, returns false. so we should report error back
-						c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
-					end
-				else
-					ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") ~= nil
-				end
-			else
-				ret = false
-			end
-			release_watching(co_address)
-			unresponse[response] = nil
-			f = nil
-			return ret
-		end
-		watching_service[co_address] = watching_service[co_address] + 1
-		unresponse[response] = true
-		return suspend(co, coroutine_resume(co, response))
-	elseif command == "EXIT" then
-		-- coroutine exit
-		local tag = session_coroutine_tracetag[co]
-		if tag then c.trace(tag, "end") end
-		local address = session_coroutine_address[co]
-		if address then
-			release_watching(address)
-			session_coroutine_id[co] = nil
-			session_coroutine_address[co] = nil
-			session_coroutine_tracetag[co] = nil
-		end
+	if command == "SUSPEND" then
+		dispatch_wakeup()
+		dispatch_error_queue()
 	elseif command == "QUIT" then
 		-- service exit
 		return
 	elseif command == "USER" then
 		-- See skynet.coutine for detail
 		error("Call skynet.coroutine.yield out of skynet.coroutine.resume\n" .. debug.traceback(co))
-	elseif command == "IGNORERET" then
-		-- We use session for other uses
-		session_coroutine_id[co] = nil
-		return suspend(co, coroutine_resume(co))
-	elseif command == "TRACE" then
-		if param then
-			session_coroutine_tracetag[co] = param
-			if param2 then
-				c.trace(param, "trace " .. param2)
-			else
-				c.trace(param, "trace")
-			end
-		else
-			param = session_coroutine_tracetag[co]
-		end
-		return suspend(co, coroutine_resume(co, param))
 	elseif command == nil then
 		-- debug trace
 		return
 	else
 		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
 	end
-	dispatch_wakeup()
-	dispatch_error_queue()
 end
 
 function skynet.timeout(ti, func)
@@ -316,11 +215,20 @@ function skynet.timeout(ti, func)
 	session_id_coroutine[session] = co
 end
 
+local function suspend_sleep(session, token)
+	local tag = session_coroutine_tracetag[running_thread]
+	if tag then c.trace(tag, "sleep", 2) end
+	session_id_coroutine[session] = running_thread
+	assert(sleep_session[token] == nil, "token duplicative")
+	sleep_session[token] = session
+
+	return coroutine_yield "SUSPEND"
+end
+
 function skynet.sleep(ti, token)
 	local session = c.intcommand("TIMEOUT",ti)
 	assert(session)
-	token = token or coroutine.running()
-	local succ, ret = coroutine_yield("SLEEP", session, token)
+	local succ, ret = suspend_sleep(session, token or coroutine.running())
 	sleep_session[token] = nil
 	if succ then
 		return
@@ -339,7 +247,7 @@ end
 function skynet.wait(token)
 	local session = c.genid()
 	token = token or coroutine.running()
-	local ret, msg = coroutine_yield("SLEEP", session, token)
+	local ret, msg = suspend_sleep(session, token or coroutine.running())
 	sleep_session[token] = nil
 	session_id_coroutine[session] = nil
 end
@@ -358,11 +266,18 @@ skynet.hpc = c.hpc	-- high performance counter
 local traceid = 0
 function skynet.trace(info)
 	traceid = traceid + 1
-	coroutine_yield("TRACE", string.format(":%08x-%d",skynet.self(), traceid), info)
+
+	local tag = string.format(":%08x-%d",skynet.self(), traceid)
+	session_coroutine_tracetag[running_thread] = tag
+	if info then
+		c.trace(tag, "trace " .. info)
+	else
+		c.trace(tag, "trace")
+	end
 end
 
 function skynet.tracetag()
-	return coroutine_yield "TRACE"
+	return session_coroutine_tracetag[running_thread]
 end
 
 local starttime
@@ -437,7 +352,8 @@ skynet.trash = assert(c.trash)
 
 local function yield_call(service, session)
 	watching_session[session] = service
-	local succ, msg, sz = coroutine_yield("CALL", session)
+	session_id_coroutine[session] = running_thread
+	local succ, msg, sz = coroutine_yield "SUSPEND"
 	watching_session[session] = nil
 	if not succ then
 		error "call failed"
@@ -446,7 +362,12 @@ local function yield_call(service, session)
 end
 
 function skynet.call(addr, typename, ...)
-	coroutine_yield("CALLTRACE", addr)
+	local tag = session_coroutine_tracetag[running_thread]
+	if tag then
+		c.trace(tag, "call", 2)
+		c.send(addr, skynet.PTYPE_TRACE, 0, tag)
+	end
+
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , p.pack(...))
 	if session == nil then
@@ -456,7 +377,11 @@ function skynet.call(addr, typename, ...)
 end
 
 function skynet.rawcall(addr, typename, msg, sz)
-	coroutine_yield("CALLTRACE", addr)
+	local tag = session_coroutine_tracetag[running_thread]
+	if tag then
+		c.trace(tag, "call", 2)
+		c.send(addr, skynet.PTYPE_TRACE, 0, tag)
+	end
 	local p = proto[typename]
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
 	return yield_call(addr, session)
@@ -474,16 +399,88 @@ end
 
 function skynet.ret(msg, sz)
 	msg = msg or ""
-	return coroutine_yield("RETURN", msg, sz)
+	local tag = session_coroutine_tracetag[running_thread]
+	if tag then c.trace(tag, "response") end
+	local co_session = session_coroutine_id[running_thread]
+	session_coroutine_id[running_thread] = nil
+	if co_session == 0 then
+		if sz ~= nil then
+			c.trash(msg, sz)
+		end
+		return false	-- send don't need ret
+	end
+	local co_address = session_coroutine_address[running_thread]
+	if not co_session then
+		error "No session"
+	end
+	local ret
+	if not dead_service[co_address] then
+		ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, msg, sz) ~= nil
+		if not ret then
+			-- If the package is too large, returns nil. so we should report error back
+			c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
+		end
+	elseif sz ~= nil then
+		c.trash(msg, sz)
+		return false
+	end
+	return ret
 end
 
 function skynet.ignoreret()
-	coroutine_yield "IGNORERET"
+	-- We use session for other uses
+	session_coroutine_id[running_thread] = nil
 end
 
 function skynet.response(pack)
 	pack = pack or skynet.pack
-	return coroutine_yield("RESPONSE", pack)
+
+	local co_session = assert(session_coroutine_id[running_thread], "no session")
+	session_coroutine_id[running_thread] = nil
+	local co_address = session_coroutine_address[running_thread]
+	local function response(ok, ...)
+		if ok == "TEST" then
+			if dead_service[co_address] then
+				release_watching(co_address)
+				unresponse[response] = nil
+				pack = false
+				return false
+			else
+				return true
+			end
+		end
+		if not pack then
+			if pack == false then
+				pack = nil
+				return false
+			end
+			error "Can't response more than once"
+		end
+
+		local ret
+		-- do not response when session == 0 (send)
+		if co_session ~= 0 and not dead_service[co_address] then
+			if ok then
+				ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, pack(...)) ~= nil
+				if not ret then
+					-- If the package is too large, returns false. so we should report error back
+					c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
+				end
+			else
+				ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") ~= nil
+			end
+		else
+			ret = false
+		end
+		release_watching(co_address)
+		unresponse[response] = nil
+		pack = nil
+		return ret
+	end
+	watching_service[co_address] = watching_service[co_address] + 1
+	unresponse[response] = true
+
+	return response
 end
 
 function skynet.retpack(...)
@@ -556,11 +553,6 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 			suspend(co, coroutine_resume(co, true, msg, sz))
 		end
 	else
-		local tag = trace_source[source]
-		if tag then
-			c.trace(tag, "request")
-			trace_source[source] = nil
-		end
 		local p = proto[prototype]
 		if p == nil then
 			if prototype == skynet.PTYPE_TRACE then
@@ -573,6 +565,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 			end
 			return
 		end
+
 		local f = p.dispatch
 		if f then
 			local ref = watching_service[source]
@@ -584,12 +577,25 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
-			session_coroutine_tracetag[co] = tag
+			local traceflag = p.trace
+			local tag = trace_source[source]
+			if tag then
+				trace_source[source] = nil
+				if traceflag ~= false then
+					c.trace(tag, "request")
+					session_coroutine_tracetag[co] = tag
+				end
+			elseif traceflag then
+				skynet.trace()
+			end
 			suspend(co, coroutine_resume(co, session,source, p.unpack(msg,sz)))
-		elseif session ~= 0 then
-			c.send(source, skynet.PTYPE_ERROR, session, "")
 		else
-			unknown_request(session, source, msg, sz, proto[prototype].name)
+			trace_source[source] = nil
+			if session ~= 0 then
+				c.send(source, skynet.PTYPE_ERROR, session, "")
+			else
+				unknown_request(session, source, msg, sz, proto[prototype].name)
+			end
 		end
 	end
 end
@@ -649,6 +655,14 @@ end
 
 skynet.error = c.error
 skynet.tracelog = c.trace
+
+-- true: force on
+-- false: force off
+-- nil: optional (use skynet.trace() to trace one message)
+function skynet.traceproto(prototype, flag)
+	local p = assert(proto[prototype])
+	p.trace = flag
+end
 
 ----- register protocol
 do
