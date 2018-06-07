@@ -228,7 +228,8 @@ end
 function skynet.sleep(ti, token)
 	local session = c.intcommand("TIMEOUT",ti)
 	assert(session)
-	local succ, ret = suspend_sleep(session, token or coroutine.running())
+	token = token or coroutine.running()
+	local succ, ret = suspend_sleep(session, token)
 	sleep_session[token] = nil
 	if succ then
 		return
@@ -247,7 +248,7 @@ end
 function skynet.wait(token)
 	local session = c.genid()
 	token = token or coroutine.running()
-	local ret, msg = suspend_sleep(session, token or coroutine.running())
+	local ret, msg = suspend_sleep(session, token)
 	sleep_session[token] = nil
 	session_id_coroutine[session] = nil
 end
