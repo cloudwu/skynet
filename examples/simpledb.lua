@@ -33,5 +33,6 @@ skynet.start(function()
 			error(string.format("Unknown command %s", tostring(cmd)))
 		end
 	end)
+--	skynet.traceproto("lua", false)	-- true off tracelog
 	skynet.register "SIMPLEDB"
 end)
