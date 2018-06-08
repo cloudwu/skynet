@@ -158,6 +158,7 @@ function COMMAND.help()
 		shrtbl = "Show shared short string table info",
 		ping = "ping address",
 		call = "call address ...",
+		trace = "trace address [proto] [on|off]",
 	}
 end
 
@@ -341,6 +342,22 @@ function COMMAND.ping(address)
 	skynet.call(address, "debug", "PING")
 	ti = skynet.now() - ti
 	return tostring(ti)
+end
+
+local function toboolean(x)
+	return x and (x == "true" or x == "on")
+end
+
+function COMMAND.trace(address, proto, flag)
+	address = adjust_address(address)
+	if flag == nil then
+		if proto == "on" or proto == "off" then
+			proto = toboolean(proto)
+		end
+	else
+		flag = toboolean(flag)
+	end
+	skynet.call(address, "debug", "TRACELOG", proto, flag)
 end
 
 function COMMANDX.call(cmd)

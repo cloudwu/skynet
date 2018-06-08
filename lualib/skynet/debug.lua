@@ -78,6 +78,16 @@ local function init(skynet, export)
 			skynet.response()	-- get response , but not return. raise error when exit
 		end
 
+		function dbgcmd.TRACELOG(proto, flag)
+			if type(proto) ~= "string" then
+				flag = proto
+				proto = "lua"
+			end
+			skynet.error(string.format("Turn trace log %s for %s", flag, proto))
+			skynet.traceproto(proto, flag)
+			skynet.ret()
+		end
+
 		return dbgcmd
 	end -- function init_dbgcmd
 

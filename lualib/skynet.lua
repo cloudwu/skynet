@@ -136,8 +136,8 @@ local function co_create(f)
 				end
 				-- coroutine exit
 				local tag = session_coroutine_tracetag[co]
-				if tag then
-					c.trace(tag, "end")
+				if tag ~= nil then
+					if tag then c.trace(tag, "end")	end
 					session_coroutine_tracetag[co] = nil
 				end
 				local address = session_coroutine_address[co]
@@ -271,6 +271,11 @@ skynet.hpc = c.hpc	-- high performance counter
 
 local traceid = 0
 function skynet.trace(info)
+	skynet.error("TRACE", session_coroutine_tracetag[running_thread])
+	if session_coroutine_tracetag[running_thread] == false then
+		-- force off trace log
+		return
+	end
 	traceid = traceid + 1
 
 	local tag = string.format(":%08x-%d",skynet.self(), traceid)
@@ -584,15 +589,21 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
 			local traceflag = p.trace
-			local tag = trace_source[source]
-			if tag then
+			if traceflag == false then
+				-- force off
 				trace_source[source] = nil
-				if traceflag ~= false then
+				session_coroutine_tracetag[co] = false
+			else
+				local tag = trace_source[source]
+				if tag then
+					trace_source[source] = nil
 					c.trace(tag, "request")
 					session_coroutine_tracetag[co] = tag
+				elseif traceflag then
+					-- set running_thread for trace
+					running_thread = co
+					skynet.trace()
 				end
-			elseif traceflag then
-				skynet.trace()
 			end
 			suspend(co, coroutine_resume(co, session,source, p.unpack(msg,sz)))
 		else
