@@ -64,6 +64,7 @@ LUA_CLIB_SKYNET = \
   lua-mysqlaux.c \
   lua-debugchannel.c \
   lua-datasheet.c \
+  lua-snapshot.c \
   \
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
