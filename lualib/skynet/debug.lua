@@ -104,6 +104,7 @@ local function init(skynet, export)
                     diff[k] = v
                 end
             end
+            old_snapshot = new_snapshot
             local ret = construct_indentation(diff)
             skynet.ret(skynet.pack(ret))
         end
