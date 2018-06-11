@@ -28,7 +28,7 @@ local function cleanup_key_value(input)
         ret[clean_key] = {
             val_type = val_type,
             parent = parent,
-            extra = trim_extra,
+            extra = v,
             key = val_key,
         }
     end

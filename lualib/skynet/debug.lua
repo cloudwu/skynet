@@ -77,37 +77,37 @@ local function init(skynet, export)
 		function dbgcmd.LINK()
 			skynet.response()	-- get response , but not return. raise error when exit
 		end
-        
-        function dbgcmd.TRACELOG(proto, flag)
-        	if type(proto) ~= "string" then
-        		flag = proto
-                proto = "lua"
-        	end
-        	skynet.error(string.format("Turn trace log %s for %s", flag, proto))
-        	skynet.traceproto(proto, flag)
-        	skynet.ret()
-        end
 
-        local old_snapshot
-        local snapshot = require "snapshot"
-        local construct_indentation = (require "skynet.snapshot_utils").construct_indentation
-        function dbgcmd.SNAPSHOT()
+		function dbgcmd.TRACELOG(proto, flag)
+			if type(proto) ~= "string" then
+				flag = proto
+				proto = "lua"
+			end
+			skynet.error(string.format("Turn trace log %s for %s", flag, proto))
+			skynet.traceproto(proto, flag)
+			skynet.ret()
+		end
+
+		local old_snapshot
+		local snapshot = require "snapshot"
+		local construct_indentation = (require "skynet.snapshot_utils").construct_indentation
+		function dbgcmd.SNAPSHOT()
 			collectgarbage "collect"
-            local new_snapshot = snapshot()
-            if not old_snapshot then
-                old_snapshot = new_snapshot
-                return skynet.ret(skynet.pack({}))
-            end
-            local diff = {}
-            for k,v in pairs(new_snapshot) do
-                if not old_snapshot[k] then
-                    diff[k] = v
-                end
-            end
-            old_snapshot = new_snapshot
-            local ret = construct_indentation(diff)
-            skynet.ret(skynet.pack(ret))
-        end
+			local new_snapshot = snapshot()
+			if not old_snapshot then
+				old_snapshot = new_snapshot
+				return skynet.ret(skynet.pack({}))
+			end
+			local diff = {}
+			for k,v in pairs(new_snapshot) do
+				if not old_snapshot[k] then
+					diff[k] = v
+				end
+			end
+			old_snapshot = new_snapshot
+			local ret = construct_indentation(diff)
+			skynet.ret(skynet.pack(ret))
+		end
 
 		return dbgcmd
 	end -- function init_dbgcmd
