@@ -89,9 +89,9 @@ local function init(skynet, export)
 		end
 
 		local old_snapshot
-		local snapshot = require "snapshot"
-		local construct_indentation = (require "skynet.snapshot_utils").construct_indentation
 		function dbgcmd.SNAPSHOT()
+			local snapshot = require "snapshot"
+			local construct_indentation = (require "skynet.snapshot_utils").construct_indentation
 			collectgarbage "collect"
 			local new_snapshot = snapshot()
 			if not old_snapshot then
