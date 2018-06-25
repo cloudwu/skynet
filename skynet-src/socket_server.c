@@ -1542,7 +1542,7 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 				union sockaddr_all sa;
 				socklen_t sasz = udp_socket_address(s, s->p.udp_address, &sa);
 				if (sasz == 0) {
-					fprintf(stderr, "socket-server : udp (%d) type mismatch.\n", id);
+					fprintf(stderr, "socket-server : set udp (%d) address first.\n", id);
 					socket_unlock(&l);
 					so.free_func((void *)buffer);
 					return -1;

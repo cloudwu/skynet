@@ -286,17 +286,29 @@ local function resolve(content)
 	skynet.wakeup(resp.co)
 end
 
+local function connect_server()
+	local fd = socket.udp(function(str, from)
+		resolve(str)
+	end)
+	socket.udp_connect(fd, dns_server.address, dns_server.port)
+
+	if dns_server.fd then
+		socket.close(fd)
+	else
+		dns_server.fd = fd
+		skynet.error(string.format("Udp server open %s:%s (%d)", dns_server.address, dns_server.port, fd))
+	end
+end
+
 local DNS_SERVER_RETIRE = 60 * 100
 local function touch_server()
 	dns_server.retire = skynet.now()
 	if dns_server.fd then
 		return
 	end
-	dns_server.fd = socket.udp(function(str, from)
-		resolve(str)
-	end)
-	skynet.error(string.format("Udp server open %s:%s (%d)", dns_server.address, dns_server.port, dns_server.fd))
-	socket.udp_connect(dns_server.fd, dns_server.address, dns_server.port)
+
+	connect_server()
+
 	local function check_alive()
 		if skynet.now() > dns_server.retire + DNS_SERVER_RETIRE then
 			local fd = dns_server.fd
