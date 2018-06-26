@@ -290,14 +290,14 @@ local function connect_server()
 	local fd = socket.udp(function(str, from)
 		resolve(str)
 	end)
-	socket.udp_connect(fd, dns_server.address, dns_server.port)
-
-	if dns_server.fd then
+	local ok, err = pcall(socket.udp_connect,fd, dns_server.address, dns_server.port)
+	if not ok then
 		socket.close(fd)
-	else
-		dns_server.fd = fd
-		skynet.error(string.format("Udp server open %s:%s (%d)", dns_server.address, dns_server.port, fd))
+		error(err)
 	end
+
+	dns_server.fd = fd
+	skynet.error(string.format("Udp server open %s:%s (%d)", dns_server.address, dns_server.port, fd))
 end
 
 local DNS_SERVER_RETIRE = 60 * 100
