@@ -59,7 +59,7 @@ function ctd.dump(root)
 				local index = dump_table(v)
 				return '\4', string.pack("<i4", index-1)
 			elseif t == "number" then
-				if math.tointeger(v) then
+				if math.tointeger(v) and v <= 0x7FFFFFFF and v >= -(0x7FFFFFFF+1) then
 					return '\1', string.pack("<i4", v)
 				else
 					return '\2', string.pack("<f",v)
