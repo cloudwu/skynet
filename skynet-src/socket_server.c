@@ -1461,6 +1461,10 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				result->data = (char *)err;
 				return SOCKET_ERR;
 			}
+			if(e->eof) {
+				force_close(ss, s, &l, result);
+				return SOCKET_CLOSE;
+			}
 			break;
 		}
 	}
