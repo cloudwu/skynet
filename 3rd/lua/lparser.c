@@ -1,5 +1,5 @@
 /*
-** $Id: lparser.c,v 2.155 2016/08/01 19:51:24 roberto Exp $
+** $Id: lparser.c,v 2.155.1.2 2017/04/29 18:11:40 roberto Exp $
 ** Lua Parser
 ** See Copyright Notice in lua.h
 */
@@ -1395,7 +1395,7 @@ static void test_then_block (LexState *ls, int *escapelist) {
     luaK_goiffalse(ls->fs, &v);  /* will jump to label if condition is true */
     enterblock(fs, &bl, 0);  /* must enter block before 'goto' */
     gotostat(ls, v.t);  /* handle goto/break */
-    while (testnext(ls, ';')) {}  /* skip semicolons */
+    while (testnext(ls, ';')) {}  /* skip colons */
     if (block_follow(ls, 0)) {  /* 'goto' is the entire block? */
       leaveblock(fs);
       return;  /* and that is it */
