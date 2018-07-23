@@ -359,6 +359,7 @@ socket_server_create() {
 		s->type = SOCKET_TYPE_INVALID;
 		clear_wb_list(&s->high);
 		clear_wb_list(&s->low);
+		spinlock_init(&s->dw_lock);
 	}
 	ss->alloc_id = 0;
 	ss->event_n = 0;
@@ -429,6 +430,7 @@ socket_server_release(struct socket_server *ss) {
 		if (s->type != SOCKET_TYPE_RESERVE) {
 			force_close(ss, s, &l, &dummy);
 		}
+		spinlock_destroy(&s->dw_lock);
 	}
 	close(ss->sendctrl_fd);
 	close(ss->recvctrl_fd);
@@ -464,7 +466,6 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 	s->warn_size = 0;
 	check_wb_list(&s->high);
 	check_wb_list(&s->low);
-	spinlock_init(&s->dw_lock);
 	s->dw_buffer = NULL;
 	s->dw_size = 0;
 	return s;

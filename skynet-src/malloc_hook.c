@@ -204,7 +204,7 @@ skynet_memalign(size_t alignment, size_t size) {
 
 void *
 skynet_aligned_alloc(size_t alignment, size_t size) {
-	void* ptr = je_aligned_alloc(alignment, size + (PREFIX_SIZE + alignment -1) & ~(alignment-1));
+	void* ptr = je_aligned_alloc(alignment, size + (size_t)((PREFIX_SIZE + alignment -1) & ~(alignment-1)));
 	if(!ptr) malloc_oom(size);
 	return fill_prefix(ptr);
 }
