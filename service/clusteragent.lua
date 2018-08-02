@@ -11,14 +11,29 @@ fd = tonumber(fd)
 
 local large_request = {}
 local register_name = {}
+local inquery_name = {}
 
 setmetatable(register_name, { __index =
 	function(self, name)
-		local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
-		if addr then
-			self[name] = addr
+		local waitco = inquery_name[name]
+		if waitco then
+			local co=coroutine.runnging()
+			table.insert(waitco, co)
+			skynet.wait(co)
+			return rawget(self, name)
+		else
+			waitco = {}
+			inquery_name[name] = waitco
+			local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
+			if addr then
+				self[name] = addr
+			end
+			inquery_name[name] = nil
+			for _, co in ipairs(waitco) do
+				skynet.wakeup(co)
+			end
+			return addr
 		end
-		return addr
 	end
 })
 
