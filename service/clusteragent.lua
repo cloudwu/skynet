@@ -17,7 +17,7 @@ setmetatable(register_name, { __index =
 	function(self, name)
 		local waitco = inquery_name[name]
 		if waitco then
-			local co=coroutine.runnging()
+			local co=coroutine.running()
 			table.insert(waitco, co)
 			skynet.wait(co)
 			return rawget(self, name)
