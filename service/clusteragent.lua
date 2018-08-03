@@ -10,10 +10,9 @@ gate = tonumber(gate)
 fd = tonumber(fd)
 
 local large_request = {}
-local register_name = {}
 local inquery_name = {}
 
-setmetatable(register_name, { __index =
+local register_name_mt = { __index =
 	function(self, name)
 		local waitco = inquery_name[name]
 		if waitco then
@@ -36,6 +35,12 @@ setmetatable(register_name, { __index =
 		end
 	end
 })
+
+local function new_register_name()
+	return setmetatable({}, register_name_mt)
+end
+
+local register_name = new_register_name()
 
 local tracetag
 
@@ -132,7 +137,7 @@ skynet.start(function()
 			socket.close(fd)
 			skynet.exit()
 		elseif cmd == "namechange" then
-			register_name = {}
+			register_name = new_register_name()
 		else
 			skynet.error(string.format("Invalid command %s from %s", cmd, skynet.address(source)))
 		end
