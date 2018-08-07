@@ -193,7 +193,7 @@ function suspend(co, result, command, param, param2)
 			session_coroutine_address[co] = nil
 			session_coroutine_tracetag[co] = nil
 		end
-		skynet.timeout(0,function() end)	-- trigger command "SUSPEND"
+		skynet.fork(function() end)	-- trigger command "SUSPEND"
 		error(debug.traceback(co,tostring(command)))
 	end
 	if command == "SUSPEND" then
@@ -540,10 +540,14 @@ function skynet.dispatch_unknown_response(unknown)
 end
 
 function skynet.fork(func,...)
-	local args = table.pack(...)
-	local co = co_create(function()
-		func(table.unpack(args,1,args.n))
-	end)
+	local n = select("#", ...)
+	local co
+	if n == 0 then
+		co = co_create(func)
+	else
+		local args = { ... }
+		co = co_create(function() func(table.unpack(args,1,n)) end)
+	end
 	table.insert(fork_queue, co)
 	return co
 end
