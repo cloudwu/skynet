@@ -3,7 +3,7 @@ local mc = require "skynet.multicast.core"
 
 local multicastd
 local multicast = {}
-local dispatch = setmetatable({} , {__mode = "kv" })
+local dispatch = {}
 
 local chan = {}
 local chan_meta = {
@@ -70,6 +70,7 @@ function chan:unsubscribe()
 	local c = assert(self.channel)
 	skynet.send(multicastd, "lua", "USUB", c)
 	self.__subscribe = nil
+	dispatch[c] = nil
 end
 
 local function dispatch_subscribe(channel, source, pack, msg, sz)
