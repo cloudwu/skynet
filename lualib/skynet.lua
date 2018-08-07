@@ -193,6 +193,7 @@ function suspend(co, result, command, param, param2)
 			session_coroutine_address[co] = nil
 			session_coroutine_tracetag[co] = nil
 		end
+		skynet.timeout(0,function() end)	-- trigger command "SUSPEND"
 		error(debug.traceback(co,tostring(command)))
 	end
 	if command == "SUSPEND" then
