@@ -65,12 +65,13 @@
 --]]
 
 local skynet = require "skynet"
-local socket = require "socket"
+local socket = require "skynet.socket"
 
 local MAX_DOMAIN_LEN = 1024
 local MAX_LABEL_LEN = 63
 local MAX_PACKET_LEN = 2048
 local DNS_HEADER_LEN = 12
+local TIMEOUT = 30 * 100	-- 30 seconds
 
 local QTYPE = {
 	A = 1,
@@ -82,7 +83,18 @@ local QCLASS = {
 	IN = 1,
 }
 
+local weak = {__mode = "kv"}
+local CACHE = {}
+
 local dns = {}
+local request_pool = {}
+
+function dns.flush()
+	CACHE[QTYPE.A] = setmetatable({},weak)
+	CACHE[QTYPE.AAAA] = setmetatable({},weak)
+end
+
+dns.flush()
 
 local function verify_domain_name(name)
 	if #name > MAX_DOMAIN_LEN then
@@ -102,7 +114,21 @@ end
 local next_tid = 1
 local function gen_tid()
 	local tid = next_tid
-	next_tid = next_tid + 1
+	if request_pool[tid] then
+		tid = nil
+		for i = 1, 65535 do
+			-- find available tid
+			if not request_pool[i] then
+				tid = i
+				break
+			end
+		end
+		assert(tid)
+	end
+	next_tid = tid + 1
+	if next_tid > 65535 then
+		next_tid = 1
+	end
 	return tid
 end
 
@@ -193,8 +219,12 @@ local function unpack_rdata(qtype, chunk)
 	end
 end
 
-local dns_server
-local request_pool = {}
+local dns_server = {
+	fd = nil,
+	address = nil,
+	port = nil,
+	retire = nil,
+}
 
 local function resolve(content)
 	if #content < DNS_HEADER_LEN then
@@ -206,36 +236,93 @@ local function resolve(content)
 	-- verify answer
 	assert(answer_header.qdcount == 1, "malformed packet")
 
-	local resp = request_pool[answer_header.tid]
-	if not resp then
-		skynet.error("Recv an invalid tid when dns query")
-		return
-	end
-
 	local question,left = unpack_question(content, left)
-	if question.name ~= resp.name then
-		skynet.error("Recv an invalid name when dns query")
-		return
-	end
 
 	local ttl
 	local answer
-	local answers = {}
+	local answers_ipv4
+	local answers_ipv6
+
 	for i=1, answer_header.ancount do
 		answer, left = unpack_answer(content, left)
-		-- only extract qtype address
-		if answer.atype == resp.qtype then
-			local ip = unpack_rdata(resp.qtype, answer.rdata)
+		local answers
+		if answer.atype == QTYPE.A then
+			answers_ipv4 = answers_ipv4 or {}
+			answers = answers_ipv4
+		elseif answer.atype == QTYPE.AAAA then
+			answers_ipv6 = answers_ipv6 or {}
+			answers = answers_ipv6
+		end
+		if answers then
+			local ip = unpack_rdata(answer.atype, answer.rdata)
 			ttl = ttl and math.min(ttl, answer.ttl) or answer.ttl
 			answers[#answers+1] = ip
 		end
 	end
 
-	if #answers > 0 then
-		resp.answers = answers
+	if answers_ipv4 then
+		CACHE[QTYPE.A][question.name] = { answers = answers_ipv4, ttl = skynet.now() + ttl * 100 }
+	end
+
+	if answers_ipv6 then
+		CACHE[QTYPE.AAAA][question.name] = { answers = answers_ipv6, ttl = skynet.now() + ttl * 100 }
+	end
+
+	local resp = request_pool[answer_header.tid]
+	if not resp then
+		-- the resp may be timeout
+		return
+	end
+
+	if question.name ~= resp.name then
+		skynet.error("Recv an invalid name when dns query")
+	end
+
+	local r = CACHE[resp.qtype][resp.name]
+	if r then
+		resp.answers = r.answers
 	end
 
 	skynet.wakeup(resp.co)
+end
+
+local function connect_server()
+	local fd = socket.udp(function(str, from)
+		resolve(str)
+	end)
+	local ok, err = pcall(socket.udp_connect,fd, dns_server.address, dns_server.port)
+	if not ok then
+		socket.close(fd)
+		error(err)
+	end
+
+	dns_server.fd = fd
+	skynet.error(string.format("Udp server open %s:%s (%d)", dns_server.address, dns_server.port, fd))
+end
+
+local DNS_SERVER_RETIRE = 60 * 100
+local function touch_server()
+	dns_server.retire = skynet.now()
+	if dns_server.fd then
+		return
+	end
+
+	connect_server()
+
+	local function check_alive()
+		if skynet.now() > dns_server.retire + DNS_SERVER_RETIRE then
+			local fd = dns_server.fd
+			if fd then
+				dns_server.fd = nil
+				socket.close(fd)
+				skynet.error(string.format("Udp server close %s:%s (%d)", dns_server.address, dns_server.port, fd))
+			end
+		else
+			skynet.timeout( 2 * DNS_SERVER_RETIRE, check_alive)
+		end
+	end
+
+	skynet.timeout( 2 * DNS_SERVER_RETIRE, check_alive)
 end
 
 function dns.server(server, port)
@@ -247,13 +334,23 @@ function dns.server(server, port)
 				break
 			end
 		end
+		f:close()
 		assert(server, "Can't get nameserver")
 	end
-	dns_server = socket.udp(function(str, from)
-		resolve(str)
-	end)
-	socket.udp_connect(dns_server, server, port or 53)
-	return server
+	assert(dns_server.fd == nil)	-- only set dns.server once
+	dns_server.address = server
+	dns_server.port = port or 53
+	touch_server()
+	return dns_server.address
+end
+
+local function lookup_cache(name, qtype, ignorettl)
+	local result = CACHE[qtype][name]
+	if result then
+		if ignorettl or (result.ttl > skynet.now()) then
+			return result.answers
+		end
+	end
 end
 
 local function suspend(tid, name, qtype)
@@ -261,29 +358,49 @@ local function suspend(tid, name, qtype)
 		name = name,
 		tid = tid,
 		qtype = qtype,
-		time = skynet.now(),	-- for timeout
 		co = coroutine.running(),
 	}
 	request_pool[tid] = req
+	skynet.fork(function()
+		skynet.sleep(TIMEOUT)
+		local req = request_pool[tid]
+		if req then
+			-- cancel tid
+			skynet.error(string.format("DNS query %s timeout", name))
+			request_pool[tid] = nil
+			skynet.wakeup(req.co)
+		end
+	end)
 	skynet.wait(req.co)
-	local answers = request_pool[tid].answers
+	local answers = req.answers
 	request_pool[tid] = nil
-	assert(answers, "no ip")
-	return answers[1], answers
+	if not req.answers then
+		local answers = lookup_cache(name, qtype, true)
+		if answers then
+			return answers[1], answers
+		end
+		error "timeout or no answer"
+	end
+	return req.answers[1], req.answers
 end
 
 function dns.resolve(name, ipv6)
 	local qtype = ipv6 and QTYPE.AAAA or QTYPE.A
 	local name = name:lower()
 	assert(verify_domain_name(name) , "illegal name")
+	local answers = lookup_cache(name, qtype)
+	if answers then
+		return answers[1], answers
+	end
 	local question_header = {
 		tid = gen_tid(),
 		flags = 0x100, -- flags: 00000001 00000000, set RD
 		qdcount = 1,
 	}
 	local req = pack_header(question_header) .. pack_question(name, qtype, QCLASS.IN)
-	assert(dns_server, "Call dns.server first")
-	socket.write(dns_server, req)
+	assert(dns_server.address, "Call dns.server first")
+	touch_server()
+	socket.write(dns_server.fd, req)
 	return suspend(question_header.tid, name, qtype)
 end
 

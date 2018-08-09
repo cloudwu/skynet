@@ -1,5 +1,5 @@
 /*
-** $Id: lmathlib.c,v 1.115 2015/03/12 14:04:04 roberto Exp $
+** $Id: lmathlib.c,v 1.119.1.1 2017/04/19 17:20:42 roberto Exp $
 ** Standard mathematical library
 ** See Copyright Notice in lua.h
 */
@@ -39,7 +39,7 @@
 static int math_abs (lua_State *L) {
   if (lua_isinteger(L, 1)) {
     lua_Integer n = lua_tointeger(L, 1);
-    if (n < 0) n = (lua_Integer)(0u - n);
+    if (n < 0) n = (lua_Integer)(0u - (lua_Unsigned)n);
     lua_pushinteger(L, n);
   }
   else
@@ -184,10 +184,13 @@ static int math_log (lua_State *L) {
   else {
     lua_Number base = luaL_checknumber(L, 2);
 #if !defined(LUA_USE_C89)
-    if (base == 2.0) res = l_mathop(log2)(x); else
+    if (base == l_mathop(2.0))
+      res = l_mathop(log2)(x); else
 #endif
-    if (base == 10.0) res = l_mathop(log10)(x);
-    else res = l_mathop(log)(x)/l_mathop(log)(base);
+    if (base == l_mathop(10.0))
+      res = l_mathop(log10)(x);
+    else
+      res = l_mathop(log)(x)/l_mathop(log)(base);
   }
   lua_pushnumber(L, res);
   return 1;
@@ -262,7 +265,7 @@ static int math_random (lua_State *L) {
     default: return luaL_error(L, "wrong number of arguments");
   }
   /* random integer in the interval [low, up] */
-  luaL_argcheck(L, low <= up, 1, "interval is empty"); 
+  luaL_argcheck(L, low <= up, 1, "interval is empty");
   luaL_argcheck(L, low >= 0 || up <= LUA_MAXINTEGER + low, 1,
                    "interval too large");
   r *= (double)(up - low) + 1.0;
@@ -273,7 +276,7 @@ static int math_random (lua_State *L) {
 
 static int math_randomseed (lua_State *L) {
   l_srand((unsigned int)(lua_Integer)luaL_checknumber(L, 1));
-  (void)rand(); /* discard first value to avoid undesirable correlations */
+  (void)l_rand(); /* discard first value to avoid undesirable correlations */
   return 0;
 }
 
@@ -281,9 +284,9 @@ static int math_randomseed (lua_State *L) {
 static int math_type (lua_State *L) {
   if (lua_type(L, 1) == LUA_TNUMBER) {
       if (lua_isinteger(L, 1))
-        lua_pushliteral(L, "integer"); 
+        lua_pushliteral(L, "integer");
       else
-        lua_pushliteral(L, "float"); 
+        lua_pushliteral(L, "float");
   }
   else {
     luaL_checkany(L, 1);

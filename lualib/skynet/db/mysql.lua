@@ -4,9 +4,9 @@
 -- The license is under the BSD license.
 -- Modified by Cloud Wu (remove bit32 for lua 5.3)
 
-local socketchannel = require "socketchannel"
-local mysqlaux = require "mysqlaux.c"
-local crypt = require "crypt"
+local socketchannel = require "skynet.socketchannel"
+local mysqlaux = require "skynet.mysqlaux.c"
+local crypt = require "skynet.crypt"
 
 
 local sub = string.sub
@@ -125,19 +125,6 @@ local function _compose_packet(self, req, size)
     return packet
 end
 
-
-local function _send_packet(self, req, size)
-    local sock = self.sock
-
-    self.packet_no = self.packet_no + 1
-
-
-    local packet = _set_byte3(size) .. strchar(self.packet_no) .. req
-
-    return socket.write(self.sock,packet)
-end
-
-
 local function _recv_packet(self,sock)
 
 
@@ -177,7 +164,7 @@ local function _recv_packet(self,sock)
         typ = "ERR"
     elseif field_count == 0xfe then
         typ = "EOF"
-    elseif field_count <= 250 then
+    else
         typ = "DATA"
     end
 
@@ -418,7 +405,7 @@ local function _recv_auth_resp(self)
 end
 
 
-local function _mysql_login(self,user,password,database)
+local function _mysql_login(self,user,password,database,on_connect)
 
     return function(sockchannel)
           local packet, typ, err =   sockchannel:response( _recv_decode_packet_resp(self) )
@@ -490,7 +477,10 @@ local function _mysql_login(self,user,password,database)
         local packet_len = #req
 
         local authpacket=_compose_packet(self,req,packet_len)
-        return sockchannel:request(authpacket,_recv_auth_resp(self))
+        sockchannel:request(authpacket,_recv_auth_resp(self))
+	if on_connect then
+		on_connect(self)
+	end
     end
 end
 
@@ -617,6 +607,10 @@ local function _query_resp(self)
         while err =="again" do
             res, err, errno, sqlstate = read_result(self,sock)
             if not res then
+                mulitresultset.badresult = true
+                mulitresultset.err = err
+                mulitresultset.errno = errno
+                mulitresultset.sqlstate = sqlstate
                 return true, mulitresultset
             end
             mulitresultset[i]=res
@@ -626,7 +620,7 @@ local function _query_resp(self)
     end
 end
 
-function _M.connect( opts)
+function _M.connect(opts)
 
     local self = setmetatable( {}, mt)
 
@@ -645,11 +639,11 @@ function _M.connect( opts)
     local channel = socketchannel.channel {
         host = opts.host,
         port = opts.port or 3306,
-        auth = _mysql_login(self,user,password,database ),
+        auth = _mysql_login(self,user,password,database,opts.on_connect),
     }
+    self.sockchannel = channel
     -- try connect first only once
     channel:connect(true)
-    self.sockchannel = channel
 
 
     return self

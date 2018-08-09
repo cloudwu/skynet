@@ -1,5 +1,5 @@
 /*
-** $Id: ldump.c,v 2.36 2015/03/30 15:43:51 roberto Exp $
+** $Id: ldump.c,v 2.37.1.1 2017/04/19 17:20:42 roberto Exp $
 ** save precompiled Lua chunks
 ** See Copyright Notice in lua.h
 */
@@ -38,7 +38,7 @@ typedef struct {
 
 
 static void DumpBlock (const void *b, size_t size, DumpState *D) {
-  if (D->status == 0) {
+  if (D->status == 0 && size > 0) {
     lua_unlock(D->L);
     D->status = (*D->writer)(D->L, b, size, D->data);
     lua_lock(D->L);

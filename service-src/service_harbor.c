@@ -346,7 +346,6 @@ dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
 	struct harbor_msg_queue * queue = node->queue;
 	uint32_t handle = node->value;
 	int harbor_id = handle >> HANDLE_REMOTE_SHIFT;
-	assert(harbor_id != 0);
 	struct skynet_context * context = h->ctx;
 	struct slave *s = &h->s[harbor_id];
 	int fd = s->fd;
@@ -365,6 +364,16 @@ dispatch_name_queue(struct harbor *h, struct keyvalue * node) {
 				while ((m = pop_queue(queue))!=NULL) {
 					push_queue_msg(s->queue, m);
 				}
+			}
+			if (harbor_id == (h->slave >> HANDLE_REMOTE_SHIFT)) {
+				// the harbor_id is local
+				struct harbor_msg * m;
+				while ((m = pop_queue(s->queue)) != NULL) {
+					int type = m->header.destination >> HANDLE_REMOTE_SHIFT;
+					skynet_send(context, m->header.source, handle , type | PTYPE_TAG_DONTCOPY, m->header.session, m->buffer, m->size);
+				}
+				release_queue(s->queue);
+				s->queue = NULL;
 			}
 		}
 		return;
@@ -411,7 +420,6 @@ push_socket_data(struct harbor *h, const struct skynet_socket_message * message)
 		}
 	}
 	if (s == NULL) {
-		skynet_free(message->buffer);
 		skynet_error(h->ctx, "Invalid socket fd (%d) data", fd);
 		return;
 	}
@@ -682,21 +690,27 @@ mainloop(struct skynet_context * context, void * ud, int type, int session, uint
 		harbor_command(h, msg,sz,session,source);
 		return 0;
 	}
-	default: {
+	case PTYPE_SYSTEM : {
 		// remote message out
 		const struct remote_message *rmsg = msg;
 		if (rmsg->destination.handle == 0) {
-			if (remote_send_name(h, source , rmsg->destination.name, type, session, rmsg->message, rmsg->sz)) {
+			if (remote_send_name(h, source , rmsg->destination.name, rmsg->type, session, rmsg->message, rmsg->sz)) {
 				return 0;
 			}
 		} else {
-			if (remote_send_handle(h, source , rmsg->destination.handle, type, session, rmsg->message, rmsg->sz)) {
+			if (remote_send_handle(h, source , rmsg->destination.handle, rmsg->type, session, rmsg->message, rmsg->sz)) {
 				return 0;
 			}
 		}
 		skynet_free((void *)rmsg->message);
 		return 0;
 	}
+	default:
+		skynet_error(context, "recv invalid message from %x,  type = %d", source, type);
+		if (session != 0 && type != PTYPE_ERROR) {
+			skynet_send(context,0,source,PTYPE_ERROR, session, NULL, 0);
+		}
+		return 0;
 	}
 }
 

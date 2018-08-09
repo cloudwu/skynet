@@ -1,18 +1,18 @@
 local skynet = require "skynet"
 local harbor = require "skynet.harbor"
 require "skynet.manager"	-- import skynet.launch, ...
-local memory = require "memory"
+local memory = require "skynet.memory"
 
 skynet.start(function()
-	local sharestring = tonumber(skynet.getenv "sharestring")
-	memory.ssexpand(sharestring or 4096)
+	local sharestring = tonumber(skynet.getenv "sharestring" or 4096)
+	memory.ssexpand(sharestring)
 
 	local standalone = skynet.getenv "standalone"
 
 	local launcher = assert(skynet.launch("snlua","launcher"))
 	skynet.name(".launcher", launcher)
 
-	local harbor_id = tonumber(skynet.getenv "harbor")
+	local harbor_id = tonumber(skynet.getenv "harbor" or 0)
 	if harbor_id == 0 then
 		assert(standalone ==  nil)
 		standalone = true

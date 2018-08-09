@@ -46,7 +46,7 @@ skynet.start(function()
 	end)
 
 	skynet.dispatch("client", function(_,_, msg)
-		-- the simple ehco service
+		-- the simple echo service
 		skynet.sleep(10)	-- sleep a while
 		skynet.ret(msg)
 	end)

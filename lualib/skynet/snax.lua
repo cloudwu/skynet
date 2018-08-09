@@ -108,14 +108,6 @@ function snax.newservice(name, ...)
 	return snax.bind(handle, name)
 end
 
-local function service_name(global, name, ...)
-	if global == true then
-		return name
-	else
-		return global
-	end
-end
-
 function snax.uniqueservice(name, ...)
 	local handle = assert(skynet.call(".service", "lua", "LAUNCH", "snaxd", name, ...))
 	return snax.bind(handle, name)
@@ -164,6 +156,11 @@ end
 
 function snax.printf(fmt, ...)
 	skynet.error(string.format(fmt, ...))
+end
+
+function snax.profile_info(obj)
+	local t = snax.interface(obj.type)
+	return skynet_call(obj.handle, "snax", t.system.profile)
 end
 
 return snax

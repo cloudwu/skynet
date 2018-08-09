@@ -11,12 +11,15 @@
 static struct skynet_context * REMOTE = 0;
 static unsigned int HARBOR = ~0;
 
+static inline int
+invalid_type(int type) {
+	return type != PTYPE_SYSTEM && type != PTYPE_HARBOR;
+}
+
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
-	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
-	rmsg->sz &= MESSAGE_TYPE_MASK;
-	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR && REMOTE);
-	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg) , source, type , session);
+	assert(invalid_type(rmsg->type) && REMOTE);
+	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg) , source, PTYPE_SYSTEM , session);
 }
 
 int 

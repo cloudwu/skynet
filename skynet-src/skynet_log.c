@@ -15,11 +15,11 @@ skynet_log_open(struct skynet_context * ctx, uint32_t handle) {
 	sprintf(tmp, "%s/%08x.log", logpath, handle);
 	FILE *f = fopen(tmp, "ab");
 	if (f) {
-		uint32_t starttime = skynet_gettime_fixsec();
-		uint32_t currenttime = skynet_gettime();
+		uint32_t starttime = skynet_starttime();
+		uint64_t currenttime = skynet_now();
 		time_t ti = starttime + currenttime/100;
 		skynet_error(ctx, "Open log file %s", tmp);
-		fprintf(f, "open time: %u %s", currenttime, ctime(&ti));
+		fprintf(f, "open time: %u %s", (uint32_t)currenttime, ctime(&ti));
 		fflush(f);
 	} else {
 		skynet_error(ctx, "Open log file %s fail", tmp);
@@ -30,7 +30,7 @@ skynet_log_open(struct skynet_context * ctx, uint32_t handle) {
 void
 skynet_log_close(struct skynet_context * ctx, FILE *f, uint32_t handle) {
 	skynet_error(ctx, "Close log file :%08x", handle);
-	fprintf(f, "close time: %u\n", skynet_gettime());
+	fprintf(f, "close time: %u\n", (uint32_t)skynet_now());
 	fclose(f);
 }
 
@@ -68,7 +68,7 @@ skynet_log_output(FILE *f, uint32_t source, int type, int session, void * buffer
 	if (type == PTYPE_SOCKET) {
 		log_socket(f, buffer, sz);
 	} else {
-		uint32_t ti = skynet_gettime();
+		uint32_t ti = (uint32_t)skynet_now();
 		fprintf(f, ":%08x %d %d %u ", source, type, session, ti);
 		log_blob(f, buffer, sz);
 		fprintf(f,"\n");

@@ -1,5 +1,5 @@
 /*
-** $Id: llex.c,v 2.93 2015/05/22 17:45:56 roberto Exp $
+** $Id: llex.c,v 2.96.1.1 2017/04/19 17:20:42 roberto Exp $
 ** Lexical Analyzer
 ** See Copyright Notice in lua.h
 */
@@ -162,7 +162,6 @@ static void inclinenumber (LexState *ls) {
 void luaX_setinput (lua_State *L, LexState *ls, ZIO *z, TString *source,
                     int firstchar) {
   ls->t.token = 0;
-  ls->decpoint = '.';
   ls->L = L;
   ls->current = firstchar;
   ls->lookahead.token = TK_EOS;  /* no look-ahead token */
@@ -207,37 +206,6 @@ static int check_next2 (LexState *ls, const char *set) {
 }
 
 
-/*
-** change all characters 'from' in buffer to 'to'
-*/
-static void buffreplace (LexState *ls, char from, char to) {
-  if (from != to) {
-    size_t n = luaZ_bufflen(ls->buff);
-    char *p = luaZ_buffer(ls->buff);
-    while (n--)
-      if (p[n] == from) p[n] = to;
-  }
-}
-
-
-#define buff2num(b,o)	(luaO_str2num(luaZ_buffer(b), o) != 0)
-
-/*
-** in case of format error, try to change decimal point separator to
-** the one defined in the current locale and check again
-*/
-static void trydecpoint (LexState *ls, TValue *o) {
-  char old = ls->decpoint;
-  ls->decpoint = lua_getlocaledecpoint();
-  buffreplace(ls, old, ls->decpoint);  /* try new decimal separator */
-  if (!buff2num(ls->buff, o)) {
-    /* format error with correct decimal point: no more options */
-    buffreplace(ls, ls->decpoint, '.');  /* undo change (for error message) */
-    lexerror(ls, "malformed number", TK_FLT);
-  }
-}
-
-
 /* LUA_NUMBER */
 /*
 ** this function is quite liberal in what it accepts, as 'luaO_str2num'
@@ -261,9 +229,8 @@ static int read_numeral (LexState *ls, SemInfo *seminfo) {
     else break;
   }
   save(ls, '\0');
-  buffreplace(ls, '.', ls->decpoint);  /* follow locale for decimal point */
-  if (!buff2num(ls->buff, &obj))  /* format error? */
-    trydecpoint(ls, &obj); /* try to update decimal point separator */
+  if (luaO_str2num(luaZ_buffer(ls->buff), &obj) == 0)  /* format error? */
+    lexerror(ls, "malformed number", TK_FLT);
   if (ttisinteger(&obj)) {
     seminfo->i = ivalue(&obj);
     return TK_INT;
@@ -277,7 +244,7 @@ static int read_numeral (LexState *ls, SemInfo *seminfo) {
 
 
 /*
-** skip a sequence '[=*[' or ']=*]'; if sequence is wellformed, return
+** skip a sequence '[=*[' or ']=*]'; if sequence is well formed, return
 ** its number of '='s; otherwise, return a negative number (-1 iff there
 ** are no '='s after initial bracket)
 */

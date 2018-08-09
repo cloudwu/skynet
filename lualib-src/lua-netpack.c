@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet_malloc.h"
 
 #include "skynet_socket.h"
@@ -435,7 +437,7 @@ static int
 lpack(lua_State *L) {
 	size_t len;
 	const char * ptr = tolstring(L, &len, 1);
-	if (len > 0x10000) {
+	if (len >= 0x10000) {
 		return luaL_error(L, "Invalid size (too long) of data : %d", (int)len);
 	}
 
@@ -462,8 +464,8 @@ ltostring(lua_State *L) {
 	return 1;
 }
 
-int
-luaopen_netpack(lua_State *L) {
+LUAMOD_API int
+luaopen_skynet_netpack(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "pop", lpop },

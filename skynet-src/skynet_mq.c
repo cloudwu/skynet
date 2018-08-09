@@ -84,7 +84,7 @@ skynet_mq_create(uint32_t handle) {
 	SPIN_INIT(q)
 	// When the queue is create (always between service create and service init) ,
 	// set in_global flag to avoid push it to global queue .
-	// If the service init success, skynet_context_new will call skynet_mq_force_push to push it to global queue.
+	// If the service init success, skynet_context_new will call skynet_mq_push to push it to global queue.
 	q->in_global = MQ_IN_GLOBAL;
 	q->release = 0;
 	q->overload = 0;
