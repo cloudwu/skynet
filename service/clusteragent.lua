@@ -42,12 +42,6 @@ end
 
 local register_name = new_register_name()
 
-local function new_register_name()
-	return setmetatable({}, register_name_mt)
-end
-
-local register_name = new_register_name()
-
 local tracetag
 
 local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
