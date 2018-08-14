@@ -31,6 +31,7 @@ struct document {
 
 struct table {
 	uint32_t array;
+	uint32_t discrete;
 	uint32_t dict;
 	uint8_t type[1];
 	// value[array]
@@ -168,35 +169,47 @@ lupdate(lua_State *L) {
 	return 1;
 }
 
-static inline uint32_t
-getuint32(const void *v) {
+static inline uint64_t
+getuint64(const void *v) {
 	union {
-		uint32_t d;
-		uint8_t t[4];
+		uint64_t d;
+		uint8_t t[8];
 	} test = { 1 };
 	if (test.t[0] == 0) {
 		// big endian
-		test.d = *(const uint32_t *)v;
-		return test.t[0] | test.t[1] << 4 | test.t[2] << 8 | test.t[3] << 12;
+		test.d = *(const uint64_t *)v;
+		uint64_t d = test.t[0];
+		int i;
+		for (i = 1; i < 8; i++) {
+			d <<= 8;
+			d |= test.t[i];
+		}
+		return d;
 	} else {
-		return *(const uint32_t *)v;
+		return *(const uint64_t *)v;
 	}
 }
 
-static inline float
-getfloat(const void *v) {
+static inline double
+getdouble(const void *v) {
 	union {
-		uint32_t d;
-		float f;
-		uint8_t t[4];
+		uint64_t d;
+		double f;
+		uint8_t t[8];
 	} test = { 1 };
 	if (test.t[0] == 0) {
 		// big endian
-		test.d = *(const uint32_t *)v;
-		test.d = test.t[0] | test.t[1] << 4 | test.t[2] << 8 | test.t[3] << 12;
+		test.d = *(const uint64_t *)v;
+		uint64_t d = test.t[0];
+		int i;
+		for (i = 1; i < 8; i++) {
+			d <<= 8;
+			d |= test.t[i];
+		}
+		test.d = d;
 		return test.f;
 	} else {
-		return *(const float *)v;
+		return *(const double *)v;
 	}
 }
 
@@ -207,19 +220,19 @@ pushvalue(lua_State *L, const void *v, int type, const struct document * doc) {
 		lua_pushnil(L);
 		break;
 	case VALUE_INTEGER:
-		lua_pushinteger(L, (int32_t)getuint32(v));
+		lua_pushinteger(L, (int64_t)getuint64(v));
 		break;
 	case VALUE_REAL:
-		lua_pushnumber(L, getfloat(v));
+		lua_pushnumber(L, getdouble(v));
 		break;
 	case VALUE_BOOLEAN:
-		lua_pushboolean(L, getuint32(v));
+		lua_pushboolean(L, getuint64(v));
 		break;
 	case VALUE_TABLE:
-		create_proxy(L, doc, getuint32(v));
+		create_proxy(L, doc, getuint64(v));
 		break;
 	case VALUE_STRING:
-		lua_pushstring(L,  (const char *)doc + doc->strtbl + getuint32(v));
+		lua_pushstring(L,  (const char *)doc + doc->strtbl + (uint32_t)getuint64(v));
 		break;
 	default:
 		luaL_error(L, "Invalid type %d at %p", type, v);
@@ -236,15 +249,20 @@ copytable(lua_State *L, int tbl, struct proxy *p) {
 	if (t == NULL) {
 		luaL_error(L, "Invalid proxy (index = %d)", p->index);
 	}
-	const uint32_t * v = (const uint32_t *)((const char *)t + sizeof(uint32_t) + sizeof(uint32_t) + ((t->array + t->dict + 3) & ~3));
+	const uint64_t * v = (const uint64_t *)((const char *)t + ((t->array + t->discrete + t->dict + sizeof(uint32_t) * 3 + 7) & ~7));
 	int i;
 	for (i=0;i<t->array;i++) {
 		pushvalue(L, v++, t->type[i], doc);
 		lua_rawseti(L, tbl, i+1);
 	}
+	for (i=0;i<t->discrete;i++) {
+		pushvalue(L, v++, VALUE_INTEGER, doc);
+		pushvalue(L, v++, t->type[t->array+i], doc);
+		lua_rawset(L, tbl);
+	}
 	for (i=0;i<t->dict;i++) {
 		pushvalue(L, v++, VALUE_STRING, doc);
-		pushvalue(L, v++, t->type[t->array+i], doc);
+		pushvalue(L, v++, t->type[t->array+t->discrete+i], doc);
 		lua_rawset(L, tbl);
 	}
 }

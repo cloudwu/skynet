@@ -9,7 +9,7 @@ document :
 table:
   int32 array
   int32 dict
-  int8*(array+dict) type (align 4)
+  int8*(array+discrete+dict) type (align 8)
   value*array
   kvpair*dict
 
@@ -18,11 +18,11 @@ kvpair:
   value v
 
 value: (union)
-  int32 integer
-  float real
-  int32 boolean
-  int32 table index
-  int32 string offset
+  int64  integer
+  double real
+  int64  boolean
+  int64  table index
+  int64  string offset
 
 type: (enum)
   0 nil
@@ -51,24 +51,25 @@ function ctd.dump(root)
 		doc.table[index] = false	-- place holder
 		local array_n = 0
 		local array = {}
+		local discrete = {}
 		local kvs = {}
 		local types = {}
 		local function encode(v)
 			local t = type(v)
 			if t == "table" then
 				local index = dump_table(v)
-				return '\4', string.pack("<i4", index-1)
+				return '\4', string.pack("<i8", index-1)
 			elseif t == "number" then
-				if math.tointeger(v) and v <= 0x7FFFFFFF and v >= -(0x7FFFFFFF+1) then
-					return '\1', string.pack("<i4", v)
+				if math.type(v) == "integer" then
+					return '\1', string.pack("<i8", v)
 				else
-					return '\2', string.pack("<f",v)
+					return '\2', string.pack("<d",v)
 				end
 			elseif t == "boolean" then
 				if v then
-					return '\3', "\0\0\0\1"
+					return '\3', "\0\0\0\0\0\0\0\1"
 				else
-					return '\3', "\0\0\0\0"
+					return '\3', "\0\0\0\0\0\0\0\0"
 				end
 			elseif t == "string" then
 				local offset = doc.strings[v]
@@ -78,7 +79,7 @@ function ctd.dump(root)
 					doc.strings[v] = offset
 					table.insert(doc.strings, v)
 				end
-				return '\5', string.pack("<I4", offset)
+				return '\5', string.pack("<I8", offset)
 			else
 				error ("Unsupport value " .. tostring(v))
 			end
@@ -88,6 +89,15 @@ function ctd.dump(root)
 			array_n = i
 		end
 		for k,v in pairs(t) do
+			local ik = math.tointeger(k)
+			if (ik and (ik <= 0 or ik > array_n)) then
+				local _, kv = encode(k)
+				local tv, ev = encode(v)
+				table.insert(types, tv)
+				table.insert(discrete, kv .. ev)
+			end
+		end
+		for k,v in pairs(t) do
 			if type(k) == "string" then
 				local _, kv = encode(k)
 				local tv, ev = encode(v)
@@ -95,17 +105,18 @@ function ctd.dump(root)
 				table.insert(kvs, kv .. ev)
 			else
 				local ik = math.tointeger(k)
-				assert(ik and ik > 0 and ik <= array_n)
+				assert(ik)
 			end
 		end
 		-- encode table
 		local typeset = table.concat(types)
-		local align = string.rep("\0", (4 - #typeset & 3) & 3)
+		local align = string.rep("\0", 4 + (8 - #typeset & 7) & 7)
 		local tmp = {
-			string.pack("<i4i4", array_n, #kvs),
+			string.pack("<i4i4i4", array_n, #discrete, #kvs),
 			typeset,
 			align,
 			table.concat(array),
+			table.concat(discrete),
 			table.concat(kvs),
 		}
 		doc.table[index] = table.concat(tmp)
@@ -138,24 +149,24 @@ function ctd.undump(v)
 	local tblidx = {}
 	local function decode(n)
 		local toffset = index[n+1] + header
-		local array, dict = string.unpack("<I4I4", v, toffset)
-		local types = { string.unpack(string.rep("B", (array+dict)), v, toffset + 8) }
-		local offset = ((array + dict + 8 + 3) & ~3) + toffset
+		local array, discrete, dict = string.unpack("<I4I4I4", v, toffset)
+		local types = { string.unpack(string.rep("B", (array+discrete+dict)), v, toffset + 12) }
+		local offset = ((array + discrete + dict + 12 + 7) & ~7) + toffset
 		local result = {}
 		local function value(t)
 			local off = offset
-			offset = offset + 4
-			if t == 1 then	-- integer
-				return (string.unpack("<i4", v, off))
+			offset = offset + 8
+			if t == 1 then -- integer
+				return (string.unpack("<i8", v, off))
 			elseif t == 2 then -- float
-				return (string.unpack("<f", v, off))
+				return (string.unpack("<d", v, off))
 			elseif t == 3 then -- boolean
-				return string.unpack("<i4", v, off) ~= 0
+				return string.unpack("<i8", v, off) ~= 0
 			elseif t == 4 then -- table
-				local tindex = (string.unpack("<I4", v, off))
+				local tindex = (string.unpack("<I8", v, off))
 				return decode(tindex)
 			elseif t == 5 then -- string
-				local sindex = string.unpack("<I4", v, off)
+				local sindex = string.unpack("<I8", v, off)
 				return (string.unpack("z", v, stringtbl + sindex))
 			else
 				error (string.format("Invalid data at %d (%d)", off, t))
@@ -164,11 +175,16 @@ function ctd.undump(v)
 		for i=1,array do
 			table.insert(result, value(types[i]))
 		end
-		for i=1,dict do
-			local sindex = string.unpack("<I4", v, offset)
-			offset = offset + 4
-			local key = string.unpack("z", v, stringtbl + sindex)
+		for i=1,discrete do
+			local key = string.unpack("<I8", v, offset)
+			offset = offset + 8
 			result[key] = value(types[array + i])
+		end
+		for i=1,dict do
+			local sindex = string.unpack("<I8", v, offset)
+			offset = offset + 8
+			local key = string.unpack("z", v, stringtbl + sindex)
+			result[key] = value(types[array + discrete + i])
 		end
 		tblidx[result] = n
 		return result
@@ -217,9 +233,9 @@ function ctd.diff(last, current)
 	local header = 4 + 4 + 4 * n + 1
 	local function remap(n)
 		local toffset = index[n+1] + header
-		local array, dict = string.unpack("<I4I4", current, toffset)
-		local types = { string.unpack(string.rep("B", (array+dict)), current, toffset + 8) }
-		local hlen = (array + dict + 8 + 3) & ~3
+		local array, discrete, dict = string.unpack("<I4I4I4", current, toffset)
+		local types = { string.unpack(string.rep("B", (array+discrete+dict)), current, toffset + 12) }
+		local hlen = ((array + discrete + dict + 12 + 7) & ~7)
 		local hastable = false
 		for _, v in ipairs(types) do
 			if v == 4 then -- table
@@ -228,19 +244,24 @@ function ctd.diff(last, current)
 			end
 		end
 		if not hastable then
-			return string.sub(current, toffset, toffset + hlen + (array + dict * 2) * 4 - 1)
+			return string.sub(current, toffset, toffset + hlen + (array + discrete * 2 + dict * 2) * 8 - 1)
 		end
 		local offset = hlen + toffset
-		local pat = "<" .. string.rep("I4", array + dict * 2)
+		local pat = "<" .. string.rep("I8", array + discrete * 2 + dict * 2)
 		local values = { string.unpack(pat, current, offset) }
 		for i = 1, array do
-			if types[i] == 4 then	-- table
+			if types[i] == 4 then  -- table
 				values[i] = map[values[i]]
 			end
 		end
+		for i = 1, discrete do
+			if types[i+array] == 4 then -- table
+				values[array+i*2] = map[values[array + i * 2]]
+			end
+		end
 		for i = 1, dict do
-			if types[i + array] == 4 then -- table
-				values[array + i * 2] = map[values[array + i * 2]]
+			if types[i + array + discrete] == 4 then -- table
+				values[array + discrete * 2 + i * 2] = map[values[array + discrete * 2 + i * 2]]
 			end
 		end
 		return string.sub(current, toffset, toffset + hlen - 1) ..
