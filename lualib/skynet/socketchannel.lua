@@ -113,7 +113,6 @@ local function dispatch_by_session(self)
 			wakeup_all(self, errormsg)
 		end
 	end
-	self.__dispatch_thread = nil
 end
 
 local function pop_response(self)
@@ -190,7 +189,6 @@ local function dispatch_by_order(self)
 			wakeup_all(self, errmsg)
 		end
 	end
-	self.__dispatch_thread = nil
 end
 
 local function dispatch_function(self)
@@ -254,7 +252,11 @@ local function connect_once(self)
 	end
 
 	self.__sock = setmetatable( {fd} , channel_socket_meta )
-	self.__dispatch_thread = skynet.fork(dispatch_function(self), self)
+	self.__dispatch_thread = skynet.fork(function()
+		pcall(dispatch_function(self), self)
+		-- clear dispatch_thread
+		self.__dispatch_thread = nil
+	end)
 
 	if self.__auth then
 		self.__authcoroutine = coroutine.running()
