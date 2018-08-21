@@ -214,7 +214,7 @@ function suspend(co, result, command, param, param2)
 end
 
 function skynet.timeout(ti, func)
-	local session = c.intcommand("TIMEOUT",ti)
+	local session = c.intcommand("TIMEOUT",ti*10)
 	assert(session)
 	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
@@ -232,7 +232,7 @@ local function suspend_sleep(session, token)
 end
 
 function skynet.sleep(ti, token)
-	local session = c.intcommand("TIMEOUT",ti)
+	local session = c.intcommand("TIMEOUT",ti*10)
 	assert(session)
 	token = token or coroutine.running()
 	local succ, ret = suspend_sleep(session, token)
@@ -267,7 +267,10 @@ function skynet.localname(name)
 	return c.addresscommand("QUERY", name)
 end
 
-skynet.now = c.now
+function skynet.now()
+    return c.now() * 10
+end
+
 skynet.hpc = c.hpc	-- high performance counter
 
 local traceid = 0
@@ -296,7 +299,7 @@ local starttime
 
 function skynet.starttime()
 	if not starttime then
-		starttime = c.intcommand("STARTTIME")
+		starttime = c.intcommand("STARTTIME") * 10
 	end
 	return starttime
 end

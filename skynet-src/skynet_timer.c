@@ -138,8 +138,9 @@ timer_shift(struct timer *T) {
 	}
 }
 
-static inline void
+static inline int
 dispatch_list(struct timer_node *current) {
+	int count = 0;
 	do {
 		struct timer_event * event = (struct timer_event *)(current+1);
 		struct skynet_message message;
@@ -153,35 +154,42 @@ dispatch_list(struct timer_node *current) {
 		struct timer_node * temp = current;
 		current=current->next;
 		skynet_free(temp);	
+		++count;
 	} while (current);
+	return count;
 }
 
-static inline void
+static inline int
 timer_execute(struct timer *T) {
+	int count = 0;
 	int idx = T->time & TIME_NEAR_MASK;
 	
 	while (T->near[idx].head.next) {
 		struct timer_node *current = link_clear(&T->near[idx]);
 		SPIN_UNLOCK(T);
 		// dispatch_list don't need lock T
-		dispatch_list(current);
+		count += dispatch_list(current);
 		SPIN_LOCK(T);
 	}
+	return count;
 }
 
-static void 
+static int
 timer_update(struct timer *T) {
+	int count = 0;
+
 	SPIN_LOCK(T);
 
 	// try to dispatch timeout 0 (rare condition)
-	timer_execute(T);
+	count += timer_execute(T);
 
 	// shift time first, and then dispatch timer message
 	timer_shift(T);
 
-	timer_execute(T);
+	count += timer_execute(T);
 
 	SPIN_UNLOCK(T);
+	return count;
 }
 
 static struct timer *
@@ -230,19 +238,19 @@ skynet_timeout(uint32_t handle, int time, int session) {
 	return session;
 }
 
-// centisecond: 1/100 second
+// centisecond: 1/1000 second
 static void
 systime(uint32_t *sec, uint32_t *cs) {
 #if !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_REALTIME, &ti);
 	*sec = (uint32_t)ti.tv_sec;
-	*cs = (uint32_t)(ti.tv_nsec / 10000000);
+	*cs = (uint32_t)(ti.tv_nsec / 1000000);
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	*sec = tv.tv_sec;
-	*cs = tv.tv_usec / 10000;
+	*cs = tv.tv_usec / 1000;
 #endif
 }
 
@@ -252,19 +260,20 @@ gettime() {
 #if !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_MONOTONIC, &ti);
-	t = (uint64_t)ti.tv_sec * 100;
-	t += ti.tv_nsec / 10000000;
+	t = (uint64_t)ti.tv_sec * 1000;
+	t += ti.tv_nsec / 1000000;
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	t = (uint64_t)tv.tv_sec * 100;
-	t += tv.tv_usec / 10000;
+	t = (uint64_t)tv.tv_sec * 1000;
+	t += tv.tv_usec / 1000;
 #endif
 	return t;
 }
 
-void
+int
 skynet_updatetime(void) {
+	int count = 0;
 	uint64_t cp = gettime();
 	if(cp < TI->current_point) {
 		skynet_error(NULL, "time diff error: change from %lld to %lld", cp, TI->current_point);
@@ -275,9 +284,10 @@ skynet_updatetime(void) {
 		TI->current += diff;
 		int i;
 		for (i=0;i<diff;i++) {
-			timer_update(TI);
+			count += timer_update(TI);
 		}
 	}
+	return count;
 }
 
 uint32_t

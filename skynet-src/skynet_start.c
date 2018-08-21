@@ -127,13 +127,19 @@ signal_hup() {
 
 static void *
 thread_timer(void *p) {
+	int n; // timer event count
+	int idle = 0; // idle loop
 	struct monitor * m = p;
 	skynet_initthread(THREAD_TIMER);
 	for (;;) {
-		skynet_updatetime();
+		n = skynet_updatetime();
 		CHECK_ABORT
-		wakeup(m,m->count-1);
-		usleep(2500);
+		++ idle;
+		if (n>0 || idle==25) {
+			wakeup(m,m->count-1);
+			idle = 0;
+		}
+		usleep(100);
 		if (SIG) {
 			signal_hup();
 			SIG = 0;
