@@ -237,7 +237,7 @@ function COMMAND.exit(address)
 	skynet.send(adjust_address(address), "debug", "EXIT")
 end
 
-function COMMAND.inject(address, filename)
+function COMMAND.inject(address, filename, ...)
 	address = adjust_address(address)
 	local f = io.open(filename, "rb")
 	if not f then
@@ -245,7 +245,7 @@ function COMMAND.inject(address, filename)
 	end
 	local source = f:read "*a"
 	f:close()
-	local ok, output = skynet.call(address, "debug", "RUN", source, filename)
+	local ok, output = skynet.call(address, "debug", "RUN", source, filename, ...)
 	if ok == false then
 		error(output)
 	end

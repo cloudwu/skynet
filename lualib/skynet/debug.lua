@@ -50,9 +50,10 @@ local function init(skynet, export)
 			skynet.exit()
 		end
 
-		function dbgcmd.RUN(source, filename)
+		function dbgcmd.RUN(source, filename, ...)
 			local inject = require "skynet.inject"
-			local ok, output = inject(skynet, source, filename , export.dispatch, skynet.register_protocol)
+			local args = table.pack(...)
+			local ok, output = inject(skynet, source, filename, args, export.dispatch, skynet.register_protocol)
 			collectgarbage "collect"
 			skynet.ret(skynet.pack(ok, table.concat(output, "\n")))
 		end
