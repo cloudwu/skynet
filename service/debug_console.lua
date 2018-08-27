@@ -69,7 +69,7 @@ local function docmd(cmdline, print, fd)
 			split[1] = cmdline
 			ok, list = pcall(cmd, split)
 		else
-			print("Invalid command, type help for command list")
+			print("Invalid command, type help for command list " .. command)
 		end
 	end
 
@@ -369,5 +369,11 @@ function COMMANDX.call(cmd)
 		error(args[2])
 	end
 	local rets = table.pack(skynet.call(address, "lua", table.unpack(args, 2, args.n)))
+	return rets
+end
+
+function COMMANDX.callname(cmd)
+	local name = cmd[2]
+	local rets = skynet.call(name, "lua", cmd[3] )
 	return rets
 end
