@@ -360,20 +360,24 @@ function COMMAND.trace(address, proto, flag)
 	skynet.call(address, "debug", "TRACELOG", proto, flag)
 end
 
-function COMMANDX.call(cmd)
-	local address = adjust_address(cmd[2])
+local function call(address, cmd)
 	local cmdline = assert(cmd[1]:match("%S+%s+%S+%s(.+)") , "need arguments")
 	local args_func = assert(load("return " .. cmdline, "debug console", "t", {}), "Invalid arguments")
 	local args = table.pack(pcall(args_func))
 	if not args[1] then
 		error(args[2])
 	end
+
 	local rets = table.pack(skynet.call(address, "lua", table.unpack(args, 2, args.n)))
 	return rets
 end
 
+function COMMANDX.call(cmd)
+	local address = adjust_address(cmd[2])
+	return call(address, cmd)
+end
+
 function COMMANDX.callname(cmd)
 	local name = cmd[2]
-	local rets = skynet.call(name, "lua", cmd[3] )
-	return rets
+	return call(name, cmd)
 end
