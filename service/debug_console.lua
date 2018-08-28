@@ -207,7 +207,10 @@ function COMMAND.service()
 end
 
 local function adjust_address(address)
-	if address:sub(1,1) ~= ":" then
+	local prefix = address:sub(1,1)
+	if prefix == '.' then
+		return assert(skynet.localname(address), "Not a valid name")
+	elseif prefix ~= ':' then
 		address = assert(tonumber("0x" .. address), "Need an address") | (skynet.harbor(skynet.self()) << 24)
 	end
 	return address
