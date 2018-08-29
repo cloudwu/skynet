@@ -232,8 +232,8 @@ local function connect_once(self)
 		return false
 	end
 	assert(not self.__sock and not self.__authcoroutine)
-	-- term current dispatch thread (send a sigal)
-	term_dispatch_thread(self, self.__dispatch_thread)
+	-- term current dispatch thread (send a signal)
+	term_dispatch_thread(self)
 
 	local fd,err = socket.open(self.__host, self.__port)
 	if not fd then
