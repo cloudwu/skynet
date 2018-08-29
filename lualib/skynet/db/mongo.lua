@@ -87,13 +87,17 @@ local function mongo_auth(mongoc)
 	local pass = rawget(mongoc,	"password")
 	local authmod = rawget(mongoc, "authmod") or "scram_sha1"
 	authmod = "auth_" ..  authmod
+	local authdb = rawget(mongoc, "authdb")
+	if authdb then
+		authdb = mongo_client.getDB(mongoc, authdb)	-- mongoc has not set metatable yet
+	end
 
 	return function()
 		if user	~= nil and pass	~= nil then
 			-- autmod can be "mongodb_cr" or "scram_sha1"
 			local auth_func = mongoc[authmod]
 			assert(auth_func , "Invalid authmod")
-			assert(auth_func(mongoc,user, pass))
+			assert(auth_func(authdb or mongoc, user, pass))
 		end
 		local rs_data =	mongoc:runCommand("ismaster")
 		if rs_data.ok == 1 then
@@ -156,6 +160,7 @@ function mongo.client( conf	)
 		username = first.username,
 		password = first.password,
 		authmod = first.authmod,
+		authdb = first.authdb,
 	}
 
 	obj.__id = 0
