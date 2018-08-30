@@ -309,7 +309,7 @@ end
 
 function mongo_db:auth(user, pass)
 	local authmod = rawget(self.connection, "authmod") or "scram_sha1"
-	local auth_func = auth_method[authmod]
+	local auth_func = auth_method["auth_" .. authmod]
 	assert(auth_func , "Invalid authmod")
 	return auth_func(self, user, pass)
 end
