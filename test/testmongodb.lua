@@ -3,6 +3,11 @@ local mongo = require "skynet.db.mongo"
 local bson = require "bson"
 
 local host, port, db_name, username, password = ...
+if port then
+	port = math.tointeger(port)
+end
+
+-- print(host, port, db_name, username, password)
 
 local function _create_client()
 	return mongo.client(
@@ -12,6 +17,25 @@ local function _create_client()
 			authdb = db_name,
 		}
 	)
+end
+
+function test_auth()
+	local c = mongo.client(
+		{
+			host = host, port = port,
+		}
+	)
+	db = c[db_name]
+	db:auth(username, password)
+
+	db.testdb:dropIndex("*")
+	db.testdb:drop()
+
+	local ok, err, ret = db.testdb:safe_insert({test_key = 1});
+	assert(ok and ret and ret.n == 1, err)
+
+	local ok, err, ret = db.testdb:safe_insert({test_key = 1});
+	assert(ok and ret and ret.n == 1, err)
 end
 
 function test_insert_without_index()
@@ -105,6 +129,10 @@ function test_expire_index()
 end
 
 skynet.start(function()
+	if username then
+		print("Test auth")
+		test_auth()
+	end
 	print("Test insert without index")
 	test_insert_without_index()
 	print("Test insert index")
