@@ -16,7 +16,7 @@ local function request(name, func, ...)
 	end
 
 	for _,v in ipairs(s) do
-		skynet.wakeup(v)
+		skynet.wakeup(v.co)
 	end
 
 	if ok then
@@ -47,7 +47,12 @@ local function waitfor(name , func, ...)
 		return request(name, func, ...)
 	end
 
-	table.insert(s, co)
+	local session, source = skynet.context()
+	table.insert(s, {
+		co = co,
+		session = session,
+		source = source,
+	})
 	skynet.wait()
 	s = service[name]
 	if type(s) == "string" then
@@ -91,7 +96,11 @@ local function list_service()
 		if type(v) == "string" then
 			v = "Error: " .. v
 		elseif type(v) == "table" then
-			v = "Querying"
+			local querying = { "Querying:" }
+			for _, detail in ipairs(v) do
+				table.insert(querying, skynet.address(detail.source) .. " " .. tostring(skynet.call(detail.source, "debug", "TASK", detail.session)))
+			end
+			v = table.concat(querying, "\n")
 		else
 			v = skynet.address(v)
 		end

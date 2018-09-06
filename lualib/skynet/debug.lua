@@ -32,10 +32,14 @@ local function init(skynet, export)
 			skynet.ret(skynet.pack(stat))
 		end
 
-		function dbgcmd.TASK()
-			local task = {}
-			skynet.task(task)
-			skynet.ret(skynet.pack(task))
+		function dbgcmd.TASK(session)
+			if session then
+				skynet.ret(skynet.pack(skynet.task(session)))
+			else
+				local task = {}
+				skynet.task(task)
+				skynet.ret(skynet.pack(task))
+			end
 		end
 
 		function dbgcmd.INFO(...)

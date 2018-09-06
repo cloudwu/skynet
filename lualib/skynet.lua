@@ -439,6 +439,12 @@ function skynet.ret(msg, sz)
 	return ret
 end
 
+function skynet.context()
+	local co_session = session_coroutine_id[running_thread]
+	local co_address = session_coroutine_address[running_thread]
+	return co_session, co_address
+end
+
 function skynet.ignoreret()
 	-- We use session for other uses
 	session_coroutine_id[running_thread] = nil
@@ -782,6 +788,14 @@ function skynet.stat(what)
 end
 
 function skynet.task(ret)
+	if type(ret) == "number" then
+		local co = session_id_coroutine[ret]
+		if co then
+			return debug.traceback(co)
+		else
+			return "No session"
+		end
+	end
 	local t = 0
 	for session,co in pairs(session_id_coroutine) do
 		if ret then
