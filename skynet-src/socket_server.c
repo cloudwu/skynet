@@ -75,11 +75,19 @@ struct wb_list {
 	struct write_buffer * tail;
 };
 
+struct socket_stat {
+	uint64_t rtime;
+	uint64_t wtime;
+	uint64_t read;
+	uint64_t write;
+};
+
 struct socket {
 	uintptr_t opaque;
 	struct wb_list high;
 	struct wb_list low;
 	int64_t wb_size;
+	struct socket_stat stat;
 	volatile uint32_t sending;
 	int fd;
 	int id;
@@ -98,6 +106,7 @@ struct socket {
 };
 
 struct socket_server {
+	volatile uint64_t time;
 	int recvctrl_fd;
 	int sendctrl_fd;
 	int checkctrl;
@@ -188,6 +197,7 @@ struct request_udp {
 	T Set opt
 	U Create UDP socket
 	C set udp address
+	Q query info
  */
 
 struct request_package {
@@ -326,7 +336,7 @@ clear_wb_list(struct wb_list *list) {
 }
 
 struct socket_server * 
-socket_server_create() {
+socket_server_create(uint64_t time) {
 	int i;
 	int fd[2];
 	poll_fd efd = sp_create();
@@ -349,6 +359,7 @@ socket_server_create() {
 	}
 
 	struct socket_server *ss = MALLOC(sizeof(*ss));
+	ss->time = time;
 	ss->event_fd = efd;
 	ss->recvctrl_fd = fd[0];
 	ss->sendctrl_fd = fd[1];
@@ -369,6 +380,11 @@ socket_server_create() {
 	assert(ss->recvctrl_fd < FD_SETSIZE);
 
 	return ss;
+}
+
+void
+socket_server_updatetime(struct socket_server *ss, uint64_t time) {
+	ss->time = time;
 }
 
 static void
@@ -468,7 +484,20 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 	check_wb_list(&s->low);
 	s->dw_buffer = NULL;
 	s->dw_size = 0;
+	memset(&s->stat, 0, sizeof(s->stat));
 	return s;
+}
+
+static inline void
+stat_read(struct socket_server *ss, struct socket *s, int n) {
+	s->stat.read += n;
+	s->stat.rtime = ss->time;
+}
+
+static inline void
+stat_write(struct socket_server *ss, struct socket *s, int n) {
+	s->stat.write += n;
+	s->stat.wtime = ss->time;
 }
 
 // return -1 when connecting
@@ -563,6 +592,7 @@ send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 				force_close(ss,s,l,result);
 				return SOCKET_CLOSE;
 			}
+			stat_write(ss,s,(int)sz);
 			s->wb_size -= sz;
 			if (sz != tmp->sz) {
 				tmp->ptr += sz;
@@ -634,7 +664,7 @@ send_list_udp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 			drop_udp(ss, s, list, tmp);
 			return -1;
 		}
-
+		stat_write(ss,s,tmp->sz);
 		s->wb_size -= tmp->sz;
 		list->head = tmp->next;
 		write_buffer_free(ss,tmp);
@@ -847,6 +877,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			if (n != so.sz) {
 				append_sendbuffer_udp(ss,s,priority,request,udp_address);
 			} else {
+				stat_write(ss,s,n);
 				so.free_func(request->buffer);
 				return -1;
 			}
@@ -1193,6 +1224,8 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		return -1;
 	}
 
+	stat_read(ss,s,n);
+
 	if (n == sz) {
 		s->p.size *= 2;
 	} else if (sz > MIN_READ_BUFFER && n*2 < sz) {
@@ -1242,6 +1275,8 @@ forward_message_udp(struct socket_server *ss, struct socket *s, struct socket_lo
 		}
 		return -1;
 	}
+	stat_read(ss,s,n);
+
 	uint8_t * data;
 	if (slen == sizeof(sa.v4)) {
 		if (s->protocol != PROTOCOL_UDP)
@@ -1298,6 +1333,20 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_lock *l
 	}
 }
 
+static int
+getname(union sockaddr_all *u, char *buffer, size_t sz) {
+	char tmp[INET6_ADDRSTRLEN];
+	void * sin_addr = (u->s.sa_family == AF_INET) ? (void*)&u->v4.sin_addr : (void *)&u->v6.sin6_addr;
+	int sin_port = ntohs((u->s.sa_family == AF_INET) ? u->v4.sin_port : u->v6.sin6_port);
+	if (inet_ntop(u->s.sa_family, sin_addr, tmp, sizeof(tmp))) {
+		snprintf(buffer, sz, "%s:%d", tmp, sin_port);
+		return 1;
+	} else {
+		buffer[0] = '\0';
+		return 0;
+	}
+}
+
 // return 0 when failed, or -1 when file limit
 static int
 report_accept(struct socket_server *ss, struct socket *s, struct socket_message *result) {
@@ -1327,17 +1376,16 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 		close(client_fd);
 		return 0;
 	}
+	// accept new one connection
+	stat_read(ss,s,1);
+
 	ns->type = SOCKET_TYPE_PACCEPT;
 	result->opaque = s->opaque;
 	result->id = s->id;
 	result->ud = id;
 	result->data = NULL;
 
-	void * sin_addr = (u.s.sa_family == AF_INET) ? (void*)&u.v4.sin_addr : (void *)&u.v6.sin6_addr;
-	int sin_port = ntohs((u.s.sa_family == AF_INET) ? u.v4.sin_port : u.v6.sin6_port);
-	char tmp[INET6_ADDRSTRLEN];
-	if (inet_ntop(u.s.sa_family, sin_addr, tmp, sizeof(tmp))) {
-		snprintf(ss->buffer, sizeof(ss->buffer), "%s:%d", tmp, sin_port);
+	if (getname(&u, ss->buffer, sizeof(ss->buffer))) {
 		result->data = ss->buffer;
 	}
 
@@ -1558,6 +1606,7 @@ socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz
 				// ignore error, let socket thread try again
 				n = 0;
 			}
+			stat_write(ss,s,n);
 			if (n == so.sz) {
 				// write done
 				socket_unlock(&l);
@@ -1827,6 +1876,7 @@ socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp
 			int n = sendto(s->fd, so.buffer, so.sz, 0, &sa.s, sasz);
 			if (n >= 0) {
 				// sendto succ
+				stat_write(ss,s,n);
 				socket_unlock(&l);
 				so.free_func((void *)buffer);
 				return 0;
@@ -1914,4 +1964,82 @@ socket_server_udp_address(struct socket_server *ss, struct socket_message *msg, 
 		return NULL;
 	}
 	return (const struct socket_udp_address *)address;
+}
+
+
+struct socket_info *
+socket_info_create(struct socket_info *last) {
+	struct socket_info *si = skynet_malloc(sizeof(*si));
+	memset(si, 0 , sizeof(*si));
+	si->next = last;
+	return si;
+}
+
+void
+socket_info_release(struct socket_info *si) {
+	while (si) {
+		struct socket_info *temp = si;
+		si = si->next;
+		skynet_free(temp);
+	}
+}
+
+static int
+query_info(struct socket *s, struct socket_info *si) {
+	union sockaddr_all u;
+	socklen_t slen = sizeof(u);
+	switch (s->type) {
+	case SOCKET_TYPE_BIND:
+		si->type = SOCKET_INFO_BIND;
+		si->name[0] = '\0';
+		break;
+	case SOCKET_TYPE_LISTEN:
+		si->type = SOCKET_INFO_LISTEN;
+		if (getsockname(s->fd, &u.s, &slen) == 0) {
+			getname(&u, si->name, sizeof(si->name));
+		}
+		break;
+	case SOCKET_TYPE_CONNECTED:
+		if (s->protocol == PROTOCOL_TCP) {
+			si->type = SOCKET_INFO_TCP;
+			if (getpeername(s->fd, &u.s, &slen) == 0) {
+				getname(&u, si->name, sizeof(si->name));
+			}
+		} else {
+			si->type = SOCKET_INFO_UDP;
+			if (udp_socket_address(s, s->p.udp_address, &u)) {
+				getname(&u, si->name, sizeof(si->name));
+			}
+		}
+		break;
+	default:
+		return 0;
+	}
+	si->id = s->id;
+	si->opaque = (uint64_t)s->opaque;
+	si->read = s->stat.read;
+	si->write = s->stat.write;
+	si->rtime = s->stat.rtime;
+	si->wtime = s->stat.wtime;
+	si->wbuffer = s->wb_size;
+
+	return 1;
+}
+
+struct socket_info *
+socket_server_info(struct socket_server *ss) {
+	int i;
+	struct socket_info * si = NULL;
+	for (i=0;i<MAX_SOCKET;i++) {
+		struct socket * s = &ss->slot[i];
+		int id = s->id;
+		struct socket_info temp;
+		if (query_info(s, &temp) && s->id == id) {
+			// socket_server_info may call in different thread, so check socket id again
+			si = socket_info_create(si);
+			temp.next = si->next;
+			*si = temp;
+		}
+	}
+	return si;
 }

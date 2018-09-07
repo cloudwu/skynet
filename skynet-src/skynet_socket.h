@@ -1,6 +1,8 @@
 #ifndef skynet_socket_h
 #define skynet_socket_h
 
+#include "socket_info.h"
+
 struct skynet_context;
 
 #define SKYNET_SOCKET_TYPE_DATA 1
@@ -22,6 +24,7 @@ void skynet_socket_init();
 void skynet_socket_exit();
 void skynet_socket_free();
 int skynet_socket_poll();
+void skynet_socket_updatetime();
 
 int skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz);
 int skynet_socket_send_lowpriority(struct skynet_context *ctx, int id, void *buffer, int sz);
@@ -37,5 +40,7 @@ int skynet_socket_udp(struct skynet_context *ctx, const char * addr, int port);
 int skynet_socket_udp_connect(struct skynet_context *ctx, int id, const char * addr, int port);
 int skynet_socket_udp_send(struct skynet_context *ctx, int id, const char * address, const void *buffer, int sz);
 const char * skynet_socket_udp_address(struct skynet_socket_message *, int *addrsz);
+
+struct socket_info * skynet_socket_info();
 
 #endif

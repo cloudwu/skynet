@@ -159,6 +159,7 @@ function COMMAND.help()
 		ping = "ping address",
 		call = "call address ...",
 		trace = "trace address [proto] [on|off]",
+		netstat = "netstat : show netstat",
 	}
 end
 
@@ -373,4 +374,51 @@ function COMMANDX.call(cmd)
 	end
 	local rets = table.pack(skynet.call(address, "lua", table.unpack(args, 2, args.n)))
 	return rets
+end
+
+local function bytes(size)
+	if size == nil or size == 0 then
+		return
+	end
+	if size < 1024 then
+		return size
+	end
+	if size < 1024 * 1024 then
+		return tostring(size/1024) .. "K"
+	end
+	return tostring(size/(1024*1024)) .. "M"
+end
+
+local function convert_stat(info)
+	local now = skynet.now()
+	local function time(t)
+		if t == nil then
+			return
+		end
+		t = now - t
+		if t < 6000 then
+			return tostring(t/100) .. "s"
+		end
+		local hour = t // (100*60*60)
+		t = t - hour * 100 * 60 * 60
+		local min = t // (100*60)
+		t = t - min * 100 * 60
+		local sec = t / 100
+		return string.format("%s%d:%.2gs",hour == 0 and "" or (hour .. ":"),min,sec)
+	end
+
+	info.address = skynet.address(info.address)
+	info.read = bytes(info.read)
+	info.write = bytes(info.write)
+	info.wbuffer = bytes(info.wbuffer)
+	info.rtime = time(info.rtime)
+	info.wtime = time(info.wtime)
+end
+
+function COMMAND.netstat()
+	local stat = socket.netstat()
+	for _, info in ipairs(stat) do
+		convert_stat(info)
+	end
+	return stat
 end
