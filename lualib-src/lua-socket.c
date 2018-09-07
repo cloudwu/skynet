@@ -693,6 +693,8 @@ getinfo(lua_State *L, struct socket_info *si) {
 		lua_setfield(L, -2, "type");
 		lua_pushinteger(L, si->read);
 		lua_setfield(L, -2, "accept");
+		lua_pushinteger(L, si->rtime);
+		lua_setfield(L, -2, "rtime");
 		if (si->name[0]) {
 			lua_pushstring(L, si->name);
 			lua_setfield(L, -2, "sock");
