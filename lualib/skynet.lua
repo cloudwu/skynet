@@ -12,6 +12,7 @@ local profile = require "skynet.profile"
 
 local cresume = profile.resume
 local running_thread = nil
+local init_thread = nil
 
 local function coroutine_resume(co, ...)
 	running_thread = co
@@ -219,6 +220,7 @@ function skynet.timeout(ti, func)
 	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
+	return co	-- for debug
 end
 
 local function suspend_sleep(session, token)
@@ -770,8 +772,9 @@ end
 
 function skynet.start(start_func)
 	c.callback(skynet.dispatch_message)
-	skynet.timeout(0, function()
+	init_thread = skynet.timeout(0, function()
 		skynet.init_service(start_func)
+		init_thread = nil
 	end)
 end
 
@@ -788,22 +791,41 @@ function skynet.stat(what)
 end
 
 function skynet.task(ret)
-	if type(ret) == "number" then
+	if ret == nil then
+		local t = 0
+		for session,co in pairs(session_id_coroutine) do
+			t = t + 1
+		end
+		return t
+	end
+	if ret == "init" then
+		if init_thread then
+			return debug.traceback(init_thread)
+		else
+			return
+		end
+	end
+	local tt = type(ret)
+	if tt == "table" then
+		for session,co in pairs(session_id_coroutine) do
+			ret[session] = debug.traceback(co)
+		end
+		return
+	elseif tt == "number" then
 		local co = session_id_coroutine[ret]
 		if co then
 			return debug.traceback(co)
 		else
 			return "No session"
 		end
-	end
-	local t = 0
-	for session,co in pairs(session_id_coroutine) do
-		if ret then
-			ret[session] = debug.traceback(co)
+	elseif tt == "thread" then
+		for session, co in pairs(session_id_coroutine) do
+			if co == ret then
+				return session
+			end
 		end
-		t = t + 1
+		return
 	end
-	return t
 end
 
 function skynet.term(service)
