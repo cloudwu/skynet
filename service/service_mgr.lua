@@ -105,10 +105,12 @@ local function list_service()
 			if v.launch then
 				local session = skynet.task(v.launch.co)
 				local launching_address = skynet.call(".launcher", "lua", "QUERY", session)
-				table.insert(querying, "Init as " .. skynet.address(launching_address))
-				table.insert(querying,  tostring(skynet.call(launching_address, "debug", "TASK", "init")))
-				table.insert(querying, "Launching from " .. skynet.address(v.launch.source))
-				table.insert(querying, tostring(skynet.call(v.launch.source, "debug", "TASK", v.launch.session)))
+				if launching_address then
+					table.insert(querying, "Init as " .. skynet.address(launching_address))
+					table.insert(querying,  skynet.call(launching_address, "debug", "TASK", "init"))
+					table.insert(querying, "Launching from " .. skynet.address(v.launch.source))
+					table.insert(querying, skynet.call(v.launch.source, "debug", "TASK", v.launch.session))
+				end
 			end
 			if #v > 0 then
 				table.insert(querying , "Querying:" )
