@@ -16,14 +16,6 @@ local chan_meta = {
 	end,
 }
 
-local function default_conf(conf)
-	conf = conf or {}
-	conf.pack = conf.pack or skynet.pack
-	conf.unpack = conf.unpack or skynet.unpack
-
-	return conf
-end
-
 function multicast.new(conf)
 	assert(multicastd, "Init first")
 	local self = {}
