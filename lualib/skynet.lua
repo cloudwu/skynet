@@ -1,7 +1,6 @@
 -- read https://github.com/cloudwu/skynet/wiki/FAQ for the module "skynet.core"
 local c = require "skynet.core"
 local tostring = tostring
-local tonumber = tonumber
 local coroutine = coroutine
 local assert = assert
 local pairs = pairs
@@ -69,9 +68,6 @@ local fork_queue = {}
 -- suspend is function
 local suspend
 
-local function string_to_handle(str)
-	return tonumber("0x" .. string.sub(str , 2))
-end
 
 ----- monitor exit
 
@@ -179,7 +175,7 @@ local function dispatch_wakeup()
 end
 
 -- suspend is local function
-function suspend(co, result, command, param, param2)
+function suspend(co, result, command)
 	if not result then
 		local session = session_coroutine_id[co]
 		if session then -- coroutine may fork by others (session is nil)
