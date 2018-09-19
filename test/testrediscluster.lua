@@ -3,11 +3,17 @@ local rediscluster = require "skynet.db.redis.cluster"
 
 local test_more = ...
 
+-- subscribe mode's callback
+local function onmessage(data,channel,pchannel)
+	print("onmessage",data,channel,pchannel)
+end
+
 skynet.start(function ()
 	local db = rediscluster.new({
 		{host="127.0.0.1",port=7000},
 		{host="127.0.0.1",port=7001},},
-		{read_slave=true,auth=nil,db=0,}
+		{read_slave=true,auth=nil,db=0,},
+		onmessage
 	)
 	db:del("list")
 	db:del("map")
@@ -86,6 +92,34 @@ skynet.start(function ()
 			end
 		end
 	end
+
+	-- test subscribe/publish
+	db:subscribe("world")
+	db:subscribe("myteam")
+	db:publish("world","hello,world")
+	db:publish("myteam","hello,my team")
+	-- low-version(such as 3.0.2) redis-server psubscribe is locally
+	-- if publish and psubscribe not map to same node,
+	-- we may lost message. so upgrade your redis or use tag to resolved!
+	db:psubscribe("{tag}*team")
+	db:publish("{tag}1team","hello,1team")
+	db:publish("{tag}2team","hello,2team")
+
+	-- i test in redis-4.0.9, it's ok
+	db:psubscribe("*team")
+	db:publish("1team","hello,1team")
+	db:publish("2team","hello,2team")
+
+	-- test eval
+	db:set("A",1)
+	local script = [[
+		if redis.call("get",KEYS[1]) == ARGV[1] then
+			return "ok"
+		else
+			return "fail"
+		end]]
+	print("eval#get",db:eval(script,1,"A",1))
+	db:del("A")
 
 	if not test_more then
 		skynet.exit()
