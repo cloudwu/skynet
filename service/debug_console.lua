@@ -59,31 +59,38 @@ local function docmd(cmdline, print, fd)
 	local split = split_cmdline(cmdline)
 	local command = split[1]
 	local cmd = COMMAND[command]
-	local ok, list
+	local args
 	if cmd then
-		ok, list = pcall(cmd, table.unpack(split,2))
+		args = { pcall(cmd, table.unpack(split,2)) }
 	else
 		cmd = COMMANDX[command]
 		if cmd then
 			split.fd = fd
 			split[1] = cmdline
-			ok, list = pcall(cmd, split)
+			args = { pcall(cmd, split) }
 		else
+			args = {}
 			print("Invalid command, type help for command list")
 		end
 	end
 
+	local ok, err = args[1], args[2]
+
 	if ok then
-		if list then
-			if type(list) == "string" then
-				print(list)
-			else
-				dump_list(print, list)
+		for i=2, #args do
+			local list = args[i]
+			if list then
+				local t = type(list)
+				if t == "string" or t == "number" then
+					print(list)
+				else
+					dump_list(print, list)
+				end
 			end
 		end
 		print("<CMD OK>")
 	else
-		print(list)
+		print(err)
 		print("<CMD Error>")
 	end
 end
