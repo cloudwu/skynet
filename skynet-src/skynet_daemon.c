@@ -12,18 +12,22 @@
 static int
 check_pid(const char *pidfile) {
 	int pid = 0;
+    int n = 0;
 	FILE *f = fopen(pidfile,"r");
 	if (f == NULL)
 		return 0;
-	int n = fscanf(f,"%d", &pid);
+    int fd = fileno(f);
+    if (flock(fd, LOCK_EX|LOCK_NB) == 0) {
+        flock(fd, LOCK_UN);
+    }
+    else {
+        n = fscanf(f,"%d", &pid);
+    }
 	fclose(f);
 
-	if (n !=1 || pid == 0 || pid == getpid()) {
+	if (n !=1 || pid == 0) {
 		return 0;
 	}
-
-	if (kill(pid, 0) && errno == ESRCH)
-		return 0;
 
 	return pid;
 }
