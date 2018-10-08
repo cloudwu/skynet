@@ -59,9 +59,7 @@ local unresponse = {}
 local wakeup_queue = {}
 local sleep_session = {}
 
-local watching_service = {}
 local watching_session = {}
-local dead_service = {}
 local error_queue = {}
 local fork_queue = {}
 
@@ -83,10 +81,12 @@ end
 local function _error_dispatch(error_session, error_source)
 	skynet.ignoreret()	-- don't return for error
 	if error_session == 0 then
-		-- service is down
-		--  Don't remove from watching_service , because user may call dead service
-		if watching_service[error_source] then
-			dead_service[error_source] = true
+		-- error_source is down, clear unreponse set
+		for resp, address in pairs(unresponse) do
+			if error_source == address then
+				print("UNRESP", address)
+				unresponse[resp] = nil
+			end
 		end
 		for session, srv in pairs(watching_session) do
 			if srv == error_source then
@@ -97,18 +97,6 @@ local function _error_dispatch(error_session, error_source)
 		-- capture an error for error_session
 		if watching_session[error_session] then
 			table.insert(error_queue, error_session)
-		end
-	end
-end
-
-local function release_watching(address)
-	local ref = watching_service[address]
-	if ref then
-		ref = ref - 1
-		if ref > 0 then
-			watching_service[address] = ref
-		else
-			watching_service[address] = nil
 		end
 	end
 end
@@ -139,7 +127,6 @@ local function co_create(f)
 				end
 				local address = session_coroutine_address[co]
 				if address then
-					release_watching(address)
 					session_coroutine_id[co] = nil
 				end
 
@@ -423,18 +410,14 @@ function skynet.ret(msg, sz)
 	if not co_session then
 		error "No session"
 	end
-	local ret
-	if not dead_service[co_address] then
-		ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, msg, sz) ~= nil
-		if not ret then
-			-- If the package is too large, returns nil. so we should report error back
-			c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
-		end
-	elseif sz ~= nil then
-		c.trash(msg, sz)
-		return false
+	local ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, msg, sz)
+	if ret then
+		return true
+	elseif ret == false then
+		-- If the package is too large, returns false. so we should report error back
+		c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 	end
-	return ret
+	return false
 end
 
 function skynet.context()
@@ -454,47 +437,38 @@ function skynet.response(pack)
 	local co_session = assert(session_coroutine_id[running_thread], "no session")
 	session_coroutine_id[running_thread] = nil
 	local co_address = session_coroutine_address[running_thread]
+	if co_session == 0 then
+		--  do not response when session == 0 (send)
+		return function() end
+	end
 	local function response(ok, ...)
 		if ok == "TEST" then
-			if dead_service[co_address] then
-				release_watching(co_address)
-				unresponse[response] = nil
-				pack = false
-				return false
-			else
-				return true
-			end
+			return unresponse[response] ~= nil
 		end
 		if not pack then
-			if pack == false then
-				pack = nil
-				return false
-			end
 			error "Can't response more than once"
 		end
 
 		local ret
-		-- do not response when session == 0 (send)
-		if co_session ~= 0 and not dead_service[co_address] then
+		if unresponse[response] then
 			if ok then
-				ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, pack(...)) ~= nil
-				if not ret then
+				ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, pack(...))
+				if ret == false then
 					-- If the package is too large, returns false. so we should report error back
 					c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 				end
 			else
-				ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") ~= nil
+				ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 			end
+			unresponse[response] = nil
+			ret = ret ~= nil
 		else
 			ret = false
 		end
-		release_watching(co_address)
-		unresponse[response] = nil
 		pack = nil
 		return ret
 	end
-	watching_service[co_address] = watching_service[co_address] + 1
-	unresponse[response] = true
+	unresponse[response] = co_address
 
 	return response
 end
@@ -588,12 +562,6 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 
 		local f = p.dispatch
 		if f then
-			local ref = watching_service[source]
-			if ref then
-				watching_service[source] = ref + 1
-			else
-				watching_service[source] = 1
-			end
 			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
