@@ -712,6 +712,12 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 	}
 
 	if (destination == 0) {
+		if (data) {
+			skynet_error(context, "Destination address can't be 0");
+			skynet_free(data);
+			return -1;
+		}
+
 		return session;
 	}
 	if (skynet_harbor_message_isremote(destination)) {
