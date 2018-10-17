@@ -21,25 +21,16 @@ local sha1= crypt.sha1
 local setmetatable = setmetatable
 local error = error
 local tonumber = tonumber
-local    new_tab = function (narr, nrec) return {} end
+local new_tab = function (narr, nrec) return {} end
 
 
-local _M = { _VERSION = '0.13' }
+local _M = { _VERSION = '0.14' }
 -- constants
 
-local STATE_CONNECTED = 1
-local STATE_COMMAND_SENT = 2
-
 local COM_QUERY = 0x03
-
 local SERVER_MORE_RESULTS_EXISTS = 8
 
--- 16MB - 1, the default max allowed packet size used by libmysqlclient
-local FULL_PACKET_SIZE = 16777215
-
-
 local mt = { __index = _M }
-
 
 -- mysql field value type converters
 local converters = new_tab(0, 8)
@@ -640,6 +631,7 @@ function _M.connect(opts)
         host = opts.host,
         port = opts.port or 3306,
         auth = _mysql_login(self,user,password,database,opts.on_connect),
+		overload = opts.overload,
     }
     self.sockchannel = channel
     -- try connect first only once
