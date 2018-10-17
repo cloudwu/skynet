@@ -592,22 +592,22 @@ local function _query_resp(self)
         if err ~= "again" then
             return true, res
         end
-        local mulitresultset = {res}
-        mulitresultset.mulitresultset = true
+        local multiresultset = {res}
+        multiresultset.multiresultset = true
         local i =2
         while err =="again" do
             res, err, errno, sqlstate = read_result(self,sock)
             if not res then
-                mulitresultset.badresult = true
-                mulitresultset.err = err
-                mulitresultset.errno = errno
-                mulitresultset.sqlstate = sqlstate
-                return true, mulitresultset
+                multiresultset.badresult = true
+                multiresultset.err = err
+                multiresultset.errno = errno
+                multiresultset.sqlstate = sqlstate
+                return true, multiresultset
             end
-            mulitresultset[i]=res
+            multiresultset[i]=res
             i=i+1
         end
-        return true, mulitresultset
+        return true, multiresultset
     end
 end
 
