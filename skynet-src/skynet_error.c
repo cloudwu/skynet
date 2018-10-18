@@ -17,6 +17,14 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 		logger = skynet_handle_findname("logger");
 	}
 	if (logger == 0) {
+		int source = skynet_context_handle(context);
+		printf("[:%08x] ",source);
+		va_list ap;
+		va_start(ap,msg);
+		vprintf(msg, ap);
+		va_end(ap);
+		printf("\n");
+		fflush(stdout);
 		return;
 	}
 
