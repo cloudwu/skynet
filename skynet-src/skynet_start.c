@@ -272,6 +272,8 @@ skynet_start(struct skynet_config * config) {
 		exit(1);
 	}
 
+	skynet_handle_namehandle(skynet_context_handle(ctx), "logger");
+
 	bootstrap(ctx, config->bootstrap);
 
 	start(config->thread);
