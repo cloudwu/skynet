@@ -1,3 +1,22 @@
+v1.2.0 (2018-11-6)
+-----------
+* Improve cluster support
+* Improve mongodb driver
+* Improve redis driver
+* Improve socket concurrent write
+* Improve socket channel
+* Improve service gate
+* Improve udp support
+* Add skynet.ignoreret
+* Add skynet.trace
+* Add skynet.context
+* Improve skynet.wait/wakeup
+* Add socket.netstat
+* Add socketchannel.overload
+* Fix memory leak for dead service
+* lua update to 5.3.5
+* jemalloc update to 5.1.0
+
 v1.1.0 (2017-10-31)
 -----------
 * add socket.disconnected()
