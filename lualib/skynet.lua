@@ -127,6 +127,7 @@ local function co_create(f)
 				local address = session_coroutine_address[co]
 				if address then
 					session_coroutine_id[co] = nil
+					session_coroutine_address[co] = nil
 				end
 
 				-- recycle co into pool
