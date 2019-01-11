@@ -21,8 +21,6 @@ local sha1= crypt.sha1
 local setmetatable = setmetatable
 local error = error
 local tonumber = tonumber
-local new_tab = function (narr, nrec) return {} end
-
 
 local _M = { _VERSION = '0.14' }
 -- constants
@@ -33,7 +31,7 @@ local SERVER_MORE_RESULTS_EXISTS = 8
 local mt = { __index = _M }
 
 -- mysql field value type converters
-local converters = new_tab(0, 8)
+local converters = {}
 
 for i = 0x01, 0x05 do
     -- tiny, short, long, float, double
@@ -46,22 +44,22 @@ converters[0xf6] = tonumber  -- newdecimal
 
 
 local function _get_byte2(data, i)
-	return strunpack("<I2",data,i)
+	return (strunpack("<I2",data,i))
 end
 
 
 local function _get_byte3(data, i)
-	return strunpack("<I3",data,i)
+	return (strunpack("<I3",data,i))
 end
 
 
 local function _get_byte4(data, i)
-	return strunpack("<I4",data,i)
+	return (strunpack("<I4",data,i))
 end
 
 
 local function _get_byte8(data, i)
-	return strunpack("<I8",data,i)
+	return (strunpack("<I8",data,i))
 end
 
 
@@ -209,7 +207,7 @@ end
 
 
 local function _parse_ok_packet(packet)
-    local res = new_tab(0, 5)
+    local res = {}
     local pos
 
     res.affected_rows, pos = _from_length_coded_bin(packet, 2)
@@ -268,7 +266,7 @@ end
 
 
 local function _parse_field_packet(data)
-    local col = new_tab(0, 2)
+    local col = {}
     local catalog, db, table, orig_table, orig_name, charsetnr, length
     local pos
     catalog, pos = _from_length_coded_str(data, 1)
@@ -310,12 +308,7 @@ end
 local function _parse_row_data_packet(data, cols, compact)
     local pos = 1
     local ncols = #cols
-    local row
-    if compact then
-        row = new_tab(ncols, 0)
-    else
-        row = new_tab(0, ncols)
-    end
+    local row = {}
     for i = 1, ncols do
         local value
         value, pos = _from_length_coded_str(data, pos)
@@ -501,7 +494,7 @@ local function read_result(self, sock)
 
     local field_count, extra = _parse_result_set_header_packet(packet)
 
-    local cols = new_tab(field_count, 0)
+    local cols = {}
     for i = 1, field_count do
         local col, err, errno, sqlstate = _recv_field_packet(self, sock)
         if not col then
@@ -527,7 +520,7 @@ local function read_result(self, sock)
 
     local compact = self.compact
 
-    local rows = new_tab( 4, 0)
+    local rows = {}
     local i = 0
     while true do
         packet, typ, err = _recv_packet(self, sock)
