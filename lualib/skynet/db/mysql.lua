@@ -364,34 +364,24 @@ end
 
 local function _recv_decode_packet_resp(self)
      return function(sock)
-		-- don't return more than 2 results
-        return true, (_recv_packet(self,sock))
-    end
-end
-
-local function _recv_auth_resp(self)
-     return function(sock)
         local packet, typ, err = _recv_packet(self,sock)
         if not packet then
-            --print("recv auth resp : failed to receive the result packet")
-            error ("failed to receive the result packet"..err)
-            --return nil,err
+            return false, "failed to receive the result packet"..err
         end
 
         if typ == 'ERR' then
             local errno, msg, sqlstate = _parse_err_packet(packet)
-            error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
-            --return nil, errno,msg, sqlstate
+            return false, strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate)
         end
 
         if typ == 'EOF' then
-            error "old pre-4.1 authentication protocol not supported"
+            return false, "old pre-4.1 authentication protocol not supported"
         end
 
         if typ ~= 'OK' then
-            error "bad packet type: "
+            return false, "bad packet type: "
         end
-        return true, true
+        return true, packet
     end
 end
 
@@ -399,16 +389,8 @@ end
 local function _mysql_login(self,user,password,database,on_connect)
 
     return function(sockchannel)
-          local packet, typ, err =   sockchannel:response( _recv_decode_packet_resp(self) )
-        --local aat={}
-        if not packet then
-            error(  err )
-        end
-
-        if typ == "ERR" then
-            local errno, msg, sqlstate = _parse_err_packet(packet)
-            error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
-        end
+	local dispatch_resp = _recv_decode_packet_resp(self)
+        local packet = sockchannel:response( dispatch_resp )
 
         self.protocol_ver = strbyte(packet)
 
@@ -468,7 +450,7 @@ local function _mysql_login(self,user,password,database,on_connect)
         local packet_len = #req
 
         local authpacket=_compose_packet(self,req,packet_len)
-        sockchannel:request(authpacket,_recv_auth_resp(self))
+        sockchannel:request(authpacket, dispatch_resp)
 	if on_connect then
 		on_connect(self)
 	end
