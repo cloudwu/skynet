@@ -5,7 +5,6 @@
 -- Modified by Cloud Wu (remove bit32 for lua 5.3)
 
 local socketchannel = require "skynet.socketchannel"
-local mysqlaux = require "skynet.mysqlaux.c"
 local crypt = require "skynet.crypt"
 
 
@@ -637,9 +636,20 @@ function _M.server_ver(self)
     return self._server_ver
 end
 
+local escape_map = {
+	['\0'] = "\\0",
+	['\b'] = "\\b",
+	['\n'] = "\\n",
+	['\r'] = "\\r",
+	['\t'] = "\\t",
+	['\26'] = "\\Z",
+	['\\'] = "\\\\",
+	["'"] = "\\'",
+	['"'] = '\\"',
+}
 
 function _M.quote_sql_str( str)
-    return mysqlaux.quote_sql_str(str)
+	return strformat("'%s'", strgsub(str, "[\0\b\n\r\t\26\\\'\"]", escape_map))
 end
 
 function _M.set_compact_arrays(self, value)
