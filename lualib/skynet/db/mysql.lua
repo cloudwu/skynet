@@ -371,7 +371,7 @@ local function _recv_decode_packet_resp(self)
         end
 
         if typ ~= 'OK' then
-            return false, "bad packet type: "
+            return false, "bad packet type: "..typ
         end
         return true, packet
     end
