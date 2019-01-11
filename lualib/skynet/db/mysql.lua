@@ -43,22 +43,22 @@ converters[0xf6] = tonumber  -- newdecimal
 
 
 local function _get_byte2(data, i)
-	return (strunpack("<I2",data,i))
+	return strunpack("<I2",data,i)
 end
 
 
 local function _get_byte3(data, i)
-	return (strunpack("<I3",data,i))
+	return strunpack("<I3",data,i)
 end
 
 
 local function _get_byte4(data, i)
-	return (strunpack("<I4",data,i))
+	return strunpack("<I4",data,i)
 end
 
 
 local function _get_byte8(data, i)
-	return (strunpack("<I8",data,i))
+	return strunpack("<I8",data,i)
 end
 
 
@@ -370,9 +370,6 @@ local function _recv_decode_packet_resp(self)
             return false, "old pre-4.1 authentication protocol not supported"
         end
 
-        if typ ~= 'OK' then
-            return false, "bad packet type: "
-        end
         return true, packet
     end
 end
