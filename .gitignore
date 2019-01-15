@@ -9,3 +9,9 @@
 *.so
 *.dSYM
 .DS_Store
+*.ipch
+.vs/
+obj/
+*.sln
+*.vcxproj
+*.vcxproj.user
