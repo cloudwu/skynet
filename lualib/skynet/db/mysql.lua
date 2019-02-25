@@ -5,7 +5,6 @@
 -- Modified by Cloud Wu (remove bit32 for lua 5.3)
 
 local socketchannel = require "skynet.socketchannel"
-local mysqlaux = require "skynet.mysqlaux.c"
 local crypt = require "skynet.crypt"
 
 
@@ -21,8 +20,6 @@ local sha1= crypt.sha1
 local setmetatable = setmetatable
 local error = error
 local tonumber = tonumber
-local new_tab = function (narr, nrec) return {} end
-
 
 local _M = { _VERSION = '0.14' }
 -- constants
@@ -33,7 +30,7 @@ local SERVER_MORE_RESULTS_EXISTS = 8
 local mt = { __index = _M }
 
 -- mysql field value type converters
-local converters = new_tab(0, 8)
+local converters = {}
 
 for i = 0x01, 0x05 do
     -- tiny, short, long, float, double
@@ -209,7 +206,7 @@ end
 
 
 local function _parse_ok_packet(packet)
-    local res = new_tab(0, 5)
+    local res = {}
     local pos
 
     res.affected_rows, pos = _from_length_coded_bin(packet, 2)
@@ -268,7 +265,7 @@ end
 
 
 local function _parse_field_packet(data)
-    local col = new_tab(0, 2)
+    local col = {}
     local catalog, db, table, orig_table, orig_name, charsetnr, length
     local pos
     catalog, pos = _from_length_coded_str(data, 1)
@@ -310,12 +307,7 @@ end
 local function _parse_row_data_packet(data, cols, compact)
     local pos = 1
     local ncols = #cols
-    local row
-    if compact then
-        row = new_tab(ncols, 0)
-    else
-        row = new_tab(0, ncols)
-    end
+    local row = {}
     for i = 1, ncols do
         local value
         value, pos = _from_length_coded_str(data, pos)
@@ -364,34 +356,21 @@ end
 
 local function _recv_decode_packet_resp(self)
      return function(sock)
-		-- don't return more than 2 results
-        return true, (_recv_packet(self,sock))
-    end
-end
-
-local function _recv_auth_resp(self)
-     return function(sock)
         local packet, typ, err = _recv_packet(self,sock)
         if not packet then
-            --print("recv auth resp : failed to receive the result packet")
-            error ("failed to receive the result packet"..err)
-            --return nil,err
+            return false, "failed to receive the result packet"..err
         end
 
         if typ == 'ERR' then
             local errno, msg, sqlstate = _parse_err_packet(packet)
-            error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
-            --return nil, errno,msg, sqlstate
+            return false, strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate)
         end
 
         if typ == 'EOF' then
-            error "old pre-4.1 authentication protocol not supported"
+            return false, "old pre-4.1 authentication protocol not supported"
         end
 
-        if typ ~= 'OK' then
-            error "bad packet type: "
-        end
-        return true, true
+        return true, packet
     end
 end
 
@@ -399,16 +378,8 @@ end
 local function _mysql_login(self,user,password,database,on_connect)
 
     return function(sockchannel)
-          local packet, typ, err =   sockchannel:response( _recv_decode_packet_resp(self) )
-        --local aat={}
-        if not packet then
-            error(  err )
-        end
-
-        if typ == "ERR" then
-            local errno, msg, sqlstate = _parse_err_packet(packet)
-            error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
-        end
+	local dispatch_resp = _recv_decode_packet_resp(self)
+        local packet = sockchannel:response( dispatch_resp )
 
         self.protocol_ver = strbyte(packet)
 
@@ -468,7 +439,7 @@ local function _mysql_login(self,user,password,database,on_connect)
         local packet_len = #req
 
         local authpacket=_compose_packet(self,req,packet_len)
-        sockchannel:request(authpacket,_recv_auth_resp(self))
+        sockchannel:request(authpacket, dispatch_resp)
 	if on_connect then
 		on_connect(self)
 	end
@@ -519,7 +490,7 @@ local function read_result(self, sock)
 
     local field_count, extra = _parse_result_set_header_packet(packet)
 
-    local cols = new_tab(field_count, 0)
+    local cols = {}
     for i = 1, field_count do
         local col, err, errno, sqlstate = _recv_field_packet(self, sock)
         if not col then
@@ -545,7 +516,7 @@ local function read_result(self, sock)
 
     local compact = self.compact
 
-    local rows = new_tab( 4, 0)
+    local rows = {}
     local i = 0
     while true do
         packet, typ, err = _recv_packet(self, sock)
@@ -662,9 +633,20 @@ function _M.server_ver(self)
     return self._server_ver
 end
 
+local escape_map = {
+	['\0'] = "\\0",
+	['\b'] = "\\b",
+	['\n'] = "\\n",
+	['\r'] = "\\r",
+	['\t'] = "\\t",
+	['\26'] = "\\Z",
+	['\\'] = "\\\\",
+	["'"] = "\\'",
+	['"'] = '\\"',
+}
 
 function _M.quote_sql_str( str)
-    return mysqlaux.quote_sql_str(str)
+	return strformat("'%s'", strgsub(str, "[\0\b\n\r\t\26\\\'\"]", escape_map))
 end
 
 function _M.set_compact_arrays(self, value)
