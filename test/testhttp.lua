@@ -3,7 +3,7 @@ local httpc = require "http.httpc"
 local dns = require "skynet.dns"
 
 local function main()
-	httpc.dns()	-- set dns server
+	--httpc.dns()	-- set dns server
 	httpc.timeout = 100	-- set timeout 1 second
 	print("GET baidu.com")
 	local respheader = {}
