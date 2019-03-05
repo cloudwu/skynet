@@ -133,6 +133,7 @@ mc_remote(lua_State *L) {
 	lua_pushlightuserdata(L, pack->data);
 	lua_pushinteger(L, (lua_Integer)(pack->size));
 	skynet_free(pack);
+	skynet_free(ptr);
 	return 2;
 }
 
