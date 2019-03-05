@@ -1,7 +1,6 @@
 -- read https://github.com/cloudwu/skynet/wiki/FAQ for the module "skynet.core"
 local c = require "skynet.core"
 local tostring = tostring
-local tonumber = tonumber
 local coroutine = coroutine
 local assert = assert
 local pairs = pairs
@@ -12,6 +11,7 @@ local profile = require "skynet.profile"
 
 local cresume = profile.resume
 local running_thread = nil
+local init_thread = nil
 
 local function coroutine_resume(co, ...)
 	running_thread = co
@@ -59,18 +59,13 @@ local unresponse = {}
 local wakeup_queue = {}
 local sleep_session = {}
 
-local watching_service = {}
 local watching_session = {}
-local dead_service = {}
 local error_queue = {}
 local fork_queue = {}
 
 -- suspend is function
 local suspend
 
-local function string_to_handle(str)
-	return tonumber("0x" .. string.sub(str , 2))
-end
 
 ----- monitor exit
 
@@ -86,10 +81,11 @@ end
 local function _error_dispatch(error_session, error_source)
 	skynet.ignoreret()	-- don't return for error
 	if error_session == 0 then
-		-- service is down
-		--  Don't remove from watching_service , because user may call dead service
-		if watching_service[error_source] then
-			dead_service[error_source] = true
+		-- error_source is down, clear unreponse set
+		for resp, address in pairs(unresponse) do
+			if error_source == address then
+				unresponse[resp] = nil
+			end
 		end
 		for session, srv in pairs(watching_session) do
 			if srv == error_source then
@@ -100,18 +96,6 @@ local function _error_dispatch(error_session, error_source)
 		-- capture an error for error_session
 		if watching_session[error_session] then
 			table.insert(error_queue, error_session)
-		end
-	end
-end
-
-local function release_watching(address)
-	local ref = watching_service[address]
-	if ref then
-		ref = ref - 1
-		if ref > 0 then
-			watching_service[address] = ref
-		else
-			watching_service[address] = nil
 		end
 	end
 end
@@ -142,8 +126,8 @@ local function co_create(f)
 				end
 				local address = session_coroutine_address[co]
 				if address then
-					release_watching(address)
 					session_coroutine_id[co] = nil
+					session_coroutine_address[co] = nil
 				end
 
 				-- recycle co into pool
@@ -178,7 +162,7 @@ local function dispatch_wakeup()
 end
 
 -- suspend is local function
-function suspend(co, result, command, param, param2)
+function suspend(co, result, command)
 	if not result then
 		local session = session_coroutine_id[co]
 		if session then -- coroutine may fork by others (session is nil)
@@ -193,6 +177,7 @@ function suspend(co, result, command, param, param2)
 			session_coroutine_address[co] = nil
 			session_coroutine_tracetag[co] = nil
 		end
+		skynet.fork(function() end)	-- trigger command "SUSPEND"
 		error(debug.traceback(co,tostring(command)))
 	end
 	if command == "SUSPEND" then
@@ -218,6 +203,7 @@ function skynet.timeout(ti, func)
 	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
+	return co	-- for debug
 end
 
 local function suspend_sleep(session, token)
@@ -424,18 +410,20 @@ function skynet.ret(msg, sz)
 	if not co_session then
 		error "No session"
 	end
-	local ret
-	if not dead_service[co_address] then
-		ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, msg, sz) ~= nil
-		if not ret then
-			-- If the package is too large, returns nil. so we should report error back
-			c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
-		end
-	elseif sz ~= nil then
-		c.trash(msg, sz)
-		return false
+	local ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, msg, sz)
+	if ret then
+		return true
+	elseif ret == false then
+		-- If the package is too large, returns false. so we should report error back
+		c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 	end
-	return ret
+	return false
+end
+
+function skynet.context()
+	local co_session = session_coroutine_id[running_thread]
+	local co_address = session_coroutine_address[running_thread]
+	return co_session, co_address
 end
 
 function skynet.ignoreret()
@@ -449,47 +437,38 @@ function skynet.response(pack)
 	local co_session = assert(session_coroutine_id[running_thread], "no session")
 	session_coroutine_id[running_thread] = nil
 	local co_address = session_coroutine_address[running_thread]
+	if co_session == 0 then
+		--  do not response when session == 0 (send)
+		return function() end
+	end
 	local function response(ok, ...)
 		if ok == "TEST" then
-			if dead_service[co_address] then
-				release_watching(co_address)
-				unresponse[response] = nil
-				pack = false
-				return false
-			else
-				return true
-			end
+			return unresponse[response] ~= nil
 		end
 		if not pack then
-			if pack == false then
-				pack = nil
-				return false
-			end
 			error "Can't response more than once"
 		end
 
 		local ret
-		-- do not response when session == 0 (send)
-		if co_session ~= 0 and not dead_service[co_address] then
+		if unresponse[response] then
 			if ok then
-				ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, pack(...)) ~= nil
-				if not ret then
+				ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, pack(...))
+				if ret == false then
 					-- If the package is too large, returns false. so we should report error back
 					c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 				end
 			else
-				ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "") ~= nil
+				ret = c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 			end
+			unresponse[response] = nil
+			ret = ret ~= nil
 		else
 			ret = false
 		end
-		release_watching(co_address)
-		unresponse[response] = nil
 		pack = nil
 		return ret
 	end
-	watching_service[co_address] = watching_service[co_address] + 1
-	unresponse[response] = true
+	unresponse[response] = co_address
 
 	return response
 end
@@ -539,10 +518,14 @@ function skynet.dispatch_unknown_response(unknown)
 end
 
 function skynet.fork(func,...)
-	local args = table.pack(...)
-	local co = co_create(function()
-		func(table.unpack(args,1,args.n))
-	end)
+	local n = select("#", ...)
+	local co
+	if n == 0 then
+		co = co_create(func)
+	else
+		local args = { ... }
+		co = co_create(function() func(table.unpack(args,1,n)) end)
+	end
 	table.insert(fork_queue, co)
 	return co
 end
@@ -579,12 +562,6 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 
 		local f = p.dispatch
 		if f then
-			local ref = watching_service[source]
-			if ref then
-				watching_service[source] = ref + 1
-			else
-				watching_service[source] = 1
-			end
 			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
@@ -759,8 +736,9 @@ end
 
 function skynet.start(start_func)
 	c.callback(skynet.dispatch_message)
-	skynet.timeout(0, function()
+	init_thread = skynet.timeout(0, function()
 		skynet.init_service(start_func)
+		init_thread = nil
 	end)
 end
 
@@ -777,14 +755,41 @@ function skynet.stat(what)
 end
 
 function skynet.task(ret)
-	local t = 0
-	for session,co in pairs(session_id_coroutine) do
-		if ret then
+	if ret == nil then
+		local t = 0
+		for session,co in pairs(session_id_coroutine) do
+			t = t + 1
+		end
+		return t
+	end
+	if ret == "init" then
+		if init_thread then
+			return debug.traceback(init_thread)
+		else
+			return
+		end
+	end
+	local tt = type(ret)
+	if tt == "table" then
+		for session,co in pairs(session_id_coroutine) do
 			ret[session] = debug.traceback(co)
 		end
-		t = t + 1
+		return
+	elseif tt == "number" then
+		local co = session_id_coroutine[ret]
+		if co then
+			return debug.traceback(co)
+		else
+			return "No session"
+		end
+	elseif tt == "thread" then
+		for session, co in pairs(session_id_coroutine) do
+			if co == ret then
+				return session
+			end
+		end
+		return
 	end
-	return t
 end
 
 function skynet.term(service)

@@ -372,7 +372,6 @@ local function suspend(tid, name, qtype)
 		end
 	end)
 	skynet.wait(req.co)
-	local answers = req.answers
 	request_pool[tid] = nil
 	if not req.answers then
 		local answers = lookup_cache(name, qtype, true)

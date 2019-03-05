@@ -39,6 +39,8 @@ function socket_channel.channel(desc)
 		__closed = false,
 		__authcoroutine = false,
 		__nodelay = desc.nodelay,
+		__overload_notify = desc.overload,
+		__overload = false,
 	}
 
 	return setmetatable(c, channel_meta)
@@ -73,17 +75,6 @@ local function wakeup_all(self, errmsg)
 				self.__result_data[co] = errmsg
 				skynet.wakeup(co)
 			end
-		end
-	end
-end
-
-local function exit_thread(self)
-	local co = coroutine.running()
-	if self.__dispatch_thread == co then
-		self.__dispatch_thread = nil
-		local connecting = self.__connecting_thread
-		if connecting then
-			skynet.wakeup(connecting)
 		end
 	end
 end
@@ -124,7 +115,6 @@ local function dispatch_by_session(self)
 			wakeup_all(self, errormsg)
 		end
 	end
-	exit_thread(self)
 end
 
 local function pop_response(self)
@@ -201,7 +191,6 @@ local function dispatch_by_order(self)
 			wakeup_all(self, errmsg)
 		end
 	end
-	exit_thread(self)
 end
 
 local function dispatch_function(self)
@@ -233,11 +222,21 @@ local function connect_backup(self)
 	end
 end
 
+local function term_dispatch_thread(self)
+	if not self.__response and self.__dispatch_thread then
+		-- dispatch by order, send close signal to dispatch thread
+		push_response(self, true, false)	-- (true, false) is close signal
+	end
+end
+
 local function connect_once(self)
 	if self.__closed then
 		return false
 	end
 	assert(not self.__sock and not self.__authcoroutine)
+	-- term current dispatch thread (send a signal)
+	term_dispatch_thread(self)
+
 	local fd,err = socket.open(self.__host, self.__port)
 	if not fd then
 		fd = connect_backup(self)
@@ -249,8 +248,43 @@ local function connect_once(self)
 		socketdriver.nodelay(fd)
 	end
 
+	-- register overload warning
+
+	local overload = self.__overload_notify
+	if overload then
+		local function overload_trigger(id, size)
+			if id == self.__sock[1] then
+				if size == 0 then
+					if self.__overload then
+						self.__overload = false
+						overload(false)
+					end
+				else
+					if not self.__overload then
+						self.__overload = true
+						overload(true)
+					else
+						skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d %s:%s)", size, id, self.__host, self.__port))
+					end
+				end
+			end
+		end
+
+		skynet.fork(overload_trigger, fd, 0)
+		socket.warning(fd, overload_trigger)
+	end
+
+	while self.__dispatch_thread do
+		-- wait for dispatch thread exit
+		skynet.yield()
+	end
+
 	self.__sock = setmetatable( {fd} , channel_socket_meta )
-	self.__dispatch_thread = skynet.fork(dispatch_function(self), self)
+	self.__dispatch_thread = skynet.fork(function()
+		pcall(dispatch_function(self), self)
+		-- clear dispatch_thread
+		self.__dispatch_thread = nil
+	end)
 
 	if self.__auth then
 		self.__authcoroutine = coroutine.running()
@@ -353,18 +387,7 @@ local function block_connect(self, once)
 end
 
 function channel:connect(once)
-	if self.__closed then
-		if self.__dispatch_thread then
-			-- closing, wait
-			assert(self.__connecting_thread == nil, "already connecting")
-			local co = coroutine.running()
-			self.__connecting_thread = co
-			skynet.wait(co)
-			self.__connecting_thread = nil
-		end
-		self.__closed = false
-	end
-
+	self.__closed = false
 	return block_connect(self, once)
 end
 
@@ -437,13 +460,9 @@ end
 
 function channel:close()
 	if not self.__closed then
-		local thread = self.__dispatch_thread
+		term_dispatch_thread(self)
 		self.__closed = true
 		close_channel_socket(self)
-		if not self.__response and self.__dispatch_thread == thread and thread then
-			-- dispatch by order, send close signal to dispatch thread
-			push_response(self, true, false)	-- (true, false) is close signal
-		end
 	end
 end
 

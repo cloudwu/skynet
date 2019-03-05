@@ -16,7 +16,7 @@ local function request(name, func, ...)
 	end
 
 	for _,v in ipairs(s) do
-		skynet.wakeup(v)
+		skynet.wakeup(v.co)
 	end
 
 	if ok then
@@ -42,12 +42,22 @@ local function waitfor(name , func, ...)
 
 	assert(type(s) == "table")
 
-	if not s.launch and func then
-		s.launch = true
+	local session, source = skynet.context()
+
+	if s.launch == nil and func then
+		s.launch = {
+			session = session,
+			source = source,
+			co = co,
+		}
 		return request(name, func, ...)
 	end
 
-	table.insert(s, co)
+	table.insert(s, {
+		co = co,
+		session = session,
+		source = source,
+	})
 	skynet.wait()
 	s = service[name]
 	if type(s) == "string" then
@@ -91,7 +101,24 @@ local function list_service()
 		if type(v) == "string" then
 			v = "Error: " .. v
 		elseif type(v) == "table" then
-			v = "Querying"
+			local querying = {}
+			if v.launch then
+				local session = skynet.task(v.launch.co)
+				local launching_address = skynet.call(".launcher", "lua", "QUERY", session)
+				if launching_address then
+					table.insert(querying, "Init as " .. skynet.address(launching_address))
+					table.insert(querying,  skynet.call(launching_address, "debug", "TASK", "init"))
+					table.insert(querying, "Launching from " .. skynet.address(v.launch.source))
+					table.insert(querying, skynet.call(v.launch.source, "debug", "TASK", v.launch.session))
+				end
+			end
+			if #v > 0 then
+				table.insert(querying , "Querying:" )
+				for _, detail in ipairs(v) do
+					table.insert(querying, skynet.address(detail.source) .. " " .. tostring(skynet.call(detail.source, "debug", "TASK", detail.session)))
+				end
+			end
+			v = table.concat(querying, "\n")
 		else
 			v = skynet.address(v)
 		end

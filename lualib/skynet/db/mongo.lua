@@ -82,18 +82,24 @@ local function __parse_addr(addr)
 	return host, tonumber(port)
 end
 
+local auth_method = {}
+
 local function mongo_auth(mongoc)
 	local user = rawget(mongoc,	"username")
 	local pass = rawget(mongoc,	"password")
 	local authmod = rawget(mongoc, "authmod") or "scram_sha1"
 	authmod = "auth_" ..  authmod
+	local authdb = rawget(mongoc, "authdb")
+	if authdb then
+		authdb = mongo_client.getDB(mongoc, authdb)	-- mongoc has not set metatable yet
+	end
 
 	return function()
 		if user	~= nil and pass	~= nil then
 			-- autmod can be "mongodb_cr" or "scram_sha1"
-			local auth_func = mongoc[authmod]
+			local auth_func = auth_method[authmod]
 			assert(auth_func , "Invalid authmod")
-			assert(auth_func(mongoc,user, pass))
+			assert(auth_func(authdb or mongoc, user, pass))
 		end
 		local rs_data =	mongoc:runCommand("ismaster")
 		if rs_data.ok == 1 then
@@ -156,6 +162,7 @@ function mongo.client( conf	)
 		username = first.username,
 		password = first.password,
 		authmod = first.authmod,
+		authdb = first.authdb,
 	}
 
 	obj.__id = 0
@@ -166,6 +173,7 @@ function mongo.client( conf	)
 		auth = mongo_auth(obj),
 		backup = backup,
 		nodelay = true,
+		overload = conf.overload,
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect(true)	-- try connect only	once
@@ -206,7 +214,7 @@ function mongo_client:runCommand(...)
 	return self.admin:runCommand(...)
 end
 
-function mongo_client:auth_mongodb_cr(user,password)
+function auth_method:auth_mongodb_cr(user,password)
 	local password = md5.sumhexa(string.format("%s:mongo:%s",user,password))
 	local result= self:runCommand "getnonce"
 	if result.ok ~=1 then
@@ -229,7 +237,7 @@ local function salt_password(password, salt, iter)
 	return output
 end
 
-function mongo_client:auth_scram_sha1(username,password)
+function auth_method:auth_scram_sha1(username,password)
 	local user = string.gsub(string.gsub(username, '=', '=3D'), ',' , '=2C')
 	local nonce = crypt.base64encode(crypt.randomkey())
 	local first_bare = "n="  .. user .. ",r="  .. nonce
@@ -298,6 +306,13 @@ end
 function mongo_client:logout()
 	local result = self:runCommand "logout"
 	return result.ok ==	1
+end
+
+function mongo_db:auth(user, pass)
+	local authmod = rawget(self.connection, "authmod") or "scram_sha1"
+	local auth_func = auth_method["auth_" .. authmod]
+	assert(auth_func , "Invalid authmod")
+	return auth_func(self, user, pass)
 end
 
 function mongo_db:runCommand(cmd,cmd_v,...)

@@ -71,7 +71,7 @@ local dummy_env = {}
 for k,v in pairs(_ENV) do dummy_env[k] = v end
 
 local function _patch(global, f)
-        local i = 1
+	local i = 1
 	while true do
 		local name, value = debug.getupvalue(f, i)
 		if name == nil then
@@ -81,10 +81,10 @@ local function _patch(global, f)
 			if old_uv then
 				debug.upvaluejoin(f, i, old_uv.func, old_uv.index)
 			end
-                else
-                    if type(value) == "function" then
-                        _patch(global, value)
-                    end
+		else
+			if type(value) == "function" then
+				_patch(global, value)
+			end
 		end
 		i = i + 1
 	end
@@ -92,7 +92,7 @@ end
 
 local function patch_func(funcs, global, group, name, f)
 	local desc = assert(find_func(funcs, group, name) , string.format("Patch mismatch %s.%s", group, name))
-        _patch(global, f)
+	_patch(global, f)
 	desc[4] = f
 end
 

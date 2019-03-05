@@ -159,6 +159,7 @@ function COMMAND.help()
 		ping = "ping address",
 		call = "call address ...",
 		trace = "trace address [proto] [on|off]",
+		netstat = "netstat : show netstat",
 	}
 end
 
@@ -207,7 +208,10 @@ function COMMAND.service()
 end
 
 local function adjust_address(address)
-	if address:sub(1,1) ~= ":" then
+	local prefix = address:sub(1,1)
+	if prefix == '.' then
+		return assert(skynet.localname(address), "Not a valid name")
+	elseif prefix ~= ':' then
 		address = assert(tonumber("0x" .. address), "Need an address") | (skynet.harbor(skynet.self()) << 24)
 	end
 	return address
@@ -237,7 +241,7 @@ function COMMAND.exit(address)
 	skynet.send(adjust_address(address), "debug", "EXIT")
 end
 
-function COMMAND.inject(address, filename)
+function COMMAND.inject(address, filename, ...)
 	address = adjust_address(address)
 	local f = io.open(filename, "rb")
 	if not f then
@@ -245,7 +249,7 @@ function COMMAND.inject(address, filename)
 	end
 	local source = f:read "*a"
 	f:close()
-	local ok, output = skynet.call(address, "debug", "RUN", source, filename)
+	local ok, output = skynet.call(address, "debug", "RUN", source, filename, ...)
 	if ok == false then
 		error(output)
 	end
@@ -370,4 +374,51 @@ function COMMANDX.call(cmd)
 	end
 	local rets = table.pack(skynet.call(address, "lua", table.unpack(args, 2, args.n)))
 	return rets
+end
+
+local function bytes(size)
+	if size == nil or size == 0 then
+		return
+	end
+	if size < 1024 then
+		return size
+	end
+	if size < 1024 * 1024 then
+		return tostring(size/1024) .. "K"
+	end
+	return tostring(size/(1024*1024)) .. "M"
+end
+
+local function convert_stat(info)
+	local now = skynet.now()
+	local function time(t)
+		if t == nil then
+			return
+		end
+		t = now - t
+		if t < 6000 then
+			return tostring(t/100) .. "s"
+		end
+		local hour = t // (100*60*60)
+		t = t - hour * 100 * 60 * 60
+		local min = t // (100*60)
+		t = t - min * 100 * 60
+		local sec = t / 100
+		return string.format("%s%d:%.2gs",hour == 0 and "" or (hour .. ":"),min,sec)
+	end
+
+	info.address = skynet.address(info.address)
+	info.read = bytes(info.read)
+	info.write = bytes(info.write)
+	info.wbuffer = bytes(info.wbuffer)
+	info.rtime = time(info.rtime)
+	info.wtime = time(info.wtime)
+end
+
+function COMMAND.netstat()
+	local stat = socket.netstat()
+	for _, info in ipairs(stat) do
+		convert_stat(info)
+	end
+	return stat
 end

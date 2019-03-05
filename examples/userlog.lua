@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 require "skynet.manager"
 
+-- register protocol text before skynet.start would be better.
 skynet.register_protocol {
 	name = "text",
 	id = skynet.PTYPE_TEXT,
@@ -21,5 +22,4 @@ skynet.register_protocol {
 }
 
 skynet.start(function()
-	skynet.register ".logger"
 end)
