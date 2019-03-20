@@ -8,6 +8,7 @@ local channel
 local session = 1
 
 local command = {}
+local waiting = {}
 
 local function send_request(addr, msg, sz)
 	-- msg is a local pointer, cluster.packrequest will free it
@@ -30,7 +31,16 @@ local function send_request(addr, msg, sz)
 	return channel:request(request, current_session, padding)
 end
 
+local function wait()
+	local co = coroutine.running()
+	table.insert(waiting, co)
+	skynet.wait(co)
+end
+
 function command.req(...)
+	if channel == nil then
+		wait()
+	end
 	local ok, msg = pcall(send_request, ...)
 	if ok then
 		if type(msg) == "table" then
@@ -45,6 +55,9 @@ function command.req(...)
 end
 
 function command.push(addr, msg, sz)
+	if channel == nil then
+		wait()
+	end
 	local request, new_session, padding = cluster.packpush(addr, session, msg, sz)
 	if padding then	-- is multi push
 		session = new_session
@@ -68,10 +81,18 @@ function command.changenode(host, port)
 			nodelay = true,
 		}
 	succ, err = pcall(c.connect, c, true)
+	if channel then
+		channel:close()
+	end
 	if succ then
 		channel = c
+		for k, co in ipairs(waiting) do
+			waiting[k] = nil
+			skynet.wakeup(co)
+		end
 		skynet.ret(skynet.pack(nil))
 	else
+		channel = nil	-- reset channel
 		skynet.response()(false)
 	end
 end
