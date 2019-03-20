@@ -36,7 +36,7 @@ write_pid(const char *pidfile) {
 		fprintf(stderr, "Can't create %s.\n", pidfile);
 		return 0;
 	}
-	f = fdopen(fd, "r+");
+	f = fdopen(fd, "w+");
 	if (f == NULL) {
 		fprintf(stderr, "Can't open %s.\n", pidfile);
 		return 0;
