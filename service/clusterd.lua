@@ -235,7 +235,7 @@ function command.socket(source, subcmd, fd, msg)
 			local agent = cluster_agent[fd]
 			if type(agent) == "boolean" then
 				cluster_agent[fd] = true
-			else
+			elseif agent then
 				skynet.send(agent, "lua", "exit")
 				cluster_agent[fd] = nil
 			end
