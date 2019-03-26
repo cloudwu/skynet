@@ -248,7 +248,7 @@ _ltls_context_write(lua_State* L) {
 
     int all_read = _bio_read(L, tls_p);
     if(all_read <= 0) {
-        luaL_error(L, "bio_read error when _ltls_context_write");
+        lua_pushstring(L, "");
     }
     return 1;
 }
