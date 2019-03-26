@@ -30,7 +30,7 @@ local function main()
 	dns.server()
 	http_test("http")
 
-	if not pcall(require,"ltls") then
+	if not pcall(require,"ltls.c") then
 		print "No ltls module, https is not supported"
 	else
 		http_test("https")
