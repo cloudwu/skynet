@@ -397,7 +397,8 @@ internshrstr (lua_State *L, const char *str, size_t l) {
 
 LUA_API void
 luaS_expandshr(int n) {
-  ATOM_ADD(&SSM.n, n);
+  if (SSM.n < n)
+    ATOM_ADD(&SSM.n, n);
 }
 
 LUAI_FUNC TString *

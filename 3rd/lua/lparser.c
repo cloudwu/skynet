@@ -550,6 +550,14 @@ static void open_func (LexState *ls, FuncState *fs, BlockCnt *bl) {
   enterblock(fs, bl, 0);
 }
 
+static lu_byte check_shortstring(const TValue *k, int sizek) {
+  int i;
+  for (i=0;i<sizek;i++) {
+    if (ttisshrstring(&k[i]))
+      return 0;
+  }
+  return 1;
+}
 
 static void close_func (LexState *ls) {
   lua_State *L = ls->L;
@@ -563,6 +571,8 @@ static void close_func (LexState *ls) {
   luaM_reallocvector(L, sp->lineinfo, sp->sizelineinfo, fs->pc, int);
   sp->sizelineinfo = fs->pc;
   luaM_reallocvector(L, f->k, sp->sizek, fs->nk, TValue);
+  sp->sharedk = check_shortstring(f->k, fs->nk);
+  sp->k = f->k;
   sp->sizek = fs->nk;
   luaM_reallocvector(L, f->p, sp->sizep, fs->np, Proto *);
   sp->sizep = fs->np;

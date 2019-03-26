@@ -1017,16 +1017,32 @@ static void cloneproto (lua_State *L, Proto *f, const Proto *src) {
   /* copy constants and nested proto */
   int i,n;
   n = src->sp->sizek;
-  f->k=luaM_newvector(L,n,TValue);
-  for (i=0; i<n; i++) setnilvalue(&f->k[i]);
-  for (i=0; i<n; i++) {
-    const TValue *s=&src->k[i];
-    TValue *o=&f->k[i];
-    if (ttisstring(s)) {
-      TString * str = luaS_clonestring(L,tsvalue(s));
-      setsvalue2n(L,o,str);
-    } else {
-      setobj(L,o,s);
+  if (src->sp->sharedk)
+    f->k = src->sp->k;
+  else {
+    lu_byte sharedk = 1;
+    f->k=luaM_newvector(L,n,TValue);
+    for (i=0; i<n; i++) setnilvalue(&f->k[i]);
+    for (i=0; i<n; i++) {
+      const TValue *s=&src->k[i];
+      TValue *o=&f->k[i];
+      if (ttisstring(s)) {
+        TString * sstr = tsvalue(s);
+        if (ttisshrstring(s)) {
+          TString * str = luaS_clonestring(L,sstr);
+          setsvalue2n(L,o,str);
+          if (str != sstr)
+            sharedk = 0;
+        } else {
+          setsvalue2n(L,o,sstr);
+        }
+      } else {
+        setobj(L,o,s);
+      }
+    }
+    if (sharedk) {
+      luaM_freearray(L, f->k, n);
+      f->k = src->sp->k;
     }
   }
   n = src->sp->sizep;

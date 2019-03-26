@@ -497,7 +497,7 @@ static int traverseproto (global_State *g, Proto *f) {
     f->cache = NULL;  /* allow cache to be collected */
   if (f->sp == NULL)
     return sizeof(Proto);
-  nk = (f->k == NULL) ? 0 : f->sp->sizek;
+  nk = (f->k == f->sp->k && g != f->sp->l_G) ? 0 : f->sp->sizek;
   np = (f->p == NULL) ? 0 : f->sp->sizep;
   for (i = 0; i < nk; i++)  /* mark literals */
     markvalue(g, &f->k[i]);
