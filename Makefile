@@ -47,7 +47,7 @@ update3rd :
 CSERVICE = snlua logger gate harbor
 LUA_CLIB = skynet \
   client \
-  bson md5 sproto lpeg
+  bson md5 sproto lpeg ltls
 
 LUA_CLIB_SKYNET = \
   lua-skynet.c lua-seri.c \
@@ -105,6 +105,9 @@ $(LUA_CLIB_PATH)/client.so : lualib-src/lua-clientsocket.c lualib-src/lua-crypt.
 
 $(LUA_CLIB_PATH)/sproto.so : lualib-src/sproto/sproto.c lualib-src/sproto/lsproto.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -Ilualib-src/sproto $^ -o $@ 
+
+$(LUA_CLIB_PATH)/ltls.so : lualib-src/ltls.c | $(LUA_CLIB_PATH)
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src -L/usr/local/opt/openssl/lib -I/usr/local/opt/openssl/include $^ -o $@ -lssl
 
 $(LUA_CLIB_PATH)/lpeg.so : 3rd/lpeg/lpcap.c 3rd/lpeg/lpcode.c 3rd/lpeg/lpprint.c 3rd/lpeg/lptree.c 3rd/lpeg/lpvm.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -I3rd/lpeg $^ -o $@ 
