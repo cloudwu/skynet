@@ -29,8 +29,12 @@ end
 local function main()
 	dns.server()
 	http_test("http")
-	print("---------")
-	http_test("https")
+
+	if not pcall(require,"ltls") then
+		print "No ltls module, https is not supported"
+	else
+		http_test("https")
+	end
 end
 
 skynet.start(function()

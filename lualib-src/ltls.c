@@ -394,7 +394,6 @@ void __attribute__((constructor)) ltls_init(void) {
 
 void __attribute__((destructor)) ltls_destory(void) {
     if(TLS_IS_INIT) {
-        ERR_remove_state(0);
         ENGINE_cleanup();
         CONF_modules_unload(1);
         ERR_free_strings();
