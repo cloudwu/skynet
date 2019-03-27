@@ -15,7 +15,7 @@ static struct socket_server * SOCKET_SERVER = NULL;
 
 void 
 skynet_socket_init() {
-	SOCKET_SERVER = socket_server_create();
+	SOCKET_SERVER = socket_server_create(skynet_now());
 }
 
 void
@@ -27,6 +27,11 @@ void
 skynet_socket_free() {
 	socket_server_release(SOCKET_SERVER);
 	SOCKET_SERVER = NULL;
+}
+
+void
+skynet_socket_updatetime() {
+	socket_server_updatetime(SOCKET_SERVER, skynet_now());
 }
 
 // mainloop thread
@@ -189,4 +194,9 @@ skynet_socket_udp_address(struct skynet_socket_message *msg, int *addrsz) {
 	sm.ud = msg->ud;
 	sm.data = msg->buffer;
 	return (const char *)socket_server_udp_address(SOCKET_SERVER, &sm, addrsz);
+}
+
+struct socket_info *
+skynet_socket_info() {
+	return socket_server_info(SOCKET_SERVER);
 }

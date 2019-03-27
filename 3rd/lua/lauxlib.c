@@ -1,5 +1,5 @@
 /*
-** $Id: lauxlib.c,v 1.289 2016/12/20 18:37:00 roberto Exp $
+** $Id: lauxlib.c,v 1.289.1.1 2017/04/19 17:20:42 roberto Exp $
 ** Auxiliary functions for building Lua libraries
 ** See Copyright Notice in lua.h
 */
@@ -1152,6 +1152,8 @@ static int cache_mode(lua_State *L) {
 	return 0;
 }
 
+LUA_API void luaS_expandshr(int n);
+
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
   int level = cache_level(L);
@@ -1171,6 +1173,7 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
     lua_pushliteral(L, "New state failed");
     return LUA_ERRMEM;
   }
+  luaS_expandshr(4096);
   int err = luaL_loadfilex_(eL, filename, mode);
   if (err != LUA_OK) {
     size_t sz = 0;

@@ -1,5 +1,5 @@
 /*
-** $Id: lfunc.c,v 2.45 2014/11/02 19:19:04 roberto Exp $
+** $Id: lfunc.c,v 2.45.1.1 2017/04/19 17:39:34 roberto Exp $
 ** Auxiliary functions to manipulate prototypes and closures
 ** See Copyright Notice in lua.h
 */
@@ -122,26 +122,33 @@ Proto *luaF_newproto (lua_State *L, SharedProto *sp) {
     sp->linedefined = 0;
     sp->lastlinedefined = 0;
     sp->source = NULL;
+    sp->k = NULL;
+    sp->sharedk = 0;
   }
   f->sp = sp;
   return f;
 }
 
 
-static void freesharedproto (lua_State *L, SharedProto *f) {
-  if (f == NULL || G(L) != f->l_G)
+static void freesharedproto (lua_State *L, Proto *pf) {
+  SharedProto *f = pf->sp;
+  if (f == NULL)
     return;
-  luaM_freearray(L, f->code, f->sizecode);
-  luaM_freearray(L, f->lineinfo, f->sizelineinfo);
-  luaM_freearray(L, f->locvars, f->sizelocvars);
-  luaM_freearray(L, f->upvalues, f->sizeupvalues);
-  luaM_free(L, f);
+  if (G(L) == f->l_G) {
+    luaM_freearray(L, f->code, f->sizecode);
+    luaM_freearray(L, f->lineinfo, f->sizelineinfo);
+    luaM_freearray(L, f->locvars, f->sizelocvars);
+    luaM_freearray(L, f->upvalues, f->sizeupvalues);
+    luaM_freearray(L, f->k, f->sizek);
+    luaM_free(L, f);
+  } else if (pf->k != f->k) {
+    luaM_freearray(L, pf->k, f->sizek);
+  }
 }
 
 void luaF_freeproto (lua_State *L, Proto *f) {
   luaM_freearray(L, f->p, f->sp->sizep);
-  luaM_freearray(L, f->k, f->sp->sizek);
-  freesharedproto(L, f->sp);
+  freesharedproto(L, f);
   luaM_free(L, f);
 }
 

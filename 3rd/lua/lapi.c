@@ -1,5 +1,5 @@
 /*
-** $Id: lapi.c,v 2.259 2016/02/29 14:27:14 roberto Exp $
+** $Id: lapi.c,v 2.259.1.2 2017/12/06 18:35:12 roberto Exp $
 ** Lua API
 ** See Copyright Notice in lua.h
 */
@@ -534,6 +534,7 @@ LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
   lua_lock(L);
   if (n == 0) {
     setfvalue(L->top, fn);
+    api_incr_top(L);
   }
   else {
     CClosure *cl;
@@ -547,9 +548,9 @@ LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
       /* does not need barrier because closure is white */
     }
     setclCvalue(L, L->top, cl);
+    api_incr_top(L);
+    luaC_checkGC(L);
   }
-  api_incr_top(L);
-  luaC_checkGC(L);
   lua_unlock(L);
 }
 
@@ -1016,16 +1017,32 @@ static void cloneproto (lua_State *L, Proto *f, const Proto *src) {
   /* copy constants and nested proto */
   int i,n;
   n = src->sp->sizek;
-  f->k=luaM_newvector(L,n,TValue);
-  for (i=0; i<n; i++) setnilvalue(&f->k[i]);
-  for (i=0; i<n; i++) {
-    const TValue *s=&src->k[i];
-    TValue *o=&f->k[i];
-    if (ttisstring(s)) {
-      TString * str = luaS_clonestring(L,tsvalue(s));
-      setsvalue2n(L,o,str);
-    } else {
-      setobj(L,o,s);
+  if (src->sp->sharedk)
+    f->k = src->sp->k;
+  else {
+    lu_byte sharedk = 1;
+    f->k=luaM_newvector(L,n,TValue);
+    for (i=0; i<n; i++) setnilvalue(&f->k[i]);
+    for (i=0; i<n; i++) {
+      const TValue *s=&src->k[i];
+      TValue *o=&f->k[i];
+      if (ttisstring(s)) {
+        TString * sstr = tsvalue(s);
+        if (ttisshrstring(s)) {
+          TString * str = luaS_clonestring(L,sstr);
+          setsvalue2n(L,o,str);
+          if (str != sstr)
+            sharedk = 0;
+        } else {
+          setsvalue2n(L,o,sstr);
+        }
+      } else {
+        setobj(L,o,s);
+      }
+    }
+    if (sharedk) {
+      luaM_freearray(L, f->k, n);
+      f->k = src->sp->k;
     }
   }
   n = src->sp->sizep;

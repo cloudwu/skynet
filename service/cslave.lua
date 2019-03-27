@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local socket = require "skynet.socket"
+local socketdriver = require "skynet.socketdriver"
 require "skynet.manager"	-- import skynet.launch, ...
 local table = table
 
@@ -41,6 +42,7 @@ local function connect_slave(slave_id, address)
 	local ok, err = pcall(function()
 		if slaves[slave_id] == nil then
 			local fd = assert(socket.open(address), "Can't connect to "..address)
+			socketdriver.nodelay(fd)
 			skynet.error(string.format("Connect to harbor %d (fd=%d), %s", slave_id, fd, address))
 			slaves[slave_id] = fd
 			monitor_clear(slave_id)
@@ -249,6 +251,7 @@ skynet.start(function()
 		local co = coroutine.running()
 		socket.start(slave_fd, function(fd, addr)
 			skynet.error(string.format("New connection (fd = %d, %s)",fd, addr))
+			socketdriver.nodelay(fd)
 			if pcall(accept_slave,fd) then
 				local s = 0
 				for k,v in pairs(slaves) do
@@ -260,8 +263,11 @@ skynet.start(function()
 			end
 		end)
 		skynet.wait()
+		socket.close(slave_fd)
+	else
+		-- slave_fd does not start, so use close_fd.
+		socket.close_fd(slave_fd)
 	end
-	socket.close(slave_fd)
 	skynet.error("Shakehand ready")
 	skynet.fork(ready)
 end)

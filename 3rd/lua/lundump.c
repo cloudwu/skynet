@@ -1,5 +1,5 @@
 /*
-** $Id: lundump.c,v 2.44 2015/11/02 16:09:30 roberto Exp $
+** $Id: lundump.c,v 2.44.1.1 2017/04/19 17:20:42 roberto Exp $
 ** load precompiled Lua chunks
 ** See Copyright Notice in lua.h
 */
@@ -119,7 +119,9 @@ static void LoadConstants (LoadState *S, Proto *f) {
   int i;
   int n = LoadInt(S);
   f->k = luaM_newvector(S->L, n, TValue);
+  f->sp->k = f->k;
   f->sp->sizek = n;
+  f->sp->sharedk = 1;
   for (i = 0; i < n; i++)
     setnilvalue(&f->k[i]);
   for (i = 0; i < n; i++) {
@@ -139,6 +141,8 @@ static void LoadConstants (LoadState *S, Proto *f) {
       setivalue(o, LoadInteger(S));
       break;
     case LUA_TSHRSTR:
+      f->sp->sharedk = 0;
+      //fall-through
     case LUA_TLNGSTR:
       setsvalue2n(S->L, o, LoadString(S));
       break;

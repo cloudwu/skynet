@@ -2,6 +2,7 @@
 #define skynet_socket_server_h
 
 #include <stdint.h>
+#include "socket_info.h"
 
 #define SOCKET_DATA 0
 #define SOCKET_CLOSE 1
@@ -21,8 +22,9 @@ struct socket_message {
 	char * data;
 };
 
-struct socket_server * socket_server_create();
+struct socket_server * socket_server_create(uint64_t time);
 void socket_server_release(struct socket_server *);
+void socket_server_updatetime(struct socket_server *, uint64_t time);
 int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);
 
 void socket_server_exit(struct socket_server *);
@@ -63,5 +65,7 @@ struct socket_object_interface {
 
 // if you send package sz == -1, use soi.
 void socket_server_userobject(struct socket_server *, struct socket_object_interface *soi);
+
+struct socket_info * socket_server_info(struct socket_server *);
 
 #endif

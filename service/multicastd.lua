@@ -97,7 +97,10 @@ skynet.register_protocol {
 	unpack = function(msg, sz)
 		return mc.packremote(msg, sz)
 	end,
-	dispatch = publish,
+	dispatch = function (...)
+		skynet.ignoreret()
+		publish(...)
+	end,
 }
 
 -- publish a message, if the caller is remote, forward the message to the owner node (by remote_publish)

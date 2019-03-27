@@ -143,6 +143,7 @@ function redis.connect(db_conf)
 		port = db_conf.port or 6379,
 		auth = redis_login(db_conf.auth, db_conf.db),
 		nodelay = true,
+		overload = db_conf.overload,
 	}
 	-- try connect first only once
 	channel:connect(true)
