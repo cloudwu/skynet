@@ -8,7 +8,6 @@ local resolve_list = {
 }
 
 skynet.start(function()
-	print("nameserver:", dns.server())	-- set nameserver
 	-- you can specify the server like dns.server("8.8.4.4", 53)
 	for _ , name in ipairs(resolve_list) do
 		local ip, ips = dns.resolve(name)
