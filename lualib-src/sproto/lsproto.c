@@ -219,7 +219,7 @@ encode(const struct sproto_arg *args) {
 		} else {
 			v = lua_tointegerx(L, -1, &isnum);
 			if(!isnum) {
-				return luaL_error(L, ".%s[%d] is not an integer (Is a %s)", 
+				return luaL_error(L, ".%s[%d] is not an integer (Is a %s)",
 					args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
 			}
 		}
@@ -249,7 +249,7 @@ encode(const struct sproto_arg *args) {
 		size_t sz = 0;
 		const char * str;
 		if (!lua_isstring(L, -1)) {
-			return luaL_error(L, ".%s[%d] is not a string (Is a %s)", 
+			return luaL_error(L, ".%s[%d] is not a string (Is a %s)",
 				args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
 		} else {
 			str = lua_tolstring(L, -1, &sz);
@@ -275,7 +275,7 @@ encode(const struct sproto_arg *args) {
 		sub.iter_key = 0;
 		r = sproto_encode(args->subtype, args->value, args->length, encode, &sub);
 		lua_settop(L, top-1);	// pop the value
-		if (r < 0) 
+		if (r < 0)
 			return SPROTO_CB_ERROR;
 		return r;
 	}
@@ -528,29 +528,56 @@ ldumpproto(lua_State *L) {
 }
 
 
+static void *
+pack(lua_State *L, int *bytes) {
+	size_t sz=0;
+	const void * buffer = getbuffer(L, 1, &sz);
+	// the worst-case space overhead of packing is 2 bytes per 2 KiB of input (256 words = 2KiB).
+	size_t maxsz = (sz + 2047) / 2048 * 2 + sz + 2;
+	void * output = lua_touserdata(L, lua_upvalueindex(1));
+	int osz = lua_tointeger(L, lua_upvalueindex(2));
+	if (osz < maxsz) {
+		output = expand_buffer(L, osz, maxsz);
+	}
+	*bytes = sproto_pack(buffer, sz, output, maxsz);
+	if (*bytes > maxsz) {
+		return NULL;
+	}
+	return output;
+}
+
 /*
 	string source	/  (lightuserdata , integer)
 	return string
  */
 static int
 lpack(lua_State *L) {
-	size_t sz=0;
-	const void * buffer = getbuffer(L, 1, &sz);
-	// the worst-case space overhead of packing is 2 bytes per 2 KiB of input (256 words = 2KiB).
-	size_t maxsz = (sz + 2047) / 2048 * 2 + sz + 2;
-	void * output = lua_touserdata(L, lua_upvalueindex(1));
 	int bytes;
-	int osz = lua_tointeger(L, lua_upvalueindex(2));
-	if (osz < maxsz) {
-		output = expand_buffer(L, osz, maxsz);
-	}
-	bytes = sproto_pack(buffer, sz, output, maxsz);
-	if (bytes > maxsz) {
+	void *output = pack(L, &bytes);
+
+	if (output == NULL) {
 		return luaL_error(L, "packing error, return size = %d", bytes);
 	}
 	lua_pushlstring(L, output, bytes);
-
 	return 1;
+}
+
+/*
+	string source	/  (lightuserdata , integer)
+	return (lightuserdata , integer)
+ */
+static int
+lpack_buffer(lua_State *L) {
+	int bytes;
+	void *output = pack(L, &bytes);
+
+	if (output == NULL) {
+		return luaL_error(L, "packing error, return size = %d", bytes);
+	}
+
+	lua_pushlightuserdata(L, output);
+	lua_pushinteger(L, bytes);
+	return 2;
 }
 
 static int
@@ -761,6 +788,7 @@ luaopen_sproto_core(lua_State *L) {
 	luaL_newlib(L,l);
 	pushfunction_withbuffer(L, "encode", lencode);
 	pushfunction_withbuffer(L, "pack", lpack);
+	pushfunction_withbuffer(L, "pack_buffer", lpack_buffer);
 	pushfunction_withbuffer(L, "unpack", lunpack);
 	return 1;
 }
