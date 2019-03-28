@@ -119,23 +119,31 @@ local function parse_hosts()
 
 	local rts = {}
 	for line in f:lines() do
-		local ip, hosts = string.match(line, "^%s*([%[%]%x%.%:]+)%s+([^#;]*)")
-		local family = guess_name_type(ip)
-		if hosts and family ~= "hostname" then
-			for host in hosts:gmatch("%S+") do
-				host = host:lower()
-				local rt = rts[host]
-				if not rt then
-					rt = {}
-					rts[host] = rt
-				end
-
-				if not rt[family] then
-					rt[family] = {}
-				end
-				table.insert(rt[family], ip)
-			end
+		local ip, hosts = string.match(line, "^%s*([%[%]%x%.%:]+)%s+([^#;]+)")
+		if not ip or not hosts then
+			goto continue
 		end
+
+		local family = guess_name_type(ip)
+		if family == "hostname" then
+			goto continue
+		end
+
+		for host in hosts:gmatch("%S+") do
+			host = host:lower()
+			local rt = rts[host]
+			if not rt then
+				rt = {}
+				rts[host] = rt
+			end
+
+			if not rt[family] then
+				rt[family] = {}
+			end
+			table.insert(rt[family], ip)
+		end
+		
+		::continue::
 	end
 	return rts
 end
