@@ -2,15 +2,24 @@ local skynet = require "skynet"
 
 local clusterd
 local cluster = {}
+local sender = {}
+
+local function get_sender(t, node)
+	local c = skynet.call(clusterd, "lua", "sender", node)
+	t[node] = c
+	return c
+end
+
+setmetatable(sender, { __index = get_sender } )
 
 function cluster.call(node, address, ...)
 	-- skynet.pack(...) will free by cluster.core.packrequest
-	return skynet.call(clusterd, "lua", "req", node, address, skynet.pack(...))
+	return skynet.call(sender[node], "lua", "req",  address, skynet.pack(...))
 end
 
 function cluster.send(node, address, ...)
 	-- push is the same with req, but no response
-	skynet.send(clusterd, "lua", "push", node, address, skynet.pack(...))
+	skynet.send(sender[node], "lua", "push", address, skynet.pack(...))
 end
 
 function cluster.open(port)
@@ -45,7 +54,7 @@ function cluster.register(name, addr)
 end
 
 function cluster.query(node, name)
-	return skynet.call(clusterd, "lua", "req", node, 0, skynet.pack(name))
+	return skynet.call(sender[node], "lua", "req", 0, skynet.pack(name))
 end
 
 skynet.init(function()

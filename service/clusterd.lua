@@ -1,4 +1,5 @@
 local skynet = require "skynet"
+require "skynet.manager"
 local sc = require "skynet.socketchannel"
 local socket = require "skynet.socket"
 local cluster = require "skynet.cluster.core"
@@ -6,6 +7,7 @@ local cluster = require "skynet.cluster.core"
 local config_name = skynet.getenv "cluster"
 local node_address = {}
 local node_session = {}
+local node_sender = {}
 local command = {}
 local config = {}
 local nodename = cluster.nodename()
@@ -40,13 +42,20 @@ local function open_channel(t, key)
 	local succ, err, c
 	if address then
 		local host, port = string.match(address, "([^:]+):(.*)$")
-		c = sc.channel {
-			host = host,
-			port = tonumber(port),
-			response = read_response,
-			nodelay = true,
-		}
-		succ, err = pcall(c.connect, c, true)
+		c = node_sender[key]
+		if c == nil then
+			c = skynet.newservice "clustersender"
+			if node_sender[key] then
+				-- double check
+				skynet.kill(c)
+				c = node_sender[key]
+			else
+				node_sender[key] = c
+			end
+		end
+
+		succ = pcall(skynet.call, c, "lua", "changenode", host, port)
+
 		if succ then
 			t[key] = c
 			ct.channel = c
@@ -120,56 +129,8 @@ function command.listen(source, addr, port)
 	skynet.ret(skynet.pack(nil))
 end
 
-local function send_request(source, node, addr, msg, sz)
-	local session = node_session[node] or 1
-	-- msg is a local pointer, cluster.packrequest will free it
-	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
-	node_session[node] = new_session
-
-	-- node_channel[node] may yield or throw error
-	local c = node_channel[node]
-
-	local tracetag = skynet.tracetag()
-	if tracetag then
-		if tracetag:sub(1,1) ~= "(" then
-			-- add nodename
-			local newtag = string.format("(%s-%s-%d)%s", nodename, node, session, tracetag)
-			skynet.tracelog(tracetag, string.format("session %s", newtag))
-			tracetag = newtag
-		end
-		skynet.tracelog(tracetag, string.format("cluster %s", node))
-		c:request(cluster.packtrace(tracetag))
-	end
-	return c:request(request, session, padding)
-end
-
-function command.req(...)
-	local ok, msg = pcall(send_request, ...)
-	if ok then
-		if type(msg) == "table" then
-			skynet.ret(cluster.concat(msg))
-		else
-			skynet.ret(msg)
-		end
-	else
-		skynet.error(msg)
-		skynet.response()(false)
-	end
-end
-
-function command.push(source, node, addr, msg, sz)
-	local session = node_session[node] or 1
-	local request, new_session, padding = cluster.packpush(addr, session, msg, sz)
-	if padding then	-- is multi push
-		node_session[node] = new_session
-	end
-
-	-- node_channel[node] may yield or throw error
-	local c = node_channel[node]
-
-	c:request(request, nil, padding)
-
-	-- notice: push may fail where the channel is disconnected or broken.
+function command.sender(source, node)
+	skynet.ret(skynet.pack(node_channel[node]))
 end
 
 local proxy = {}
@@ -235,7 +196,7 @@ function command.socket(source, subcmd, fd, msg)
 			local agent = cluster_agent[fd]
 			if type(agent) == "boolean" then
 				cluster_agent[fd] = true
-			else
+			elseif agent then
 				skynet.send(agent, "lua", "exit")
 				cluster_agent[fd] = nil
 			end

@@ -1152,6 +1152,8 @@ static int cache_mode(lua_State *L) {
 	return 0;
 }
 
+LUA_API void luaS_expandshr(int n);
+
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
   int level = cache_level(L);
@@ -1171,6 +1173,7 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
     lua_pushliteral(L, "New state failed");
     return LUA_ERRMEM;
   }
+  luaS_expandshr(4096);
   int err = luaL_loadfilex_(eL, filename, mode);
   if (err != LUA_OK) {
     size_t sz = 0;
