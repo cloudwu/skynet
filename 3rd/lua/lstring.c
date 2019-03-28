@@ -11,7 +11,7 @@
 
 
 #include <string.h>
-
+#include <time.h>
 #include "lua.h"
 
 #include "ldebug.h"
@@ -143,9 +143,19 @@ static TString *createstrobj (lua_State *L, size_t l, int tag, unsigned int h) {
   return ts;
 }
 
+static unsigned int LNGSTR_SEED;
+static unsigned int make_lstr_seed() {
+  size_t buff[4];
+  unsigned int h = time(NULL);
+  buff[0] = cast(size_t, h);
+  buff[1] = cast(size_t, &LNGSTR_SEED);
+  buff[2] = cast(size_t, &make_lstr_seed);
+  buff[3] = cast(size_t, &luaS_createlngstrobj);
+  return luaS_hash((const char*)buff, sizeof(buff), h);
+}
 
 TString *luaS_createlngstrobj (lua_State *L, size_t l) {
-  TString *ts = createstrobj(L, l, LUA_TLNGSTR, G(L)->seed);
+  TString *ts = createstrobj(L, l, LUA_TLNGSTR, LNGSTR_SEED);
   ts->u.lnglen = l;
   return ts;
 }
@@ -284,6 +294,7 @@ luaS_initshr() {
 	for (i=0;i<SHRSTR_SLOT;i++) {
 		rwlock_init(&s->h[i].lock);
 	}
+  LNGSTR_SEED = make_lstr_seed();
 }
 
 LUA_API void
