@@ -1175,6 +1175,7 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   }
   luaS_expandshr(4096);
   int err = luaL_loadfilex_(eL, filename, mode);
+  luaS_expandshr(-4096);
   if (err != LUA_OK) {
     size_t sz = 0;
     const char * msg = lua_tolstring(eL, -1, &sz);

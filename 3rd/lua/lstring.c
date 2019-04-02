@@ -544,8 +544,13 @@ internshrstr (lua_State *L, const char *str, size_t l) {
 LUA_API void
 luaS_expandshr(int n) {
 	struct shrmap * s = &SSM;
-	if (s->n < n) {
-		ATOM_ADD(&s->n, n);
+	if (n < 0) {
+		if (-n > s->n) {
+			n = -s->n;
+		}
+	}
+	ATOM_ADD(&s->n, n);
+	if (n > 0) {
 		int t = (s->total + s->n) * 5 / 4;
 		if (t > s->mask) {
 			shrstr_expandpage(t);
