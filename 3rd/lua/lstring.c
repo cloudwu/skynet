@@ -281,10 +281,10 @@ struct shrmap_slot {
 
 struct shrmap {
 	struct rwlock lock;
-	unsigned int n;
-	unsigned int mask;
-	unsigned int total;
-	unsigned int roslots;
+	int n;
+	int mask;
+	int total;
+	int roslots;
 	struct shrmap_slot * readwrite;
 	struct shrmap_slot * readonly;
 };
@@ -292,8 +292,8 @@ struct shrmap {
 static struct shrmap SSM;
 
 static struct shrmap_slot *
-shrstr_newpage(unsigned int sz) {
-	unsigned int i;
+shrstr_newpage(int sz) {
+	int i;
 	struct shrmap_slot * s = (struct shrmap_slot *)malloc(sz * sizeof(*s));
 	for (i=0;i<sz;i++) {
 		rwlock_init(&s[i].lock);
@@ -303,9 +303,9 @@ shrstr_newpage(unsigned int sz) {
 }
 
 static void
-shrstr_deletepage(struct shrmap_slot *s, unsigned int sz) {
+shrstr_deletepage(struct shrmap_slot *s, int sz) {
 	if (s) {
-		unsigned int i;
+		int i;
 		for (i=0;i<sz;i++) {
 			TString *str = s[i].str;
 			while (str) {
@@ -319,7 +319,7 @@ shrstr_deletepage(struct shrmap_slot *s, unsigned int sz) {
 }
 
 static int
-shrstr_allocpage(struct shrmap * s, unsigned int osz, unsigned int sz, struct shrmap_slot * newpage) {
+shrstr_allocpage(struct shrmap * s, int osz, int sz, struct shrmap_slot * newpage) {
 	if (s->readonly != NULL)
 		return 0;
 	if ((s->mask + 1) != osz)
@@ -333,13 +333,13 @@ shrstr_allocpage(struct shrmap * s, unsigned int osz, unsigned int sz, struct sh
 }
 
 static void
-shrstr_rehash(struct shrmap *s, unsigned int slotid) {
+shrstr_rehash(struct shrmap *s, int slotid) {
 	struct shrmap_slot *slot = &s->readonly[slotid];
 	rwlock_wlock(&slot->lock);
 		TString *str = slot->str;
 		while (str) {
 			TString * next = str->u.hnext;
-			unsigned int newslotid = str->hash & s->mask;
+			int newslotid = str->hash & s->mask;
 			struct shrmap_slot *newslot = &s->readwrite[newslotid];
 			rwlock_wlock(&newslot->lock);
 				str->u.hnext = newslot->str;
@@ -361,14 +361,14 @@ shrstr_rehash(struct shrmap *s, unsigned int slotid) {
 	6. remove temporary readonly (writelock SSM)
  */
 static void
-shrstr_expandpage(unsigned int cap) {
+shrstr_expandpage(int cap) {
 	struct shrmap * s = &SSM;
 	if (s->readonly)
 		return;
-	unsigned int osz = s->mask + 1;
-	unsigned int sz = osz * 2;
+	int osz = s->mask + 1;
+	int sz = osz * 2;
 	// overflow check
-	if (sz == 0)
+	if (sz <= 0)
 		return;
 	while (sz < cap)
 		sz = sz * 2;
@@ -380,7 +380,7 @@ shrstr_expandpage(unsigned int cap) {
 		shrstr_deletepage(newpage, sz);
 		return;
 	}
-	unsigned int i;
+	int i;
 	for (i=0;i<osz;i++) {
 		shrstr_rehash(s, i);
 	}
@@ -406,7 +406,7 @@ LUA_API void
 luaS_exitshr() {
 	struct shrmap * s = &SSM;
 	rwlock_wlock(&s->lock);
-	unsigned int sz = s->mask + 1;
+	int sz = s->mask + 1;
 	shrstr_deletepage(s->readwrite, sz);
 	shrstr_deletepage(s->readonly, s->roslots);
 	s->readwrite = NULL;
@@ -451,7 +451,7 @@ query_string(TString *t, unsigned int h, const char *str, lu_byte l) {
 			ts = find_string(t, slot, h, str, l);
 		rwlock_runlock(&slot->lock);
 		if (ts == NULL && s->readonly != NULL) {
-			unsigned int mask = s->roslots - 1;
+			int mask = s->roslots - 1;
 			slot = &s->readonly[h & mask];
 			rwlock_rlock(&slot->lock);
 				ts = find_string(t, slot, h, str, l);
@@ -542,11 +542,11 @@ internshrstr (lua_State *L, const char *str, size_t l) {
 }
 
 LUA_API void
-luaS_expandshr(unsigned int n) {
+luaS_expandshr(int n) {
 	struct shrmap * s = &SSM;
 	if (s->n < n) {
 		ATOM_ADD(&s->n, n);
-		unsigned int t = (s->total + s->n) * 5 / 4;
+		int t = (s->total + s->n) * 5 / 4;
 		if (t > s->mask) {
 			shrstr_expandpage(t);
 		}
@@ -622,10 +622,10 @@ luaS_shrinfo(lua_State *L) {
 	memset(&total, 0, sizeof(total));
 	struct shrmap * s = &SSM;
 	struct variance v = { 0,0,0 };
-	unsigned int slots = 0;
+	int slots = 0;
 	rwlock_rlock(&s->lock);
-		unsigned int i;
-		unsigned int sz = s->mask + 1;
+		int i;
+		int sz = s->mask + 1;
 		for (i=0;i<sz;i++) {
 			struct shrmap_slot *slot = &s->readwrite[i];
 			getslot(slot, &tmp);

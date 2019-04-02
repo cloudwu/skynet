@@ -49,7 +49,7 @@ LUAI_FUNC TString *luaS_createlngstrobj (lua_State *L, size_t l);
 
 LUA_API void luaS_initshr();
 LUA_API void luaS_exitshr();
-LUA_API void luaS_expandshr(unsigned int n);
+LUA_API void luaS_expandshr(int n);
 LUAI_FUNC TString *luaS_clonestring(lua_State *L, TString *);
 LUA_API int luaS_shrinfo(lua_State *L);
 
