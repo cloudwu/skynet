@@ -367,6 +367,9 @@ shrstr_expandpage(unsigned int cap) {
 		return;
 	unsigned int osz = s->mask + 1;
 	unsigned int sz = osz * 2;
+	// overflow check
+	if (sz == 0)
+		return;
 	while (sz < cap)
 		sz = sz * 2;
 	struct shrmap_slot * newpage = shrstr_newpage(sz);
@@ -655,11 +658,10 @@ luaS_shrinfo(lua_State *L) {
 	lua_pushinteger(L, total.len);	// longest
 	lua_pushinteger(L, SSM.n);	// space
 	lua_pushinteger(L, slots);	// slots
-	lua_pushnumber(L, v.mean);	// average
 	if (v.count > 1) {
 		lua_pushnumber(L, v.m2 / v.count);	// variance
 	} else {
 		lua_pushnumber(L, 0);	// variance
 	}
-	return 7;
+	return 6;
 }
