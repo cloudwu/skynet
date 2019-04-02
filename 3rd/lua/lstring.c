@@ -595,39 +595,71 @@ getslot(struct shrmap_slot *s, struct slotinfo *info) {
 	rwlock_runlock(&s->lock);
 }
 
+
+struct variance {
+	int count;
+	double mean;
+	double m2;
+};
+
+static void
+variance_update(struct variance *v, int newValue_) {
+	double newValue = (double)newValue_;
+	++v->count;
+	double delta = newValue - v->mean;
+	v->mean += delta / v->count;
+	double delta2 = newValue - v->mean;
+	v->m2 += delta * delta2;
+}
+
 LUA_API int
 luaS_shrinfo(lua_State *L) {
 	struct slotinfo total;
 	struct slotinfo tmp;
 	memset(&total, 0, sizeof(total));
 	struct shrmap * s = &SSM;
+	struct variance v = { 0,0,0 };
+	unsigned int slots = 0;
 	rwlock_rlock(&s->lock);
 		unsigned int i;
 		unsigned int sz = s->mask + 1;
 		for (i=0;i<sz;i++) {
 			struct shrmap_slot *slot = &s->readwrite[i];
 			getslot(slot, &tmp);
-			if (tmp.len > total.len) {
-				total.len = tmp.len;
+			if (tmp.len > 0) {
+				if (tmp.len > total.len) {
+					total.len = tmp.len;
+				}
+				total.size += tmp.size;
+				variance_update(&v, tmp.len);
+				++slots;
 			}
-			total.size += tmp.size;
 		}
 		if (s->readonly) {
 			sz = s->roslots;
 			for (i=0;i<sz;i++) {
 				struct shrmap_slot *slot = &s->readonly[i];
 				getslot(slot, &tmp);
-				if (tmp.len > total.len) {
-					total.len = tmp.len;
+				if (tmp.len > 0) {
+					if (tmp.len > total.len) {
+						total.len = tmp.len;
+					}
+					total.size += tmp.size;
+					variance_update(&v, tmp.len);
 				}
-				total.size += tmp.size;
 			}
 		}
 	rwlock_runlock(&s->lock);
-	lua_pushinteger(L, SSM.total);
-	lua_pushinteger(L, total.size);
-	lua_pushinteger(L, total.len);
-	lua_pushinteger(L, SSM.n);
-	lua_pushinteger(L, sz);
-	return 5;
+	lua_pushinteger(L, SSM.total);	// count
+	lua_pushinteger(L, total.size);	// total size
+	lua_pushinteger(L, total.len);	// longest
+	lua_pushinteger(L, SSM.n);	// space
+	lua_pushinteger(L, slots);	// slots
+	lua_pushnumber(L, v.mean);	// average
+	if (v.count > 1) {
+		lua_pushnumber(L, v.m2 / v.count);	// variance
+	} else {
+		lua_pushnumber(L, 0);	// variance
+	}
+	return 7;
 }
