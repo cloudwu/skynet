@@ -143,10 +143,18 @@ function command.proxy(source, node, name)
 		end
 	end
 	local fullname = node .. "." .. name
-	if proxy[fullname] == nil then
-		proxy[fullname] = skynet.newservice("clusterproxy", node, name)
+	local p = proxy[fullname]
+	if p == nil then
+		p = skynet.newservice("clusterproxy", node, name)
+		-- double check
+		if proxy[fullname] then
+			skynet.kill(p)
+			p = proxy[fullname]
+		else
+			proxy[fullname] = p
+		end
 	end
-	skynet.ret(skynet.pack(proxy[fullname]))
+	skynet.ret(skynet.pack(p))
 end
 
 local cluster_agent = {}	-- fd:service
