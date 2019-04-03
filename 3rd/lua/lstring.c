@@ -367,11 +367,12 @@ shrstr_expandpage(int cap) {
 		return;
 	int osz = s->mask + 1;
 	int sz = osz * 2;
-	// overflow check
-	if (sz <= 0)
-		return;
-	while (sz < cap)
+	while (sz < cap) {
+		// overflow check
+		if (sz <= 0)
+			return;
 		sz = sz * 2;
+	}
 	struct shrmap_slot * newpage = shrstr_newpage(sz);
 	rwlock_wlock(&s->lock);
 	int succ = shrstr_allocpage(s, osz, sz, newpage);
