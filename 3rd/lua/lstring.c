@@ -295,6 +295,8 @@ static struct shrmap_slot *
 shrstr_newpage(int sz) {
 	int i;
 	struct shrmap_slot * s = (struct shrmap_slot *)malloc(sz * sizeof(*s));
+	if (s == NULL)
+		return NULL;
 	for (i=0;i<sz;i++) {
 		rwlock_init(&s[i].lock);
 		s[i].str = NULL;
@@ -374,6 +376,8 @@ shrstr_expandpage(int cap) {
 		sz = sz * 2;
 	}
 	struct shrmap_slot * newpage = shrstr_newpage(sz);
+	if (newpage == NULL)
+		return;
 	rwlock_wlock(&s->lock);
 	int succ = shrstr_allocpage(s, osz, sz, newpage);
 	rwlock_wunlock(&s->lock);
