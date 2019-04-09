@@ -336,8 +336,8 @@ function COMMAND.cmem()
 end
 
 function COMMAND.shrtbl()
-	local n, total, longest, space = memory.ssinfo()
-	return { n = n, total = total, longest = longest, space = space }
+	local n, total, longest, space, slots, variance = memory.ssinfo()
+	return { n = n, total = total, longest = longest, space = space, slots = slots, average = n / slots, variace = variance }
 end
 
 function COMMAND.ping(address)
