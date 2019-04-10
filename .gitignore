@@ -15,3 +15,5 @@ obj/
 *.sln
 *.vcxproj
 *.vcxproj.user
+Debug/
+Release/
