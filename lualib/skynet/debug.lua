@@ -58,7 +58,6 @@ local function init(skynet, export)
 			local inject = require "skynet.inject"
 			local args = table.pack(...)
 			local ok, output = inject(skynet, source, filename, args, export.dispatch, skynet.register_protocol)
-			collectgarbage "collect"
 			skynet.ret(skynet.pack(ok, table.concat(output, "\n")))
 		end
 
