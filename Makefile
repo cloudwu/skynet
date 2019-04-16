@@ -69,6 +69,7 @@ LUA_CLIB_SKYNET = \
   lua-stm.c \
   lua-debugchannel.c \
   lua-datasheet.c \
+  lua-ssm.c \
   \
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
