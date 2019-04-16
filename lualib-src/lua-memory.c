@@ -4,7 +4,6 @@
 #include <lauxlib.h>
 
 #include "malloc_hook.h"
-#include "luashrtbl.h"
 
 static int
 ltotal(lua_State *L) {
@@ -37,13 +36,6 @@ ldump(lua_State *L) {
 }
 
 static int
-lexpandshrtbl(lua_State *L) {
-	int n = luaL_checkinteger(L, 1);
-	luaS_expandshr(n);
-	return 0;
-}
-
-static int
 lcurrent(lua_State *L) {
 	lua_pushinteger(L, malloc_current_memory());
 	return 1;
@@ -59,8 +51,6 @@ luaopen_skynet_memory(lua_State *L) {
 		{ "dumpinfo", ldumpinfo },
 		{ "dump", ldump },
 		{ "info", dump_mem_lua },
-		{ "ssinfo", luaS_shrinfo },
-		{ "ssexpand", lexpandshrtbl },
 		{ "current", lcurrent },
 		{ NULL, NULL },
 	};

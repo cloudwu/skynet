@@ -79,7 +79,7 @@ static l_noret error_expected (LexState *ls, int token) {
 static l_noret errorlimit (FuncState *fs, int limit, const char *what) {
   lua_State *L = fs->ls->L;
   const char *msg;
-  int line = fs->f->sp->linedefined;
+  int line = fs->f->linedefined;
   const char *where = (line == 0)
                       ? "main function"
                       : luaO_pushfstring(L, "function at line %d", line);
@@ -160,15 +160,14 @@ static void checkname (LexState *ls, expdesc *e) {
 
 static int registerlocalvar (LexState *ls, TString *varname) {
   FuncState *fs = ls->fs;
-  Proto *fp = fs->f;
-  SharedProto *f = fp->sp;
+  Proto *f = fs->f;
   int oldsize = f->sizelocvars;
   luaM_growvector(ls->L, f->locvars, fs->nlocvars, f->sizelocvars,
                   LocVar, SHRT_MAX, "local variables");
   while (oldsize < f->sizelocvars)
     f->locvars[oldsize++].varname = NULL;
   f->locvars[fs->nlocvars].varname = varname;
-  luaC_objbarrier(ls->L, fp, varname);
+  luaC_objbarrier(ls->L, f, varname);
   return fs->nlocvars++;
 }
 
@@ -196,7 +195,7 @@ static void new_localvarliteral_ (LexState *ls, const char *name, size_t sz) {
 static LocVar *getlocvar (FuncState *fs, int i) {
   int idx = fs->ls->dyd->actvar.arr[fs->firstlocal + i].idx;
   lua_assert(idx < fs->nlocvars);
-  return &fs->f->sp->locvars[idx];
+  return &fs->f->locvars[idx];
 }
 
 
@@ -218,7 +217,7 @@ static void removevars (FuncState *fs, int tolevel) {
 
 static int searchupvalue (FuncState *fs, TString *name) {
   int i;
-  Upvaldesc *up = fs->f->sp->upvalues;
+  Upvaldesc *up = fs->f->upvalues;
   for (i = 0; i < fs->nups; i++) {
     if (eqstr(up[i].name, name)) return i;
   }
@@ -227,8 +226,7 @@ static int searchupvalue (FuncState *fs, TString *name) {
 
 
 static int newupvalue (FuncState *fs, TString *name, expdesc *v) {
-  Proto *fp = fs->f;
-  SharedProto *f = fp->sp;
+  Proto *f = fs->f;
   int oldsize = f->sizeupvalues;
   checklimit(fs, fs->nups + 1, MAXUPVAL, "upvalues");
   luaM_growvector(fs->ls->L, f->upvalues, fs->nups, f->sizeupvalues,
@@ -238,7 +236,7 @@ static int newupvalue (FuncState *fs, TString *name, expdesc *v) {
   f->upvalues[fs->nups].instack = (v->k == VLOCAL);
   f->upvalues[fs->nups].idx = cast_byte(v->u.info);
   f->upvalues[fs->nups].name = name;
-  luaC_objbarrier(fs->ls->L, fp, name);
+  luaC_objbarrier(fs->ls->L, f, name);
   return fs->nups++;
 }
 
@@ -503,13 +501,13 @@ static Proto *addprototype (LexState *ls) {
   lua_State *L = ls->L;
   FuncState *fs = ls->fs;
   Proto *f = fs->f;  /* prototype of current function */
-  if (fs->np >= f->sp->sizep) {
-    int oldsize = f->sp->sizep;
-    luaM_growvector(L, f->p, fs->np, f->sp->sizep, Proto *, MAXARG_Bx, "functions");
-    while (oldsize < f->sp->sizep)
+  if (fs->np >= f->sizep) {
+    int oldsize = f->sizep;
+    luaM_growvector(L, f->p, fs->np, f->sizep, Proto *, MAXARG_Bx, "functions");
+    while (oldsize < f->sizep)
       f->p[oldsize++] = NULL;
   }
-  f->p[fs->np++] = clp = luaF_newproto(L, NULL);
+  f->p[fs->np++] = clp = luaF_newproto(L);
   luaC_objbarrier(L, f, clp);
   return clp;
 }
@@ -529,7 +527,7 @@ static void codeclosure (LexState *ls, expdesc *v) {
 
 
 static void open_func (LexState *ls, FuncState *fs, BlockCnt *bl) {
-  SharedProto *f;
+  Proto *f;
   fs->prev = ls->fs;  /* linked list of funcstates */
   fs->ls = ls;
   ls->fs = fs;
@@ -544,42 +542,31 @@ static void open_func (LexState *ls, FuncState *fs, BlockCnt *bl) {
   fs->nactvar = 0;
   fs->firstlocal = ls->dyd->actvar.n;
   fs->bl = NULL;
-  f = fs->f->sp;
+  f = fs->f;
   f->source = ls->source;
   f->maxstacksize = 2;  /* registers 0/1 are always valid */
   enterblock(fs, bl, 0);
 }
 
-static lu_byte check_shortstring(const TValue *k, int sizek) {
-  int i;
-  for (i=0;i<sizek;i++) {
-    if (ttisshrstring(&k[i]))
-      return 0;
-  }
-  return 1;
-}
 
 static void close_func (LexState *ls) {
   lua_State *L = ls->L;
   FuncState *fs = ls->fs;
   Proto *f = fs->f;
-  SharedProto *sp = f->sp;
   luaK_ret(fs, 0, 0);  /* final return */
   leaveblock(fs);
-  luaM_reallocvector(L, sp->code, sp->sizecode, fs->pc, Instruction);
-  sp->sizecode = fs->pc;
-  luaM_reallocvector(L, sp->lineinfo, sp->sizelineinfo, fs->pc, int);
-  sp->sizelineinfo = fs->pc;
-  luaM_reallocvector(L, f->k, sp->sizek, fs->nk, TValue);
-  sp->sharedk = check_shortstring(f->k, fs->nk);
-  sp->k = f->k;
-  sp->sizek = fs->nk;
-  luaM_reallocvector(L, f->p, sp->sizep, fs->np, Proto *);
-  sp->sizep = fs->np;
-  luaM_reallocvector(L, sp->locvars, sp->sizelocvars, fs->nlocvars, LocVar);
-  sp->sizelocvars = fs->nlocvars;
-  luaM_reallocvector(L, sp->upvalues, sp->sizeupvalues, fs->nups, Upvaldesc);
-  sp->sizeupvalues = fs->nups;
+  luaM_reallocvector(L, f->code, f->sizecode, fs->pc, Instruction);
+  f->sizecode = fs->pc;
+  luaM_reallocvector(L, f->lineinfo, f->sizelineinfo, fs->pc, int);
+  f->sizelineinfo = fs->pc;
+  luaM_reallocvector(L, f->k, f->sizek, fs->nk, TValue);
+  f->sizek = fs->nk;
+  luaM_reallocvector(L, f->p, f->sizep, fs->np, Proto *);
+  f->sizep = fs->np;
+  luaM_reallocvector(L, f->locvars, f->sizelocvars, fs->nlocvars, LocVar);
+  f->sizelocvars = fs->nlocvars;
+  luaM_reallocvector(L, f->upvalues, f->sizeupvalues, fs->nups, Upvaldesc);
+  f->sizeupvalues = fs->nups;
   lua_assert(fs->bl == NULL);
   ls->fs = fs->prev;
   luaC_checkGC(L);
@@ -755,8 +742,8 @@ static void constructor (LexState *ls, expdesc *t) {
   } while (testnext(ls, ',') || testnext(ls, ';'));
   check_match(ls, '}', '{', line);
   lastlistfield(fs, &cc);
-  SETARG_B(fs->f->sp->code[pc], luaO_int2fb(cc.na)); /* set initial array size */
-  SETARG_C(fs->f->sp->code[pc], luaO_int2fb(cc.nh));  /* set initial table size */
+  SETARG_B(fs->f->code[pc], luaO_int2fb(cc.na)); /* set initial array size */
+  SETARG_C(fs->f->code[pc], luaO_int2fb(cc.nh));  /* set initial table size */
 }
 
 /* }====================================================================== */
@@ -766,7 +753,7 @@ static void constructor (LexState *ls, expdesc *t) {
 static void parlist (LexState *ls) {
   /* parlist -> [ param { ',' param } ] */
   FuncState *fs = ls->fs;
-  SharedProto *f = fs->f->sp;
+  Proto *f = fs->f;
   int nparams = 0;
   f->is_vararg = 0;
   if (ls->t.token != ')') {  /* is 'parlist' not empty? */
@@ -797,7 +784,7 @@ static void body (LexState *ls, expdesc *e, int ismethod, int line) {
   FuncState new_fs;
   BlockCnt bl;
   new_fs.f = addprototype(ls);
-  new_fs.f->sp->linedefined = line;
+  new_fs.f->linedefined = line;
   open_func(ls, &new_fs, &bl);
   checknext(ls, '(');
   if (ismethod) {
@@ -807,7 +794,7 @@ static void body (LexState *ls, expdesc *e, int ismethod, int line) {
   parlist(ls);
   checknext(ls, ')');
   statlist(ls);
-  new_fs.f->sp->lastlinedefined = ls->linenumber;
+  new_fs.f->lastlinedefined = ls->linenumber;
   check_match(ls, TK_END, TK_FUNCTION, line);
   codeclosure(ls, e);
   close_func(ls);
@@ -973,7 +960,7 @@ static void simpleexp (LexState *ls, expdesc *v) {
     }
     case TK_DOTS: {  /* vararg */
       FuncState *fs = ls->fs;
-      check_condition(ls, fs->f->sp->is_vararg,
+      check_condition(ls, fs->f->is_vararg,
                       "cannot use '...' outside a vararg function");
       init_exp(v, VVARARG, luaK_codeABC(fs, OP_VARARG, 0, 1, 0));
       break;
@@ -1609,7 +1596,7 @@ static void statement (LexState *ls) {
       break;
     }
   }
-  lua_assert(ls->fs->f->sp->maxstacksize >= ls->fs->freereg &&
+  lua_assert(ls->fs->f->maxstacksize >= ls->fs->freereg &&
              ls->fs->freereg >= ls->fs->nactvar);
   ls->fs->freereg = ls->fs->nactvar;  /* free registers */
   leavelevel(ls);
@@ -1626,7 +1613,7 @@ static void mainfunc (LexState *ls, FuncState *fs) {
   BlockCnt bl;
   expdesc v;
   open_func(ls, fs, &bl);
-  fs->f->sp->is_vararg = 1;  /* main function is always declared vararg */
+  fs->f->is_vararg = 1;  /* main function is always declared vararg */
   init_exp(&v, VLOCAL, 0);  /* create and... */
   newupvalue(fs, ls->envn, &v);  /* ...set environment upvalue */
   luaX_next(ls);  /* read first token */
@@ -1646,13 +1633,13 @@ LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
   lexstate.h = luaH_new(L);  /* create table for scanner */
   sethvalue(L, L->top, lexstate.h);  /* anchor it */
   luaD_inctop(L);
-  funcstate.f = cl->p = luaF_newproto(L, NULL);
-  funcstate.f->sp->source = luaS_new(L, name);  /* create and anchor TString */
+  funcstate.f = cl->p = luaF_newproto(L);
+  funcstate.f->source = luaS_new(L, name);  /* create and anchor TString */
   lua_assert(iswhite(funcstate.f));  /* do not need barrier here */
   lexstate.buff = buff;
   lexstate.dyd = dyd;
   dyd->actvar.n = dyd->gt.n = dyd->label.n = 0;
-  luaX_setinput(L, &lexstate, z, funcstate.f->sp->source, firstchar);
+  luaX_setinput(L, &lexstate, z, funcstate.f->source, firstchar);
   mainfunc(&lexstate, &funcstate);
   lua_assert(!funcstate.prev && funcstate.nups == 1 && !lexstate.fs);
   /* all scopes should be correctly finished */
