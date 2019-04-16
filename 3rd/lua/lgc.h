@@ -79,11 +79,13 @@
 #define WHITE1BIT	1  /* object is white (type 1) */
 #define BLACKBIT	2  /* object is black */
 #define FINALIZEDBIT	3  /* object has been marked for finalization */
+#define SHAREBIT	4  /* object shared from other state */
 /* bit 7 is currently used by tests (luaL_checkmemory) */
 
 #define WHITEBITS	bit2mask(WHITE0BIT, WHITE1BIT)
 
 
+/* short string is always white */
 #define iswhite(x)      testbits((x)->marked, WHITEBITS)
 #define isblack(x)      testbit((x)->marked, BLACKBIT)
 #define isgray(x)  /* neither white nor black */  \
@@ -91,9 +93,11 @@
 
 #define tofinalize(x)	testbit((x)->marked, FINALIZEDBIT)
 
+#define isshared(x)     testbit((x)->marked, SHAREBIT)
+#define makeshared(x)   l_setbit((x)->marked, SHAREBIT)
 #define otherwhite(g)	((g)->currentwhite ^ WHITEBITS)
 #define isdeadm(ow,m)	(!(((m) ^ WHITEBITS) & (ow)))
-#define isdead(g,v)	isdeadm(otherwhite(g), (v)->marked)
+#define isdead(g,v)	isdeadm(otherwhite(g) | bitmask(SHAREBIT), (v)->marked)
 
 #define changewhite(x)	((x)->marked ^= WHITEBITS)
 #define gray2black(x)	l_setbit((x)->marked, BLACKBIT)
