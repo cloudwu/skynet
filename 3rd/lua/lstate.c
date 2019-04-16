@@ -71,27 +71,6 @@ typedef struct LG {
 
 
 /*
-** Compute an initial seed as random as possible. Rely on Address Space
-** Layout Randomization (if present) to increase randomness..
-*/
-#define addbuff(b,p,e) \
-  { size_t t = cast(size_t, e); \
-    memcpy(b + p, &t, sizeof(t)); p += sizeof(t); }
-
-static unsigned int makeseed (lua_State *L) {
-  char buff[4 * sizeof(size_t)];
-  unsigned int h = luai_makeseed();
-  int p = 0;
-  addbuff(buff, p, L);  /* heap variable */
-  addbuff(buff, p, &h);  /* local variable */
-  addbuff(buff, p, luaO_nilobject);  /* global variable */
-  addbuff(buff, p, &lua_newstate);  /* public function */
-  lua_assert(p == sizeof(buff));
-  return luaS_hash(buff, p, h);
-}
-
-
-/*
 ** set GCdebt to a new value keeping the value (totalbytes + GCdebt)
 ** invariant (and avoiding underflows in 'totalbytes')
 */
@@ -245,7 +224,7 @@ static void close_state (lua_State *L) {
   luaC_freeallobjects(L);  /* collect all objects */
   if (g->version)  /* closing a fully built state? */
     luai_userstateclose(L);
-  luaM_freearray(L, G(L)->strt.hash, G(L)->strt.size);
+  luaS_collect(g, 1);  /* clear short strings */
   freestack(L);
   lua_assert(gettotalbytes(g) == sizeof(LG));
   (*g->frealloc)(g->ud, fromstate(L), sizeof(LG), 0);  /* free main block */
@@ -308,11 +287,8 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->frealloc = f;
   g->ud = ud;
   g->mainthread = L;
-  g->seed = makeseed(L);
   g->gcrunning = 0;  /* no GC while building state */
   g->GCestimate = 0;
-  g->strt.size = g->strt.nuse = 0;
-  g->strt.hash = NULL;
   setnilvalue(&g->l_registry);
   g->panic = NULL;
   g->version = NULL;
@@ -328,6 +304,9 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->gcfinnum = 0;
   g->gcpause = LUAI_GCPAUSE;
   g->gcstepmul = LUAI_GCMUL;
+  g->strsave = NULL;
+  g->strmark = NULL;
+  g->strfix = NULL;
   for (i=0; i < LUA_NUMTAGS; i++) g->mt[i] = NULL;
   if (luaD_rawrunprotected(L, f_luaopen, NULL) != LUA_OK) {
     /* memory allocation error: free partial state */

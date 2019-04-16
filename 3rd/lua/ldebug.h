@@ -11,9 +11,9 @@
 #include "lstate.h"
 
 
-#define pcRel(pc, p)	(cast(int, (pc) - (p)->sp->code) - 1)
+#define pcRel(pc, p)	(cast(int, (pc) - (p)->code) - 1)
 
-#define getfuncline(f,pc)	(((f)->sp->lineinfo) ? (f)->sp->lineinfo[pc] : -1)
+#define getfuncline(f,pc)	(((f)->lineinfo) ? (f)->lineinfo[pc] : -1)
 
 #define resethookcount(L)	(L->hookcount = L->basehookcount)
 

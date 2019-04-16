@@ -233,7 +233,8 @@ LUA_API void  (lua_pushcclosure) (lua_State *L, lua_CFunction fn, int n);
 LUA_API void  (lua_pushboolean) (lua_State *L, int b);
 LUA_API void  (lua_pushlightuserdata) (lua_State *L, void *p);
 LUA_API int   (lua_pushthread) (lua_State *L);
-
+LUA_API void  (lua_clonefunction) (lua_State *L, const void * fp);
+LUA_API void  (lua_sharefunction) (lua_State *L, int index);
 
 /*
 ** get functions (Lua -> stack)
@@ -281,8 +282,6 @@ LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
                           const char *chunkname, const char *mode);
 
 LUA_API int (lua_dump) (lua_State *L, lua_Writer writer, void *data, int strip);
-
-LUA_API void (lua_clonefunction) (lua_State *L, const void *eL);
 
 
 /*
@@ -460,11 +459,6 @@ struct lua_Debug {
 
 /* }====================================================================== */
 
-/* Add by skynet */
-
-LUA_API lua_State * skynet_sig_L;
-LUA_API void (lua_checksig_)(lua_State *L);
-#define lua_checksig(L) if (skynet_sig_L) { lua_checksig_(L); }
 
 /******************************************************************************
 * Copyright (C) 1994-2018 Lua.org, PUC-Rio.

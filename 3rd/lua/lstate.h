@@ -130,6 +130,8 @@ typedef struct CallInfo {
 #define setoah(st,v)	((st) = ((st) & ~CIST_OAH) | (v))
 #define getoah(st)	((st) & CIST_OAH)
 
+/* SSM (short string map) See lstring.c */
+struct ssm_ref;
 
 /*
 ** 'global state', shared by all threads of this state
@@ -141,9 +143,7 @@ typedef struct global_State {
   l_mem GCdebt;  /* bytes allocated not yet compensated by the collector */
   lu_mem GCmemtrav;  /* memory traversed by the GC */
   lu_mem GCestimate;  /* an estimate of the non-garbage memory in use */
-  stringtable strt;  /* hash table for strings */
   TValue l_registry;
-  unsigned int seed;  /* randomized seed for hashes */
   lu_byte currentwhite;
   lu_byte gcstate;  /* state of garbage collector */
   lu_byte gckind;  /* kind of GC running */
@@ -169,6 +169,9 @@ typedef struct global_State {
   TString *tmname[TM_N];  /* array with tag-method names */
   struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types */
   TString *strcache[STRCACHE_N][STRCACHE_M];  /* cache for strings in API */
+  struct ssm_ref *strsave;
+  struct ssm_ref *strmark;
+  struct ssm_ref *strfix;
 } global_State;
 
 

@@ -597,7 +597,7 @@ static int pmain (lua_State *L) {
 int main (int argc, char **argv) {
   int status, result;
   lua_State *L;
-  luaS_initshr();  /* init global short string table */
+  luaS_initssm();
   L = luaL_newstate();  /* create state */
   if (L == NULL) {
     l_message(argv[0], "cannot create state: not enough memory");
@@ -610,7 +610,7 @@ int main (int argc, char **argv) {
   result = lua_toboolean(L, -1);  /* get result */
   report(L, status);
   lua_close(L);
-  luaS_exitshr();
+  luaS_exitssm();
   return (result && status == LUA_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

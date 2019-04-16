@@ -1013,52 +1013,11 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   return status;
 }
 
-static void cloneproto (lua_State *L, Proto *f, const Proto *src) {
-  /* copy constants and nested proto */
-  int i,n;
-  n = src->sp->sizek;
-  if (src->sp->sharedk)
-    f->k = src->sp->k;
-  else {
-    lu_byte sharedk = 1;
-    f->k=luaM_newvector(L,n,TValue);
-    for (i=0; i<n; i++) setnilvalue(&f->k[i]);
-    for (i=0; i<n; i++) {
-      const TValue *s=&src->k[i];
-      TValue *o=&f->k[i];
-      if (ttisstring(s)) {
-        TString * sstr = tsvalue(s);
-        if (ttisshrstring(s)) {
-          TString * str = luaS_clonestring(L,sstr);
-          setsvalue2n(L,o,str);
-          if (str != sstr)
-            sharedk = 0;
-        } else {
-          setsvalue2n(L,o,sstr);
-        }
-      } else {
-        setobj(L,o,s);
-      }
-    }
-    if (sharedk) {
-      luaM_freearray(L, f->k, n);
-      f->k = src->sp->k;
-    }
-  }
-  n = src->sp->sizep;
-  f->p=luaM_newvector(L,n,struct Proto *);
-  for (i=0; i<n; i++) f->p[i]=NULL;
-  for (i=0; i<n; i++) {
-    f->p[i]= luaF_newproto(L, src->p[i]->sp);
-	cloneproto(L, f->p[i], src->p[i]);
-  }
-}
-
 LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
   LClosure *cl;
   LClosure *f = cast(LClosure *, fp);
   lua_lock(L);
-  if (f->p->sp->l_G == G(L)) {
+  if (f->p->l_G == G(L)) {
     setclLvalue(L,L->top,f);
     api_incr_top(L);
     lua_unlock(L);
@@ -1067,8 +1026,7 @@ LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
   cl = luaF_newLclosure(L,f->nupvalues);
   setclLvalue(L,L->top,cl);
   api_incr_top(L);
-  cl->p = luaF_newproto(L, f->p->sp);
-  cloneproto(L, cl->p, f->p);
+  cl->p = f->p;
   luaF_initupvals(L, cl);
 
   if (cl->nupvalues >= 1) {  /* does it have an upvalue? */
@@ -1080,6 +1038,15 @@ LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
     luaC_upvalbarrier(L, cl->upvals[0]);
   }
   lua_unlock(L);
+}
+
+LUA_API void lua_sharefunction (lua_State *L, int index) {
+  if (!lua_isfunction(L,index) || lua_iscfunction(L,index)) {
+    lua_pushstring(L, "Only Lua function can share");
+    lua_error(L);
+  }
+  LClosure *f = cast(LClosure *, lua_topointer(L, index));
+  luaF_shareproto(f->p);
 }
 
 LUA_API int lua_dump (lua_State *L, lua_Writer writer, void *data, int strip) {
@@ -1276,7 +1243,7 @@ static const char *aux_upvalue (StkId fi, int n, TValue **val,
     case LUA_TLCL: {  /* Lua closure */
       LClosure *f = clLvalue(fi);
       TString *name;
-      SharedProto *p = f->p->sp;
+      Proto *p = f->p;
       if (!(1 <= n && n <= p->sizeupvalues)) return NULL;
       *val = f->upvals[n-1]->v;
       if (uv) *uv = f->upvals[n - 1];
@@ -1328,7 +1295,7 @@ static UpVal **getupvalref (lua_State *L, int fidx, int n, LClosure **pf) {
   StkId fi = index2addr(L, fidx);
   api_check(L, ttisLclosure(fi), "Lua function expected");
   f = clLvalue(fi);
-  api_check(L, (1 <= n && n <= f->p->sp->sizeupvalues), "invalid upvalue index");
+  api_check(L, (1 <= n && n <= f->p->sizeupvalues), "invalid upvalue index");
   if (pf) *pf = f;
   return &f->upvals[n - 1];  /* get its upvalue pointer */
 }
