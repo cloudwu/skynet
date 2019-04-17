@@ -509,7 +509,7 @@ exist(struct ssm_ref *r, TString *s) {
 		TString *t = r->array[mid];
 		if (t == s)
 			return 1;
-		if (s > t)
+		if (memcmp(&s,&t,sizeof(TString *)) > 0)
 			begin = mid + 1;
 		else
 			end = mid - 1;
