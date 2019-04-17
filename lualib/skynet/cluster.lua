@@ -11,16 +11,19 @@ local function get_sender(t, node)
 		local co=coroutine.running()
 		table.insert(waitco, co)
 		skynet.wait(co)
-		return rawget(t, node)
+		return assert(rawget(t, node))
 	else
 		waitco = {}
 		inquery_name[node] = waitco
-		local c = skynet.call(clusterd, "lua", "sender", node)
+		local ok,c = pcall(skynet.call, clusterd, "lua", "sender", node)
+		if ok then
+			t[node] = c
+		end
 		inquery_name[node] = nil
-		t[node] = c
 		for _, co in ipairs(waitco) do
 			skynet.wakeup(co)
 		end
+		assert(ok,c)
 		return c
 	end
 end
