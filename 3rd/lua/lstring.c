@@ -579,7 +579,7 @@ luaS_clonestring(lua_State *L, TString *ts) {
   if (result)
     return result;
   // look up SSM by ptr
-  result = query_string(ts, 0, NULL, 0);
+  result = query_string(ts, ts->hash, NULL, 0);
   if (result)
     return result;
   h = luaS_hash(str, l, 0);
