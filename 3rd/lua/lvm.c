@@ -207,6 +207,8 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
     const TValue *tm;  /* '__newindex' metamethod */
     if (slot != NULL) {  /* is 't' a table? */
       Table *h = hvalue(t);  /* save 't' table */
+      if (isshared(h))
+        luaG_typeerror(L, t, "change");
       lua_assert(ttisnil(slot));  /* old value must be nil */
       tm = fasttm(L, h->metatable, TM_NEWINDEX);  /* get metamethod */
       if (tm == NULL) {  /* no metamethod? */
