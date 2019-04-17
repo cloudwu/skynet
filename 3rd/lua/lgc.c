@@ -1018,6 +1018,7 @@ static l_mem atomic (lua_State *L) {
   clearvalues(g, g->allweak, origall);
   luaS_clearcache(g);
   g->currentwhite = cast_byte(otherwhite(g));  /* flip current white */
+  luaS_collect(g, 0);  /* send short strings set to gc thread */
   work += g->GCmemtrav;  /* complete counting */
   return work;  /* estimate of memory marked by 'atomic' */
 }
@@ -1084,7 +1085,6 @@ static lu_mem singlestep (lua_State *L) {
         return (n * GCFINALIZECOST);
       }
       else {  /* emergency mode or no more finalizers */
-        luaS_collect(g, 0);  /* send short strings set to gc thread */
         g->gcstate = GCSpause;  /* finish collection */
         return 0;
       }
