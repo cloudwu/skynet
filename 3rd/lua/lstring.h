@@ -49,13 +49,16 @@ struct ssm_info {
 	int total;
 	int longest;
 	int slots;
+	int garbage;
 	size_t size;
+	size_t garbage_size;
 	double variance;
 };
 
 struct ssm_collect {
 	void *key;
 	int n;
+	int sweep;
 };
 
 LUA_API void luaS_initssm();
