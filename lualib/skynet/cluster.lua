@@ -3,26 +3,11 @@ local skynet = require "skynet"
 local clusterd
 local cluster = {}
 local sender = {}
-local inquery_name = {}
 
 local function get_sender(t, node)
-	local waitco = inquery_name[node]
-	if waitco then
-		local co=coroutine.running()
-		table.insert(waitco, co)
-		skynet.wait(co)
-		return rawget(t, node)
-	else
-		waitco = {}
-		inquery_name[node] = waitco
-		local c = skynet.call(clusterd, "lua", "sender", node)
-		inquery_name[node] = nil
-		t[node] = c
-		for _, co in ipairs(waitco) do
-			skynet.wakeup(co)
-		end
-		return c
-	end
+	local c = skynet.call(clusterd, "lua", "sender", node)
+	t[node] = c
+	return c
 end
 
 setmetatable(sender, { __index = get_sender } )
