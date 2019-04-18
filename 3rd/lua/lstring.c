@@ -218,6 +218,7 @@ struct shrmap {
 	struct rwlock lock;
 	int rwslots;
 	int total;
+	int garbage;
 	int roslots;
 	struct shrmap_slot * readwrite;
 	struct shrmap_slot * readonly;
@@ -517,6 +518,14 @@ exist(struct ssm_ref *r, TString *s) {
 	return 0;
 }
 
+static void
+release_tstring(TString *s) {
+	DEC_SREF(s);
+	if (ZERO_SREF(s)) {
+		ATOM_INC(&SSM.garbage);
+	}
+}
+
 static int
 collectref(struct collect_queue * c) {
 	int i;
@@ -535,7 +544,7 @@ collectref(struct collect_queue * c) {
 			if (s) {
 				if (!exist(mark, s) && !exist(fix, s)) {
 					save->hash[i] = NULL;
-					DEC_SREF(s);
+					release_tstring(s);
 					++total;
 				}
 			}
@@ -546,7 +555,7 @@ collectref(struct collect_queue * c) {
 			if (!exist(mark, s) && !exist(fix, s)) {
 				--save->asize;
 				save->array[i] = save->array[save->asize];
-				DEC_SREF(s);
+				release_tstring(s);
 				++total;
 			} else {
 				++i;
@@ -557,13 +566,13 @@ collectref(struct collect_queue * c) {
 		for (i=0;i<save->hsize;i++) {
 			TString * s = save->hash[i];
 			if (s) {
-				DEC_SREF(s);
+				release_tstring(s);
 				++total;
 			}
 		}
 		for (i=0;i<save->asize;i++) {
 			TString * s = save->array[i];
-			DEC_SREF(s);
+			release_tstring(s);
 			++total;
 		}
 		clear_vm(c);
@@ -682,6 +691,7 @@ shrstr_rehash(struct shrmap *s, int slotid) {
 			if (ZERO_SREF(str)) {
 				free(str);
 				ATOM_DEC(&SSM.total);
+				ATOM_DEC(&SSM.garbage);
 			} else {
 				int newslotid = lmod(str->hash, s->rwslots);
 				struct shrmap_slot *newslot = &s->readwrite[newslotid];
@@ -737,12 +747,74 @@ expandssm() {
 	shrstr_deletepage(oldpage, osz);
 }
 
+static int
+sweep_slot(struct shrmap *s, int i) {
+	struct shrmap_slot *slot = &s->readwrite[i];
+	int n = 0;
+	TString *ts;
+	rwlock_rlock(&slot->lock);
+		ts = slot->str;
+		while (ts) {
+			if (ZERO_SREF(ts)) {
+				n = 1;
+				break;
+			}
+			ts = (TString *)ts->next;
+		}
+	rwlock_runlock(&slot->lock);
+	if (n == 0)
+		return 0;
+
+	n = 0;
+	rwlock_wlock(&slot->lock);
+		TString **ref = &slot->str;
+		ts = *ref;
+		while (ts) {
+			if (ZERO_SREF(ts)) {
+				*ref = (TString *)ts->next;
+				free(ts);
+				ts = *ref;
+				ATOM_DEC(&SSM.total);
+				ATOM_DEC(&SSM.garbage);
+				++n;
+			} else {
+				ref = (TString **)&(ts->next);
+				ts = *ref;
+			}
+		}
+	rwlock_wunlock(&slot->lock);
+	return n;
+}
+
+static int
+sweepssm() {
+	struct shrmap * s = &SSM;
+	rwlock_rlock(&s->lock);
+		if (s->readonly) {
+			rwlock_runlock(&s->lock);
+			return 0;
+		}
+		int sz = s->rwslots;
+		int i;
+		int n = 0;
+		for (i=0;i<sz;i++) {
+			n += sweep_slot(s, i);
+		}
+	rwlock_runlock(&s->lock);
+	return n;
+}
+
 /* call it in a separate thread */
 LUA_API int
 luaS_collectssm(struct ssm_collect *info) {
 	struct shrmap * s = &SSM;
 	if (s->total * 5 / 4 > s->rwslots) {
 		expandssm();
+	}
+	if (s->garbage > s->total / 8) {
+		info->sweep = sweepssm();
+	} else {
+		info->sweep = 0;
 	}
 	if (s->head) {
 		struct collect_queue * cqueue;
@@ -819,6 +891,9 @@ find_and_collect(struct shrmap_slot * slot, unsigned int h, const char *str, lu_
 		if (ts->hash == h &&
 			ts->shrlen == l &&
 			memcmp(str, ts+1, l) == 0) {
+			if (ZERO_SREF(ts)) {
+				ATOM_INC(&SSM.garbage);
+			}
 			ADD_SREF(ts);
 			break;
 		}
@@ -827,6 +902,7 @@ find_and_collect(struct shrmap_slot * slot, unsigned int h, const char *str, lu_
 			free(ts);
 			ts = *ref;
 			ATOM_DEC(&SSM.total);
+			ATOM_DEC(&SSM.garbage);
 		} else {
 			ref = (TString **)&(ts->next);
 			ts = *ref;
@@ -941,7 +1017,9 @@ internshrstr(lua_State *L, const char *str, size_t l) {
 
 struct slotinfo {
 	int len;
+	int garbage;
 	size_t size;
+	size_t garbage_size;
 };
 
 static void
@@ -951,7 +1029,12 @@ getslot(struct shrmap_slot *s, struct slotinfo *info) {
 	TString *ts = s->str;
 	while (ts) {
 		++info->len;
-		info->size += sizelstring(ts->shrlen);
+		size_t sz = sizelstring(ts->shrlen);
+		if (ZERO_SREF(ts)) {
+			++info->garbage;
+			info->garbage_size += sz;
+		}
+		info->size += sz;
 		ts = (TString *)ts->next;
 	}
 	rwlock_runlock(&s->lock);
@@ -992,6 +1075,8 @@ luaS_infossm(struct ssm_info *info) {
 					total.len = tmp.len;
 				}
 				total.size += tmp.size;
+				total.garbage_size += tmp.garbage_size;
+				total.garbage += tmp.garbage;
 				variance_update(&v, tmp.len);
 				++slots;
 			}
@@ -1005,7 +1090,10 @@ luaS_infossm(struct ssm_info *info) {
 					if (tmp.len > total.len) {
 						total.len = tmp.len;
 					}
+					// may double counting, but it's only an info
 					total.size += tmp.size;
+					total.garbage_size += tmp.garbage_size;
+					total.garbage += tmp.garbage;
 					variance_update(&v, tmp.len);
 				}
 			}
@@ -1015,6 +1103,8 @@ luaS_infossm(struct ssm_info *info) {
 	info->size = total.size;
 	info->longest = total.len;
 	info->slots = slots;
+	info->garbage = SSM.garbage;
+	info->garbage_size = total.garbage_size;
 	if (v.count > 1) {
 		info->variance = v.m2 / v.count;
 	} else {
