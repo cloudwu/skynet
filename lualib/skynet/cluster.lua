@@ -60,7 +60,7 @@ function cluster.send(node, address, ...)
 	-- push is the same with req, but no response
 	local s = sender[node]
 	if not s then
-		table.insert(task_queue[node], table.pack(address, ...))
+		table.insert(task_queue[node], table.pack(address, skynet.pack(...)))
 	else
 		skynet.send(sender[node], "lua", "push", address, skynet.pack(...))
 	end
