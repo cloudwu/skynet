@@ -20,6 +20,10 @@ linfo(lua_State *L) {
 	lua_setfield(L, -2, "slots");
 	lua_pushinteger(L, info.size);
 	lua_setfield(L, -2, "size");
+	lua_pushinteger(L, info.garbage);
+	lua_setfield(L, -2, "garbage");
+	lua_pushinteger(L, info.garbage_size);
+	lua_setfield(L, -2, "garbage_size");
 	lua_pushnumber(L, info.variance);
 	lua_setfield(L, -2, "variance");
 
@@ -43,6 +47,8 @@ lcollect(lua_State *L) {
 		if (again && lua_istable(L, 2)) {
 			lua_pushinteger(L, info.n);
 			lua_setfield(L, 2, "n");
+			lua_pushinteger(L, info.sweep);
+			lua_setfield(L, 2, "sweep");
 			lua_pushlightuserdata(L, info.key);
 			lua_setfield(L, 2, "key");
 		}
