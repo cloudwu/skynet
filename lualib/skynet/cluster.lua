@@ -18,7 +18,7 @@ local function request_sender(q, node)
 	for _, task in ipairs(q) do
 		if type(task) == "table" then
 			if c then
-				skynet.send(c, "lua", "push", table.unpack(task,1,task.n))
+				skynet.send(c, "lua", "push", task[1], skynet.pack(table.unpack(task,2,task.n)))
 			end
 		else
 			skynet.wakeup(task)
