@@ -1103,7 +1103,7 @@ luaS_infossm(struct ssm_info *info) {
 	info->size = total.size;
 	info->longest = total.len;
 	info->slots = slots;
-	info->garbage = SSM.garbage;
+	info->garbage = total.garbage;
 	info->garbage_size = total.garbage_size;
 	if (v.count > 1) {
 		info->variance = v.m2 / v.count;
