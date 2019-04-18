@@ -8,10 +8,10 @@ end
 local function collect()
 	local info = {}
 	while true do
-		while ssm.collect(false, info) do
-			skynet.error(string.format("Collect %d strings from %s", info.n, info.key))
-		end
---		ssm.collect(true)
+--		while ssm.collect(false, info) do
+--			skynet.error(string.format("Collect %d strings from %s, sweep %d", info.n, info.key, info.sweep))
+--		end
+		ssm.collect(true)
 		skynet.sleep(50)
 	end
 end
