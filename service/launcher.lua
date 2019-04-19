@@ -45,7 +45,7 @@ end
 function command.MEM()
 	local list = {}
 	for k,v in pairs(services) do
-		local ok, kb, bytes = pcall(skynet.call,k,"debug","MEM")
+		local ok, kb = pcall(skynet.call,k,"debug","MEM")
 		if not ok then
 			list[skynet.address(k)] = string.format("ERROR (%s)",v)
 		else
