@@ -145,17 +145,15 @@ load_matrixfile(lua_State *L) {
 	luaL_openlibs(L);
 	const char * source = (const char *)lua_touserdata(L, 1);
 	if (source[0] == '@') {
-		if (luaL_loadfilex_(L, source+1, NULL) || lua_pcall(L, 0, LUA_MULTRET, 0)) {
+		if (luaL_loadfilex_(L, source+1, NULL) != LUA_OK)
 			lua_error(L);
-		}
 	} else {
-		if (luaL_dostring(L, source) != LUA_OK) {
+		if (luaL_loadstring(L, source) != LUA_OK)
 			lua_error(L);
-		}
 	}
-	if (lua_gettop(L) == 0) {
-		luaL_error(L, "No table returns");
-	}
+	lua_replace(L, 1);
+	if (lua_pcall(L, lua_gettop(L) - 1, 1, 0) != LUA_OK)
+		lua_error(L);
 	lua_gc(L, LUA_GCCOLLECT, 0);
 	lua_pushcfunction(L, make_matrix);
 	lua_insert(L, -2);
@@ -170,9 +168,41 @@ matrix_from_file(lua_State *L) {
 		return luaL_error(L, "luaL_newstate failed");
 	}
 	const char * source = luaL_checkstring(L, 1);
+	int top = lua_gettop(L);
 	lua_pushcfunction(mL, load_matrixfile);
 	lua_pushlightuserdata(mL, (void *)source);
-	int ok = lua_pcall(mL, 1, 1, 0);
+	if (top > 1) {
+		if (!lua_checkstack(mL, top + 1)) {
+			return luaL_error(L, "Too many argument %d", top);
+		}
+		int i;
+		for (i=2;i<=top;i++) {
+			switch(lua_type(L, i)) {
+			case LUA_TBOOLEAN:
+				lua_pushboolean(mL, lua_toboolean(L, i));
+				break;
+			case LUA_TNUMBER:
+				if (lua_isinteger(L, i)) {
+					lua_pushinteger(mL, lua_tointeger(L, i));
+				} else {
+					lua_pushnumber(mL, lua_tonumber(L, i));
+				}
+				break;
+			case LUA_TLIGHTUSERDATA:
+				lua_pushlightuserdata(mL, lua_touserdata(L, i));
+				break;
+			case LUA_TFUNCTION:
+				if (lua_iscfunction(L, i) && lua_getupvalue(L, i, 1) == NULL) {
+					lua_pushcfunction(mL, lua_tocfunction(L, i));
+					break;
+				}
+				return luaL_argerror(L, i, "Only support light C function");
+			default:
+				return luaL_argerror(L, i, "Type invalid");
+			}
+		}
+	}
+	int ok = lua_pcall(mL, top, 1, 0);
 	if (ok != LUA_OK) {
 		lua_pushstring(L, lua_tostring(mL, -1));
 		lua_close(mL);
