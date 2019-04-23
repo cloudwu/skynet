@@ -24,17 +24,33 @@ local function sharetable_service()
 		end
 	end
 
-	function sharetable.load(source, filename, datasource)
+	function sharetable.loadfile(source, filename, ...)
 		close_matrix(files[filename])
-		if datasource == nil then
-			skynet.error("Load file : " .. filename)
-			datasource = "@" .. filename
-		else
-			skynet.error("Load chunk with name : " .. filename)
-		end
-
-		local m = core.matrix(datasource)
+		local m = core.matrix("@" .. filename, ...)
 		files[filename] = m
+		skynet.ret()
+	end
+
+	function sharetable.loadstring(source, filename, datasource, ...)
+		close_matrix(files[filename])
+		local m = core.matrix(datasource, ...)
+		files[filename] = m
+		skynet.ret()
+	end
+
+	local function loadtable(filename, ptr, len)
+		close_matrix(files[filename])
+		local m = core.matrix([[
+			local unpack, ptr, len = ...
+			return unpack(ptr, len)
+		]], skynet.unpack, ptr, len)
+		files[filename] = m
+	end
+
+	function sharetable.loadtable(source, filename, ptr, len)
+		local ok, err = pcall(loadtable, filename, ptr, len)
+		skynet.trash(ptr, len)
+		assert(ok, err)
 		skynet.ret()
 	end
 
@@ -160,8 +176,17 @@ local sharetable = setmetatable ( {} , {
 	__gc = report_close,
 })
 
-function sharetable.load(filename, source)
-	skynet.call(sharetable.address, "lua", "load", filename, source)
+function sharetable.loadfile(filename, ...)
+	skynet.call(sharetable.address, "lua", "loadfile", filename, ...)
+end
+
+function sharetable.loadstring(filename, source, ...)
+	skynet.call(sharetable.address, "lua", "loadstring", filename, source, ...)
+end
+
+function sharetable.loadtable(filename, tbl)
+	assert(type(tbl) == "table")
+	skynet.call(sharetable.address, "lua", "loadtable", filename, skynet.pack(tbl))
 end
 
 function sharetable.query(filename)
