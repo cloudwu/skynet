@@ -1,9 +1,9 @@
 local skynet = require "skynet"
-local mc = require "multicast.core"
+local mc = require "skynet.multicast.core"
 
 local multicastd
 local multicast = {}
-local dispatch = setmetatable({} , {__mode = "kv" })
+local dispatch = {}
 
 local chan = {}
 local chan_meta = {
@@ -15,14 +15,6 @@ local chan_meta = {
 		return string.format("[Multicast:%x]",self.channel)
 	end,
 }
-
-local function default_conf(conf)
-	conf = conf or {}
-	conf.pack = conf.pack or skynet.pack
-	conf.unpack = conf.unpack or skynet.unpack
-
-	return conf
-end
 
 function multicast.new(conf)
 	assert(multicastd, "Init first")
@@ -70,9 +62,12 @@ function chan:unsubscribe()
 	local c = assert(self.channel)
 	skynet.send(multicastd, "lua", "USUB", c)
 	self.__subscribe = nil
+	dispatch[c] = nil
 end
 
 local function dispatch_subscribe(channel, source, pack, msg, sz)
+	-- channel as session, do need response
+	skynet.ignoreret()
 	local self = dispatch[channel]
 	if not self then
 		mc.close(pack)

@@ -2,6 +2,8 @@
 	modify from https://github.com/cloudwu/lua-serialize
  */
 
+#define LUA_LIB
+
 #include "skynet_malloc.h"
 
 #include <lua.h>
@@ -551,7 +553,7 @@ seri(lua_State *L, struct block *b, int len) {
 }
 
 int
-_luaseri_unpack(lua_State *L) {
+luaseri_unpack(lua_State *L) {
 	if (lua_isnoneornil(L,1)) {
 		return 0;
 	}
@@ -594,8 +596,8 @@ _luaseri_unpack(lua_State *L) {
 	return lua_gettop(L) - 1;
 }
 
-int
-_luaseri_pack(lua_State *L) {
+LUAMOD_API int
+luaseri_pack(lua_State *L) {
 	struct block temp;
 	temp.next = NULL;
 	struct write_block wb;

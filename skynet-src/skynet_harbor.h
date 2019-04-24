@@ -16,6 +16,7 @@ struct remote_message {
 	struct remote_name destination;
 	const void * message;
 	size_t sz;
+	int type;
 };
 
 void skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session);

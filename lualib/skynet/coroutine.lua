@@ -10,7 +10,6 @@ local coroutine_running = coroutine.running
 local select = select
 local skynetco = {}
 
-skynetco.create = coroutine.create
 skynetco.isyieldable = coroutine.isyieldable
 skynetco.running = coroutine.running
 skynetco.status = coroutine.status
@@ -26,7 +25,7 @@ end
 
 do -- begin skynetco.resume
 
-	local profile = require "profile"
+	local profile = require "skynet.profile"
 	-- skynet use profile.resume_co/yield_co instead of coroutine.resume/yield
 
 	local skynet_resume = profile.resume_co

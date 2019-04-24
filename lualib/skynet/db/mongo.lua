@@ -1,11 +1,13 @@
 local bson = require "bson"
-local socket = require "socket"
-local socketchannel	= require "socketchannel"
+local socket = require "skynet.socket"
+local socketchannel	= require "skynet.socketchannel"
 local skynet = require "skynet"
-local driver = require "mongo.driver"
+local driver = require "skynet.mongo.driver"
 local md5 =	require	"md5"
+local crypt = require "skynet.crypt"
 local rawget = rawget
 local assert = assert
+local table = table
 
 local bson_encode =	bson.encode
 local bson_encode_order	= bson.encode_order
@@ -80,13 +82,24 @@ local function __parse_addr(addr)
 	return host, tonumber(port)
 end
 
+local auth_method = {}
+
 local function mongo_auth(mongoc)
 	local user = rawget(mongoc,	"username")
 	local pass = rawget(mongoc,	"password")
+	local authmod = rawget(mongoc, "authmod") or "scram_sha1"
+	authmod = "auth_" ..  authmod
+	local authdb = rawget(mongoc, "authdb")
+	if authdb then
+		authdb = mongo_client.getDB(mongoc, authdb)	-- mongoc has not set metatable yet
+	end
 
 	return function()
 		if user	~= nil and pass	~= nil then
-			assert(mongoc:auth(user, pass))
+			-- autmod can be "mongodb_cr" or "scram_sha1"
+			local auth_func = auth_method[authmod]
+			assert(auth_func , "Invalid authmod")
+			assert(auth_func(authdb or mongoc, user, pass))
 		end
 		local rs_data =	mongoc:runCommand("ismaster")
 		if rs_data.ok == 1 then
@@ -99,12 +112,38 @@ local function mongo_auth(mongoc)
 				mongoc.__sock:changebackup(backup)
 			end
 			if rs_data.ismaster	then
+				if rawget(mongoc, "__pickserver") then
+					rawset(mongoc, "__pickserver", nil)
+				end
 				return
 			else
-				local host,	port = __parse_addr(rs_data.primary)
-				mongoc.host	= host
-				mongoc.port	= port
-				mongoc.__sock:changehost(host, port)
+				if rs_data.primary then
+					local host,	port = __parse_addr(rs_data.primary)
+					mongoc.host	= host
+					mongoc.port	= port
+					mongoc.__sock:changehost(host, port)
+				else
+					skynet.error("WARNING: NO PRIMARY RETURN " .. rs_data.me)
+					-- determine the primary db using hosts
+					local pickserver = {}
+					if rawget(mongoc, "__pickserver") == nil then
+						for _, v in ipairs(rs_data.hosts) do
+							if v ~= rs_data.me then
+								table.insert(pickserver, v)
+							end
+							rawset(mongoc, "__pickserver", pickserver)
+						end
+					end
+					if #mongoc.__pickserver <= 0 then
+						error("CAN NOT DETERMINE THE PRIMARY DB")
+					end
+					skynet.error("INFO: TRY TO CONNECT " .. mongoc.__pickserver[1])
+					local host, port = __parse_addr(mongoc.__pickserver[1])
+					table.remove(mongoc.__pickserver, 1)
+					mongoc.host	= host
+					mongoc.port	= port
+					mongoc.__sock:changehost(host, port)
+				end
 			end
 		end
 	end
@@ -122,6 +161,8 @@ function mongo.client( conf	)
 		port = first.port or 27017,
 		username = first.username,
 		password = first.password,
+		authmod = first.authmod,
+		authdb = first.authdb,
 	}
 
 	obj.__id = 0
@@ -132,6 +173,7 @@ function mongo.client( conf	)
 		auth = mongo_auth(obj),
 		backup = backup,
 		nodelay = true,
+		overload = conf.overload,
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect(true)	-- try connect only	once
@@ -172,7 +214,7 @@ function mongo_client:runCommand(...)
 	return self.admin:runCommand(...)
 end
 
-function mongo_client:auth(user,password)
+function auth_method:auth_mongodb_cr(user,password)
 	local password = md5.sumhexa(string.format("%s:mongo:%s",user,password))
 	local result= self:runCommand "getnonce"
 	if result.ok ~=1 then
@@ -184,9 +226,93 @@ function mongo_client:auth(user,password)
 	return result.ok ==	1
 end
 
+local function salt_password(password, salt, iter)
+	salt = salt .. "\0\0\0\1"
+	local output = crypt.hmac_sha1(password, salt)
+	local inter = output
+	for i=2,iter do
+		inter = crypt.hmac_sha1(password, inter)
+		output = crypt.xor_str(output, inter)
+	end
+	return output
+end
+
+function auth_method:auth_scram_sha1(username,password)
+	local user = string.gsub(string.gsub(username, '=', '=3D'), ',' , '=2C')
+	local nonce = crypt.base64encode(crypt.randomkey())
+	local first_bare = "n="  .. user .. ",r="  .. nonce
+	local sasl_start_payload = crypt.base64encode("n,," .. first_bare)
+	local r
+
+	r = self:runCommand("saslStart",1,"autoAuthorize",1,"mechanism","SCRAM-SHA-1","payload",sasl_start_payload)
+	if r.ok ~= 1 then
+		return false
+	end
+
+	local conversationId = r['conversationId']
+	local server_first = r['payload']
+	local parsed_s = crypt.base64decode(server_first)
+	local parsed_t = {}
+	for k, v in string.gmatch(parsed_s, "(%w+)=([^,]*)") do
+		parsed_t[k] = v
+	end
+	local iterations = tonumber(parsed_t['i'])
+	local salt = parsed_t['s']
+	local rnonce = parsed_t['r']
+
+	if not string.sub(rnonce, 1, 12) == nonce then
+		skynet.error("Server returned an invalid nonce.")
+		return false
+	end
+	local without_proof = "c=biws,r=" .. rnonce
+	local pbkdf2_key = md5.sumhexa(string.format("%s:mongo:%s",username,password))
+	local salted_pass = salt_password(pbkdf2_key, crypt.base64decode(salt), iterations)
+	local client_key = crypt.hmac_sha1(salted_pass, "Client Key")
+	local stored_key = crypt.sha1(client_key)
+	local auth_msg = first_bare .. ',' .. parsed_s .. ',' .. without_proof
+	local client_sig = crypt.hmac_sha1(stored_key, auth_msg)
+	local client_key_xor_sig = crypt.xor_str(client_key, client_sig)
+	local client_proof = "p=" .. crypt.base64encode(client_key_xor_sig)
+	local client_final = crypt.base64encode(without_proof .. ',' .. client_proof)
+	local server_key = crypt.hmac_sha1(salted_pass, "Server Key")
+	local server_sig = crypt.base64encode(crypt.hmac_sha1(server_key, auth_msg))
+
+	r = self:runCommand("saslContinue",1,"conversationId",conversationId,"payload",client_final)
+	if r.ok ~= 1 then
+		return false
+	end
+	parsed_s = crypt.base64decode(r['payload'])
+	parsed_t = {}
+	for k, v in string.gmatch(parsed_s, "(%w+)=([^,]*)") do
+		parsed_t[k] = v
+	end
+	if parsed_t['v'] ~= server_sig then
+		skynet.error("Server returned an invalid signature.")
+		return false
+	end
+	if not r.done then
+		r = self:runCommand("saslContinue",1,"conversationId",conversationId,"payload","")
+		if r.ok ~= 1 then
+			return false
+		end
+		if not r.done then
+			skynet.error("SASL conversation failed to complete.")
+			return false
+		end
+	end
+	return true
+end
+
 function mongo_client:logout()
 	local result = self:runCommand "logout"
 	return result.ok ==	1
+end
+
+function mongo_db:auth(user, pass)
+	local authmod = rawget(self.connection, "authmod") or "scram_sha1"
+	local auth_func = auth_method["auth_" .. authmod]
+	assert(auth_func , "Invalid authmod")
+	return auth_func(self, user, pass)
 end
 
 function mongo_db:runCommand(cmd,cmd_v,...)
@@ -229,8 +355,23 @@ function mongo_collection:insert(doc)
 	sock:request(pack)
 end
 
+local function werror(r)
+	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError)
+
+	local err
+	if not ok then
+		if r.writeErrors then
+			err = r.writeErrors[1].errmsg
+		else
+			err = r.writeConcernError.errmsg
+		end
+	end
+	return ok, err, r
+end
+
 function mongo_collection:safe_insert(doc)
-	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
+	local r = self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
+	return werror(r)
 end
 
 function mongo_collection:batch_insert(docs)
@@ -252,10 +393,28 @@ function mongo_collection:update(selector,update,upsert,multi)
 	sock:request(pack)
 end
 
+function mongo_collection:safe_update(selector, update, upsert, multi)
+	local r = self.database:runCommand("update", self.name, "updates", {bson_encode({
+		q = selector,
+		u = update,
+		upsert = upsert,
+		multi = multi,
+	})})
+	return werror(r)
+end
+
 function mongo_collection:delete(selector, single)
 	local sock = self.connection.__sock
 	local pack = driver.delete(self.full_name, single, bson_encode(selector))
 	sock:request(pack)
+end
+
+function mongo_collection:safe_delete(selector, single)
+	local r = self.database:runCommand("delete", self.name, "deletes", {bson_encode({
+		q = selector,
+		limit = single and 1 or 0,
+	})})
+	return werror(r)
 end
 
 function mongo_collection:findOne(query, selector)
@@ -285,8 +444,24 @@ function mongo_collection:find(query, selector)
 	} ,	cursor_meta)
 end
 
-function mongo_cursor:sort(key_list)
-	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key_list}
+local function unfold(list, key, ...)
+	if key == nil then
+		return list
+	end
+	local next_func, t = pairs(key)
+	local k, v = next_func(t)	-- The first key pair
+	table.insert(list, k)
+	table.insert(list, v)
+	return unfold(list, ...)
+end
+
+-- cursor:sort { key = 1 } or cursor:sort( {key1 = 1}, {key2 = -1})
+function mongo_cursor:sort(key, key_v, ...)
+	if key_v then
+		local key_list = unfold({}, key, key_v , ...)
+		key = bson_encode_order(table.unpack(key_list))
+	end
+	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key}
 	return self
 end
 
@@ -318,30 +493,73 @@ function mongo_cursor:count(with_limit_and_skip)
 end
 
 
+-- For compatibility.
 -- collection:createIndex({username = 1}, {unique = true})
-function mongo_collection:createIndex(keys, option)
-	local name = option.name
-	option.name = nil
-
-	if not name then
-		for k, v in pairs(keys) do
-			name = (name == nil) and k or (name .. "_" .. k)
-			name = name  .. "_" .. v
-		end
-	end
-
-
-	local doc = {};
-	doc.name = name
-	doc.key = keys
-	for k, v in pairs(option) do
+local function createIndex_onekey(self, key, option)
+	local doc = {}
+	for k,v in pairs(option) do
 		doc[k] = v
 	end
+	local k,v = next(key)	-- support only one key
+	assert(next(key,k) == nil, "Use new api for multi-keys")
+	doc.name = doc.name or (k .. "_" .. v)
+	doc.key = key
+
 	return self.database:runCommand("createIndexes", self.name, "indexes", {doc})
 end
 
-mongo_collection.ensureIndex = mongo_collection.createIndex;
 
+local function IndexModel(option)
+	local doc = {}
+	for k,v in pairs(option) do
+		if type(k) == "string" then
+			doc[k] = v
+		end
+	end
+
+	local keys = {}
+	local name
+	for _, kv in ipairs(option) do
+		local k,v
+		if type(kv) == "string" then
+			k = kv
+			v = 1
+		else
+			k,v = next(kv)
+		end
+		table.insert(keys, k)
+		table.insert(keys, v)
+		name = (name == nil) and k or (name .. "_" .. k)
+		name = name  .. "_" .. v
+	end
+	assert(name, "Need keys")
+
+	doc.name = doc.name or name
+	doc.key = bson_encode_order(table.unpack(keys))
+
+	return doc
+end
+
+-- collection:createIndex { { key1 = 1}, { key2 = 1 },  unique = true }
+-- or collection:createIndex { "key1", "key2",  unique = true }
+-- or collection:createIndex( { key1 = 1} , { unique = true } )	-- For compatibility
+function mongo_collection:createIndex(arg1 , arg2)
+	if arg2 then
+		return createIndex_onekey(self, arg1, arg2)
+	else
+		return self.database:runCommand("createIndexes", self.name, "indexes", { IndexModel(arg1) })
+	end
+end
+
+function mongo_collection:createIndexes(...)
+	local idx = { ... }
+	for k,v in ipairs(idx) do
+		idx[k] = IndexModel(v)
+	end
+	return self.database:runCommand("createIndexes", self.name, "indexes", idx)
+end
+
+mongo_collection.ensureIndex = mongo_collection.createIndex
 
 function mongo_collection:drop()
 	return self.database:runCommand("drop", self.name)
@@ -385,10 +603,10 @@ function mongo_cursor:hasNext()
 		local pack
 		if self.__data == nil then
 			local query = self.__sortquery or self.__query
-			pack = driver.query(request_id, self.__flags, self.__collection.full_name, self.__skip, -self.__limit, query, self.__selector)
+			pack = driver.query(request_id, self.__flags, self.__collection.full_name, self.__skip, self.__limit, query, self.__selector)
 		else
 			if self.__cursor then
-				pack = driver.more(request_id, self.__collection.full_name, -self.__limit, self.__cursor)
+				pack = driver.more(request_id, self.__collection.full_name, self.__limit, self.__cursor)
 			else
 				-- no more
 				self.__document	= nil
@@ -404,10 +622,20 @@ function mongo_cursor:hasNext()
 
 		if ok then
 			if doc then
-				self.__document	= result.result
+				local doc = result.result
+				self.__document	= doc
 				self.__data	= result.data
 				self.__ptr = 1
 				self.__cursor =	cursor
+				local limit = self.__limit
+				if cursor and limit > 0 then
+					limit = limit - #doc
+					if limit <= 0 then
+						-- reach limit
+						self:close()
+					end
+					self.__limit = limit
+				end
 				return true
 			else
 				self.__document	= nil
@@ -445,11 +673,11 @@ function mongo_cursor:next()
 end
 
 function mongo_cursor:close()
-	-- todo: warning hasNext after close
 	if self.__cursor then
 		local sock = self.__collection.connection.__sock
 		local pack = driver.kill(self.__cursor)
 		sock:request(pack)
+		self.__cursor = nil
 	end
 end
 

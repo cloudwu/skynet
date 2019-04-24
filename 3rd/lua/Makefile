@@ -19,7 +19,7 @@ SYSCFLAGS=
 SYSLDFLAGS=
 SYSLIBS=
 
-MYCFLAGS=-I../../skynet-src
+MYCFLAGS=-I../../skynet-src -g
 MYLDFLAGS=
 MYLIBS=
 MYOBJS=

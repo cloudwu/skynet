@@ -11,6 +11,8 @@
 #define SIZEOF_LENGTH 4
 #define SIZEOF_HEADER 2
 #define SIZEOF_FIELD 2
+#define SIZEOF_INT64 ((int)sizeof(uint64_t))
+#define SIZEOF_INT32 ((int)sizeof(uint32_t))
 
 struct field {
 	int tag;
@@ -18,6 +20,7 @@ struct field {
 	const char * name;
 	struct sproto_type * st;
 	int key;
+	int extra;
 };
 
 struct sproto_type {
@@ -31,6 +34,7 @@ struct sproto_type {
 struct protocol {
 	const char *name;
 	int tag;
+	int confirm;	// confirm == 1 where response nil
 	struct sproto_type * p[2];
 };
 
@@ -177,6 +181,18 @@ import_string(struct sproto *s, const uint8_t * stream) {
 	return buffer;
 }
 
+static int
+calc_pow(int base, int n) {
+	int r;
+	if (n == 0)
+		return 1;
+	r = calc_pow(base * base , n / 2);
+	if (n&1) {
+		r *= base;
+	}
+	return r;
+}
+
 static const uint8_t *
 import_field(struct sproto *s, struct field *f, const uint8_t * stream) {
 	uint32_t sz;
@@ -190,6 +206,7 @@ import_field(struct sproto *s, struct field *f, const uint8_t * stream) {
 	f->name = NULL;
 	f->st = NULL;
 	f->key = -1;
+	f->extra = 0;
 
 	sz = todword(stream);
 	stream += SIZEOF_LENGTH;
@@ -222,12 +239,18 @@ import_field(struct sproto *s, struct field *f, const uint8_t * stream) {
 			f->type = value;
 			break;
 		case 2: // type index
-			if (value >= s->type_n)
-				return NULL;	// invalid type index
-			if (f->type >= 0)
-				return NULL;
-			f->type = SPROTO_TSTRUCT;
-			f->st = &s->type[value];
+			if (f->type == SPROTO_TINTEGER) {
+				f->extra = calc_pow(10, value);
+			} else if (f->type == SPROTO_TSTRING) {
+				f->extra = value;	// string if 0 ; binary is 1
+			} else {
+				if (value >= s->type_n)
+					return NULL;	// invalid type index
+				if (f->type >= 0)
+					return NULL;
+				f->type = SPROTO_TSTRUCT;
+				f->st = &s->type[value];
+			}
 			break;
 		case 3: // tag
 			f->tag = value;
@@ -344,6 +367,7 @@ import_protocol(struct sproto *s, struct protocol *p, const uint8_t * stream) {
 	p->tag = -1;
 	p->p[SPROTO_REQUEST] = NULL;
 	p->p[SPROTO_RESPONSE] = NULL;
+	p->confirm = 0;
 	tag = 0;
 	for (i=0;i<fn;i++,tag++) {
 		int value = toword(stream + SIZEOF_FIELD * i);
@@ -374,6 +398,9 @@ import_protocol(struct sproto *s, struct protocol *p, const uint8_t * stream) {
 			if (value < 0 || value>=s->type_n)
 				return NULL;
 			p->p[SPROTO_RESPONSE] = &s->type[value];
+			break;
+		case 4:	// confirm
+			p->confirm = value;
 			break;
 		default:
 			return NULL;
@@ -463,11 +490,6 @@ sproto_release(struct sproto * s) {
 void
 sproto_dump(struct sproto *s) {
 	int i,j;
-	static const char * buildin[] = {
-		"integer",
-		"boolean",
-		"string",
-	};
 	printf("=== %d types ===\n", s->type_n);
 	for (i=0;i<s->type_n;i++) {
 		struct sproto_type *t = &s->type[i];
@@ -476,25 +498,45 @@ sproto_dump(struct sproto *s) {
 			char array[2] = { 0, 0 };
 			const char * type_name = NULL;
 			struct field *f = &t->f[j];
+			int type = f->type & ~SPROTO_TARRAY;
 			if (f->type & SPROTO_TARRAY) {
 				array[0] = '*';
 			} else {
 				array[0] = 0;
 			}
-			{
-				int t = f->type & ~SPROTO_TARRAY;
-				if (t == SPROTO_TSTRUCT) {
-					type_name = f->st->name;
-				} else {
-					assert(t<SPROTO_TSTRUCT);
-					type_name = buildin[t];
+			if (type == SPROTO_TSTRUCT) {
+				type_name = f->st->name;
+			} else {
+				switch(type) {
+				case SPROTO_TINTEGER:
+					if (f->extra) {
+						type_name = "decimal";
+					} else {
+						type_name = "integer";
+					}
+					break;
+				case SPROTO_TBOOLEAN:
+					type_name = "boolean";
+					break;
+				case SPROTO_TSTRING:
+					if (f->extra == SPROTO_TSTRING_BINARY)
+						type_name = "binary";
+					else
+						type_name = "string";
+					break;
+				default:
+					type_name = "invalid";
+					break;
 				}
 			}
-			if (f->key >= 0) {
-				printf("\t%s (%d) %s%s(%d)\n", f->name, f->tag, array, type_name, f->key);
-			} else {
-				printf("\t%s (%d) %s%s\n", f->name, f->tag, array, type_name);
+			printf("\t%s (%d) %s%s", f->name, f->tag, array, type_name);
+			if (type == SPROTO_TINTEGER && f->extra > 0) {
+				printf("(%d)", f->extra);
 			}
+			if (f->key >= 0) {
+				printf("[%d]", f->key);
+			}
+			printf("\n");
 		}
 	}
 	printf("=== %d protocol ===\n", s->protocol_n);
@@ -507,6 +549,8 @@ sproto_dump(struct sproto *s) {
 		}
 		if (p->p[SPROTO_RESPONSE]) {
 			printf(" response:%s", p->p[SPROTO_RESPONSE]->name);
+		} else if (p->confirm) {
+			printf(" response nil");
 		}
 		printf("\n");
 	}
@@ -553,6 +597,12 @@ sproto_protoquery(const struct sproto *sp, int proto, int what) {
 		return p->p[what];
 	}
 	return NULL;
+}
+
+int
+sproto_protoresponse(const struct sproto * sp, int proto) {
+	struct protocol * p = query_proto(sp, proto);
+	return (p!=NULL && (p->p[SPROTO_RESPONSE] || p->confirm));
 }
 
 const char *
@@ -677,10 +727,10 @@ encode_object(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int si
 	args->value = data+SIZEOF_LENGTH;
 	args->length = size-SIZEOF_LENGTH;
 	sz = cb(args);
-	if (sz <= 0)
-		return sz;
-	if (args->type == SPROTO_TSTRING) {
-		--sz;	// the length of null string is 1
+	if (sz < 0) {
+		if (sz == SPROTO_CB_NIL)
+			return 0;
+		return -1;	// sz == SPROTO_CB_ERROR
 	}
 	assert(sz <= size-SIZEOF_LENGTH);	// verify buffer overflow
 	return fill_size(data, sz);
@@ -702,7 +752,7 @@ uint32_to_uint64(int negative, uint8_t *buffer) {
 }
 
 static uint8_t *
-encode_integer_array(sproto_callback cb, struct sproto_arg *args, uint8_t *buffer, int size) {
+encode_integer_array(sproto_callback cb, struct sproto_arg *args, uint8_t *buffer, int size, int *noarray) {
 	uint8_t * header = buffer;
 	int intlen;
 	int index;
@@ -710,8 +760,10 @@ encode_integer_array(sproto_callback cb, struct sproto_arg *args, uint8_t *buffe
 		return NULL;
 	buffer++;
 	size--;
-	intlen = sizeof(uint32_t);
+	intlen = SIZEOF_INT32;
 	index = 1;
+	*noarray = 0;
+
 	for (;;) {
 		int sz;
 		union {
@@ -722,40 +774,47 @@ encode_integer_array(sproto_callback cb, struct sproto_arg *args, uint8_t *buffe
 		args->length = sizeof(u);
 		args->index = index;
 		sz = cb(args);
-		if (sz < 0)
+		if (sz <= 0) {
+			if (sz == SPROTO_CB_NIL) // nil object, end of array
+				break;
+			if (sz == SPROTO_CB_NOARRAY) {	// no array, don't encode it
+				*noarray = 1;
+				break;
+			}
+			return NULL;	// sz == SPROTO_CB_ERROR
+		}
+		// notice: sizeof(uint64_t) is size_t (unsigned) , size may be negative. See issue #75
+		// so use MACRO SIZOF_INT64 instead
+		if (size < SIZEOF_INT64)
 			return NULL;
-		if (sz == 0)	// nil object, end of array
-			break;
-		if (size < sizeof(uint64_t))
-			return NULL;
-		if (sz == sizeof(uint32_t)) {
+		if (sz == SIZEOF_INT32) {
 			uint32_t v = u.u32;
 			buffer[0] = v & 0xff;
 			buffer[1] = (v >> 8) & 0xff;
 			buffer[2] = (v >> 16) & 0xff;
 			buffer[3] = (v >> 24) & 0xff;
 
-			if (intlen == sizeof(uint64_t)) {
+			if (intlen == SIZEOF_INT64) {
 				uint32_to_uint64(v & 0x80000000, buffer);
 			}
 		} else {
 			uint64_t v;
-			if (sz != sizeof(uint64_t))
+			if (sz != SIZEOF_INT64)
 				return NULL;
-			if (intlen == sizeof(uint32_t)) {
+			if (intlen == SIZEOF_INT32) {
 				int i;
 				// rearrange
-				size -= (index-1) * sizeof(uint32_t);
-				if (size < sizeof(uint64_t))
+				size -= (index-1) * SIZEOF_INT32;
+				if (size < SIZEOF_INT64)
 					return NULL;
-				buffer += (index-1) * sizeof(uint32_t);
+				buffer += (index-1) * SIZEOF_INT32;
 				for (i=index-2;i>=0;i--) {
 					int negative;
-					memcpy(header+1+i*sizeof(uint64_t), header+1+i*sizeof(uint32_t), sizeof(uint32_t));
-					negative = header[1+i*sizeof(uint64_t)+3] & 0x80;
-					uint32_to_uint64(negative, header+1+i*sizeof(uint64_t));
+					memcpy(header+1+i*SIZEOF_INT64, header+1+i*SIZEOF_INT32, SIZEOF_INT32);
+					negative = header[1+i*SIZEOF_INT64+3] & 0x80;
+					uint32_to_uint64(negative, header+1+i*SIZEOF_INT64);
 				}
-				intlen = sizeof(uint64_t);
+				intlen = SIZEOF_INT64;
 			}
 
 			v = u.u64;
@@ -790,11 +849,17 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 	size -= SIZEOF_LENGTH;
 	buffer = data + SIZEOF_LENGTH;
 	switch (args->type) {
-	case SPROTO_TINTEGER:
-		buffer = encode_integer_array(cb,args,buffer,size);
+	case SPROTO_TINTEGER: {
+		int noarray;
+		buffer = encode_integer_array(cb,args,buffer,size, &noarray);
 		if (buffer == NULL)
 			return -1;
+	
+		if (noarray) {
+			return 0;
+		}
 		break;
+	}
 	case SPROTO_TBOOLEAN:
 		args->index = 1;
 		for (;;) {
@@ -802,10 +867,13 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 			args->value = &v;
 			args->length = sizeof(v);
 			sz = cb(args);
-			if (sz < 0)
-				return -1;
-			if (sz == 0)	// nil object , end of array
-				break;
+			if (sz < 0) {
+				if (sz == SPROTO_CB_NIL)		// nil object , end of array
+					break;
+				if (sz == SPROTO_CB_NOARRAY)	// no array, don't encode it
+					return 0;
+				return -1;	// sz == SPROTO_CB_ERROR
+			}
 			if (size < 1)
 				return -1;
 			buffer[0] = v ? 1: 0;
@@ -823,12 +891,13 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 			args->value = buffer+SIZEOF_LENGTH;
 			args->length = size;
 			sz = cb(args);
-			if (sz == 0)
-				break;
-			if (sz < 0)
-				return -1;
-			if (args->type == SPROTO_TSTRING) {
-				--sz;
+			if (sz < 0) {
+				if (sz == SPROTO_CB_NIL) {
+					break;
+				}
+				if (sz == SPROTO_CB_NOARRAY)	// no array, don't encode it
+					return 0;
+				return -1;	// sz == SPROTO_CB_ERROR
 			}
 			fill_size(buffer, sz);
 			buffer += SIZEOF_LENGTH+sz;
@@ -838,8 +907,6 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 		break;
 	}
 	sz = buffer - (data + SIZEOF_LENGTH);
-	if (sz == 0)	// empty array
-		return 0;
 	return fill_size(data, sz);
 }
 
@@ -869,6 +936,7 @@ sproto_encode(const struct sproto_type *st, void * buffer, int size, sproto_call
 		args.tagid = f->tag;
 		args.subtype = f->st;
 		args.mainindex = f->key;
+		args.extra = f->extra;
 		if (type & SPROTO_TARRAY) {
 			args.type = type & ~SPROTO_TARRAY;
 			sz = encode_array(cb, &args, data, size);
@@ -885,18 +953,21 @@ sproto_encode(const struct sproto_type *st, void * buffer, int size, sproto_call
 				args.value = &u;
 				args.length = sizeof(u);
 				sz = cb(&args);
-				if (sz < 0)
-					return -1;
-				if (sz == 0)	// nil object
-					continue;
-				if (sz == sizeof(uint32_t)) {
+				if (sz < 0) {
+					if (sz == SPROTO_CB_NIL)
+						continue;
+					if (sz == SPROTO_CB_NOARRAY)	// no array, don't encode it
+						return 0;
+					return -1;	// sz == SPROTO_CB_ERROR
+				}
+				if (sz == SIZEOF_INT32) {
 					if (u.u32 < 0x7fff) {
 						value = (u.u32+1) * 2;
 						sz = 2; // sz can be any number > 0
 					} else {
 						sz = encode_integer(u.u32, data, size);
 					}
-				} else if (sz == sizeof(uint64_t)) {
+				} else if (sz == SIZEOF_INT64) {
 					sz= encode_uint64(u.u64, data, size);
 				} else {
 					return -1;
@@ -985,31 +1056,36 @@ decode_array(sproto_callback cb, struct sproto_arg *args, uint8_t * stream) {
 	uint32_t sz = todword(stream);
 	int type = args->type;
 	int i;
+	if (sz == 0) {
+		// It's empty array, call cb with index == -1 to create the empty array.
+		args->index = -1;
+		args->value = NULL;
+		args->length = 0;
+		cb(args);
+		return 0;
+	}	
 	stream += SIZEOF_LENGTH;
 	switch (type) {
 	case SPROTO_TINTEGER: {
-		int len;
-		if (sz < 1)
-			return -1;
-		len = *stream;
+		int len = *stream;
 		++stream;
 		--sz;
-		if (len == sizeof(uint32_t)) {
-			if (sz % sizeof(uint32_t) != 0)
+		if (len == SIZEOF_INT32) {
+			if (sz % SIZEOF_INT32 != 0)
 				return -1;
-			for (i=0;i<sz/sizeof(uint32_t);i++) {
-				uint64_t value = expand64(todword(stream + i*sizeof(uint32_t)));
+			for (i=0;i<sz/SIZEOF_INT32;i++) {
+				uint64_t value = expand64(todword(stream + i*SIZEOF_INT32));
 				args->index = i+1;
 				args->value = &value;
 				args->length = sizeof(value);
 				cb(args);
 			}
-		} else if (len == sizeof(uint64_t)) {
-			if (sz % sizeof(uint64_t) != 0)
+		} else if (len == SIZEOF_INT64) {
+			if (sz % SIZEOF_INT64 != 0)
 				return -1;
-			for (i=0;i<sz/sizeof(uint64_t);i++) {
-				uint64_t low = todword(stream + i*sizeof(uint64_t));
-				uint64_t hi = todword(stream + i*sizeof(uint64_t) + sizeof(uint32_t));
+			for (i=0;i<sz/SIZEOF_INT64;i++) {
+				uint64_t low = todword(stream + i*SIZEOF_INT64);
+				uint64_t hi = todword(stream + i*SIZEOF_INT64 + SIZEOF_INT32);
 				uint64_t value = low | hi << 32;
 				args->index = i+1;
 				args->value = &value;
@@ -1093,6 +1169,7 @@ sproto_decode(const struct sproto_type *st, const void * data, int size, sproto_
 		args.subtype = f->st;
 		args.index = 0;
 		args.mainindex = f->key;
+		args.extra = f->extra;
 		if (value < 0) {
 			if (f->type & SPROTO_TARRAY) {
 				if (decode_array(cb, &args, currentdata)) {
@@ -1102,16 +1179,16 @@ sproto_decode(const struct sproto_type *st, const void * data, int size, sproto_
 				switch (f->type) {
 				case SPROTO_TINTEGER: {
 					uint32_t sz = todword(currentdata);
-					if (sz == sizeof(uint32_t)) {
+					if (sz == SIZEOF_INT32) {
 						uint64_t v = expand64(todword(currentdata + SIZEOF_LENGTH));
 						args.value = &v;
 						args.length = sizeof(v);
 						cb(&args);
-					} else if (sz != sizeof(uint64_t)) {
+					} else if (sz != SIZEOF_INT64) {
 						return -1;
 					} else {
 						uint32_t low = todword(currentdata + SIZEOF_LENGTH);
-						uint32_t hi = todword(currentdata + SIZEOF_LENGTH + sizeof(uint32_t));
+						uint32_t hi = todword(currentdata + SIZEOF_LENGTH + SIZEOF_INT32);
 						uint64_t v = (uint64_t)low | (uint64_t) hi << 32;
 						args.value = &v;
 						args.length = sizeof(v);

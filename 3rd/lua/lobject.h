@@ -1,5 +1,5 @@
 /*
-** $Id: lobject.h,v 2.116 2015/11/03 18:33:10 roberto Exp $
+** $Id: lobject.h,v 2.117.1.1 2017/04/19 17:39:34 roberto Exp $
 ** Type definitions for Lua objects
 ** See Copyright Notice in lua.h
 */
@@ -402,8 +402,9 @@ typedef struct LocVar {
 
 typedef struct SharedProto {
   lu_byte numparams;  /* number of fixed parameters */
-  lu_byte is_vararg;  /* 2: declared vararg; 1: uses vararg */
+  lu_byte is_vararg;
   lu_byte maxstacksize;  /* number of registers needed by this function */
+  lu_byte sharedk;  /* constants can be shared directly */
   int sizeupvalues;  /* size of 'upvalues' */
   int sizek;  /* size of 'k' */
   int sizecode;
@@ -418,6 +419,7 @@ typedef struct SharedProto {
   LocVar *locvars;  /* information about local variables (debug information) */
   Upvaldesc *upvalues;  /* upvalue information */
   TString  *source;  /* used for debug information */
+  TValue *k;  /* Shared constants */
 } SharedProto;
 
 /*

@@ -1,5 +1,5 @@
 /*
-** $Id: lutf8lib.c,v 1.15 2015/03/28 19:16:55 roberto Exp $
+** $Id: lutf8lib.c,v 1.16.1.1 2017/04/19 17:29:57 roberto Exp $
 ** Standard library for UTF-8 manipulation
 ** See Copyright Notice in lua.h
 */
@@ -171,7 +171,7 @@ static int byteoffset (lua_State *L) {
   }
   else {
     if (iscont(s + posi))
-      luaL_error(L, "initial position is a continuation byte");
+      return luaL_error(L, "initial position is a continuation byte");
     if (n < 0) {
        while (n < 0 && posi > 0) {  /* move back */
          do {  /* find beginning of previous character */
@@ -194,7 +194,7 @@ static int byteoffset (lua_State *L) {
     lua_pushinteger(L, posi + 1);
   else  /* no such character */
     lua_pushnil(L);
-  return 1;  
+  return 1;
 }
 
 

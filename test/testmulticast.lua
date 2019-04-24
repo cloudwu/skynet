@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local mc = require "multicast"
-local dc = require "datacenter"
+local mc = require "skynet.multicast"
+local dc = require "skynet.datacenter"
 
 local mode = ...
 

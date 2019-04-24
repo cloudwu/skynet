@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet_malloc.h"
 
 #include <stdlib.h>
@@ -87,8 +89,8 @@ lnewbuffer(lua_State *L) {
 	Comment: The table pool record all the buffers chunk, 
 	and the first index [1] is a lightuserdata : free_node. We can always use this pointer for struct buffer_node .
 	The following ([2] ...)  userdatas in table pool is the buffer chunk (for struct buffer_node), 
-	we never free them until the VM closed. The size of first chunk ([2]) is 8 struct buffer_node,
-	and the second size is 16 ... The largest size of chunk is LARGE_PAGE_NODE (4096)
+	we never free them until the VM closed. The size of first chunk ([2]) is 16 struct buffer_node,
+	and the second size is 32 ... The largest size of chunk is LARGE_PAGE_NODE (4096)
 
 	lpushbbuffer will get a free struct buffer_node from table pool, and then put the msg/size in it.
 	lpopbuffer return the struct buffer_node back to table pool (By calling return_free_node).
@@ -255,6 +257,9 @@ static int
 lclearbuffer(lua_State *L) {
 	struct socket_buffer * sb = lua_touserdata(L, 1);
 	if (sb == NULL) {
+		if (lua_isnil(L, 1)) {
+			return 0;
+		}
 		return luaL_error(L, "Need buffer object at param 1");
 	}
 	luaL_checktype(L,2,LUA_TTABLE);
@@ -565,8 +570,9 @@ lsendlow(lua_State *L) {
 	int id = luaL_checkinteger(L, 1);
 	int sz = 0;
 	void *buffer = get_buffer(L, 2, &sz);
-	skynet_socket_send_lowpriority(ctx, id, buffer, sz);
-	return 0;
+	int err = skynet_socket_send_lowpriority(ctx, id, buffer, sz);
+	lua_pushboolean(L, !err);
+	return 1;
 }
 
 static int
@@ -674,8 +680,74 @@ ludp_address(lua_State *L) {
 	return 2;
 }
 
-int
-luaopen_socketdriver(lua_State *L) {
+static void
+getinfo(lua_State *L, struct socket_info *si) {
+	lua_newtable(L);
+	lua_pushinteger(L, si->id);
+	lua_setfield(L, -2, "id");
+	lua_pushinteger(L, si->opaque);
+	lua_setfield(L, -2, "address");
+	switch(si->type) {
+	case SOCKET_INFO_LISTEN:
+		lua_pushstring(L, "LISTEN");
+		lua_setfield(L, -2, "type");
+		lua_pushinteger(L, si->read);
+		lua_setfield(L, -2, "accept");
+		lua_pushinteger(L, si->rtime);
+		lua_setfield(L, -2, "rtime");
+		if (si->name[0]) {
+			lua_pushstring(L, si->name);
+			lua_setfield(L, -2, "sock");
+		}
+		return;
+	case SOCKET_INFO_TCP:
+		lua_pushstring(L, "TCP");
+		break;
+	case SOCKET_INFO_UDP:
+		lua_pushstring(L, "UDP");
+		break;
+	case SOCKET_INFO_BIND:
+		lua_pushstring(L, "BIND");
+		break;
+	default:
+		lua_pushstring(L, "UNKNOWN");
+		lua_setfield(L, -2, "type");
+		return;
+	}
+	lua_setfield(L, -2, "type");
+	lua_pushinteger(L, si->read);
+	lua_setfield(L, -2, "read");
+	lua_pushinteger(L, si->write);
+	lua_setfield(L, -2, "write");
+	lua_pushinteger(L, si->wbuffer);
+	lua_setfield(L, -2, "wbuffer");
+	lua_pushinteger(L, si->rtime);
+	lua_setfield(L, -2, "rtime");
+	lua_pushinteger(L, si->wtime);
+	lua_setfield(L, -2, "wtime");
+	if (si->name[0]) {
+		lua_pushstring(L, si->name);
+		lua_setfield(L, -2, "peer");
+	}
+}
+
+static int
+linfo(lua_State *L) {
+	lua_newtable(L);
+	struct socket_info * si = skynet_socket_info();
+	struct socket_info * temp = si;
+	int n = 0;
+	while (temp) {
+		getinfo(L, temp);
+		lua_seti(L, -2, ++n);
+		temp = temp->next;
+	}
+	socket_info_release(si);
+	return 1;
+}
+
+LUAMOD_API int
+luaopen_skynet_socketdriver(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "buffer", lnewbuffer },
@@ -687,6 +759,7 @@ luaopen_socketdriver(lua_State *L) {
 		{ "readline", lreadline },
 		{ "str2p", lstr2p },
 		{ "header", lheader },
+		{ "info", linfo },
 
 		{ "unpack", lunpack },
 		{ NULL, NULL },

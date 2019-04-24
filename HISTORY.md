@@ -1,4 +1,93 @@
-v1.0.0-rc2 (2015-3-7)
+v1.2.0 (2018-11-6)
+-----------
+* Improve cluster support
+* Improve mongodb driver
+* Improve redis driver
+* Improve socket concurrent write
+* Improve socket channel
+* Improve service gate
+* Improve udp support
+* Add skynet.ignoreret
+* Add skynet.trace
+* Add skynet.context
+* Improve skynet.wait/wakeup
+* Add socket.netstat
+* Add socketchannel.overload
+* Fix memory leak for dead service
+* lua update to 5.3.5
+* jemalloc update to 5.1.0
+
+v1.1.0 (2017-10-31)
+-----------
+* add socket.disconnected()
+* fix bugs : see comments for detail
+
+v1.1.0-rc (2017-7-18)
+-----------
+* config file : support include
+* debug console : User config binding IP
+* debug console : Add call command
+* debug console : Report error message of inject code
+* debug console : Change response message
+* sharedata : Add sharedata.flush
+* sharedata : Add sharedata.deepcopy
+* cluster : Add cluster.send
+* cluster : Add API to update config table
+* skynet : Add skynet.state
+* skynet : Keep the order of skynet.wakeup
+* skynet : Add a MEMORY_CHECK macro for debugging
+* httpc : Add httpc.timeout
+* mongo driver : sort support multi-key
+* bson : Check utf8 string
+* bson : No longer support numberic key 
+* daemon mode: Can output the error messages
+* sproto : Support decimal number
+* sproto: Support binary type
+* sproto: Support response nil
+* crypt: Add crypt.hmac64_md5
+* redis: Add redis-cluster support
+* socket server : Optimize socket write (Try direct write from worker thread first)
+* Add prefix skynet to all skynet lua modules
+* datasheet : New module for replacement of sharedata
+* jemalloc : Update to 5.0.1
+* lua : Update to 5.3.4
+* lpeg : Update to 1.0.1
+
+v1.0.0 (2016-7-11)
+-----------
+* Version 1.0.0 Released
+
+v1.0.0-rc5 (2016-7-4)
+-----------
+* MongoDB : Support auth_scram_sha1
+* MongoDB : Auto determine primary host
+* Bugfix : memory leak in multicast
+* Bugfix : Lua 5.3.3
+* Bson : support meta array
+
+v1.0.0-rc4 (2016-6-13)
+-----------
+* Update lua to 5.3.3
+* Update jemalloc to 4.2.1
+* Add debug console command ping
+* Lua bson support __pairs
+* Add mongo.createIndexes and fix bug in old mongo.createIndex
+* Handle signal HUP to reopen log file (for logrotate)
+
+v1.0.0-rc3 (2016-5-9)
+-----------
+* Update jemalloc 4.1.1
+* Update lua 5.3.3 rc1
+* Update sproto to support encoding empty table
+* Make skynet.init stable (keep order)
+* skynet.getenv can return empty string
+* Add lua VM memory warning
+* lua VM support memory limit
+* skynet.pcall suport varargs
+* Bugfix : Global name query
+* Bugfix : snax.queryglobal
+
+v1.0.0-rc2 (2016-3-7)
 -----------
 * Fix a bug in lua 5.3.2
 * Update sproto (fix bugs and add ud for package)
