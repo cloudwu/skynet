@@ -276,9 +276,10 @@ static void reallymarkobject (global_State *g, GCObject *o) {
       break;
     }
     case LUA_TTABLE: {
-      if (!isshared(o))
+      if (!isshared(o)) {
         white2gray(o);
         linkgclist(gco2t(o), g->gray);
+      }
       break;
     }
     case LUA_TTHREAD: {
