@@ -6,6 +6,7 @@ local assert = assert
 local pairs = pairs
 local pcall = pcall
 local table = table
+local tremove = table.remove
 
 local profile = require "skynet.profile"
 
@@ -70,7 +71,7 @@ local suspend
 ----- monitor exit
 
 local function dispatch_error_queue()
-	local session = table.remove(error_queue,1)
+	local session = tremove(error_queue,1)
 	if session then
 		local co = session_id_coroutine[session]
 		session_id_coroutine[session] = nil
@@ -105,7 +106,7 @@ end
 local coroutine_pool = setmetatable({}, { __mode = "kv" })
 
 local function co_create(f)
-	local co = table.remove(coroutine_pool)
+	local co = tremove(coroutine_pool)
 	if co == nil then
 		co = coroutine_create(function(...)
 			f(...)
@@ -148,7 +149,7 @@ local function co_create(f)
 end
 
 local function dispatch_wakeup()
-	local token = table.remove(wakeup_queue,1)
+	local token = tremove(wakeup_queue,1)
 	if token then
 		local session = sleep_session[token]
 		if session then
@@ -597,11 +598,10 @@ end
 function skynet.dispatch_message(...)
 	local succ, err = pcall(raw_dispatch_message,...)
 	while true do
-		local key,co = next(fork_queue)
+		local co = tremove(fork_queue,1)
 		if co == nil then
 			break
 		end
-		fork_queue[key] = nil
 		local fork_succ, fork_err = pcall(suspend,co,coroutine_resume(co))
 		if not fork_succ then
 			if succ then
