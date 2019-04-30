@@ -49,6 +49,26 @@ lcurrent(lua_State *L) {
 	return 1;
 }
 
+static int
+ldumpheap(lua_State *L) {
+	mallctl_cmd("prof.dump");
+	return 0;
+}
+
+static int
+lprofactive(lua_State *L) {
+	bool *pval, active;
+	if (lua_isnone(L, 1)) {
+		pval = NULL;
+	} else {
+		active = lua_toboolean(L, 1) ? true : false;
+		pval = &active;
+	}
+	bool ret = mallctl_bool("prof.active", pval);
+	lua_pushboolean(L, ret);
+	return 1;
+}
+
 LUAMOD_API int
 luaopen_skynet_memory(lua_State *L) {
 	luaL_checkversion(L);
@@ -62,6 +82,8 @@ luaopen_skynet_memory(lua_State *L) {
 		{ "ssinfo", luaS_shrinfo },
 		{ "ssexpand", lexpandshrtbl },
 		{ "current", lcurrent },
+		{ "dumpheap", ldumpheap },
+		{ "profactive", lprofactive },
 		{ NULL, NULL },
 	};
 

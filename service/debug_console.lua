@@ -160,6 +160,8 @@ function COMMAND.help()
 		call = "call address ...",
 		trace = "trace address [proto] [on|off]",
 		netstat = "netstat : show netstat",
+		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
+		dumpheap = "dumpheap : dump heap profilling",
 	}
 end
 
@@ -421,4 +423,19 @@ function COMMAND.netstat()
 		convert_stat(info)
 	end
 	return stat
+end
+
+function COMMAND.dumpheap()
+	memory.dumpheap()
+end
+
+function COMMAND.profactive(flag)
+	if flag ~= nil then
+		if flag == "on" or flag == "off" then
+			flag = toboolean(flag)
+		end
+		memory.profactive(flag)
+	end
+	local active = memory.profactive()
+	return "heap profilling is ".. (active and "active" or "deactive")
 end
