@@ -65,10 +65,10 @@ get_allocated_field(uint32_t handle) {
 	return &data->allocated;
 }
 
-inline static void 
+inline static void
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
 	ATOM_ADD(&_used_memory, __n);
-	ATOM_INC(&_memory_block); 
+	ATOM_INC(&_memory_block);
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
 		ATOM_ADD(allocated, __n);
@@ -126,12 +126,29 @@ static void malloc_oom(size_t size) {
 	abort();
 }
 
-void 
+void
 memory_info_dump(void) {
 	je_malloc_stats_print(0,0,0);
 }
 
-size_t 
+bool
+mallctl_bool(const char* name, bool* newval) {
+	bool v = 0;
+	size_t len = sizeof(v);
+	if(newval) {
+		je_mallctl(name, &v, &len, newval, sizeof(bool));
+	} else {
+		je_mallctl(name, &v, &len, NULL, 0);
+	}
+	return v;
+}
+
+int
+mallctl_cmd(const char* name) {
+	return je_mallctl(name, NULL, NULL, NULL, 0);
+}
+
+size_t
 mallctl_int64(const char* name, size_t* newval) {
 	size_t v = 0;
 	size_t len = sizeof(v);
@@ -144,7 +161,7 @@ mallctl_int64(const char* name, size_t* newval) {
 	return v;
 }
 
-int 
+int
 mallctl_opt(const char* name, int* newval) {
 	int v = 0;
 	size_t len = sizeof(v);
@@ -223,18 +240,18 @@ skynet_posix_memalign(void **memptr, size_t alignment, size_t size) {
 #define raw_realloc realloc
 #define raw_free free
 
-void 
+void
 memory_info_dump(void) {
 	skynet_error(NULL, "No jemalloc");
 }
 
-size_t 
+size_t
 mallctl_int64(const char* name, size_t* newval) {
 	skynet_error(NULL, "No jemalloc : mallctl_int64 %s.", name);
 	return 0;
 }
 
-int 
+int
 mallctl_opt(const char* name, int* newval) {
 	skynet_error(NULL, "No jemalloc : mallctl_opt %s.", name);
 	return 0;
@@ -275,7 +292,7 @@ skynet_strdup(const char *str) {
 	return ret;
 }
 
-void * 
+void *
 skynet_lalloc(void *ptr, size_t osize, size_t nsize) {
 	if (nsize == 0) {
 		raw_free(ptr);
