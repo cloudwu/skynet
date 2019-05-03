@@ -41,7 +41,7 @@ $(JEMALLOC_STATICLIB) : 3rd/jemalloc/Makefile
 	git submodule update --init
 
 3rd/jemalloc/Makefile : | 3rd/jemalloc/autogen.sh
-	cd 3rd/jemalloc && ./autogen.sh --with-jemalloc-prefix=je_ --disable-valgrind
+	cd 3rd/jemalloc && ./autogen.sh --with-jemalloc-prefix=je_ --enable-prof
 
 jemalloc : $(MALLOC_STATICLIB)
 
