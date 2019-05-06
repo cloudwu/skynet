@@ -2,13 +2,14 @@ local skynet = require "skynet"
 local sc = require "skynet.socketchannel"
 local socket = require "skynet.socket"
 local cluster = require "skynet.cluster.core"
-local ignoreret = skynet.ignoreret
 
 local channel
 local session = 1
+local node, nodename = ...
 
 local command = {}
 local waiting = {}
+
 
 local function send_request(addr, msg, sz)
 	-- msg is a local pointer, cluster.packrequest will free it
@@ -16,7 +17,6 @@ local function send_request(addr, msg, sz)
 	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
 	session = new_session
 
-	-- node_channel[node] may yield or throw error
 	local tracetag = skynet.tracetag()
 	if tracetag then
 		if tracetag:sub(1,1) ~= "(" then
@@ -63,7 +63,6 @@ function command.push(addr, msg, sz)
 		session = new_session
 	end
 
-	-- node_channel[node] may yield or throw error
 	channel:request(request, nil, padding)
 end
 
@@ -80,7 +79,7 @@ function command.changenode(host, port)
 			response = read_response,
 			nodelay = true,
 		}
-	succ, err = pcall(c.connect, c, true)
+	local succ, err = pcall(c.connect, c, true)
 	if channel then
 		channel:close()
 	end
@@ -103,6 +102,3 @@ skynet.start(function()
 		f(...)
 	end)
 end)
-
-
-
