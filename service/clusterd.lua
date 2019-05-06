@@ -1,22 +1,13 @@
 local skynet = require "skynet"
 require "skynet.manager"
-local sc = require "skynet.socketchannel"
-local socket = require "skynet.socket"
 local cluster = require "skynet.cluster.core"
 
 local config_name = skynet.getenv "cluster"
 local node_address = {}
-local node_session = {}
 local node_sender = {}
 local command = {}
 local config = {}
 local nodename = cluster.nodename()
-
-local function read_response(sock)
-	local sz = socket.header(sock:read(2))
-	local msg = sock:read(sz)
-	return cluster.unpackresponse(msg)	-- session, ok, data, padding
-end
 
 local connecting = {}
 
@@ -44,7 +35,7 @@ local function open_channel(t, key)
 		local host, port = string.match(address, "([^:]+):(.*)$")
 		c = node_sender[key]
 		if c == nil then
-			c = skynet.newservice "clustersender"
+			c = skynet.newservice("clustersender", key, nodename)
 			if node_sender[key] then
 				-- double check
 				skynet.kill(c)
