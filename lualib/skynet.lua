@@ -7,6 +7,7 @@ local pairs = pairs
 local pcall = pcall
 local table = table
 local tremove = table.remove
+local tinsert = table.insert
 
 local profile = require "skynet.profile"
 
@@ -90,13 +91,13 @@ local function _error_dispatch(error_session, error_source)
 		end
 		for session, srv in pairs(watching_session) do
 			if srv == error_source then
-				table.insert(error_queue, session)
+				tinsert(error_queue, session)
 			end
 		end
 	else
 		-- capture an error for error_session
 		if watching_session[error_session] then
-			table.insert(error_queue, error_session)
+			tinsert(error_queue, error_session)
 		end
 	end
 end
@@ -480,7 +481,7 @@ end
 
 function skynet.wakeup(token)
 	if sleep_session[token] then
-		table.insert(wakeup_queue, token)
+		tinsert(wakeup_queue, token)
 		return true
 	end
 end
@@ -527,7 +528,7 @@ function skynet.fork(func,...)
 		local args = { ... }
 		co = co_create(function() func(table.unpack(args,1,n)) end)
 	end
-	table.insert(fork_queue, co)
+	tinsert(fork_queue, co)
 	return co
 end
 
@@ -689,7 +690,7 @@ function skynet.init(f, name)
 	if init_func == nil then
 		f()
 	else
-		table.insert(init_func, f)
+		tinsert(init_func, f)
 		if name then
 			assert(type(name) == "string")
 			assert(init_func[name] == nil)
