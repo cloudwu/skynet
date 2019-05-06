@@ -52,7 +52,9 @@ function tlshelper.readfunc(fd, tls_ctx)
                 local ds = readfunc(sz)
                 s = tls_ctx:read(ds)
             end
-            return read_buff .. s
+            s = read_buff .. s
+            read_buff = ""
+            return s
         else
             while #read_buff < sz do
                 local ds = readfunc()
