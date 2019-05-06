@@ -1094,21 +1094,20 @@ save(const char *key, const void * proto) {
   SPIN_LOCK(&CC)
     if (CC.L == NULL) {
       init();
-      L = CC.L;
-    } else {
-      L = CC.L;
-      lua_pushstring(L, key);
-      lua_pushvalue(L, -1);
-      lua_rawget(L, LUA_REGISTRYINDEX);
-      result = lua_touserdata(L, -1); /* stack: key oldvalue */
-      if (result == NULL) {
-        lua_pop(L,1);
-        lua_pushlightuserdata(L, (void *)proto);
-        lua_rawset(L, LUA_REGISTRYINDEX);
-      } else {
-        lua_pop(L,2);
-      }
     }
+    L = CC.L;
+    lua_pushstring(L, key);
+    lua_pushvalue(L, -1);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    result = lua_touserdata(L, -1); /* stack: key oldvalue */
+    if (result == NULL) {
+      lua_pop(L,1);
+      lua_pushlightuserdata(L, (void *)proto);
+      lua_rawset(L, LUA_REGISTRYINDEX);
+    } else {
+      lua_pop(L,2);
+    }
+    
   SPIN_UNLOCK(&CC)
   return result;
 }
