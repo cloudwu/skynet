@@ -84,6 +84,7 @@ local function sharetable_service()
 		local m = files[filename]
 		if m == nil then
 			skynet.ret()
+			return
 		end
 		local ptr = query_file(source, filename)
 		skynet.ret(skynet.pack(ptr))
@@ -191,7 +192,9 @@ end
 
 function sharetable.query(filename)
 	local newptr = skynet.call(sharetable.address, "lua", "query", filename)
-	return core.clone(newptr)
+	if newptr then
+		return core.clone(newptr)
+	end
 end
 
 return sharetable
