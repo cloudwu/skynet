@@ -119,19 +119,20 @@ _bio_read(lua_State* L, struct tls_context* tls_p) {
     if(pending >0) {
         luaL_Buffer b;
         luaL_buffinit(L, &b);
-        do {
+        while(pending > 0) {
             read = BIO_read(tls_p->out_bio, outbuff, sizeof(outbuff));
-            // printf("_bio_read:%d pending:%d\n", read, pending);
-            if(read > sizeof(outbuff)) {
-                luaL_error(L, "invalid BIO_read:%d", read);
-            }else if(read == -2) {
-                luaL_error(L, "BIO_read not implemented in the specific BIO type");
-            }else if (read > 0) {
+            // printf("BIO_read read:%d pending:%d\n", read, pending);
+            if(read <= 0) {
+                luaL_error(L, "BIO_read error:%d", read);
+            }else if(read <= sizeof(outbuff)) {
                 all_read += read;
                 luaL_addlstring(&b, (const char*)outbuff, read);
+            }else {
+                luaL_error(L, "invalid BIO_read:%d", read);
             }
-        }while(read == sizeof(outbuff));
-        if(all_read>0){
+            pending = BIO_ctrl_pending(tls_p->out_bio);
+        }
+        if(all_read>0) {
             luaL_pushresult(&b);
         }
     }
@@ -145,13 +146,14 @@ _bio_write(lua_State* L, struct tls_context* tls_p, const char* s, size_t len) {
     size_t sz = len;
     while(sz > 0) {
         int written = BIO_write(tls_p->in_bio, p, sz);
-        if(written > sz) {
-            luaL_error(L, "invalid BIO_write");
-        }else if(written > 0) {
+        // printf("BIO_write written:%d sz:%zu\n", written, sz);
+        if(written <= 0) {
+            luaL_error(L, "BIO_write error:%d", written);
+        }else if (written <= sz) {
             p += written;
             sz -= written;
-        }else if (written == -2) {
-            luaL_error(L, "BIO_write not implemented in the specific BIO type");
+        }else {
+            luaL_error(L, "invalid BIO_write:%d", written);
         }
     }
 }
@@ -224,7 +226,7 @@ _ltls_context_read(lua_State* L) {
         }else if(read <= sizeof(outbuff)) {
             luaL_addlstring(&b, outbuff, read);
         }else {
-            luaL_error(L, "invalid SSL_read");
+            luaL_error(L, "invalid SSL_read:%d", read);
         }
     }while(true);
     luaL_pushresult(&b);
@@ -247,7 +249,7 @@ _ltls_context_write(lua_State* L) {
             unencrypted_data += written;
             slen -= written;
         }else {
-            luaL_error(L, "invalid SSL_write");
+            luaL_error(L, "invalid SSL_write:%d", written);
         }
     }
 
