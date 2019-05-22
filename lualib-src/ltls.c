@@ -215,16 +215,16 @@ _ltls_context_read(lua_State* L) {
 
     do {
         read = SSL_read(tls_p->ssl, outbuff, sizeof(outbuff));
-        if(read < 0) {
+        if(read <= 0) {
             int err = SSL_get_error(tls_p->ssl, read);
             if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
                 break;
             }
             luaL_error(L, "SSL_read error:%d", err);
-        }else if(read > sizeof(outbuff)) {
-            luaL_error(L, "invalid SSL_read");
-        }else if (read > 0) {
+        }else if(read <= sizeof(outbuff)) {
             luaL_addlstring(&b, outbuff, read);
+        }else {
+            luaL_error(L, "invalid SSL_read");
         }
     }while(true);
     luaL_pushresult(&b);
@@ -238,16 +238,16 @@ _ltls_context_write(lua_State* L) {
     size_t slen = 0;
     char* unencrypted_data = (char*)lua_tolstring(L, 2, &slen);
 
-    while(slen >0) {
+    while(slen > 0) {
         int written = SSL_write(tls_p->ssl, unencrypted_data,  slen);
-        if(written < 0) {
+        if(written <= 0) {
             int err = SSL_get_error(tls_p->ssl, written);
             luaL_error(L, "SSL_write error:%d", err);
-        }else if(written > slen) {
-            luaL_error(L, "invalid SSL_write");
-        }else if(written>0) {
+        }else if(written <= slen) {
             unencrypted_data += written;
             slen -= written;
+        }else {
+            luaL_error(L, "invalid SSL_write");
         }
     }
 
