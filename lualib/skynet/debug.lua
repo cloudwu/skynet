@@ -93,6 +93,27 @@ local function init(skynet, export)
 			skynet.ret()
 		end
 
+		local old_snapshot
+		function dbgcmd.SNAPSHOT()
+			local snapshot = require "snapshot"
+			local construct_indentation = (require "skynet.snapshot_utils").construct_indentation
+			collectgarbage "collect"
+			local new_snapshot = snapshot()
+			if not old_snapshot then
+				old_snapshot = new_snapshot
+				return skynet.ret(skynet.pack({}))
+			end
+			local diff = {}
+			for k,v in pairs(new_snapshot) do
+				if not old_snapshot[k] then
+					diff[k] = v
+				end
+			end
+			old_snapshot = new_snapshot
+			local ret = construct_indentation(diff)
+			skynet.ret(skynet.pack(ret))
+		end
+
 		return dbgcmd
 	end -- function init_dbgcmd
 
