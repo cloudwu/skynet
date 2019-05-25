@@ -335,8 +335,11 @@ markref(struct ssm_ref *r, TString *s, int changeref) {
 	unsigned int h = s->hash;
 	int slot = lmod(h, r->hsize);
 	TString * hs = r->hash[slot];
-	if (hs == s)
+	if (hs == s){
+		if (changeref)
+			DEC_SREF(s);
 		return;
+	}
 	++r->nuse;
 	if (r->nuse >= r->hsize && r->hsize <= MAX_INT/2) {
 		expand_ref(r, changeref);
@@ -346,6 +349,8 @@ markref(struct ssm_ref *r, TString *s, int changeref) {
 	if (hs != NULL) {
 		if (hs == s) {
 			--r->nuse;
+			if (changeref)
+				DEC_SREF(s);
 			return;
 		}
 		insert_ref(r, hs);
