@@ -230,9 +230,10 @@ struct shrmap {
 
 static struct shrmap SSM;
 
-#define ADD_SREF(ts) ATOM_INC(&((ts)->u.ref))
-#define DEC_SREF(ts) ATOM_DEC(&((ts)->u.ref))
+#define ADD_SREF(ts) do {if(ATOM_INC(&((ts)->u.ref))==1) ATOM_DEC(&SSM.garbage);}while(0)
+#define DEC_SREF(ts) do {if(ATOM_DEC(&((ts)->u.ref))==0) ATOM_INC(&SSM.garbage);}while(0)
 #define ZERO_SREF(ts) ((ts)->u.ref == 0)
+#define FREE_SREF(ts) do {free(ts);ATOM_DEC(&SSM.total);ATOM_DEC(&SSM.garbage);}while(0)
 
 static struct ssm_ref *
 newref(int size) {
@@ -526,9 +527,6 @@ exist(struct ssm_ref *r, TString *s) {
 static void
 release_tstring(TString *s) {
 	DEC_SREF(s);
-	if (ZERO_SREF(s)) {
-		ATOM_INC(&SSM.garbage);
-	}
 }
 
 static int
@@ -664,7 +662,7 @@ shrstr_deletepage(struct shrmap_slot *s, int sz) {
 			TString *str = s[i].str;
 			while (str) {
 				TString * next = (TString *)str->next;
-				free(str);
+				FREE_SREF(str);
 				str = next;
 			}
 		}
@@ -694,9 +692,7 @@ shrstr_rehash(struct shrmap *s, int slotid) {
 		while (str) {
 			TString * next = (TString *)str->next;
 			if (ZERO_SREF(str)) {
-				free(str);
-				ATOM_DEC(&SSM.total);
-				ATOM_DEC(&SSM.garbage);
+				FREE_SREF(str);
 			} else {
 				int newslotid = lmod(str->hash, s->rwslots);
 				struct shrmap_slot *newslot = &s->readwrite[newslotid];
@@ -777,10 +773,8 @@ sweep_slot(struct shrmap *s, int i) {
 		while (ts) {
 			if (ZERO_SREF(ts)) {
 				*ref = (TString *)ts->next;
-				free(ts);
+				FREE_SREF(ts);
 				ts = *ref;
-				ATOM_DEC(&SSM.total);
-				ATOM_DEC(&SSM.garbage);
 				++n;
 			} else {
 				ref = (TString **)&(ts->next);
@@ -896,18 +890,13 @@ find_and_collect(struct shrmap_slot * slot, unsigned int h, const char *str, lu_
 		if (ts->hash == h &&
 			ts->shrlen == l &&
 			memcmp(str, ts+1, l) == 0) {
-			if (ZERO_SREF(ts)) {
-				ATOM_INC(&SSM.garbage);
-			}
 			ADD_SREF(ts);
 			break;
 		}
 		if (ZERO_SREF(ts)) {
 			*ref = (TString *)ts->next;
-			free(ts);
+			FREE_SREF(ts);
 			ts = *ref;
-			ATOM_DEC(&SSM.total);
-			ATOM_DEC(&SSM.garbage);
 		} else {
 			ref = (TString **)&(ts->next);
 			ts = *ref;
