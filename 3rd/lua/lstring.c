@@ -353,12 +353,10 @@ markref(struct ssm_ref *r, TString *s, int changeref) {
 			if (changeref)
 				DEC_SREF(s);
 			return;
-		} else {
-			insert_ref(r, s);
 		}
-	} else {
-		r->hash[slot] = s;
+		insert_ref(r, hs);
 	}
+	r->hash[slot] = s;
 }
 
 void
