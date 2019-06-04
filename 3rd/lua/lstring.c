@@ -353,10 +353,12 @@ markref(struct ssm_ref *r, TString *s, int changeref) {
 			if (changeref)
 				DEC_SREF(s);
 			return;
+		} else {
+			insert_ref(r, s);
 		}
-		insert_ref(r, hs);
+	} else {
+		r->hash[slot] = s;
 	}
-	r->hash[slot] = s;
 }
 
 void
@@ -431,12 +433,12 @@ mergeset(struct ssm_ref *set, struct ssm_ref * rset, int changeref) {
 	for (i=0;i<rset->hsize;i++) {
 		TString * s = rset->hash[i];
 		if (s) {
-			insert_ref(set, s);
+			markref(set, s, changeref);
 		}
 	}
 	for (i=0;i<rset->asize;i++) {
 		TString * s = rset->array[i];
-		insert_ref(set, s);
+		markref(set, s, changeref);
 	}
 	delete_ref(rset);
 	remove_duplicate(set, changeref);
