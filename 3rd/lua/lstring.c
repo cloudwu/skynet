@@ -524,11 +524,6 @@ exist(struct ssm_ref *r, TString *s) {
 	return 0;
 }
 
-static void
-release_tstring(TString *s) {
-	DEC_SREF(s);
-}
-
 static int
 collectref(struct collect_queue * c) {
 	int i;
@@ -547,7 +542,8 @@ collectref(struct collect_queue * c) {
 			if (s) {
 				if (!exist(mark, s) && !exist(fix, s)) {
 					save->hash[i] = NULL;
-					release_tstring(s);
+					--save->nuse;
+					DEC_SREF(s);
 					++total;
 				}
 			}
@@ -557,8 +553,9 @@ collectref(struct collect_queue * c) {
 			TString * s = save->array[i];
 			if (!exist(mark, s) && !exist(fix, s)) {
 				--save->asize;
+				--save->nuse;
 				save->array[i] = save->array[save->asize];
-				release_tstring(s);
+				DEC_SREF(s);
 				++total;
 			} else {
 				++i;
@@ -569,13 +566,13 @@ collectref(struct collect_queue * c) {
 		for (i=0;i<save->hsize;i++) {
 			TString * s = save->hash[i];
 			if (s) {
-				release_tstring(s);
+				DEC_SREF(s);
 				++total;
 			}
 		}
 		for (i=0;i<save->asize;i++) {
 			TString * s = save->array[i];
-			release_tstring(s);
+			DEC_SREF(s);
 			++total;
 		}
 		clear_vm(c);
