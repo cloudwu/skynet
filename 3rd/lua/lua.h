@@ -459,6 +459,11 @@ struct lua_Debug {
 
 /* }====================================================================== */
 
+/* Add by skynet */
+
+LUA_API lua_State * skynet_sig_L;
+LUA_API void (lua_checksig_)(lua_State *L);
+#define lua_checksig(L) if (skynet_sig_L) { lua_checksig_(L); }
 
 /******************************************************************************
 * Copyright (C) 1994-2018 Lua.org, PUC-Rio.
