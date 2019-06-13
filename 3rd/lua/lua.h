@@ -235,6 +235,7 @@ LUA_API void  (lua_pushlightuserdata) (lua_State *L, void *p);
 LUA_API int   (lua_pushthread) (lua_State *L);
 LUA_API void  (lua_clonefunction) (lua_State *L, const void * fp);
 LUA_API void  (lua_sharefunction) (lua_State *L, int index);
+LUA_API void  (lua_sharestring) (lua_State *L, int index);
 
 /*
 ** get functions (Lua -> stack)

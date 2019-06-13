@@ -6,8 +6,6 @@
 
 #include "lstring.h"
 #include "lobject.h"
-#include "ltable.h"
-#include "lstate.h"
 #include "lapi.h"
 #include "lgc.h"
 
@@ -44,15 +42,9 @@ mark_shared(lua_State *L) {
 				if (!lua_iscfunction(L, idx) || lua_getupvalue(L, idx, 1) != NULL)
 					luaL_error(L, "Invalid function");
 				break;
-			case LUA_TSTRING: {
-				const char *str = lua_tostring(L, idx);
-				TString *ts = (TString *)(str - sizeof(UTString));
-				if(ts->tt == LUA_TLNGSTR)
-					makeshared(ts);
-				else
-					luaS_fix(G(L), ts);
+			case LUA_TSTRING:
+				lua_sharestring(L, idx);
 				break;
-			}
 			default:
 				luaL_error(L, "Invalid type [%s]", lua_typename(L, t));
 				break;

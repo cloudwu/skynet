@@ -1049,6 +1049,18 @@ LUA_API void lua_sharefunction (lua_State *L, int index) {
   luaF_shareproto(f->p);
 }
 
+LUA_API void lua_sharestring (lua_State *L, int index) {
+  const char *str = lua_tostring(L, index);
+  if (str == NULL)
+    luaG_runerror(L, "need a string to share");
+
+  TString *ts = (TString *)(str - sizeof(UTString));
+  if(ts->tt == LUA_TLNGSTR)
+    makeshared(ts);
+  else
+    luaS_fix(G(L), ts);
+}
+
 LUA_API int lua_dump (lua_State *L, lua_Writer writer, void *data, int strip) {
   int status;
   TValue *o;
