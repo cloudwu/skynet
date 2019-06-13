@@ -733,8 +733,13 @@ static void freeobj (lua_State *L, GCObject *o) {
 }
 
 
-#define sweepwholelist(L,p)	sweeplist(L,p,MAX_LUMEM)
-static GCObject **sweeplist (lua_State *L, GCObject **p, lu_mem count);
+static void sweepwholelist (lua_State *L, GCObject **p) {
+  while (*p != NULL) {
+    GCObject *curr = *p;
+    *p = curr->next;  /* remove 'curr' from list */
+    freeobj(L, curr);  /* erase 'curr' */
+   }
+}
 
 
 /*
