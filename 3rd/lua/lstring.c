@@ -445,7 +445,7 @@ mergeset(struct ssm_ref *set, struct ssm_ref * rset, int changeref) {
 static void
 merge_last(struct collect_queue * c) {
 	void *key = c->key;
-	int hash = (int)((uintptr_t)key % VMHASHSLOTS);
+	int hash = (int)((size_t)key % VMHASHSLOTS);
 	struct shrmap * s = &SSM;
 	struct collect_queue * slot = s->vm[hash];
 	if (slot == NULL) {
@@ -485,7 +485,7 @@ merge_last(struct collect_queue * c) {
 static void
 clear_vm(struct collect_queue * c) {
 	void *key = c->key;
-	int hash = (int)((uintptr_t)key % VMHASHSLOTS);
+	int hash = (int)((size_t)key % VMHASHSLOTS);
 	struct shrmap * s = &SSM;
 	struct collect_queue * slot = s->vm[hash];
 	lua_assert(slot == c);
