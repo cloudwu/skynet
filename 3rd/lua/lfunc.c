@@ -155,6 +155,7 @@ void luaF_shareproto (Proto *f) {
   int i;
   if (f == NULL)
     return;
+  makeshared(f);
   MAKESHARED(f->source);
   for (i = 0; i < f->sizek; i++) {
     if (ttnov(&f->k[i]) == LUA_TSTRING)

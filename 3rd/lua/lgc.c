@@ -266,8 +266,10 @@ static void reallymarkobject (global_State *g, GCObject *o) {
       break;
     }
     case LUA_TLCL: {
-      white2gray(o);
-      linkgclist(gco2lcl(o), g->gray);
+      if (!isshared(o)) {
+        white2gray(o);
+        linkgclist(gco2lcl(o), g->gray);
+	  }
       break;
     }
     case LUA_TCCL: {
