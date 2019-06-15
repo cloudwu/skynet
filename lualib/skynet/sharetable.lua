@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local service = require "skynet.service"
 local core = require "skynet.sharetable.core"
+local is_sharedtable = core.is_sharedtable
 
 local function sharetable_service()
 	local skynet = require "skynet"
@@ -218,6 +219,7 @@ local getupvalue = debug.getupvalue
 local setupvalue = debug.setupvalue
 local getlocal = debug.getlocal
 local setlocal = debug.setlocal
+local getinfo = debug.getinfo
 
 local NILOBJ = {}
 local function insert_replace(old_t, new_t, replace_map)
@@ -257,7 +259,7 @@ local function resolve_replace(replace_map)
         assert(v ~= nil)
         local tv = type(v)
         local f = match[tv]
-        if record_map[v] then
+        if record_map[v] or is_sharedtable(v) then
             return
         end
 
@@ -339,14 +341,14 @@ local function resolve_replace(replace_map)
     end
 
     local function match_function(f)
-        local info = debug.getinfo(f)
+        local info = getinfo(f, "uf")
         match_funcinfo(info)
     end
 
     local function match_thread(co)
         local level = 1
         while true do
-            local info = debug.getinfo(co, level)
+            local info = getinfo(co, level, "uf")
             if not info then
                 break
             end

@@ -55,6 +55,17 @@ mark_shared(lua_State *L) {
 }
 
 static int
+lis_sharedtable(lua_State* L) {
+	int b = 0;
+	if(lua_type(L, 1) == LUA_TTABLE) {
+		Table * t = (Table *)lua_topointer(L, 1);
+		b = isshared(t);
+	}
+	lua_pushboolean(L, b);
+	return 1;
+}
+
+static int
 make_matrix(lua_State *L) {
 	// turn off gc , because marking shared will prevent gc mark.
 	lua_gc(L, LUA_GCSTOP, 0);
@@ -212,6 +223,7 @@ luaopen_skynet_sharetable_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "clone", clone_table },
 		{ "matrix", matrix_from_file },
+		{ "is_sharedtable", lis_sharedtable },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L, l);
