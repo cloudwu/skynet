@@ -118,6 +118,7 @@ function CMD.update(name, t, ...)
 	if watch then
 		sharedata.host.markdirty(oldcobj)
 		for _,response in pairs(watch) do
+			sharedata.host.incref(newobj)
 			response(true, newobj)
 		end
 	end
@@ -138,6 +139,7 @@ end
 function CMD.monitor(name, obj)
 	local v = assert(pool[name])
 	if obj ~= v.obj then
+		sharedata.host.incref(v.obj)
 		return v.obj
 	end
 
