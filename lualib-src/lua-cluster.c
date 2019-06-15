@@ -4,6 +4,7 @@
 #include <lauxlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "skynet.h"
 
@@ -73,6 +74,11 @@ fill_header(lua_State *L, uint8_t *buf, int sz) {
 		BYTE 2/3 ; 2:multipart, 3:multipart end
 		DWORD SESSION
 		PADDING msgpart(sz)
+
+	trace
+		WORD stringsz + 1
+		BYTE 4
+		STRING tag
  */
 static int
 packreq_number(lua_State *L, int session, void * msg, uint32_t sz, int is_push) {
@@ -177,14 +183,14 @@ packrequest(lua_State *L, int is_push) {
 	} else {
 		multipak = packreq_string(L, session, msg, sz, is_push);
 	}
-	int current_session = session;
-	if (++session < 0) {
-		session = 1;
+	uint32_t new_session = (uint32_t)session + 1;
+	if (new_session > INT32_MAX) {
+		new_session = 1;
 	}
-	lua_pushinteger(L, session);
+	lua_pushinteger(L, new_session);
 	if (multipak) {
 		lua_createtable(L, multipak, 0);
-		packreq_multi(L, current_session, msg, sz);
+		packreq_multi(L, session, msg, sz);
 		skynet_free(msg);
 		return 3;
 	} else {
@@ -203,18 +209,43 @@ lpackpush(lua_State *L) {
 	return packrequest(L, 1);
 }
 
+static int
+lpacktrace(lua_State *L) {
+	size_t sz;
+	const char * tag = luaL_checklstring(L, 1, &sz);
+	if (sz > 0x8000) {
+		return luaL_error(L, "trace tag is too long : %d", (int) sz);
+	}
+	uint8_t buf[TEMP_LENGTH];
+	buf[2] = 4;
+	fill_header(L, buf, sz+1);
+	memcpy(buf+3, tag, sz);
+	lua_pushlstring(L, (const char *)buf, sz+3);
+	return 1;
+}
+
 /*
 	string packed message
 	return 	
 		uint32_t or string addr
 		int session
-		string msg
+		lightuserdata msg
+		int sz
 		boolean padding
+		boolean is_push
  */
 
 static inline uint32_t
 unpack_uint32(const uint8_t * buf) {
 	return buf[0] | buf[1]<<8 | buf[2]<<16 | buf[3]<<24;
+}
+
+static void
+return_buffer(lua_State *L, const char * buffer, int sz) {
+	void * ptr = skynet_malloc(sz);
+	memcpy(ptr, buffer, sz);
+	lua_pushlightuserdata(L, ptr);
+	lua_pushinteger(L, sz);
 }
 
 static int
@@ -226,14 +257,15 @@ unpackreq_number(lua_State *L, const uint8_t * buf, int sz) {
 	uint32_t session = unpack_uint32(buf+5);
 	lua_pushinteger(L, address);
 	lua_pushinteger(L, session);
-	lua_pushlstring(L, (const char *)buf+9, sz-9);
+
+	return_buffer(L, (const char *)buf+9, sz-9);
 	if (session == 0) {
 		lua_pushnil(L);
 		lua_pushboolean(L,1);	// is_push, no reponse
-		return 5;
+		return 6;
 	}
 
-	return 3;
+	return 4;
 }
 
 static int
@@ -246,11 +278,12 @@ unpackmreq_number(lua_State *L, const uint8_t * buf, int sz, int is_push) {
 	uint32_t size = unpack_uint32(buf+9);
 	lua_pushinteger(L, address);
 	lua_pushinteger(L, session);
+	lua_pushnil(L);
 	lua_pushinteger(L, size);
 	lua_pushboolean(L, 1);	// padding multi part
 	lua_pushboolean(L, is_push);
 
-	return 5;
+	return 6;
 }
 
 static int
@@ -262,10 +295,16 @@ unpackmreq_part(lua_State *L, const uint8_t * buf, int sz) {
 	uint32_t session = unpack_uint32(buf+1);
 	lua_pushboolean(L, 0);	// no address
 	lua_pushinteger(L, session);
-	lua_pushlstring(L, (const char *)buf+5, sz-5);
+	return_buffer(L, (const char *)buf+5, sz-5);
 	lua_pushboolean(L, padding);
 
-	return 4;
+	return 5;
+}
+
+static int
+unpacktrace(lua_State *L, const char * buf, int sz) {
+	lua_pushlstring(L, buf + 1, sz - 1);
+	return 1;
 }
 
 static int
@@ -280,14 +319,14 @@ unpackreq_string(lua_State *L, const uint8_t * buf, int sz) {
 	lua_pushlstring(L, (const char *)buf+2, namesz);
 	uint32_t session = unpack_uint32(buf + namesz + 2);
 	lua_pushinteger(L, (uint32_t)session);
-	lua_pushlstring(L, (const char *)buf+2+namesz+4, sz - namesz - 6);
+	return_buffer(L, (const char *)buf+2+namesz+4, sz - namesz - 6);
 	if (session == 0) {
 		lua_pushnil(L);
 		lua_pushboolean(L,1);	// is_push, no reponse
-		return 5;
+		return 6;
 	}
 
-	return 3;
+	return 4;
 }
 
 static int
@@ -303,18 +342,26 @@ unpackmreq_string(lua_State *L, const uint8_t * buf, int sz, int is_push) {
 	uint32_t session = unpack_uint32(buf + namesz + 2);
 	uint32_t size = unpack_uint32(buf + namesz + 6);
 	lua_pushinteger(L, session);
+	lua_pushnil(L);
 	lua_pushinteger(L, size);
 	lua_pushboolean(L, 1);	// padding multipart
 	lua_pushboolean(L, is_push);
 
-	return 5;
+	return 6;
 }
 
 static int
 lunpackrequest(lua_State *L) {
-	size_t ssz;
-	const char *msg = luaL_checklstring(L,1,&ssz);
-	int sz = (int)ssz;
+	int sz;
+	const char *msg;
+	if (lua_type(L, 1) == LUA_TLIGHTUSERDATA) {
+		msg = (const char *)lua_touserdata(L, 1);
+		sz = luaL_checkinteger(L, 2);
+	} else {
+		size_t ssz;
+		msg = luaL_checklstring(L,1,&ssz);
+		sz = (int)ssz;
+	}
 	switch (msg[0]) {
 	case 0:
 		return unpackreq_number(L, (const uint8_t *)msg, sz);
@@ -325,6 +372,8 @@ lunpackrequest(lua_State *L) {
 	case 2:
 	case 3:
 		return unpackmreq_part(L, (const uint8_t *)msg, sz);
+	case 4:
+		return unpacktrace(L, msg, sz);
 	case '\x80':
 		return unpackreq_string(L, (const uint8_t *)msg, sz);
 	case '\x81':
@@ -474,6 +523,32 @@ lunpackresponse(lua_State *L) {
 	}
 }
 
+/*
+	table
+	pointer
+	sz
+
+	push (pointer/sz) as string into table, and free pointer
+ */
+static int
+lappend(lua_State *L) {
+	luaL_checktype(L, 1, LUA_TTABLE);
+	int n = lua_rawlen(L, 1);
+	if (lua_isnil(L, 2)) {
+		lua_settop(L, 3);
+		lua_seti(L, 1, n + 1);
+		return 0;
+	}
+	void * buffer = lua_touserdata(L, 2);
+	if (buffer == NULL)
+		return luaL_error(L, "Need lightuserdata");
+	int sz = luaL_checkinteger(L, 3);
+	lua_pushlstring(L, (const char *)buffer, sz);
+	skynet_free((void *)buffer);
+	lua_seti(L, 1, n+1);
+	return 0;
+}
+
 static int
 lconcat(lua_State *L) {
 	if (!lua_istable(L,1))
@@ -507,15 +582,41 @@ lconcat(lua_State *L) {
 	return 2;
 }
 
+static int
+lisname(lua_State *L) {
+	const char * name = lua_tostring(L, 1);
+	if (name && name[0] == '@') {
+		lua_pushboolean(L, 1);
+		return 1;
+	}
+	return 0;
+}
+
+static int
+lnodename(lua_State *L) {
+	pid_t pid = getpid();
+	char hostname[256];
+	if (gethostname(hostname, sizeof(hostname))==0) {
+		lua_pushfstring(L, "%s%d", hostname, (int)pid);
+	} else {
+		lua_pushfstring(L, "noname%d", (int)pid);
+	}
+	return 1;
+}
+
 LUAMOD_API int
-luaopen_cluster_core(lua_State *L) {
+luaopen_skynet_cluster_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "packrequest", lpackrequest },
 		{ "packpush", lpackpush },
+		{ "packtrace", lpacktrace },
 		{ "unpackrequest", lunpackrequest },
 		{ "packresponse", lpackresponse },
 		{ "unpackresponse", lunpackresponse },
+		{ "append", lappend },
 		{ "concat", lconcat },
+		{ "isname", lisname },
+		{ "nodename", lnodename },
 		{ NULL, NULL },
 	};
 	luaL_checkversion(L);

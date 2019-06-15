@@ -465,7 +465,7 @@ ltostring(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_netpack(lua_State *L) {
+luaopen_skynet_netpack(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "pop", lpop },

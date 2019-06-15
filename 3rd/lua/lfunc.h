@@ -1,5 +1,5 @@
 /*
-** $Id: lfunc.h,v 2.15 2015/01/13 15:49:11 roberto Exp $
+** $Id: lfunc.h,v 2.15.1.1 2017/04/19 17:39:34 roberto Exp $
 ** Auxiliary functions to manipulate prototypes and closures
 ** See Copyright Notice in lua.h
 */
@@ -47,7 +47,7 @@ struct UpVal {
 #define upisopen(up)	((up)->v != &(up)->u.value)
 
 
-LUAI_FUNC Proto *luaF_newproto (lua_State *L, SharedProto *sp);
+LUAI_FUNC Proto *luaF_newproto (lua_State *L);
 LUAI_FUNC CClosure *luaF_newCclosure (lua_State *L, int nelems);
 LUAI_FUNC LClosure *luaF_newLclosure (lua_State *L, int nelems);
 LUAI_FUNC void luaF_initupvals (lua_State *L, LClosure *cl);
@@ -56,6 +56,7 @@ LUAI_FUNC void luaF_close (lua_State *L, StkId level);
 LUAI_FUNC void luaF_freeproto (lua_State *L, Proto *f);
 LUAI_FUNC const char *luaF_getlocalname (const Proto *func, int local_number,
                                          int pc);
+LUAI_FUNC void luaF_shareproto (Proto *func);
 
 
 #endif

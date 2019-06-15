@@ -1,5 +1,5 @@
 /*
-** $Id: lstate.h,v 2.133 2016/12/22 13:08:50 roberto Exp $
+** $Id: lstate.h,v 2.133.1.1 2017/04/19 17:39:34 roberto Exp $
 ** Global State
 ** See Copyright Notice in lua.h
 */
@@ -26,6 +26,24 @@
 ** 'tobefnz': all objects ready to be finalized;
 ** 'fixedgc': all objects that are not to be collected (currently
 ** only small strings, such as reserved words).
+**
+** Moreover, there is another set of lists that control gray objects.
+** These lists are linked by fields 'gclist'. (All objects that
+** can become gray have such a field. The field is not the same
+** in all objects, but it always has this name.)  Any gray object
+** must belong to one of these lists, and all objects in these lists
+** must be gray:
+**
+** 'gray': regular gray objects, still waiting to be visited.
+** 'grayagain': objects that must be revisited at the atomic phase.
+**   That includes
+**   - black objects got in a write barrier;
+**   - all kinds of weak tables during propagation phase;
+**   - all threads.
+** 'weak': tables with weak values to be cleared;
+** 'ephemeron': ephemeron tables with white->white entries;
+** 'allweak': tables with weak keys and/or weak values to be cleared.
+** The last three lists are used only during the atomic phase.
 
 */
 
@@ -112,6 +130,8 @@ typedef struct CallInfo {
 #define setoah(st,v)	((st) = ((st) & ~CIST_OAH) | (v))
 #define getoah(st)	((st) & CIST_OAH)
 
+/* SSM (short string map) See lstring.c */
+struct ssm_ref;
 
 /*
 ** 'global state', shared by all threads of this state
@@ -123,9 +143,7 @@ typedef struct global_State {
   l_mem GCdebt;  /* bytes allocated not yet compensated by the collector */
   lu_mem GCmemtrav;  /* memory traversed by the GC */
   lu_mem GCestimate;  /* an estimate of the non-garbage memory in use */
-  stringtable strt;  /* hash table for strings */
   TValue l_registry;
-  unsigned int seed;  /* randomized seed for hashes */
   lu_byte currentwhite;
   lu_byte gcstate;  /* state of garbage collector */
   lu_byte gckind;  /* kind of GC running */
@@ -151,6 +169,9 @@ typedef struct global_State {
   TString *tmname[TM_N];  /* array with tag-method names */
   struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types */
   TString *strcache[STRCACHE_N][STRCACHE_M];  /* cache for strings in API */
+  struct ssm_ref *strsave;
+  struct ssm_ref *strmark;
+  struct ssm_ref *strfix;
 } global_State;
 
 

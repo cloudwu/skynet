@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local cluster = require "cluster"
-local snax = require "snax"
+local cluster = require "skynet.cluster"
+local snax = require "skynet.snax"
 
 skynet.start(function()
 	cluster.reload {

@@ -133,6 +133,7 @@ mc_remote(lua_State *L) {
 	lua_pushlightuserdata(L, pack->data);
 	lua_pushinteger(L, (lua_Integer)(pack->size));
 	skynet_free(pack);
+	skynet_free(ptr);
 	return 2;
 }
 
@@ -146,7 +147,7 @@ mc_nextid(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_multicast_core(lua_State *L) {
+luaopen_skynet_multicast_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "pack", mc_packlocal },
 		{ "unpack", mc_unpacklocal },

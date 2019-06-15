@@ -1,5 +1,5 @@
 /*
-** $Id: lobject.h,v 2.117 2016/08/01 19:51:24 roberto Exp $
+** $Id: lobject.h,v 2.117.1.1 2017/04/19 17:39:34 roberto Exp $
 ** Type definitions for Lua objects
 ** See Copyright Notice in lua.h
 */
@@ -307,7 +307,7 @@ typedef struct TString {
   unsigned int hash;
   union {
     size_t lnglen;  /* length for long strings */
-    struct TString *hnext;  /* linked list for hash table */
+    size_t ref;	/* reference count for short strings */
   } u;
 } TString;
 
@@ -400,7 +400,12 @@ typedef struct LocVar {
   int endpc;    /* first point where variable is dead */
 } LocVar;
 
-typedef struct SharedProto {
+
+/*
+** Function Prototypes
+*/
+typedef struct Proto {
+  CommonHeader;
   lu_byte numparams;  /* number of fixed parameters */
   lu_byte is_vararg;
   lu_byte maxstacksize;  /* number of registers needed by this function */
@@ -412,24 +417,15 @@ typedef struct SharedProto {
   int sizelocvars;
   int linedefined;  /* debug information  */
   int lastlinedefined;  /* debug information  */
-  void *l_G;  /* global state belongs to */
+  TValue *k;  /* constants used by the function */
   Instruction *code;  /* opcodes */
+  struct Proto **p;  /* functions defined inside the function */
   int *lineinfo;  /* map from opcodes to source lines (debug information) */
   LocVar *locvars;  /* information about local variables (debug information) */
   Upvaldesc *upvalues;  /* upvalue information */
   TString  *source;  /* used for debug information */
-} SharedProto;
-
-/*
-** Function Prototypes
-*/
-typedef struct Proto {
-  CommonHeader;
-  struct SharedProto *sp;
-  TValue *k;  /* constants used by the function */
-  struct Proto **p;  /* functions defined inside the function */
-  struct LClosure *cache;  /* last-created closure with this prototype */
   GCObject *gclist;
+  void *l_G;  /* global state belongs to */
 } Proto;
 
 

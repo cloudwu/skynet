@@ -78,6 +78,8 @@ _init_env(lua_State *L) {
 int sigign() {
 	struct sigaction sa;
 	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = 0;
+	sigemptyset(&sa.sa_mask);
 	sigaction(SIGPIPE, &sa, 0);
 	return 0;
 }
@@ -124,7 +126,7 @@ main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	luaS_initshr();
+	luaS_initssm();
 	skynet_globalinit();
 	skynet_env_init();
 
@@ -160,7 +162,7 @@ main(int argc, char *argv[]) {
 
 	skynet_start(&config);
 	skynet_globalexit();
-	luaS_exitshr();
+	luaS_exitssm();
 
 	return 0;
 }

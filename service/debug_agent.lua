@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local debugchannel = require "debugchannel"
+local debugchannel = require "skynet.debugchannel"
 
 local CMD = {}
 

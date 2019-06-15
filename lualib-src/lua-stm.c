@@ -235,7 +235,7 @@ lread(lua_State *L) {
 }
 
 LUAMOD_API int
-luaopen_stm(lua_State *L) {
+luaopen_skynet_stm(lua_State *L) {
 	luaL_checkversion(L);
 	lua_createtable(L, 0, 3);
 

@@ -1,5 +1,5 @@
 /*
-** $Id: lgc.c,v 2.215 2016/12/22 13:08:50 roberto Exp $
+** $Id: lgc.c,v 2.215.1.2 2017/08/31 16:15:27 roberto Exp $
 ** Garbage Collector
 ** See Copyright Notice in lua.h
 */
@@ -65,7 +65,7 @@
 */
 #define maskcolors	(~(bitmask(BLACKBIT) | WHITEBITS))
 #define makewhite(g,x)	\
- (x->marked = cast_byte((x->marked & maskcolors) | luaC_white(g)))
+ (x->marked = cast_byte((x->marked & maskcolors) | (x->marked & bitmask(SHAREBIT)) | luaC_white(g)))
 
 #define white2gray(x)	resetbits(x->marked, WHITEBITS)
 #define black2gray(x)	resetbit(x->marked, BLACKBIT)
@@ -193,6 +193,10 @@ void luaC_upvalbarrier_ (lua_State *L, UpVal *uv) {
 
 void luaC_fix (lua_State *L, GCObject *o) {
   global_State *g = G(L);
+  if (o->tt == LUA_TSHRSTR) {
+    luaS_fix(g, gco2ts(o));
+    return;
+  }
   if (g->allgc != o)
 	  return;  /* if object is not 1st in 'allgc' list, it is in global short string table */
   white2gray(o);  /* they will be gray forever */
@@ -235,20 +239,22 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
 */
 static void reallymarkobject (global_State *g, GCObject *o) {
  reentry:
-  white2gray(o);
   switch (o->tt) {
     case LUA_TSHRSTR: {
-      gray2black(o);
-      g->GCmemtrav += sizelstring(gco2ts(o)->shrlen);
+      luaS_mark(g, gco2ts(o));
       break;
     }
     case LUA_TLNGSTR: {
-      gray2black(o);
-      g->GCmemtrav += sizelstring(gco2ts(o)->u.lnglen);
+      if (!isshared(o)) {
+        white2gray(o);
+        gray2black(o);
+        g->GCmemtrav += sizelstring(gco2ts(o)->u.lnglen);
+      }
       break;
     }
     case LUA_TUSERDATA: {
       TValue uvalue;
+      white2gray(o);
       markobjectN(g, gco2u(o)->metatable);  /* mark its metatable */
       gray2black(o);
       g->GCmemtrav += sizeudata(gco2u(o));
@@ -260,23 +266,32 @@ static void reallymarkobject (global_State *g, GCObject *o) {
       break;
     }
     case LUA_TLCL: {
+      white2gray(o);
       linkgclist(gco2lcl(o), g->gray);
       break;
     }
     case LUA_TCCL: {
+      white2gray(o);
       linkgclist(gco2ccl(o), g->gray);
       break;
     }
     case LUA_TTABLE: {
-      linkgclist(gco2t(o), g->gray);
+      if (!isshared(o)) {
+        white2gray(o);
+        linkgclist(gco2t(o), g->gray);
+      }
       break;
     }
     case LUA_TTHREAD: {
+      white2gray(o);
       linkgclist(gco2th(o), g->gray);
       break;
     }
     case LUA_TPROTO: {
-      linkgclist(gco2p(o), g->gray);
+      if (!isshared(o)) {
+        white2gray(o);
+        linkgclist(gco2p(o), g->gray);
+     }
       break;
     }
     default: lua_assert(0); break;
@@ -471,20 +486,6 @@ static lu_mem traversetable (global_State *g, Table *h) {
                          sizeof(Node) * cast(size_t, allocsizenode(h));
 }
 
-static int marksharedproto (global_State *g, SharedProto *f) {
-  int i;
-  if (g != f->l_G)
-    return 0;
-  markobjectN(g, f->source);
-  for (i = 0; i < f->sizeupvalues; i++)  /* mark upvalue names */
-    markobjectN(g, f->upvalues[i].name);
-  for (i = 0; i < f->sizelocvars; i++)  /* mark local-variable names */
-    markobjectN(g, f->locvars[i].varname);
-  return sizeof(Instruction) * f->sizecode +
-         sizeof(int) * f->sizelineinfo +
-         sizeof(LocVar) * f->sizelocvars +
-         sizeof(Upvaldesc) * f->sizeupvalues;
-}
 
 /*
 ** Traverse a prototype. (While a prototype is being build, its
@@ -492,20 +493,24 @@ static int marksharedproto (global_State *g, SharedProto *f) {
 ** NULL, so the use of 'markobjectN')
 */
 static int traverseproto (global_State *g, Proto *f) {
-  int i,nk,np;
-  if (f->cache && iswhite(f->cache))
-    f->cache = NULL;  /* allow cache to be collected */
-  if (f->sp == NULL)
-    return sizeof(Proto);
-  nk = (f->k == NULL) ? 0 : f->sp->sizek;
-  np = (f->p == NULL) ? 0 : f->sp->sizep;
-  for (i = 0; i < nk; i++)  /* mark literals */
+  int i;
+  if (g != f->l_G)
+    return 0;
+  markobjectN(g, f->source);
+  for (i = 0; i < f->sizek; i++)  /* mark literals */
     markvalue(g, &f->k[i]);
-  for (i = 0; i < np; i++)  /* mark nested protos */
+  for (i = 0; i < f->sizeupvalues; i++)  /* mark upvalue names */
+    markobjectN(g, f->upvalues[i].name);
+  for (i = 0; i < f->sizep; i++)  /* mark nested protos */
     markobjectN(g, f->p[i]);
-  return sizeof(Proto) + sizeof(Proto *) * np +
-                         sizeof(TValue) * nk +
-                         marksharedproto(g, f->sp);
+  for (i = 0; i < f->sizelocvars; i++)  /* mark local-variable names */
+    markobjectN(g, f->locvars[i].varname);
+  return sizeof(Proto) + sizeof(Instruction) * f->sizecode +
+                         sizeof(Proto *) * f->sizep +
+                         sizeof(TValue) * f->sizek +
+                         sizeof(int) * f->sizelineinfo +
+                         sizeof(LocVar) * f->sizelocvars +
+                         sizeof(Upvaldesc) * f->sizeupvalues;
 }
 
 
@@ -654,8 +659,9 @@ static void clearkeys (global_State *g, GCObject *l, GCObject *f) {
     for (n = gnode(h, 0); n < limit; n++) {
       if (!ttisnil(gval(n)) && (iscleared(g, gkey(n)))) {
         setnilvalue(gval(n));  /* remove value ... */
-        removeentry(n);  /* and remove entry from table */
       }
+      if (ttisnil(gval(n)))  /* is entry empty? */
+        removeentry(n);  /* remove entry from table */
     }
   }
 }
@@ -718,10 +724,6 @@ static void freeobj (lua_State *L, GCObject *o) {
     case LUA_TTABLE: luaH_free(L, gco2t(o)); break;
     case LUA_TTHREAD: luaE_freethread(L, gco2th(o)); break;
     case LUA_TUSERDATA: luaM_freemem(L, o, sizeudata(gco2u(o))); break;
-    case LUA_TSHRSTR:
-      luaS_remove(L, gco2ts(o));  /* remove it from hash table */
-      luaM_freemem(L, o, sizelstring(gco2ts(o)->shrlen));
-      break;
     case LUA_TLNGSTR: {
       luaM_freemem(L, o, sizelstring(gco2ts(o)->u.lnglen));
       break;
@@ -731,8 +733,13 @@ static void freeobj (lua_State *L, GCObject *o) {
 }
 
 
-#define sweepwholelist(L,p)	sweeplist(L,p,MAX_LUMEM)
-static GCObject **sweeplist (lua_State *L, GCObject **p, lu_mem count);
+static void sweepwholelist (lua_State *L, GCObject **p) {
+  while (*p != NULL) {
+    GCObject *curr = *p;
+    *p = curr->next;  /* remove 'curr' from list */
+    freeobj(L, curr);  /* erase 'curr' */
+   }
+}
 
 
 /*
@@ -744,7 +751,7 @@ static GCObject **sweeplist (lua_State *L, GCObject **p, lu_mem count);
 */
 static GCObject **sweeplist (lua_State *L, GCObject **p, lu_mem count) {
   global_State *g = G(L);
-  int ow = otherwhite(g);
+  int ow = otherwhite(g) | bitmask(SHAREBIT);  /* shared object never dead */
   int white = luaC_white(g);  /* current white */
   while (*p != NULL && count-- > 0) {
     GCObject *curr = *p;
@@ -754,7 +761,7 @@ static GCObject **sweeplist (lua_State *L, GCObject **p, lu_mem count) {
       freeobj(L, curr);  /* erase 'curr' */
     }
     else {  /* change mark to 'white' */
-      curr->marked = cast_byte((marked & maskcolors) | white);
+      curr->marked = cast_byte((marked & maskcolors) | (marked & bitmask(SHAREBIT)) |white);
       p = &curr->next;  /* go to next element */
     }
   }
@@ -781,19 +788,6 @@ static GCObject **sweeptolive (lua_State *L, GCObject **p) {
 ** Finalization
 ** =======================================================
 */
-
-/*
-** If possible, shrink string table
-*/
-static void checkSizes (lua_State *L, global_State *g) {
-  if (g->gckind != KGC_EMERGENCY) {
-    l_mem olddebt = g->GCdebt;
-    if (g->strt.nuse < g->strt.size / 4)  /* string table too big? */
-      luaS_resize(L, g->strt.size / 2);  /* shrink it a little */
-    g->GCestimate += g->GCdebt - olddebt;  /* update estimate */
-  }
-}
-
 
 static GCObject *udata2finalize (global_State *g) {
   GCObject *o = g->tobefnz;  /* get first element */
@@ -985,7 +979,6 @@ void luaC_freeallobjects (lua_State *L) {
   sweepwholelist(L, &g->finobj);
   sweepwholelist(L, &g->allgc);
   sweepwholelist(L, &g->fixedgc);  /* collect fixed objects */
-  lua_assert(g->strt.nuse == 0);
 }
 
 
@@ -1031,6 +1024,7 @@ static l_mem atomic (lua_State *L) {
   clearvalues(g, g->allweak, origall);
   luaS_clearcache(g);
   g->currentwhite = cast_byte(otherwhite(g));  /* flip current white */
+  luaS_collect(g, 0);  /* send short strings set to gc thread */
   work += g->GCmemtrav;  /* complete counting */
   return work;  /* estimate of memory marked by 'atomic' */
 }
@@ -1056,7 +1050,7 @@ static lu_mem singlestep (lua_State *L) {
   global_State *g = G(L);
   switch (g->gcstate) {
     case GCSpause: {
-      g->GCmemtrav = g->strt.size * sizeof(GCObject*);
+      g->GCmemtrav = 0;
       restartcollection(g);
       g->gcstate = GCSpropagate;
       return g->GCmemtrav;
@@ -1088,7 +1082,6 @@ static lu_mem singlestep (lua_State *L) {
     }
     case GCSswpend: {  /* finish sweeps */
       makewhite(g, g->mainthread);  /* sweep main thread */
-      checkSizes(L, g);
       g->gcstate = GCScallfin;
       return 0;
     }

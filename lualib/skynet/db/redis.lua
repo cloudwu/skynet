@@ -1,6 +1,6 @@
 local skynet = require "skynet"
-local socket = require "socket"
-local socketchannel = require "socketchannel"
+local socket = require "skynet.socket"
+local socketchannel = require "skynet.socketchannel"
 
 local table = table
 local string = string
@@ -143,6 +143,7 @@ function redis.connect(db_conf)
 		port = db_conf.port or 6379,
 		auth = redis_login(db_conf.auth, db_conf.db),
 		nodelay = true,
+		overload = db_conf.overload,
 	}
 	-- try connect first only once
 	channel:connect(true)

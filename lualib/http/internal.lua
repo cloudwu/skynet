@@ -48,9 +48,6 @@ function M.recvheader(readbytes, lines, header)
 		while true do
 			local bytes = readbytes()
 			header = header .. bytes
-			if #header > LIMIT then
-				return
-			end
 			e = header:find("\r\n\r\n", -#bytes-3, true)
 			if e then
 				result = header:sub(e+4)
@@ -58,6 +55,9 @@ function M.recvheader(readbytes, lines, header)
 			end
 			if header:find "^\r\n" then
 				return header:sub(3)
+			end
+			if #header > LIMIT then
+				return
 			end
 		end
 	end

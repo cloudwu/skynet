@@ -1,5 +1,5 @@
 /*
-** $Id: lapi.c,v 2.259 2016/02/29 14:27:14 roberto Exp $
+** $Id: lapi.c,v 2.259.1.2 2017/12/06 18:35:12 roberto Exp $
 ** Lua API
 ** See Copyright Notice in lua.h
 */
@@ -534,6 +534,7 @@ LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
   lua_lock(L);
   if (n == 0) {
     setfvalue(L->top, fn);
+    api_incr_top(L);
   }
   else {
     CClosure *cl;
@@ -547,9 +548,9 @@ LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
       /* does not need barrier because closure is white */
     }
     setclCvalue(L, L->top, cl);
+    api_incr_top(L);
+    luaC_checkGC(L);
   }
-  api_incr_top(L);
-  luaC_checkGC(L);
   lua_unlock(L);
 }
 
@@ -857,6 +858,8 @@ LUA_API int lua_setmetatable (lua_State *L, int objindex) {
   }
   switch (ttnov(obj)) {
     case LUA_TTABLE: {
+      if (isshared(hvalue(obj)))
+        luaG_runerror(L, "can't setmetatable to shared table");
       hvalue(obj)->metatable = mt;
       if (mt) {
         luaC_objbarrier(L, gcvalue(obj), mt);
@@ -1012,36 +1015,11 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   return status;
 }
 
-static void cloneproto (lua_State *L, Proto *f, const Proto *src) {
-  /* copy constants and nested proto */
-  int i,n;
-  n = src->sp->sizek;
-  f->k=luaM_newvector(L,n,TValue);
-  for (i=0; i<n; i++) setnilvalue(&f->k[i]);
-  for (i=0; i<n; i++) {
-    const TValue *s=&src->k[i];
-    TValue *o=&f->k[i];
-    if (ttisstring(s)) {
-      TString * str = luaS_clonestring(L,tsvalue(s));
-      setsvalue2n(L,o,str);
-    } else {
-      setobj(L,o,s);
-    }
-  }
-  n = src->sp->sizep;
-  f->p=luaM_newvector(L,n,struct Proto *);
-  for (i=0; i<n; i++) f->p[i]=NULL;
-  for (i=0; i<n; i++) {
-    f->p[i]= luaF_newproto(L, src->p[i]->sp);
-	cloneproto(L, f->p[i], src->p[i]);
-  }
-}
-
 LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
   LClosure *cl;
   LClosure *f = cast(LClosure *, fp);
   lua_lock(L);
-  if (f->p->sp->l_G == G(L)) {
+  if (f->p->l_G == G(L)) {
     setclLvalue(L,L->top,f);
     api_incr_top(L);
     lua_unlock(L);
@@ -1050,8 +1028,7 @@ LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
   cl = luaF_newLclosure(L,f->nupvalues);
   setclLvalue(L,L->top,cl);
   api_incr_top(L);
-  cl->p = luaF_newproto(L, f->p->sp);
-  cloneproto(L, cl->p, f->p);
+  cl->p = f->p;
   luaF_initupvals(L, cl);
 
   if (cl->nupvalues >= 1) {  /* does it have an upvalue? */
@@ -1063,6 +1040,25 @@ LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
     luaC_upvalbarrier(L, cl->upvals[0]);
   }
   lua_unlock(L);
+}
+
+LUA_API void lua_sharefunction (lua_State *L, int index) {
+  if (!lua_isfunction(L,index) || lua_iscfunction(L,index))
+    luaG_runerror(L, "Only Lua function can share");
+  LClosure *f = cast(LClosure *, lua_topointer(L, index));
+  luaF_shareproto(f->p);
+}
+
+LUA_API void lua_sharestring (lua_State *L, int index) {
+  const char *str = lua_tostring(L, index);
+  if (str == NULL)
+    luaG_runerror(L, "need a string to share");
+
+  TString *ts = (TString *)(str - sizeof(UTString));
+  if(ts->tt == LUA_TLNGSTR)
+    makeshared(ts);
+  else
+    luaS_fix(G(L), ts);
 }
 
 LUA_API int lua_dump (lua_State *L, lua_Writer writer, void *data, int strip) {
@@ -1259,7 +1255,7 @@ static const char *aux_upvalue (StkId fi, int n, TValue **val,
     case LUA_TLCL: {  /* Lua closure */
       LClosure *f = clLvalue(fi);
       TString *name;
-      SharedProto *p = f->p->sp;
+      Proto *p = f->p;
       if (!(1 <= n && n <= p->sizeupvalues)) return NULL;
       *val = f->upvals[n-1]->v;
       if (uv) *uv = f->upvals[n - 1];
@@ -1311,7 +1307,7 @@ static UpVal **getupvalref (lua_State *L, int fidx, int n, LClosure **pf) {
   StkId fi = index2addr(L, fidx);
   api_check(L, ttisLclosure(fi), "Lua function expected");
   f = clLvalue(fi);
-  api_check(L, (1 <= n && n <= f->p->sp->sizeupvalues), "invalid upvalue index");
+  api_check(L, (1 <= n && n <= f->p->sizeupvalues), "invalid upvalue index");
   if (pf) *pf = f;
   return &f->upvals[n - 1];  /* get its upvalue pointer */
 }

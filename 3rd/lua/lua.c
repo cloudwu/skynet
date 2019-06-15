@@ -1,5 +1,5 @@
 /*
-** $Id: lua.c,v 1.230 2017/01/12 17:14:26 roberto Exp $
+** $Id: lua.c,v 1.230.1.1 2017/04/19 17:29:57 roberto Exp $
 ** Lua stand-alone interpreter
 ** See Copyright Notice in lua.h
 */
@@ -139,7 +139,7 @@ static void print_usage (const char *badoption) {
   "Available options are:\n"
   "  -e stat  execute string 'stat'\n"
   "  -i       enter interactive mode after executing 'script'\n"
-  "  -l name  require library 'name'\n"
+  "  -l name  require library 'name' into global 'name'\n"
   "  -v       show version information\n"
   "  -E       ignore environment variables\n"
   "  --       stop handling options\n"
@@ -597,7 +597,7 @@ static int pmain (lua_State *L) {
 int main (int argc, char **argv) {
   int status, result;
   lua_State *L;
-  luaS_initshr();  /* init global short string table */
+  luaS_initssm();
   L = luaL_newstate();  /* create state */
   if (L == NULL) {
     l_message(argv[0], "cannot create state: not enough memory");
@@ -610,7 +610,7 @@ int main (int argc, char **argv) {
   result = lua_toboolean(L, -1);  /* get result */
   report(L, status);
   lua_close(L);
-  luaS_exitshr();
+  luaS_exitssm();
   return (result && status == LUA_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
