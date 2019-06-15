@@ -1,0 +1,9 @@
+thread = 8
+mqueue = 256
+cpath = "./cservice/?.so"
+logger = nil
+harbor = 0
+
+start = "share"
+luaservice ="./service/?.lua;./test/?.lua;./examples/?.lua"
+snax = "./examples/?.lua;./test/?.lua"
