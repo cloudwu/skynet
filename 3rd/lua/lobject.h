@@ -425,7 +425,6 @@ typedef struct Proto {
   Upvaldesc *upvalues;  /* upvalue information */
   TString  *source;  /* used for debug information */
   GCObject *gclist;
-  void *l_G;  /* global state belongs to */
 } Proto;
 
 
