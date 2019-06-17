@@ -39,8 +39,12 @@ mark_shared(lua_State *L) {
 			case LUA_TLIGHTUSERDATA:
 				break;
 			case LUA_TFUNCTION:
-				if (!lua_iscfunction(L, idx) || lua_getupvalue(L, idx, 1) != NULL)
-					luaL_error(L, "Invalid function");
+				if (lua_getupvalue(L, idx, 1) != NULL) {
+					luaL_error(L, "Invalid function with upvalue");
+				} else if (!lua_iscfunction(L, idx)) {
+					LClosure *f = (LClosure *)lua_topointer(L, idx);
+					makeshared(f);
+				}
 				break;
 			case LUA_TSTRING:
 				lua_sharestring(L, idx);

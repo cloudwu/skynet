@@ -935,6 +935,7 @@ new_string(unsigned int h, const char *str, lu_byte l) {
 	memset(ts, 0, sz);
 	setbits(ts->marked, WHITEBITS);
 	gray2black(ts);
+	makeshared(ts);
 	ts->tt = LUA_TSHRSTR;
 	ts->hash = h;
 	ts->shrlen = l;
