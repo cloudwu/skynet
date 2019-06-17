@@ -1018,13 +1018,8 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
 LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
   LClosure *cl;
   LClosure *f = cast(LClosure *, fp);
+  api_check(L, isshared(gcvalue(f->p)), "Not a shared proto");
   lua_lock(L);
-  if (f->p->l_G == G(L)) {
-    setclLvalue(L,L->top,f);
-    api_incr_top(L);
-    lua_unlock(L);
-    return;
-  }
   cl = luaF_newLclosure(L,f->nupvalues);
   setclLvalue(L,L->top,cl);
   api_incr_top(L);

@@ -496,8 +496,6 @@ static lu_mem traversetable (global_State *g, Table *h) {
 */
 static int traverseproto (global_State *g, Proto *f) {
   int i;
-  if (g != f->l_G)
-    return 0;
   markobjectN(g, f->source);
   for (i = 0; i < f->sizek; i++)  /* mark literals */
     markvalue(g, &f->k[i]);
