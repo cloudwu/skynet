@@ -19,6 +19,7 @@
 #include "lmem.h"
 #include "lobject.h"
 #include "lstate.h"
+#include "lstring.h"
 
 
 
@@ -148,22 +149,20 @@ const char *luaF_getlocalname (const Proto *f, int local_number, int pc) {
   return NULL;  /* not found */
 }
 
-#define MAKESHARED(x) if ((x) && (x)->tt == LUA_TLNGSTR) makeshared(x)
-
 void luaF_shareproto (Proto *f) {
   int i;
   if (f == NULL)
     return;
   makeshared(f);
-  MAKESHARED(f->source);
+  luaS_share(f->source);
   for (i = 0; i < f->sizek; i++) {
     if (ttnov(&f->k[i]) == LUA_TSTRING)
-      MAKESHARED(tsvalue(&f->k[i]));
+      luaS_share(tsvalue(&f->k[i]));
   }
   for (i = 0; i < f->sizeupvalues; i++)
-    MAKESHARED(f->upvalues[i].name);
+    luaS_share(f->upvalues[i].name);
   for (i = 0; i < f->sizelocvars; i++)
-    MAKESHARED(f->locvars[i].varname);
+    luaS_share(f->locvars[i].varname);
   for (i = 0; i < f->sizep; i++)
     luaF_shareproto(f->p[i]);
 }

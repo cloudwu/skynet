@@ -1050,10 +1050,19 @@ LUA_API void lua_sharestring (lua_State *L, int index) {
     luaG_runerror(L, "need a string to share");
 
   TString *ts = (TString *)(str - sizeof(UTString));
-  if(ts->tt == LUA_TLNGSTR)
-    makeshared(ts);
-  else
-    luaS_fix(G(L), ts);
+  luaS_share(ts);
+}
+
+LUA_API void lua_clonetable(lua_State *L, const void * tp) {
+  Table *t = cast(Table *, tp);
+
+  if (!isshared(t))
+    luaG_runerror(L, "Not a shared table");
+
+  lua_lock(L);
+  sethvalue(L, L->top, t);
+  api_incr_top(L);
+  lua_unlock(L);
 }
 
 LUA_API int lua_dump (lua_State *L, lua_Writer writer, void *data, int strip) {

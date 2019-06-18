@@ -224,7 +224,7 @@ static void close_state (lua_State *L) {
   luaC_freeallobjects(L);  /* collect all objects */
   if (g->version)  /* closing a fully built state? */
     luai_userstateclose(L);
-  luaS_collect(g, 1);  /* clear short strings */
+  luaM_freearray(L, G(L)->strt.hash, G(L)->strt.size);
   freestack(L);
   lua_assert(gettotalbytes(g) == sizeof(LG));
   (*g->frealloc)(g->ud, fromstate(L), sizeof(LG), 0);  /* free main block */
@@ -289,6 +289,8 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->mainthread = L;
   g->gcrunning = 0;  /* no GC while building state */
   g->GCestimate = 0;
+  g->strt.size = g->strt.nuse = 0;
+  g->strt.hash = NULL;
   setnilvalue(&g->l_registry);
   g->panic = NULL;
   g->version = NULL;
@@ -304,9 +306,6 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->gcfinnum = 0;
   g->gcpause = LUAI_GCPAUSE;
   g->gcstepmul = LUAI_GCMUL;
-  g->strsave = NULL;
-  g->strmark = NULL;
-  g->strfix = NULL;
   for (i=0; i < LUA_NUMTAGS; i++) g->mt[i] = NULL;
   if (luaD_rawrunprotected(L, f_luaopen, NULL) != LUA_OK) {
     /* memory allocation error: free partial state */

@@ -69,7 +69,6 @@ LUA_CLIB_SKYNET = \
   lua-stm.c \
   lua-debugchannel.c \
   lua-datasheet.c \
-  lua-ssm.c \
   lua-sharetable.c \
   \
 
