@@ -1103,7 +1103,7 @@ save(const char *key, const void * proto) {
     } else {
       lua_pop(L,2);
     }
-    
+
   SPIN_UNLOCK(&CC)
   return result;
 }

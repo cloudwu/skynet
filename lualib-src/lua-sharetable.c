@@ -4,12 +4,9 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#include "lstring.h"
-#include "lobject.h"
-#include "lapi.h"
 #include "lgc.h"
 
-#ifdef ENABLE_SHORT_STRING_TABLE
+#ifdef makeshared
 
 static void
 mark_shared(lua_State *L) {
@@ -81,12 +78,7 @@ make_matrix(lua_State *L) {
 
 static int
 clone_table(lua_State *L) {
-	Table * t = (Table *)lua_touserdata(L, 1);
-	if (!isshared(t))
-		return luaL_error(L, "Not a shared table");
-
-	sethvalue(L, L->top, t);
-	api_incr_top(L);
+	lua_clonetable(L, lua_touserdata(L, 1));
 
 	return 1;
 }
