@@ -65,7 +65,7 @@ int luaS_eqshrstr (TString *a, TString *b) {
 
 void luaS_share (TString *ts) {
   makeshared(ts);
-  ts->id = ATOM_INC(&STRID);
+  ts->id = ATOM_DEC(&STRID);
 }
 
 unsigned int luaS_hash (const char *str, size_t l, unsigned int seed) {
