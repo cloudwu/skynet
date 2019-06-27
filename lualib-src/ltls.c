@@ -320,7 +320,10 @@ lnew_ctx(lua_State* L) {
     struct ssl_ctx* ctx_p = (struct ssl_ctx*)lua_newuserdata(L, sizeof(*ctx_p));
     ctx_p->ctx = SSL_CTX_new(SSLv23_method());
     if(!ctx_p->ctx) {
-        luaL_error(L, "SSL_CTX_new client faild.");
+        unsigned int err = ERR_get_error();
+        char buf[256];
+        ERR_error_string_n(err, buf, sizeof(buf));
+        luaL_error(L, "SSL_CTX_new client faild. %s\n", buf);
     }
 
     if(luaL_newmetatable(L, "_TLS_SSLCTX_METATABLE_")) {
