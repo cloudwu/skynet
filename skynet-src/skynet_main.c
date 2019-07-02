@@ -132,6 +132,11 @@ main(int argc, char *argv[]) {
 
 	struct skynet_config config;
 
+#ifdef LUA_CACHELIB
+	// init the lock of code cache
+	luaL_initcodecache();
+#endif
+
 	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);	// link lua lib
 
