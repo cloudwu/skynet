@@ -1,6 +1,5 @@
 local skynet = require "skynet"
 local socket = require "http.sockethelper"
-local url = require "http.url"
 local internal = require "http.internal"
 local dns = require "skynet.dns"
 local string = string
@@ -74,7 +73,9 @@ local function request(interface, method, host, url, recvheader, header, content
 			end
 		else
 			-- no content-length, read all
-			body = body .. interface.readall()
+			if method ~= "CONNECT" then
+				body = body .. interface.readall()
+			end
 		end
 	end
 
@@ -135,27 +136,38 @@ local function gen_interface(protocol, fd)
 end
 
 
-function httpc.request(method, host, url, recvheader, header, content)
-	local protocol
+function httpc.request(method, host, url, recvheader, header, content, proxy)
 	local timeout = httpc.timeout	-- get httpc.timeout before any blocked api
+	local protocol, hostname, port
+
 	protocol, host = check_protocol(host)
-	local hostname, port = host:match"([^:]+):?(%d*)$"
+
+	if proxy then
+		proxy = skynet.getenv(protocol .. "_proxy")
+		hostname, port = proxy:match"([^:]+):?(%d*)$"
+	else
+		hostname, port = host:match"([^:]+):?(%d*)$"
+	end
+
 	if port == "" then
 		port = protocol=="http" and 80 or protocol=="https" and 443
 	else
 		port = tonumber(port)
 	end
+
 	if async_dns and not hostname:match(".*%d+$") then
 		hostname = dns.resolve(hostname)
 	end
+
 	local fd = socket.connect(hostname, port, timeout)
 	if not fd then
 		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostname, port, timeout))
 		return
 	end
-	-- print("protocol hostname port", protocol, hostname, port)
+
 	local interface = gen_interface(protocol, fd)
 	local finish
+
 	if timeout then
 		skynet.timeout(timeout, function()
 			if not finish then
@@ -166,15 +178,46 @@ function httpc.request(method, host, url, recvheader, header, content)
 			end
 		end)
 	end
-	if interface.init then
-		interface.init()
-	end
-	local ok , statuscode, body = pcall(request, interface, method, host, url, recvheader, header, content)
+
+	local ok, statuscode, body = pcall(function ()
+		if proxy then
+			local proxy_interface
+			if protocol == "http" then
+				proxy_interface = interface
+			else
+				proxy_interface = gen_interface("http", fd)
+			end
+
+			local host_port = host:match"[^:]+:?(%d*)$"
+			local addr
+
+			if host_port == "" then
+				host_port = protocol=="http" and 80 or protocol=="https" and 443
+				addr = host .. ':' .. host_port
+			else
+				addr = host
+			end
+
+			local code, body = request(proxy_interface, "CONNECT", addr, addr)
+			if code ~= 200 then
+				return code, body
+			end
+		end
+
+		if interface.init then
+			interface.init()
+		end
+
+		return request(interface, method, host, url, recvheader, header, content)
+	end)
+
 	finish = true
 	socket.close(fd)
+
 	if interface.close then
 		interface.close()
 	end
+
 	if ok then
 		return statuscode, body
 	else
@@ -192,7 +235,7 @@ local function escape(s)
 	end))
 end
 
-function httpc.post(host, url, form, recvheader)
+function httpc.post(host, url, form, recvheader, proxy)
 	local header = {
 		["content-type"] = "application/x-www-form-urlencoded"
 	}
@@ -201,7 +244,7 @@ function httpc.post(host, url, form, recvheader)
 		table.insert(body, string.format("%s=%s",escape(k),escape(v)))
 	end
 
-	return httpc.request("POST", host, url, recvheader, header, table.concat(body , "&"))
+	return httpc.request("POST", host, url, recvheader, header, table.concat(body , "&"), proxy)
 end
 
 return httpc

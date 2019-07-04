@@ -25,6 +25,13 @@ local function http_test(protocol)
 	print(status)
 end
 
+local function test_http_proxy()
+    skynet.setenv('http_proxy', '127.0.0.1:8118')
+    skynet.setenv('https_proxy', '127.0.0.1:8118')
+
+    skynet.error(httpc.get('http://httpbin.org', '/get?test=true', nil, nil, nil, true))
+    skynet.error(httpc.post('https://httpbin.org', '/post', { test = 'true' }, nil, true))
+end
 
 local function main()
 	dns.server()
