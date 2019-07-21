@@ -368,7 +368,7 @@ function M.accept(socket_id, handle, protocol)
 end
 
 
-function M.connect(url, header)
+function M.connect(url, header, timeout)
     local protocol, host, uri = string.match(url, "^(wss?)://([^/]+)(.*)$")
     if protocol ~= "wss" and protocol ~= "ws" then
         error(string.format("invalid protocol: %s", protocol))
@@ -382,8 +382,7 @@ function M.connect(url, header)
     end
 
     uri = uri == "" and "/" or uri
-    local socket_id = socket.open(host_name, host_port)
-    assert(socket_id)
+    local socket_id = sockethelper.connect(host_name, host_port, timeout)
     local ws_obj = _new_client_ws(socket_id, protocol)
     write_handshake(ws_obj, host_name, uri, header)
     return socket_id
