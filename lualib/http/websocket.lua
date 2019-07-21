@@ -180,9 +180,10 @@ local function read_frame(self)
     local s = self.read(2)
     local v1, v2 = string.unpack("I1I1", s)
     local fin  = (v1 & 0x80) ~= 0
-    local rsv1 = (v1 & 0x40) ~= 0
-    local rsv2 = (v1 & 0x20) ~= 0
-    local rsv3 = (v1 & 0x10) ~= 0
+    -- unused flag
+    -- local rsv1 = (v1 & 0x40) ~= 0
+    -- local rsv2 = (v1 & 0x20) ~= 0
+    -- local rsv3 = (v1 & 0x10) ~= 0
     local op   =  v1 & 0x0f
     local mask = (v2 & 0x80) ~= 0
     local payload_len = (v2 & 0x7f)
@@ -194,27 +195,10 @@ local function read_frame(self)
         payload_len = string.unpack(">I8", s)
     end
 
-    -- print("fin, rsv1, rsv2, rsv3, op, mask, payload_len", 
-    -- fin, rsv1, rsv2, rsv3, op, mask, payload_len)
-    local masking_key
-    if mask then
-        s = self.read(4)
-        local k1, k2, k3, k4 = string.unpack("I1I1I1I1", s)
-        masking_key = {k1, k2, k3, k4}
-    end
-
+    -- print(string.format("fin:%s, op:%s, mask:%s, payload_len:%s", fin, op_code[op], mask, payload_len))
+    local masking_key = mask and self.read(4) or false
     local payload_data = payload_len>0 and self.read(payload_len) or ""
-    if masking_key then
-        local t = {}
-        local len = #payload_data
-        for i=1, len do
-            local c = string.byte(payload_data, i)
-            local m = masking_key[(i-1) % 4 + 1]
-            local v = c ~ m
-            t[i] = string.char(v)
-        end
-        payload_data = table.concat(t)
-    end
+    payload_data = masking_key and crypt.xor_str(payload_data, masking_key) or payload_data
     return fin, assert(op_code[op]), payload_data
 end
 
@@ -238,7 +222,7 @@ local function resolve_accept(self)
             local code, reason
             local payload_len = #payload_data
             if payload_len > 2 then
-                local fmt = string.format(">I2s[%d]", payload_len - 2)
+                local fmt = string.format(">I2c%d", payload_len - 2)
                 code, reason = string.unpack(fmt, payload_data)
             end
             try_handle(self, "close", code, reason)
@@ -455,7 +439,11 @@ function M.close(id, code ,reason)
 
     pcall(function ()
         reason = reason or ""
-        local payload_data = code and string.pack(">I2s", code, reason) or nil
+        local payload_data
+        if code then
+            local fmt =string.format(">I2c%d", #reason)
+            payload_data = string.pack(fmt, code, reason)
+        end
         write_frame(ws_obj, "close", payload_data)
     end)
     _close_websocket(ws_obj)
