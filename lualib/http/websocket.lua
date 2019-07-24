@@ -9,7 +9,19 @@ local socket_error = sockethelper.socket_error
 local GLOBAL_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 local M = {}
+
+
 local ws_pool = {}
+local function _close_websocket(ws_obj)
+    local id = ws_obj.id
+    assert(ws_pool[id] == ws_obj)
+    ws_pool[id] = nil
+    ws_obj.close()
+end
+
+local function _isws_closed(id)
+    return not ws_pool[id]
+end
 
 
 local function write_handshake(self, host, url, header)
@@ -156,7 +168,6 @@ local op_code = {
 local function write_frame(self, op, payload_data)
     payload_data = payload_data or ""
     local payload_len = #payload_data
-    local send_buf = {}
     local op_v = assert(op_code[op])
     local v1 = 0x80 | op_v -- fin is 1 with opcode
     local s
@@ -217,6 +228,9 @@ local function resolve_accept(self)
     try_handle(self, "handshake", header)
     local recv_buf = {}
     while true do
+        if _isws_closed(self.id) then
+            return
+        end
         local fin, op, payload_data = read_frame(self)
         if op == "close" then
             local code, reason
@@ -335,14 +349,6 @@ local function _new_server_ws(socket_id, handle, protocol)
 end
 
 
-local function _close_websocket(ws_obj)
-    local id = ws_obj.id
-    assert(ws_pool[id] == ws_obj)
-    ws_pool[id] = nil
-    ws_obj.close()
-end
-
-
 -- handle interface
 -- connect / handshake / message / ping / pong / close / error
 function M.accept(socket_id, handle, protocol)
@@ -357,10 +363,15 @@ function M.accept(socket_id, handle, protocol)
     end
 
     local ok, err = xpcall(resolve_accept, debug.traceback, ws_obj)
-    _close_websocket(ws_obj)
+    local closed = _isws_closed(socket_id)
+    if not closed then
+        _close_websocket(ws_obj)
+    end
     if not ok then
         if err == socket_error then
-            try_handle(ws_obj, "error", ws_obj)
+            if not closed then
+                try_handle(ws_obj, "error", ws_obj)
+            end
         else
             error(err)
         end
