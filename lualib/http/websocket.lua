@@ -82,7 +82,7 @@ local function read_handshake(self)
     end
 
     httpver = assert(tonumber(httpver))
-    if httpver < 1.0 or httpver > 1.1 then
+    if httpver < 1.1 then
         return 505  -- HTTP Version not supported
     end
 
