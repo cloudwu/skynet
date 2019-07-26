@@ -250,6 +250,7 @@ local function resolve_accept(self)
 
     local header = err
     try_handle(self, "handshake", header)
+    local recv_count = 0
     local recv_buf = {}
     while true do
         if _isws_closed(self.id) then
@@ -271,10 +272,15 @@ local function resolve_accept(self)
                 try_handle(self, "message", payload_data)
             else
                 recv_buf[#recv_buf+1] = payload_data
+                recv_count = recv_count + #payload_data
+                if recv_count > MAX_FRAME_SIZE then
+                    error("payload_len is too large")
+                end
                 if fin then
                     local s = table.concat(recv_buf)
                     try_handle(self, "message", s)
                     recv_buf = {}  -- clear recv_buf
+                    recv_count = 0
                 end
             end
         end
