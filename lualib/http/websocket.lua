@@ -226,7 +226,7 @@ local function read_frame(self)
         payload_len = string.unpack(">I8", s)
     end
 
-    if payload_len > MAX_FRAME_SIZE then
+    if self.mode == "server" and payload_len > MAX_FRAME_SIZE then
         error("payload_len is too large")
     end
 
@@ -322,6 +322,8 @@ local function _new_client_ws(socket_id, protocol)
     else
         error(string.format("invalid websocket protocol:%s", tostring(protocol)))
     end
+
+    obj.mode = "client"
     obj.id = assert(socket_id)
     obj.guid = GLOBAL_GUID
     ws_pool[socket_id] = obj
@@ -367,6 +369,7 @@ local function _new_server_ws(socket_id, handle, protocol)
         error(string.format("invalid websocket protocol:%s", tostring(protocol)))
     end
 
+    obj.mode = "server"
     obj.id = assert(socket_id)
     obj.handle = handle
     obj.guid = GLOBAL_GUID
@@ -481,9 +484,6 @@ function M.close(id, code ,reason)
             payload_data = string.pack(fmt, code, reason)
         end
         write_frame(ws_obj, "close", payload_data)
-        -- local fin, op, payload_data = read_frame(ws_obj)
-        -- assert(fin and op == "close")
-        -- local code, reason = read_close(payload_data)
     end, debug.traceback)
     _close_websocket(ws_obj)
     if not ok then
