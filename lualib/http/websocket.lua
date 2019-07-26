@@ -230,7 +230,7 @@ local function read_frame(self)
         error("payload_len is too large")
     end
 
-    print(string.format("fin:%s, op:%s, mask:%s, payload_len:%s", fin, op_code[op], mask, payload_len))
+    -- print(string.format("fin:%s, op:%s, mask:%s, payload_len:%s", fin, op_code[op], mask, payload_len))
     local masking_key = mask and self.read(4) or false
     local payload_data = payload_len>0 and self.read(payload_len) or ""
     payload_data = masking_key and crypt.xor_str(payload_data, masking_key) or payload_data
