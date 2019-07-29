@@ -72,6 +72,9 @@ local function request(interface, method, host, url, recvheader, header, content
 				local padding = read(length - #body)
 				body = body .. padding
 			end
+		elseif code == 204 or code == 304 or code < 200 then
+			body = ""
+			-- See https://stackoverflow.com/questions/15991173/is-the-content-length-header-required-for-a-http-1-0-response
 		else
 			-- no content-length, read all
 			body = body .. interface.readall()
