@@ -254,6 +254,7 @@ local function resolve_accept(self)
     local recv_buf = {}
     while true do
         if _isws_closed(self.id) then
+            try_handle(self, "close")
             return
         end
         local fin, op, payload_data = read_frame(self)
@@ -398,7 +399,9 @@ function M.accept(socket_id, handle, protocol)
     end
     if not ok then
         if err == socket_error then
-            if not closed then
+            if closed then
+                try_handle(ws_obj, "close")
+            else
                 try_handle(ws_obj, "error")
             end
         else
