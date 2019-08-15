@@ -275,7 +275,7 @@ local function resolve_replace(replace_map)
             local nv = replace_map[mt]
             if nv then
                 nv = getnv(mt)
-                setmetatable(t, nv)
+                setmetatable(v, nv)
             else
                 match_value(mt)
             end
