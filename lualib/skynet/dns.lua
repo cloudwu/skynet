@@ -516,7 +516,7 @@ function dns.resolve(name, ipv6)
 		return answer, answers
 	end
 
-	return remote_resolve(name, ipv6, timeout)
+	return remote_resolve(name, ipv6)
 end
 
 return dns
