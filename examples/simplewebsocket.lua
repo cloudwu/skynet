@@ -11,8 +11,9 @@ if MODE == "agent" then
         print("ws connect from: " .. tostring(id))
     end
 
-    function handle.handshake(id, header)
-        print("ws handshake from: " .. tostring(id))
+    function handle.handshake(id, header, url)
+        local addr = websocket.addrinfo(id)
+        print("ws handshake from: " .. tostring(id), "url", url, "addr:", addr)
         print("----header-----")
         for k,v in pairs(header) do
             print(k,v)
@@ -41,8 +42,8 @@ if MODE == "agent" then
     end
 
     skynet.start(function ()
-        skynet.dispatch("lua", function (_,_, id, protocol)
-            websocket.accept(id, handle, protocol)
+        skynet.dispatch("lua", function (_,_, id, protocol, addr)
+            websocket.accept(id, handle, protocol, addr)
         end)
     end)
 
@@ -50,7 +51,7 @@ else
     local function simple_echo_client_service(protocol)
         local skynet = require "skynet"
         local websocket = require "http.websocket"
-        local url = string.format("%s://127.0.0.1:9948/", protocol)
+        local url = string.format("%s://127.0.0.1:9948/test_websocket", protocol)
         local ws_id = websocket.connect(url)
         while true do
             local msg = "hello world!"
@@ -78,7 +79,7 @@ else
         skynet.error(string.format("Listen websocket port 9948 protocol:%s", protocol))
         socket.start(id, function(id, addr)
             print(string.format("accept client socket_id: %s addr:%s", id, addr))
-            skynet.send(agent[balance], "lua", id, protocol)
+            skynet.send(agent[balance], "lua", id, protocol, addr)
             balance = balance + 1
             if balance > #agent then
                 balance = 1

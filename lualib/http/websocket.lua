@@ -140,7 +140,7 @@ local function read_handshake(self)
                   sub_pro ..
                   "\r\n"
     self.write(resp)
-    return nil, header
+    return nil, header, url
 end
 
 local function try_handle(self, method, ...)
@@ -240,7 +240,7 @@ end
 
 local function resolve_accept(self)
     try_handle(self, "connect")
-    local code, err = read_handshake(self)
+    local code, err, url = read_handshake(self)
     if code then
         local ok, s = httpd.write_response(self.write, code, err)
         if not ok then
@@ -249,7 +249,7 @@ local function resolve_accept(self)
     end
 
     local header = err
-    try_handle(self, "handshake", header)
+    try_handle(self, "handshake", header, url)
     local recv_count = 0
     local recv_buf = {}
     while true do
@@ -381,10 +381,11 @@ end
 
 -- handle interface
 -- connect / handshake / message / ping / pong / close / error
-function M.accept(socket_id, handle, protocol)
+function M.accept(socket_id, handle, protocol, addr)
     socket.start(socket_id)
     protocol = protocol or "ws"
     local ws_obj = _new_server_ws(socket_id, handle, protocol)
+    ws_obj.addr = addr
     local on_warning = handle and handle["warning"]
     if on_warning then
         socket.warning(socket_id, function (id, sz)
@@ -427,6 +428,7 @@ function M.connect(url, header, timeout)
     uri = uri == "" and "/" or uri
     local socket_id = sockethelper.connect(host_name, host_port, timeout)
     local ws_obj = _new_client_ws(socket_id, protocol)
+    ws_obj.addr = host
     write_handshake(ws_obj, host_name, uri, header)
     return socket_id
 end
@@ -472,6 +474,10 @@ function M.ping(id)
     write_frame(ws_obj, "ping")
 end
 
+function M.addrinfo(id)
+    local ws_obj = assert(ws_pool[id])
+    return ws_obj.addr
+end
 
 function M.close(id, code ,reason)
     local ws_obj = ws_pool[id]
