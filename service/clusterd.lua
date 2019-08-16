@@ -50,6 +50,8 @@ local function open_channel(t, key)
 		if succ then
 			t[key] = c
 			ct.channel = c
+		else
+			err = string.format("changenode [%s] (%s:%s) failed", key, host, port)
 		end
 	else
 		err = string.format("cluster node [%s] is %s.", key,  address == false and "down" or "absent")
