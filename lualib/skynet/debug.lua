@@ -42,6 +42,10 @@ local function init(skynet, export)
 			end
 		end
 
+		function dbgcmd.UNIQTASK()
+			skynet.ret(skynet.pack(skynet.uniqtask()))
+		end
+
 		function dbgcmd.INFO(...)
 			if internal_info_func then
 				skynet.ret(skynet.pack(internal_info_func(...)))

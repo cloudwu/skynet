@@ -8,6 +8,7 @@ local pcall = pcall
 local table = table
 local tremove = table.remove
 local tinsert = table.insert
+local traceback = debug.traceback
 
 local profile = require "skynet.profile"
 
@@ -773,7 +774,7 @@ function skynet.task(ret)
 	local tt = type(ret)
 	if tt == "table" then
 		for session,co in pairs(session_id_coroutine) do
-			ret[session] = debug.traceback(co)
+			ret[session] = traceback(co)
 		end
 		return
 	elseif tt == "number" then
@@ -791,6 +792,30 @@ function skynet.task(ret)
 		end
 		return
 	end
+end
+
+function skynet.uniqtask()
+	local stacks = {}
+	for session, co in pairs(session_id_coroutine) do
+		local stack = traceback(co)
+		local info = stacks[stack] or {count = 0, sessions = {}}
+		info.count = info.count + 1
+		if info.count < 10 then
+			info.sessions[#info.sessions+1] = session
+		end
+		stacks[stack] = info
+	end
+	local ret = {}
+	for stack, info in pairs(stacks) do
+		local count = info.count
+		local sessions = table.concat(info.sessions, ",")
+		if count > 10 then
+			sessions = sessions .. "..."
+		end
+		local head_line = string.format("%d\tsessions:[%s]\n", count, sessions)
+		ret[head_line] = stack
+	end
+	return ret
 end
 
 function skynet.term(service)
