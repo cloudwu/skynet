@@ -129,10 +129,6 @@ local function _recv_packet(self,sock)
         return nil, nil, "empty packet"
     end
 
-    if len > self._max_packet_size then
-        return nil, nil, "packet size too big: " .. len
-    end
-
     local num = strbyte(data, pos)
 
     self.packet_no = num
