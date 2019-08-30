@@ -148,6 +148,7 @@ function COMMAND.help()
 		clearcache = "clear lua code cache",
 		service = "List unique service",
 		task = "task address : show service task detail",
+		uniqtask = "task address : show service unique task detail",
 		inject = "inject address luascript.lua",
 		logon = "logon address",
 		logoff = "logoff address",
@@ -260,6 +261,11 @@ end
 function COMMAND.task(address)
 	address = adjust_address(address)
 	return skynet.call(address,"debug","TASK")
+end
+
+function COMMAND.uniqtask(address)
+	address = adjust_address(address)
+	return skynet.call(address,"debug","UNIQTASK")
 end
 
 function COMMAND.info(address, ...)

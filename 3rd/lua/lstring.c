@@ -64,6 +64,8 @@ int luaS_eqshrstr (TString *a, TString *b) {
 }
 
 void luaS_share (TString *ts) {
+  if (ts == NULL)
+    return;
   makeshared(ts);
   ts->id = ATOM_DEC(&STRID);
 }
