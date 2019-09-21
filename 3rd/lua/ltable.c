@@ -608,7 +608,10 @@ const TValue *luaH_get (Table *t, const TValue *key) {
 ** barrier and invalidate the TM cache.
 */
 TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
-  const TValue *p = luaH_get(t, key);
+  const TValue *p;
+  if(isshared(t))
+    luaG_runerror(L,"attempt to change a shared table");
+  p = luaH_get(t, key);
   if (p != luaO_nilobject)
     return cast(TValue *, p);
   else return luaH_newkey(L, t, key);
