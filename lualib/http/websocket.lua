@@ -119,6 +119,7 @@ local function read_handshake(self)
     local sw_protocol = header["sec-websocket-protocol"]
     local sub_pro = ""
     if sw_protocol then
+        local has_chat = false
         for sub_protocol in string.gmatch(sw_protocol, "[^%s,]+") do
             if sub_protocol == "chat" then
                 sub_pro = "Sec-WebSocket-Protocol: chat\r\n"
