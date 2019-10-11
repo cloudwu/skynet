@@ -135,6 +135,10 @@ function command.sender(source, node)
 	skynet.ret(skynet.pack(node_channel[node]))
 end
 
+function command.senders(source)
+	skynet.retpack(node_sender)
+end
+
 local proxy = {}
 
 function command.proxy(source, node, name)

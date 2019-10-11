@@ -177,9 +177,9 @@ function suspend(co, result, command)
 				c.send(addr, skynet.PTYPE_ERROR, session, "")
 			end
 			session_coroutine_id[co] = nil
-			session_coroutine_address[co] = nil
-			session_coroutine_tracetag[co] = nil
 		end
+		session_coroutine_address[co] = nil
+		session_coroutine_tracetag[co] = nil
 		skynet.fork(function() end)	-- trigger command "SUSPEND"
 		error(debug.traceback(co,tostring(command)))
 	end
