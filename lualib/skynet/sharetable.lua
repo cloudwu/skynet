@@ -2,6 +2,7 @@ local skynet = require "skynet"
 local service = require "skynet.service"
 local core = require "skynet.sharetable.core"
 local is_sharedtable = core.is_sharedtable
+local stackvalues = core.stackvalues
 
 local function sharetable_service()
 	local skynet = require "skynet"
@@ -257,6 +258,10 @@ local function resolve_replace(replace_map)
 
     local function match_value(v)
         assert(v ~= nil)
+        if v == RECORD then
+            return
+        end
+
         local tv = type(v)
         local f = match[tv]
         if record_map[v] or is_sharedtable(v) then
@@ -270,26 +275,65 @@ local function resolve_replace(replace_map)
     end
 
     local function match_mt(v)
-        local mt = getmetatable(v)
+        local mt = debug.getmetatable(v)
         if mt then
             local nv = replace_map[mt]
             if nv then
                 nv = getnv(mt)
-                setmetatable(v, nv)
+                debug.setmetatable(v, nv)
             else
                 match_value(mt)
             end
         end
     end
 
+    local function match_internmt()
+        local internal_types = {
+            pointer = debug.upvalueid(getnv, 1),
+            boolean = false,
+            str = "",
+            number = 42,
+            thread = coroutine.running(),
+            func = getnv,
+        }
+        for _,v in pairs(internal_types) do
+            match_mt(v)
+        end
+        match_mt(nil)
+    end
+
+
     local function match_table(t)
+        local keys = false
         for k,v in next, t do
+            local tk = type(k)
+            if match[tk] then
+                keys = keys or {}
+                keys[#keys+1] = k
+            end
+
             local nv = replace_map[v]
             if nv then
                 nv = getnv(v)
                 rawset(t, k, nv)
             else
                 match_value(v)
+            end
+        end
+
+        if keys then
+            for _, old_k in ipairs(keys) do
+                local new_k = replace_map[old_k]
+                if new_k then
+                    local value = rawget(t, old_k)
+                    new_k = getnv(old_k)
+                    rawset(t, old_k, nil)
+                    if new_k then
+                        rawset(t, new_k, value)
+                    end
+                else
+                    match_value(old_k)
+                end
             end
         end
         match_mt(t)
@@ -345,8 +389,33 @@ local function resolve_replace(replace_map)
         match_funcinfo(info)
     end
 
+    local stack_values_tmp = {}
     local function match_thread(co)
+        -- match stackvalues
+        local n = stackvalues(co, stack_values_tmp)
+        for i=1,n do
+            local v = stack_values_tmp[i]
+            stack_values_tmp[i] = nil
+            match_value(v)
+        end
+
+        -- match callinfo
         local level = 1
+        -- jump the fucntion from sharetable.update to top
+        local is_self = coroutine.running() == co
+        if is_self then
+            while true do
+                local info = getinfo(co, level, "uf")
+                level = level + 1
+                if not info then
+                    level = 1
+                    break
+                elseif info.func == sharetable.update then
+                    break
+                end
+            end
+        end
+
         while true do
             local info = getinfo(co, level, "uf")
             if not info then
@@ -364,6 +433,8 @@ local function resolve_replace(replace_map)
     match["userdata"] = match_userdata
     match["thread"] = match_thread
 
+    match_internmt()
+
     local root = debug.getregistry()
     assert(replace_map[root] == nil)
     match_table(root)
@@ -380,13 +451,15 @@ function sharetable.update(...)
 			for old_t,_ in pairs(map) do
 				if old_t ~= new_t then
 					insert_replace(old_t, new_t, replace_map)
+                    map[old_t] = nil
 				end
 			end
-			RECORD[name] = nil
 		end
 	end
 
-	resolve_replace(replace_map)
+    if next(replace_map) then
+	   resolve_replace(replace_map)
+    end
 end
 
 return sharetable

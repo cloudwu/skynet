@@ -83,6 +83,32 @@ clone_table(lua_State *L) {
 	return 1;
 }
 
+static int
+lco_stackvalues(lua_State* L) {
+    lua_State *cL = lua_tothread(L, 1);
+    luaL_argcheck(L, cL, 1, "thread expected");
+    int n = 0;
+    if(cL != L) {
+        luaL_checktype(L, 2, LUA_TTABLE);
+        n = lua_gettop(cL);
+        if(n > 0) {
+            luaL_checkstack(L, n+1, NULL);
+            int top = lua_gettop(L);
+            lua_xmove(cL, L, n);
+            int i=0;
+            for(i=1; i<=n; i++) {
+                lua_pushvalue(L, top+i);
+                lua_seti(L, 2, i);
+            }
+            lua_xmove(L, cL, n);
+        }
+    }
+
+    lua_pushinteger(L, n);
+    return 1;
+}
+
+
 struct state_ud {
 	lua_State *L;
 };
@@ -218,6 +244,7 @@ luaopen_skynet_sharetable_core(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "clone", clone_table },
+		{ "stackvalues", lco_stackvalues }, 
 		{ "matrix", matrix_from_file },
 		{ "is_sharedtable", lis_sharedtable },
 		{ NULL, NULL },
