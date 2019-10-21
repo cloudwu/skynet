@@ -92,17 +92,15 @@ lco_stackvalues(lua_State* L) {
         luaL_checktype(L, 2, LUA_TTABLE);
         n = lua_gettop(cL);
         if(n > 0) {
-            lua_checkstack(L, n+1);
+            luaL_checkstack(L, n+1, NULL);
             int top = lua_gettop(L);
             lua_xmove(cL, L, n);
             int i=0;
-            for(i=0; i<n; i++) {
-                lua_pushvalue(L, top+1+i);
-                lua_seti(L, 2, i+1);
+            for(i=1; i<=n; i++) {
+                lua_pushvalue(L, top+i);
+                lua_seti(L, 2, i);
             }
             lua_xmove(L, cL, n);
-        } else {
-            n = 0;
         }
     }
 

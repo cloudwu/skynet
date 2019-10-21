@@ -275,23 +275,40 @@ local function resolve_replace(replace_map)
     end
 
     local function match_mt(v)
-        local mt = getmetatable(v)
+        local mt = debug.getmetatable(v)
         if mt then
             local nv = replace_map[mt]
             if nv then
                 nv = getnv(mt)
-                setmetatable(v, nv)
+                debug.setmetatable(v, nv)
             else
                 match_value(mt)
             end
         end
     end
 
+    local function match_internmt()
+        local internal_types = {
+            pointer = debug.upvalueid(getnv, 1),
+            boolean = false,
+            str = "",
+            number = 42,
+            thread = coroutine.running(),
+            func = getnv,
+        }
+        for _,v in pairs(internal_types) do
+            match_mt(v)
+        end
+        match_mt(nil)
+    end
+
+
     local function match_table(t)
-        local keys = {}
+        local keys = false
         for k,v in next, t do
             local tk = type(k)
             if match[tk] then
+                keys = keys or {}
                 keys[#keys+1] = k
             end
 
@@ -304,17 +321,19 @@ local function resolve_replace(replace_map)
             end
         end
 
-        for _, old_k in ipairs(keys) do
-            local new_k = replace_map[old_k]
-            if new_k then
-                local value = rawget(t, old_k)
-                new_k = getnv(old_k)
-                rawset(t, old_k, nil)
+        if keys then
+            for _, old_k in ipairs(keys) do
+                local new_k = replace_map[old_k]
                 if new_k then
-                    rawset(t, new_k, value)
+                    local value = rawget(t, old_k)
+                    new_k = getnv(old_k)
+                    rawset(t, old_k, nil)
+                    if new_k then
+                        rawset(t, new_k, value)
+                    end
+                else
+                    match_value(old_k)
                 end
-            else
-                match_value(old_k)
             end
         end
         match_mt(t)
@@ -413,6 +432,8 @@ local function resolve_replace(replace_map)
     match["function"] = match_function
     match["userdata"] = match_userdata
     match["thread"] = match_thread
+
+    match_internmt()
 
     local root = debug.getregistry()
     assert(replace_map[root] == nil)
