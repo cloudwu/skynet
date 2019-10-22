@@ -162,6 +162,7 @@ function COMMAND.help()
 		netstat = "netstat : show netstat",
 		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
 		dumpheap = "dumpheap : dump heap profilling",
+		detail = "task address : show all service task traceback",
 	}
 end
 
@@ -348,6 +349,11 @@ function COMMAND.ping(address)
 	skynet.call(address, "debug", "PING")
 	ti = skynet.now() - ti
 	return tostring(ti)
+end
+
+function COMMAND.detail(address)
+	address = adjust_address(address)
+	return skynet.call(address,"debug","DETAIL")
 end
 
 local function toboolean(x)

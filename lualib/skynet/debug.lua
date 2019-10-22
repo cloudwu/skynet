@@ -97,6 +97,12 @@ local function init(skynet, export)
 			skynet.ret()
 		end
 
+		function dbgcmd.DETAIL()
+			local detail = {}
+			skynet.detail(detail)
+			skynet.ret(skynet.pack(detail))
+		end
+		
 		return dbgcmd
 	end -- function init_dbgcmd
 

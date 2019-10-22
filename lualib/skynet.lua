@@ -9,6 +9,7 @@ local table = table
 local tremove = table.remove
 local tinsert = table.insert
 local traceback = debug.traceback
+local string = string
 
 local profile = require "skynet.profile"
 
@@ -65,10 +66,12 @@ local sleep_session = {}
 local watching_session = {}
 local error_queue = {}
 local fork_queue = {}
+local traceback_cache = {}
 
 -- suspend is function
 local suspend
 
+local is_detail = false
 
 ----- monitor exit
 
@@ -77,6 +80,7 @@ local function dispatch_error_queue()
 	if session then
 		local co = session_id_coroutine[session]
 		session_id_coroutine[session] = nil
+		if is_detail then traceback_cache[session] = nil end
 		return suspend(co, coroutine_resume(co, false))
 	end
 end
@@ -159,6 +163,7 @@ local function dispatch_wakeup()
 			local tag = session_coroutine_tracetag[co]
 			if tag then c.trace(tag, "resume") end
 			session_id_coroutine[session] = "BREAK"
+			if is_detail then traceback_cache[session] = {co = string.format("co:%s", co), traceback = traceback(), } end
 			return suspend(co, coroutine_resume(co, false, "BREAK"))
 		end
 	end
@@ -181,7 +186,7 @@ function suspend(co, result, command)
 		session_coroutine_address[co] = nil
 		session_coroutine_tracetag[co] = nil
 		skynet.fork(function() end)	-- trigger command "SUSPEND"
-		error(debug.traceback(co,tostring(command)))
+		error(traceback(co, tostring(command)))
 	end
 	if command == "SUSPEND" then
 		dispatch_wakeup()
@@ -191,12 +196,12 @@ function suspend(co, result, command)
 		return
 	elseif command == "USER" then
 		-- See skynet.coutine for detail
-		error("Call skynet.coroutine.yield out of skynet.coroutine.resume\n" .. debug.traceback(co))
+		error("Call skynet.coroutine.yield out of skynet.coroutine.resume\n" .. traceback(co))
 	elseif command == nil then
 		-- debug trace
 		return
 	else
-		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
+		error("Unknown command : " .. command .. "\n" .. traceback(co))
 	end
 end
 
@@ -206,6 +211,7 @@ function skynet.timeout(ti, func)
 	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
+	if is_detail then traceback_cache[session] = {co = string.format("co:%s", co), traceback = traceback(), } end
 	return co	-- for debug
 end
 
@@ -215,6 +221,7 @@ local function suspend_sleep(session, token)
 	session_id_coroutine[session] = running_thread
 	assert(sleep_session[token] == nil, "token duplicative")
 	sleep_session[token] = session
+	if is_detail then traceback_cache[session] = {co = string.format("co:%s", running_thread), traceback = traceback(), } end
 
 	return coroutine_yield "SUSPEND"
 end
@@ -245,6 +252,7 @@ function skynet.wait(token)
 	local ret, msg = suspend_sleep(session, token)
 	sleep_session[token] = nil
 	session_id_coroutine[session] = nil
+	if is_detail then traceback_cache[session] = nil end
 end
 
 function skynet.self()
@@ -353,6 +361,9 @@ skynet.trash = assert(c.trash)
 local function yield_call(service, session)
 	watching_session[session] = service
 	session_id_coroutine[session] = running_thread
+	
+	if is_detail then traceback_cache[session] = {co = string.format("co:%s", running_thread), traceback = traceback(), } end
+
 	local succ, msg, sz = coroutine_yield "SUSPEND"
 	watching_session[session] = nil
 	if not succ then
@@ -541,12 +552,14 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 		local co = session_id_coroutine[session]
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
+		if is_detail then traceback_cache[session] = nil end
 		elseif co == nil then
 			unknown_response(session, source, msg, sz)
 		else
 			local tag = session_coroutine_tracetag[co]
 			if tag then c.trace(tag, "resume") end
 			session_id_coroutine[session] = nil
+			if is_detail then traceback_cache[session] = nil end
 			suspend(co, coroutine_resume(co, true, msg, sz))
 		end
 	else
@@ -722,7 +735,7 @@ local function init_template(start, ...)
 end
 
 function skynet.pcall(start, ...)
-	return xpcall(init_template, debug.traceback, start, ...)
+	return xpcall(init_template, traceback, start, ...)
 end
 
 function skynet.init_service(start)
@@ -766,7 +779,7 @@ function skynet.task(ret)
 	end
 	if ret == "init" then
 		if init_thread then
-			return debug.traceback(init_thread)
+			return traceback(init_thread)
 		else
 			return
 		end
@@ -780,7 +793,7 @@ function skynet.task(ret)
 	elseif tt == "number" then
 		local co = session_id_coroutine[ret]
 		if co then
-			return debug.traceback(co)
+			return traceback(co)
 		else
 			return "No session"
 		end
@@ -816,6 +829,21 @@ function skynet.uniqtask()
 		ret[head_line] = stack
 	end
 	return ret
+end
+
+function skynet.detail_trigger()
+	is_detail = true
+end
+
+function skynet.detail(ret)
+	local t = 0
+	for session, info in pairs(traceback_cache) do
+		if ret then
+			ret[session] = info.co .. info.traceback
+		end
+		t = t + 1
+	end
+	return t
 end
 
 function skynet.term(service)
