@@ -181,7 +181,7 @@ function suspend(co, result, command)
 		session_coroutine_address[co] = nil
 		session_coroutine_tracetag[co] = nil
 		skynet.fork(function() end)	-- trigger command "SUSPEND"
-		error(debug.traceback(co,tostring(command)))
+		error(traceback(co,tostring(command)))
 	end
 	if command == "SUSPEND" then
 		dispatch_wakeup()
@@ -191,12 +191,12 @@ function suspend(co, result, command)
 		return
 	elseif command == "USER" then
 		-- See skynet.coutine for detail
-		error("Call skynet.coroutine.yield out of skynet.coroutine.resume\n" .. debug.traceback(co))
+		error("Call skynet.coroutine.yield out of skynet.coroutine.resume\n" .. traceback(co))
 	elseif command == nil then
 		-- debug trace
 		return
 	else
-		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
+		error("Unknown command : " .. command .. "\n" .. traceback(co))
 	end
 end
 
@@ -722,7 +722,7 @@ local function init_template(start, ...)
 end
 
 function skynet.pcall(start, ...)
-	return xpcall(init_template, debug.traceback, start, ...)
+	return xpcall(init_template, traceback, start, ...)
 end
 
 function skynet.init_service(start)
@@ -766,7 +766,7 @@ function skynet.task(ret)
 	end
 	if ret == "init" then
 		if init_thread then
-			return debug.traceback(init_thread)
+			return traceback(init_thread)
 		else
 			return
 		end
@@ -780,7 +780,7 @@ function skynet.task(ret)
 	elseif tt == "number" then
 		local co = session_id_coroutine[ret]
 		if co then
-			return debug.traceback(co)
+			return traceback(co)
 		else
 			return "No session"
 		end
