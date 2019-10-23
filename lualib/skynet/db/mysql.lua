@@ -881,7 +881,7 @@ local function _prepare_resp(self,sql)
 end
 
 -- 注册预处理语句
-function _prepare(self,query)
+local function _prepare(self,query)
     local stmt = self.stmts[query]
     if stmt then
         return stmt
