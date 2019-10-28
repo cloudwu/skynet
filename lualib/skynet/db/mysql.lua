@@ -25,26 +25,13 @@ local tonumber = tonumber
 local _M = { _VERSION = '0.14' }
 -- constants
 
-local pow_2_16 = 2^16
-local pow_2_24 = 2^24
-
-local STATE_CONNECTED = 1
-local STATE_COMMAND_SENT = 2
-
-local COM_QUERY = 0x03
-local COM_PING = 0x0e
-local COM_STMT_PREPARE = 0x16
+local COM_QUERY = '\x03'
+local COM_PING = '\x0e'
+local COM_STMT_PREPARE = '\x16'
 local COM_STMT_EXECUTE = 0x17
 local COM_STMT_SEND_LONG_DATA = 0x18
-local COM_STMT_CLOSE = 0x19
-local COM_STMT_RESET = 0x1a
-local COM_SET_OPTION = 0x1b
-local COM_STMT_FETCH = 0x1c
 
 local CURSOR_TYPE_NO_CURSOR = 0x00
-local CURSOR_TYPE_READ_ONLY = 0x01
-local CURSOR_TYPE_FOR_UPDATE = 0x02
-local CURSOR_TYPE_SCROLLABLE = 0x04
 
 local SERVER_MORE_RESULTS_EXISTS = 8
 
@@ -233,15 +220,15 @@ local function _set_length_coded_bin(n)
         return strchar(n)
     end
 
-    if n<pow_2_16 then
-        return strchar(0xfc).._set_byte2(n)
+    if n<(1<<16) then
+        return strpack('<BI2',0xfc,n)
     end
 
-    if n<pow_2_24 then
-        return strchar(0xfd).._set_byte3(n)
+    if n<(1<<24) then
+        return strpack('<BI3',0xfd,n)
     end
 
-    return strchar(0xfe).._set_byte8(n)
+    return strpack('<BI8',0xfe,n)
 end
 
 local function _from_length_coded_str(data, pos)
@@ -490,10 +477,9 @@ local function _mysql_login(self,user,password,database,on_connect)
 
         local authpacket=_compose_packet(self,req,packet_len)
         sockchannel:request(authpacket, dispatch_resp)
-	if on_connect then
-        self.stmts = {}
-		on_connect(self)
-	end
+        if on_connect then
+            on_connect(self)
+        end
     end
 end
 
@@ -501,7 +487,7 @@ end
 local function _compose_ping(self)
     self.packet_no = -1
 
-    local cmd_packet = strchar(COM_PING)
+    local cmd_packet = COM_PING
     local packet_len = #cmd_packet
 
     local querypacket = _compose_packet(self, cmd_packet, packet_len)
@@ -512,7 +498,7 @@ local function _compose_query(self, query)
 
     self.packet_no = -1
 
-    local cmd_packet = strchar(COM_QUERY) .. query
+    local cmd_packet = COM_QUERY..query
     local packet_len = 1 + #query
 
     local querypacket = _compose_packet(self, cmd_packet, packet_len)
@@ -522,7 +508,7 @@ end
 local function _compose_stmt_prepare(self, query)
     self.packet_no = -1
 
-    local cmd_packet = strchar(COM_STMT_PREPARE) .. query
+    local cmd_packet = COM_STMT_PREPARE .. query
     local packet_len = #cmd_packet
 
     local querypacket = _compose_packet(self, cmd_packet, packet_len)
@@ -559,7 +545,7 @@ local function _compose_stmt_execute(self,stmt,cursor_type,args)
 
     self.packet_no = -1
 
-    local cmd_packet
+    local cmd_packet = string.pack("<BI4BI4",COM_STMT_EXECUTE,stmt.prepare_id,cursor_type,0x01)
     if arg_num>0 then
         local null_count=mathfloor((arg_num+7)/8)
 
@@ -579,19 +565,7 @@ local function _compose_stmt_execute(self,stmt,cursor_type,args)
             values_buf=values_buf..vs
         end
 
-        cmd_packet = strchar(COM_STMT_EXECUTE)
-                    .. _set_byte4(stmt.prepare_id)
-                    .. strchar(cursor_type)
-                    .. _set_byte4(0x01)
-                    ..strrep("\0",null_count)
-                    ..strchar(0x01)
-                    ..types_buf
-                    ..values_buf
-    else
-        cmd_packet = strchar(COM_STMT_EXECUTE)
-                    .. _set_byte4(stmt.prepare_id)
-                    .. strchar(cursor_type)
-                    .. _set_byte4(0x01)
+        cmd_packet = cmd_packet..strrep("\0",null_count)..strchar(0x01)..types_buf..values_buf
     end
 
     local packet_len = #cmd_packet
@@ -605,47 +579,6 @@ local function _compose_stmt_send_long_data(self, prepare_id,arg_id,arg_data)
                     .. _set_byte4(prepare_id)
                     .. _set_byte2(arg_id)
                     .. arg_data
-
-    local packet_len = #cmd_packet
-
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
-    return querypacket
-end
-
-local function _compose_stmt_close(self, prepare_id)
-    local cmd_packet = strchar(COM_STMT_CLOSE)
-                    .. _set_byte4(prepare_id)
-
-    local packet_len = #cmd_packet
-
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
-    return querypacket
-end
-
-local function _compose_stmt_reset(self, prepare_id)
-    local cmd_packet = strchar(COM_STMT_RESET)
-                    .. _set_byte4(prepare_id)
-
-    local packet_len = #cmd_packet
-
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
-    return querypacket
-end
-
-local function _compose_set_option(self,option)
-    local cmd_packet = strchar(COM_SET_OPTION)
-                    .. _set_byte2(option)
-
-    local packet_len = #cmd_packet
-
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
-    return querypacket
-end
-
-local function _compose_stmt_fetch(self,prepare_id,line_num)
-    local cmd_packet = strchar(COM_STMT_FETCH)
-                    .. _set_byte4(prepare_id)
-                    .. _set_byte4(line_num)
 
     local packet_len = #cmd_packet
 
@@ -776,7 +709,8 @@ local function _query_resp(self)
 end
 
 function _M.connect(opts)
-    local self = setmetatable( {stmts = {}}, mt)
+
+    local self = setmetatable( {}, mt)
 
     local max_packet_size = opts.max_packet_size
     if not max_packet_size then
@@ -881,23 +815,13 @@ local function _prepare_resp(self,sql)
 end
 
 -- 注册预处理语句
-local function _prepare(self,query)
-    local stmt = self.stmts[query]
-    if stmt then
-        return stmt
-    end
-
-    local querypacket = _compose_stmt_prepare(self, query)
+function _M.prepare(self,sql)
+    local querypacket = _compose_stmt_prepare(self, sql)
     local sockchannel = self.sockchannel
     if not self.prepare_resp then
         self.prepare_resp = _prepare_resp(self)
     end
-    stmt = sockchannel:request( querypacket, self.prepare_resp )
-    if stmt then
-        self.stmts[query] = stmt
-    end
-
-    return stmt
+    return sockchannel:request( querypacket, self.prepare_resp )
 end
 
 local function _get_datetime(data,pos)
@@ -941,7 +865,8 @@ local _binary_parser = {
 
 local function _parse_row_data_binary(data, cols, compact)
     local ncols = #cols
-    local null_count=mathfloor((ncols+7+2)/8)
+    -- 协议空位图 (列数量 + 7 + 2) / 8
+    local null_count=mathfloor((ncols+9)/8)
     local pos = 2+null_count
     local value
 
@@ -1100,14 +1025,15 @@ local function _execute_resp(self)
 end
 
 --[[
-    执行sql语句
+    执行预处理语句
     失败返回字段
         errno
         badresult
         sqlstate
         err
 ]]
-function _M.execute(self, sql,...)
+function _M.execute(self, stmt,...)
+    -- 检查参数，不能为nil
     local p_n = select('#',...)
     local p_v
     for i=1,p_n do
@@ -1116,26 +1042,12 @@ function _M.execute(self, sql,...)
             return {
                 badresult=true,
                 errno=30902,
-                err="prepare sql fail : "..sql,
+                err="parameter "..i.." is nil",
             }
         end
     end
 
-    local args = {...}
-
-    local stmt=_prepare(self,sql)
-    if not stmt then
-        return {
-            badresult=true,
-            errno=30901,
-            err="prepare sql fail : "..sql,
-            }
-    end
-    if stmt.badresult then
-        return stmt
-    end
-
-    local querypacket,er = _compose_stmt_execute(self,stmt,CURSOR_TYPE_NO_CURSOR,args)
+    local querypacket,er = _compose_stmt_execute(self,stmt,CURSOR_TYPE_NO_CURSOR,{...})
     if not querypacket then
         return {
             badresult=true,
