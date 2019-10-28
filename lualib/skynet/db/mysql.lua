@@ -29,7 +29,6 @@ local COM_QUERY = '\x03'
 local COM_PING = '\x0e'
 local COM_STMT_PREPARE = '\x16'
 local COM_STMT_EXECUTE = 0x17
-local COM_STMT_SEND_LONG_DATA = 0x18
 
 local CURSOR_TYPE_NO_CURSOR = 0x00
 
@@ -132,8 +131,9 @@ local function _compute_token(password, scramble)
 		end)
 end
 
-local function _compose_packet(self, req, size)
+local function _compose_packet(self, req)
    self.packet_no = self.packet_no + 1
+   local size = #req
 
     local packet = _set_byte3(size) .. strchar(self.packet_no) .. req
     return packet
@@ -473,9 +473,7 @@ local function _mysql_login(self,user,password,database,on_connect)
 			token,
 			database)
 
-        local packet_len = #req
-
-        local authpacket=_compose_packet(self,req,packet_len)
+        local authpacket=_compose_packet(self,req)
         sockchannel:request(authpacket, dispatch_resp)
         if on_connect then
             on_connect(self)
@@ -487,10 +485,7 @@ end
 local function _compose_ping(self)
     self.packet_no = -1
 
-    local cmd_packet = COM_PING
-    local packet_len = #cmd_packet
-
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
+    local querypacket = _compose_packet(self, COM_PING)
     return querypacket
 end
 
@@ -499,9 +494,8 @@ local function _compose_query(self, query)
     self.packet_no = -1
 
     local cmd_packet = COM_QUERY..query
-    local packet_len = 1 + #query
 
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
+    local querypacket = _compose_packet(self, cmd_packet)
     return querypacket
 end
 
@@ -509,9 +503,8 @@ local function _compose_stmt_prepare(self, query)
     self.packet_no = -1
 
     local cmd_packet = COM_STMT_PREPARE .. query
-    local packet_len = #cmd_packet
 
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
+    local querypacket = _compose_packet(self, cmd_packet)
     return querypacket
 end
 
@@ -568,21 +561,7 @@ local function _compose_stmt_execute(self,stmt,cursor_type,args)
         cmd_packet = cmd_packet..strrep("\0",null_count)..strchar(0x01)..types_buf..values_buf
     end
 
-    local packet_len = #cmd_packet
-
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
-    return querypacket
-end
-
-local function _compose_stmt_send_long_data(self, prepare_id,arg_id,arg_data)
-    local cmd_packet = strchar(COM_STMT_SEND_LONG_DATA)
-                    .. _set_byte4(prepare_id)
-                    .. _set_byte2(arg_id)
-                    .. arg_data
-
-    local packet_len = #cmd_packet
-
-    local querypacket = _compose_packet(self, cmd_packet, packet_len)
+    local querypacket = _compose_packet(self, cmd_packet)
     return querypacket
 end
 
@@ -781,11 +760,7 @@ local function read_prepare_result(self, sock)
         resp.err = "first typ must be OK,now"..typ
         return false,resp
     end
-    local pos
-    resp.prepare_id,pos = _get_byte4(packet,2)
-    resp.field_count,pos = _get_byte2(packet,pos)
-    resp.param_count,pos = _get_byte2(packet,pos)
-    resp.warning_count = _get_byte2(packet,pos+1)
+    resp.prepare_id,resp.field_count,resp.param_count,resp.warning_count = string.unpack("<I4I2I2xI2",packet,2)
 
     resp.params = {}
     resp.fields = {}
@@ -829,12 +804,7 @@ local function _get_datetime(data,pos)
     local value
     len,pos = _from_length_coded_bin(data,pos)
     if len==7 then
-        year,pos=_get_byte2(data,pos)
-        month,pos=_get_byte1(data,pos)
-        day,pos=_get_byte1(data,pos)
-        hour,pos=_get_byte1(data,pos)
-        minute,pos=_get_byte1(data,pos)
-        second,pos=_get_byte1(data,pos)
+        year,month,day,hour,minute,second,pos=string.unpack("<I2BBBBB",data,pos)
         value = strformat("%04d-%02d-%02d %02d:%02d:%02d",year,month,day,hour,minute,second)
     else
         value = "2017-09-09 20:08:09"
@@ -865,7 +835,7 @@ local _binary_parser = {
 
 local function _parse_row_data_binary(data, cols, compact)
     local ncols = #cols
-    -- 协议空位图 (列数量 + 7 + 2) / 8
+    -- 空位图,前两个bit系统保留 (列数量 + 7 + 2) / 8
     local null_count=mathfloor((ncols+9)/8)
     local pos = 2+null_count
     local value
