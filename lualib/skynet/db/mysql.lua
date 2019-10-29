@@ -8,7 +8,6 @@ local socketchannel = require "skynet.socketchannel"
 local crypt = require "skynet.crypt"
 
 
-local mathfloor = math.floor
 local sub = string.sub
 local strgsub = string.gsub
 local strformat = string.format
@@ -21,6 +20,7 @@ local sha1= crypt.sha1
 local setmetatable = setmetatable
 local error = error
 local tonumber = tonumber
+local tointeger = math.tointeger
 
 local _M = { _VERSION = '0.14' }
 -- constants
@@ -135,7 +135,7 @@ local function _compose_packet(self, req)
    self.packet_no = self.packet_no + 1
    local size = #req
 
-   local packet = string.pack("<I3Bc"..size,size,self.packet_no,req)
+   local packet = strpack("<I3Bc"..size,size,self.packet_no,req)
    return packet
 end
 
@@ -511,7 +511,7 @@ end
 --参数字段类型转换
 local store_types = {
     number=function(v)
-        if mathfloor(v)<v then
+        if not tointeger(v) then
             return _set_byte2(0x05),_set_double(v)
         else
             return _set_byte2(0x08),_set_byte8(v)
@@ -538,7 +538,7 @@ local function _compose_stmt_execute(self,stmt,cursor_type,args)
 
     self.packet_no = -1
 
-    local cmd_packet = string.pack("<c1I4BI4",COM_STMT_EXECUTE,stmt.prepare_id,cursor_type,0x01)
+    local cmd_packet = strpack("<c1I4BI4",COM_STMT_EXECUTE,stmt.prepare_id,cursor_type,0x01)
     if arg_num>0 then
         local null_count=(arg_num+7)//8
 
@@ -760,7 +760,7 @@ local function read_prepare_result(self, sock)
         resp.err = "first typ must be OK,now"..typ
         return false,resp
     end
-    resp.prepare_id,resp.field_count,resp.param_count,resp.warning_count = string.unpack("<I4I2I2xI2",packet,2)
+    resp.prepare_id,resp.field_count,resp.param_count,resp.warning_count = strunpack("<I4I2I2xI2",packet,2)
 
     resp.params = {}
     resp.fields = {}
