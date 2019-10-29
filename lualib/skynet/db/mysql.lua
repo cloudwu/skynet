@@ -23,15 +23,13 @@ local tonumber = tonumber
 local tointeger = math.tointeger
 
 local _M = { _VERSION = '0.14' }
--- constants
 
+-- constants
 local COM_QUERY = '\x03'
 local COM_PING = '\x0e'
 local COM_STMT_PREPARE = '\x16'
 local COM_STMT_EXECUTE = '\x17'
-
 local CURSOR_TYPE_NO_CURSOR = 0x00
-
 local SERVER_MORE_RESULTS_EXISTS = 8
 
 local mt = { __index = _M }
@@ -49,42 +47,40 @@ converters[0x0d] = tonumber  -- year
 converters[0xf6] = tonumber  -- newdecimal
 
 local function _get_byte1(data, i)
-	return strbyte(data,i),i+1
+    return strbyte(data,i),i+1
 end
 
 local function _get_byte2(data, i)
-	return strunpack("<I2",data,i)
+    return strunpack("<I2",data,i)
 end
 
 local function _get_byte3(data, i)
-	return strunpack("<I3",data,i)
+    return strunpack("<I3",data,i)
 end
 
 local function _get_byte4(data, i)
-	return strunpack("<I4",data,i)
+    return strunpack("<I4",data,i)
 end
 
 local function _get_byte8(data, i)
-	return strunpack("<I8",data,i)
+    return strunpack("<I8",data,i)
 end
 
 local function _get_float(data, i)
-	return strunpack("<f",data,i)
+    return strunpack("<f",data,i)
 end
 
 local function _get_double(data, i)
-	return strunpack("<d",data,i)
+    return strunpack("<d",data,i)
 end
 
 local function _set_byte2(n)
     return strpack("<I2", n)
 end
 
-
 local function _set_byte3(n)
     return strpack("<I3", n)
 end
-
 
 local function _set_byte4(n)
     return strpack("<I4", n)
@@ -107,9 +103,8 @@ local function _from_cstring(data, i)
 end
 
 local function _dumphex(bytes)
-	return strgsub(bytes, ".", function(x) return strformat("%02x ", strbyte(x)) end)
+    return strgsub(bytes, ".", function(x) return strformat("%02x ", strbyte(x)) end)
 end
-
 
 local function _compute_token(password, scramble)
     if password == "" then
@@ -122,13 +117,13 @@ local function _compute_token(password, scramble)
     local stage2 = sha1(stage1)
     local stage3 = sha1(scramble .. stage2)
 
-	local i = 0
-	return strgsub(stage3,".",
-		function(x)
-			i = i + 1
-			-- ~ is xor in lua 5.3
-			return strchar(strbyte(x) ~ strbyte(stage1, i))
-		end)
+    local i = 0
+    return strgsub(stage3,".",
+        function(x)
+            i = i + 1
+            -- ~ is xor in lua 5.3
+            return strchar(strbyte(x) ~ strbyte(stage1, i))
+        end)
 end
 
 local function _compose_packet(self, req)
@@ -138,17 +133,12 @@ local function _compose_packet(self, req)
 end
 
 local function _recv_packet(self,sock)
-
-
     local data = sock:read( 4)
     if not data then
         return nil, nil, "failed to receive packet header: "
     end
 
-
     local len, pos = _get_byte3(data, 1)
-
-
     if len == 0 then
         return nil, nil, "empty packet"
     end
@@ -156,11 +146,9 @@ local function _recv_packet(self,sock)
     self.packet_no = strbyte(data, pos)
 
     data = sock:read(len)
-
     if not data then
         return nil, nil, "failed to read packet content: "
     end
-
 
     local field_count = strbyte(data, 1)
     local typ
@@ -176,7 +164,6 @@ local function _recv_packet(self,sock)
 
     return data, typ
 end
-
 
 local function _from_length_coded_bin(data, pos)
     local first = strbyte(data, pos)
@@ -233,43 +220,31 @@ local function _from_length_coded_str(data, pos)
     if len == nil then
         return nil, pos
     end
-
     return sub(data, pos, pos + len - 1), pos + len
 end
-
 
 local function _parse_ok_packet(packet)
     local res = {}
     local pos
 
     res.affected_rows, pos = _from_length_coded_bin(packet, 2)
-
     res.insert_id, pos = _from_length_coded_bin(packet, pos)
-
     res.server_status, pos = _get_byte2(packet, pos)
-
     res.warning_count, pos = _get_byte2(packet, pos)
-
 
     local message = sub(packet, pos)
     if message and message ~= "" then
         res.message = message
     end
-
-
     return res
 end
 
-
 local function _parse_eof_packet(packet)
     local pos = 2
-
     local warning_count, pos = _get_byte2(packet, pos)
     local status_flags = _get_byte2(packet, pos)
-
     return warning_count, status_flags
 end
-
 
 local function _parse_err_packet(packet)
     local errno, pos = _get_byte2(packet, 2)
@@ -281,48 +256,36 @@ local function _parse_err_packet(packet)
         sqlstate = sub(packet, pos, pos + 5 - 1)
         pos = pos + 5
     end
-
     local message = sub(packet, pos)
     return errno, message, sqlstate
 end
-
 
 local function _parse_result_set_header_packet(packet)
     local field_count, pos = _from_length_coded_bin(packet, 1)
     return field_count, _from_length_coded_bin(packet, pos)
 end
 
-
 local function _parse_field_packet(data)
     local col = {}
     local catalog, db, table, orig_table, orig_name, charsetnr, length
     local pos
+
     catalog, pos = _from_length_coded_str(data, 1)
-
-
     db, pos = _from_length_coded_str(data, pos)
     table, pos = _from_length_coded_str(data, pos)
     orig_table, pos = _from_length_coded_str(data, pos)
     col.name, pos = _from_length_coded_str(data, pos)
-
     orig_name, pos = _from_length_coded_str(data, pos)
-
     pos = pos + 1 -- ignore the filler
-
     charsetnr, pos = _get_byte2(data, pos)
-
     length, pos = _get_byte4(data, pos)
-
     col.type = strbyte(data, pos)
 
     --[[
     pos = pos + 1
-
     col.flags, pos = _get_byte2(data, pos)
-
     col.decimals = strbyte(data, pos)
     pos = pos + 1
-
     local default = sub(data, pos + 2)
     if default and default ~= "" then
         col.default = default
@@ -331,7 +294,6 @@ local function _parse_field_packet(data)
 
     return col
 end
-
 
 local function _parse_row_data_packet(data, cols, compact)
     local value, col, conv
@@ -359,7 +321,6 @@ local function _parse_row_data_packet(data, cols, compact)
 
     return row
 end
-
 
 local function _recv_field_packet(self, sock)
     local packet, typ, err = _recv_packet(self, sock)
@@ -401,11 +362,9 @@ local function _recv_decode_packet_resp(self)
     end
 end
 
-
 local function _mysql_login(self,user,password,database,on_connect)
-
     return function(sockchannel)
-	local dispatch_resp = _recv_decode_packet_resp(self)
+        local dispatch_resp = _recv_decode_packet_resp(self)
         local packet = sockchannel:response( dispatch_resp )
 
         self.protocol_ver = strbyte(packet)
@@ -417,9 +376,7 @@ local function _mysql_login(self,user,password,database,on_connect)
 
         self._server_ver = server_ver
 
-
         local thread_id, pos = _get_byte4(packet, pos)
-
         local scramble1 = sub(packet, pos, pos + 8 - 1)
         if not scramble1 then
             error "1st part of scramble not found"
@@ -429,10 +386,8 @@ local function _mysql_login(self,user,password,database,on_connect)
 
         -- two lower bytes
         self._server_capabilities, pos = _get_byte2(packet, pos)
-
         self._server_lang = strbyte(packet, pos)
         pos = pos + 1
-
         self._server_status, pos = _get_byte2(packet, pos)
 
         local more_capabilities
@@ -441,7 +396,6 @@ local function _mysql_login(self,user,password,database,on_connect)
         self._server_capabilities = self._server_capabilities|more_capabilities<<16
 
         local len = 21 - 8 - 1
-
         pos = pos + 1 + 10
 
         local scramble_part2 = sub(packet, pos, pos + len - 1)
@@ -449,20 +403,16 @@ local function _mysql_login(self,user,password,database,on_connect)
             error "2nd part of scramble not found"
         end
 
-
         local scramble = scramble1..scramble_part2
         local token = _compute_token(password, scramble)
-
         local client_flags = 260047;
-
-		local req = strpack("<I4I4c24zs1z",
-			client_flags,
-			self._max_packet_size,
-			strrep("\0", 24),	-- TODO: add support for charset encoding
-			user,
-			token,
-			database)
-
+        local req = strpack("<I4I4c24zs1z",
+            client_flags,
+            self._max_packet_size,
+            strrep("\0", 24),	-- TODO: add support for charset encoding
+            user,
+            token,
+            database)
         local authpacket=_compose_packet(self,req)
         sockchannel:request(authpacket, dispatch_resp)
         if on_connect then
@@ -513,32 +463,27 @@ local store_types = {
 
 local function _compose_stmt_execute(self,stmt,cursor_type,args)
     local arg_num = #args
-    if arg_num~=stmt.param_count then
+    if arg_num ~= stmt.param_count then
         error("require stmt.param_count "..stmt.param_count.." get arg_num "..arg_num)
     end
 
     self.packet_no = -1
 
     local cmd_packet = strpack("<c1I4BI4",COM_STMT_EXECUTE,stmt.prepare_id,cursor_type,0x01)
-    if arg_num>0 then
+    if arg_num > 0 then
         local null_count=(arg_num+7)//8
-
         local f,ts,vs
         local types_buf=""
         local values_buf=""
-
         for _,v in pairs(args) do
             f= store_types[type(v)]
             if not f then
                 error("invalid parameter type",type(v))
             end
-
             ts,vs = f(v)
-
             types_buf=types_buf..ts
             values_buf=values_buf..vs
         end
-
         cmd_packet = cmd_packet..strrep("\0",null_count)..strchar(0x01)..types_buf..values_buf
     end
 
@@ -574,7 +519,6 @@ local function read_result(self, sock)
     -- typ == 'DATA'
 
     local field_count, extra = _parse_result_set_header_packet(packet)
-
     local cols = {}
     for i = 1, field_count do
         local col, err, errno, sqlstate = _recv_field_packet(self, sock)
@@ -582,7 +526,6 @@ local function read_result(self, sock)
             return nil, err, errno, sqlstate
             --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
         end
-
         cols[i] = col
     end
 
@@ -600,7 +543,6 @@ local function read_result(self, sock)
     -- typ == 'EOF'
 
     local compact = self.compact
-
     local rows = {}
     local i = 0
     while true do
@@ -612,11 +554,9 @@ local function read_result(self, sock)
 
         if typ == 'EOF' then
             local warning_count, status_flags = _parse_eof_packet(packet)
-
             if status_flags&SERVER_MORE_RESULTS_EXISTS ~= 0 then
                 return rows, "again"
             end
-
             break
         end
 
@@ -667,7 +607,6 @@ local function _query_resp(self)
 end
 
 function _M.connect(opts)
-
     local self = setmetatable( {}, mt)
 
     local max_packet_size = opts.max_packet_size
@@ -677,7 +616,6 @@ function _M.connect(opts)
     self._max_packet_size = max_packet_size
     self.compact = opts.compact_arrays
 
-
     local database = opts.database or ""
     local user = opts.user or ""
     local password = opts.password or ""
@@ -686,23 +624,19 @@ function _M.connect(opts)
         host = opts.host,
         port = opts.port or 3306,
         auth = _mysql_login(self,user,password,database,opts.on_connect),
-		overload = opts.overload,
+        overload = opts.overload,
     }
     self.sockchannel = channel
     -- try connect first only once
     channel:connect(true)
 
-
     return self
 end
-
-
 
 function _M.disconnect(self)
     self.sockchannel:close()
     setmetatable(self, nil)
 end
-
 
 function _M.query(self, query)
     local querypacket = _compose_query(self, query)
@@ -843,14 +777,12 @@ local function _parse_row_data_binary(data, cols, compact)
         local col = cols[i]
         local typ = col.type
         local name = col.name
-
         if not null_fields[i] then
             parser = _binary_parser[typ]
             if not parser then
                 error("_parse_row_data_binary()error,unsupported field type "..typ)
             end
             value,pos = parser(data,pos)
-
             if compact then
                 row[i] = value
             else
@@ -896,17 +828,15 @@ local function read_execute_result(self,sock)
     local col
     while true do
         packet, typ, err = _recv_packet(self, sock)
-        if typ=="EOF" then
+        if typ == "EOF" then
             local warning_count, status_flags = _parse_eof_packet(packet)
             break
         end
-
         col = _parse_field_packet(packet)
         if not col then
             break
             --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
         end
-
         table.insert(cols,col)
     end
 
@@ -920,20 +850,17 @@ local function read_execute_result(self,sock)
     local row
     while true do
         packet, typ, err = _recv_packet(self, sock)
-
-        if typ=="EOF" then
+        if typ == "EOF" then
             local warning_count, status_flags = _parse_eof_packet(packet)
             if status_flags&SERVER_MORE_RESULTS_EXISTS ~= 0 then
                 return rows, "again"
             end
             break
         end
-
         row = _parse_row_data_binary(packet,cols,compact)
         if not col then
             break
         end
-
         table.insert(rows,row)
     end
 
@@ -1032,24 +959,23 @@ function _M.server_ver(self)
 end
 
 local escape_map = {
-	['\0'] = "\\0",
-	['\b'] = "\\b",
-	['\n'] = "\\n",
-	['\r'] = "\\r",
-	['\t'] = "\\t",
-	['\26'] = "\\Z",
-	['\\'] = "\\\\",
-	["'"] = "\\'",
-	['"'] = '\\"',
+    ['\0'] = "\\0",
+    ['\b'] = "\\b",
+    ['\n'] = "\\n",
+    ['\r'] = "\\r",
+    ['\t'] = "\\t",
+    ['\26'] = "\\Z",
+    ['\\'] = "\\\\",
+    ["'"] = "\\'",
+    ['"'] = '\\"',
 }
 
 function _M.quote_sql_str( str)
-	return strformat("'%s'", strgsub(str, "[\0\b\n\r\t\26\\\'\"]", escape_map))
+    return strformat("'%s'", strgsub(str, "[\0\b\n\r\t\26\\\'\"]", escape_map))
 end
 
 function _M.set_compact_arrays(self, value)
     self.compact = value
 end
-
 
 return _M
