@@ -134,9 +134,7 @@ end
 local function _compose_packet(self, req)
    self.packet_no = self.packet_no + 1
    local size = #req
-
-   local packet = strpack("<I3Bc"..size,size,self.packet_no,req)
-   return packet
+   return strpack("<I3Bc"..size,size,self.packet_no,req)
 end
 
 local function _recv_packet(self,sock)
@@ -155,9 +153,7 @@ local function _recv_packet(self,sock)
         return nil, nil, "empty packet"
     end
 
-    local num = strbyte(data, pos)
-
-    self.packet_no = num
+    self.packet_no = strbyte(data, pos)
 
     data = sock:read(len)
 
@@ -293,11 +289,7 @@ end
 
 local function _parse_result_set_header_packet(packet)
     local field_count, pos = _from_length_coded_bin(packet, 1)
-
-    local extra
-    extra = _from_length_coded_bin(packet, pos)
-
-    return field_count, extra
+    return field_count, _from_length_coded_bin(packet, pos)
 end
 
 
@@ -484,28 +476,19 @@ end
 -- 构造ping数据包
 local function _compose_ping(self)
     self.packet_no = -1
-
-    local querypacket = _compose_packet(self, COM_PING)
-    return querypacket
+    return _compose_packet(self, COM_PING)
 end
 
 local function _compose_query(self, query)
-
     self.packet_no = -1
-
     local cmd_packet = COM_QUERY..query
-
-    local querypacket = _compose_packet(self, cmd_packet)
-    return querypacket
+    return _compose_packet(self, cmd_packet)
 end
 
 local function _compose_stmt_prepare(self, query)
     self.packet_no = -1
-
     local cmd_packet = COM_STMT_PREPARE .. query
-
-    local querypacket = _compose_packet(self, cmd_packet)
-    return querypacket
+    return _compose_packet(self, cmd_packet)
 end
 
 --参数字段类型转换
@@ -561,8 +544,7 @@ local function _compose_stmt_execute(self,stmt,cursor_type,args)
         cmd_packet = cmd_packet..strrep("\0",null_count)..strchar(0x01)..types_buf..values_buf
     end
 
-    local querypacket = _compose_packet(self, cmd_packet)
-    return querypacket
+    return _compose_packet(self, cmd_packet)
 end
 
 local function read_result(self, sock)
@@ -646,9 +628,8 @@ local function read_result(self, sock)
 
         -- typ == 'DATA'
 
-        local row = _parse_row_data_packet(packet, cols, compact)
         i = i + 1
-        rows[i] = row
+        rows[i] = _parse_row_data_packet(packet, cols, compact)
     end
 
     return rows
