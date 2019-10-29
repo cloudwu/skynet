@@ -334,18 +334,17 @@ end
 
 
 local function _parse_row_data_packet(data, cols, compact)
+    local value, col, conv
     local pos = 1
     local ncols = #cols
     local row = {}
+
     for i = 1, ncols do
-        local value
         value, pos = _from_length_coded_str(data, pos)
-        local col = cols[i]
-        local typ = col.type
-        local name = col.name
+        col = cols[i]
 
         if value ~= nil then
-            local conv = converters[typ]
+            conv = converters[col.type]
             if conv then
                 value = conv(value)
             end
@@ -353,9 +352,8 @@ local function _parse_row_data_packet(data, cols, compact)
 
         if compact then
             row[i] = value
-
         else
-            row[name] = value
+            row[col.name] = value
         end
     end
 
