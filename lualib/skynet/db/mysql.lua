@@ -28,7 +28,7 @@ local _M = { _VERSION = '0.14' }
 local COM_QUERY = '\x03'
 local COM_PING = '\x0e'
 local COM_STMT_PREPARE = '\x16'
-local COM_STMT_EXECUTE = 0x17
+local COM_STMT_EXECUTE = '\x17'
 
 local CURSOR_TYPE_NO_CURSOR = 0x00
 
@@ -135,8 +135,8 @@ local function _compose_packet(self, req)
    self.packet_no = self.packet_no + 1
    local size = #req
 
-    local packet = _set_byte3(size) .. strchar(self.packet_no) .. req
-    return packet
+   local packet = string.pack("<I3Bc"..size,size,self.packet_no,req)
+   return packet
 end
 
 local function _recv_packet(self,sock)
@@ -538,9 +538,9 @@ local function _compose_stmt_execute(self,stmt,cursor_type,args)
 
     self.packet_no = -1
 
-    local cmd_packet = string.pack("<BI4BI4",COM_STMT_EXECUTE,stmt.prepare_id,cursor_type,0x01)
+    local cmd_packet = string.pack("<c1I4BI4",COM_STMT_EXECUTE,stmt.prepare_id,cursor_type,0x01)
     if arg_num>0 then
-        local null_count=mathfloor((arg_num+7)/8)
+        local null_count=(arg_num+7)//8
 
         local f,ts,vs
         local types_buf=""
@@ -836,7 +836,7 @@ local _binary_parser = {
 local function _parse_row_data_binary(data, cols, compact)
     local ncols = #cols
     -- 空位图,前两个bit系统保留 (列数量 + 7 + 2) / 8
-    local null_count=mathfloor((ncols+9)/8)
+    local null_count=(ncols+9)//8
     local pos = 2+null_count
     local value
 
