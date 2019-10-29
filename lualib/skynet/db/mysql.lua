@@ -102,13 +102,10 @@ local function _from_cstring(data, i)
 end
 
 local function _dumphex(bytes)
-    return strgsub(
-        bytes,
-        ".",
+    return strgsub(bytes, ".",
         function(x)
             return strformat("%02x ", strbyte(x))
-        end
-    )
+        end)
 end
 
 local function _compute_token(password, scramble)
@@ -123,9 +120,7 @@ local function _compute_token(password, scramble)
     local stage3 = sha1(scramble .. stage2)
 
     local i = 0
-    return strgsub(
-        stage3,
-        ".",
+    return strgsub(stage3, ".",
         function(x)
             i = i + 1
             -- ~ is xor in lua 5.3
@@ -258,7 +253,7 @@ local function _parse_err_packet(packet)
     local errno, pos = _get_byte2(packet, 2)
     local marker = sub(packet, pos, pos)
     local sqlstate
-    if marker == "#" then
+    if marker == '#' then
         -- with sqlstate
         pos = pos + 1
         sqlstate = sub(packet, pos, pos + 5 - 1)
@@ -413,9 +408,7 @@ local function _mysql_login(self, user, password, database, on_connect)
         local scramble = scramble1 .. scramble_part2
         local token = _compute_token(password, scramble)
         local client_flags = 260047
-        local req =
-            strpack(
-            "<I4I4c24zs1z",
+        local req = strpack("<I4I4c24zs1z",
             client_flags,
             self._max_packet_size,
             strrep("\0", 24), -- TODO: add support for charset encoding
@@ -504,13 +497,13 @@ local function read_result(self, sock)
     local packet, typ, err = _recv_packet(self, sock)
     if not packet then
         return nil, err
-    --error( err )
+        --error( err )
     end
 
     if typ == "ERR" then
         local errno, msg, sqlstate = _parse_err_packet(packet)
         return nil, msg, errno, sqlstate
-    --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
+        --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
     end
 
     if typ == "OK" then
@@ -523,7 +516,7 @@ local function read_result(self, sock)
 
     if typ ~= "DATA" then
         return nil, "packet type " .. typ .. " not supported"
-    --error( "packet type " .. typ .. " not supported" )
+        --error( "packet type " .. typ .. " not supported" )
     end
 
     -- typ == 'DATA'
@@ -534,7 +527,7 @@ local function read_result(self, sock)
         local col, err, errno, sqlstate = _recv_field_packet(self, sock)
         if not col then
             return nil, err, errno, sqlstate
-        --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
+            --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
         end
         cols[i] = col
     end
@@ -571,7 +564,7 @@ local function read_result(self, sock)
         end
 
         -- if typ ~= 'DATA' then
-        -- return nil, 'bad row packet type: ' .. typ
+        --     return nil, 'bad row packet type: ' .. typ
         -- end
 
         -- typ == 'DATA'
@@ -809,13 +802,13 @@ local function read_execute_result(self, sock)
     local packet, typ, err = _recv_packet(self, sock)
     if not packet then
         return nil, err
-    --error( err )
+        --error( err )
     end
 
     if typ == "ERR" then
         local errno, msg, sqlstate = _parse_err_packet(packet)
         return nil, msg, errno, sqlstate
-    --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
+        --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
     end
 
     if typ == "OK" then
@@ -828,7 +821,7 @@ local function read_execute_result(self, sock)
 
     if typ ~= "DATA" then
         return nil, "packet type " .. typ .. " not supported"
-    --error( "packet type " .. typ .. " not supported" )
+        --error( "packet type " .. typ .. " not supported" )
     end
 
     -- typ == 'DATA'
@@ -846,7 +839,7 @@ local function read_execute_result(self, sock)
         col = _parse_field_packet(packet)
         if not col then
             break
-        --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
+            --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
         end
         table.insert(cols, col)
     end
@@ -921,7 +914,7 @@ end
 ]]
 function _M.execute(self, stmt, ...)
     -- 检查参数，不能为nil
-    local p_n = select("#", ...)
+    local p_n = select('#', ...)
     local p_v
     for i = 1, p_n do
         p_v = select(i, ...)
@@ -970,19 +963,19 @@ function _M.server_ver(self)
 end
 
 local escape_map = {
-    ["\0"] = "\\0",
-    ["\b"] = "\\b",
-    ["\n"] = "\\n",
-    ["\r"] = "\\r",
-    ["\t"] = "\\t",
-    ["\26"] = "\\Z",
-    ["\\"] = "\\\\",
+    ['\0'] = "\\0",
+    ['\b'] = "\\b",
+    ['\n'] = "\\n",
+    ['\r'] = "\\r",
+    ['\t'] = "\\t",
+    ['\26'] = "\\Z",
+    ['\\'] = "\\\\",
     ["'"] = "\\'",
-    ['"'] = '\\"'
+    ['"'] = '\\"',
 }
 
-function _M.quote_sql_str(str)
-    return strformat("'%s'", strgsub(str, '[\0\b\n\r\t\26\\\'"]', escape_map))
+function _M.quote_sql_str( str)
+    return strformat("'%s'", strgsub(str, "[\0\b\n\r\t\26\\\'\"]", escape_map))
 end
 
 function _M.set_compact_arrays(self, value)
