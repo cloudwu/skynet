@@ -43,7 +43,10 @@ if MODE == "agent" then
 
     skynet.start(function ()
         skynet.dispatch("lua", function (_,_, id, protocol, addr)
-            websocket.accept(id, handle, protocol, addr)
+            local ok, err = websocket.accept(id, handle, protocol, addr)
+            if not ok then
+                print(err)
+            end
         end)
     end)
 
