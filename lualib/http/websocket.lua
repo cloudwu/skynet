@@ -407,9 +407,11 @@ function M.accept(socket_id, handle, protocol, addr)
                 try_handle(ws_obj, "error")
             end
         else
-            error(err)
+            -- error(err)
+            return false, err
         end
     end
+    return true
 end
 
 
