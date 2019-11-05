@@ -117,13 +117,13 @@ skynet_socket_poll() {
 }
 
 int
-skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz) {
-	return socket_server_send(SOCKET_SERVER, id, buffer, sz);
+skynet_socket_sendbuffer(struct skynet_context *ctx, struct socket_sendbuffer *buffer) {
+	return socket_server_send(SOCKET_SERVER, buffer);
 }
 
 int
-skynet_socket_send_lowpriority(struct skynet_context *ctx, int id, void *buffer, int sz) {
-	return socket_server_send_lowpriority(SOCKET_SERVER, id, buffer, sz);
+skynet_socket_sendbuffer_lowpriority(struct skynet_context *ctx, struct socket_sendbuffer *buffer) {
+	return socket_server_send_lowpriority(SOCKET_SERVER, buffer);
 }
 
 int 
@@ -179,8 +179,8 @@ skynet_socket_udp_connect(struct skynet_context *ctx, int id, const char * addr,
 }
 
 int 
-skynet_socket_udp_send(struct skynet_context *ctx, int id, const char * address, const void *buffer, int sz) {
-	return socket_server_udp_send(SOCKET_SERVER, id, (const struct socket_udp_address *)address, buffer, sz);
+skynet_socket_udp_sendbuffer(struct skynet_context *ctx, const char * address, struct socket_sendbuffer *buffer) {
+	return socket_server_udp_send(SOCKET_SERVER, (const struct socket_udp_address *)address, buffer);
 }
 
 const char *
