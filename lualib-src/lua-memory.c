@@ -61,6 +61,13 @@ lprofactive(lua_State *L) {
 	return 1;
 }
 
+static int
+lwatch(lua_State *L) {
+	uint32_t handle = luaL_checkinteger(L, 1);
+	skynet_memory_watch(handle);
+	return 0;
+}
+
 LUAMOD_API int
 luaopen_skynet_memory(lua_State *L) {
 	luaL_checkversion(L);
@@ -74,6 +81,7 @@ luaopen_skynet_memory(lua_State *L) {
 		{ "current", lcurrent },
 		{ "dumpheap", ldumpheap },
 		{ "profactive", lprofactive },
+		{ "watch", lwatch },
 		{ NULL, NULL },
 	};
 

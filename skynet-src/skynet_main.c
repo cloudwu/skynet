@@ -116,6 +116,11 @@ static const char * load_config = "\
 
 int
 main(int argc, char *argv[]) {
+#ifdef LUA_CACHELIB
+	// init the lock of code cache
+	luaL_initcodecache(codecache_lalloc);
+#endif
+
 	const char * config_file = NULL ;
 	if (argc > 1) {
 		config_file = argv[1];
@@ -131,11 +136,6 @@ main(int argc, char *argv[]) {
 	sigign();
 
 	struct skynet_config config;
-
-#ifdef LUA_CACHELIB
-	// init the lock of code cache
-	luaL_initcodecache();
-#endif
 
 	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);	// link lua lib

@@ -1042,6 +1042,8 @@ LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver, size_t sz) {
 
 // use clonefunction
 
+static lua_Alloc cc_alloc = l_alloc;
+
 #include "spinlock.h"
 
 struct codecache {
@@ -1057,18 +1059,23 @@ clearcache() {
 		return;
 	SPIN_LOCK(&CC)
 		lua_close(CC.L);
-		CC.L = luaL_newstate();
+		lua_State *L = lua_newstate(cc_alloc, (void*)0x43434343);
+		if (L) lua_atpanic(L, &panic);
+		CC.L = L;
 	SPIN_UNLOCK(&CC)
 }
 
 static void
 init() {
-	CC.L = luaL_newstate();
+	lua_State *L = lua_newstate(cc_alloc, (void*)0x43434343);
+	if (L) lua_atpanic(L, &panic);
+	CC.L = L;
 }
 
 LUALIB_API void
-luaL_initcodecache(void) {
+luaL_initcodecache(lua_Alloc f) {
 	SPIN_INIT(&CC);
+	if (f) cc_alloc = f;
 }
 
 static const void *
@@ -1154,6 +1161,22 @@ static int cache_mode(lua_State *L) {
 	return 0;
 }
 
+typedef union {
+	void *p;
+	char s[8];
+} lfud;
+
+static void shortname(lfud *ud, const char* name) {
+	ud->p = NULL;
+	const char* r = strrchr(name, '/');
+	if (r == NULL) {
+		r = name;
+	} else {
+		r++;
+	}
+	strncpy(ud->s, r, sizeof(ud->s));
+}
+
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
   int level = cache_level(L);
@@ -1168,11 +1191,14 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   if (level == CACHE_EXIST) {
     return luaL_loadfilex_(L, filename, mode);
   }
-  lua_State * eL = luaL_newstate();
+  lfud ud;
+  shortname(&ud, filename);
+  lua_State *eL = lua_newstate(cc_alloc, ud.p);
   if (eL == NULL) {
     lua_pushliteral(L, "New state failed");
     return LUA_ERRMEM;
   }
+  lua_atpanic(eL, &panic);
   int err = luaL_loadfilex_(eL, filename, mode);
   if (err != LUA_OK) {
     size_t sz = 0;

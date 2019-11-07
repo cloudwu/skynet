@@ -12,6 +12,8 @@
 // turn on MEMORY_CHECK can do more memory check, such as double free
 // #define MEMORY_CHECK
 
+#define MEMORY_CODECACHE_HANDLE 0xC0DECACE
+
 #define MEMORY_ALLOCTAG 0x20140605
 #define MEMORY_FREETAG 0x0badf00d
 
@@ -21,9 +23,12 @@ static size_t _memory_block = 0;
 struct mem_data {
 	uint32_t handle;
 	ssize_t allocated;
+	uint32_t blockalloc;
+	uint32_t blockfree;
 };
 
 struct mem_cookie {
+	uint32_t tag;
 	uint32_t handle;
 #ifdef MEMORY_CHECK
 	uint32_t dogtag;
@@ -31,10 +36,12 @@ struct mem_cookie {
 };
 
 #define SLOT_SIZE 0x10000
+#define TAG_SLOT_SIZE 0x1000
 #define PREFIX_SIZE sizeof(struct mem_cookie)
 
 static struct mem_data mem_stats[SLOT_SIZE];
-
+static struct mem_data tag_stats[TAG_SLOT_SIZE];
+static uint32_t tag_handle = MEMORY_CODECACHE_HANDLE;
 
 #ifndef NOUSE_JEMALLOC
 
@@ -44,7 +51,7 @@ static struct mem_data mem_stats[SLOT_SIZE];
 #define raw_realloc je_realloc
 #define raw_free je_free
 
-static ssize_t*
+static struct mem_data*
 get_allocated_field(uint32_t handle) {
 	int h = (int)(handle & (SLOT_SIZE - 1));
 	struct mem_data *data = &mem_stats[h];
@@ -62,40 +69,80 @@ get_allocated_field(uint32_t handle) {
 	if(data->handle != handle) {
 		return 0;
 	}
-	return &data->allocated;
+	return data;
+}
+
+static struct mem_data*
+get_tag_slot(uint32_t tag) {
+	int h = (int)(tag & (TAG_SLOT_SIZE - 1));
+	struct mem_data *data = &tag_stats[h];
+	uint32_t old_handle = data->handle;
+	struct mem_data *start_data = data;
+	while(old_handle != tag) {
+		if (old_handle == 0) {
+			if(ATOM_CAS(&data->handle, old_handle, tag)) {
+				break;
+			}
+		}
+		data++;
+		if (data >= tag_stats+TAG_SLOT_SIZE) {
+			data = tag_stats + 1;
+		}
+		if (data == start_data)
+			return NULL;
+		old_handle = data->handle;
+	}
+	return data;
 }
 
 inline static void
-update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
+update_xmalloc_stat_alloc(uint32_t handle, uint32_t tag, size_t __n) {
 	ATOM_ADD(&_used_memory, __n);
 	ATOM_INC(&_memory_block);
-	ssize_t* allocated = get_allocated_field(handle);
-	if(allocated) {
-		ATOM_ADD(allocated, __n);
+	struct mem_data* data = get_allocated_field(handle);
+	if(data) {
+		ATOM_ADD(&data->allocated, __n);
+		ATOM_INC(&data->blockalloc);
+	}
+	if (handle != tag_handle)
+		return;
+	struct mem_data* tdata = get_tag_slot(tag);
+	if(tdata) {
+		ATOM_ADD(&tdata->allocated, __n);
+		ATOM_INC(&tdata->blockalloc);
 	}
 }
 
 inline static void
-update_xmalloc_stat_free(uint32_t handle, size_t __n) {
+update_xmalloc_stat_free(uint32_t handle, uint32_t tag, size_t __n) {
 	ATOM_SUB(&_used_memory, __n);
 	ATOM_DEC(&_memory_block);
-	ssize_t* allocated = get_allocated_field(handle);
-	if(allocated) {
-		ATOM_SUB(allocated, __n);
+	struct mem_data* data = get_allocated_field(handle);
+	if(data) {
+		ATOM_SUB(&data->allocated, __n);
+		ATOM_INC(&data->blockfree);
+	}
+	if (handle != tag_handle)
+		return;
+	struct mem_data* tdata = get_tag_slot(tag);
+	if(tdata) {
+		ATOM_SUB(&tdata->allocated, __n);
+		ATOM_INC(&tdata->blockfree);
 	}
 }
 
 inline static void*
-fill_prefix(char* ptr) {
+fill_prefix(char* ptr, uint32_t tag) {
 	uint32_t handle = skynet_current_handle();
 	size_t size = je_malloc_usable_size(ptr);
 	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
 	memcpy(&p->handle, &handle, sizeof(handle));
+	memcpy(&p->tag, &tag, sizeof(tag));
 #ifdef MEMORY_CHECK
 	uint32_t dogtag = MEMORY_ALLOCTAG;
 	memcpy(&p->dogtag, &dogtag, sizeof(dogtag));
 #endif
-	update_xmalloc_stat_alloc(handle, size);
+	update_xmalloc_stat_alloc(handle, tag, size);
 	return ptr;
 }
 
@@ -105,6 +152,8 @@ clean_prefix(char* ptr) {
 	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
 	uint32_t handle;
 	memcpy(&handle, &p->handle, sizeof(handle));
+	uint32_t tag;
+	memcpy(&tag, &p->tag, sizeof(tag));
 #ifdef MEMORY_CHECK
 	uint32_t dogtag;
 	memcpy(&dogtag, &p->dogtag, sizeof(dogtag));
@@ -115,7 +164,7 @@ clean_prefix(char* ptr) {
 	dogtag = MEMORY_FREETAG;
 	memcpy(&p->dogtag, &dogtag, sizeof(dogtag));
 #endif
-	update_xmalloc_stat_free(handle, size);
+	update_xmalloc_stat_free(handle, tag, size);
 	return ptr;
 }
 
@@ -180,22 +229,38 @@ mallctl_opt(const char* name, int* newval) {
 }
 
 // hook : malloc, realloc, free, calloc
-
 void *
-skynet_malloc(size_t size) {
+skynet_malloc_tag(unsigned tag, size_t size) {
 	void* ptr = je_malloc(size + PREFIX_SIZE);
 	if(!ptr) malloc_oom(size);
-	return fill_prefix(ptr);
+	return fill_prefix(ptr, tag);
 }
 
 void *
-skynet_realloc(void *ptr, size_t size) {
+skynet_malloc_raw(size_t size) {
+	void* ptr = je_malloc(size + PREFIX_SIZE);
+	if(!ptr) malloc_oom(size);
+	return fill_prefix(ptr, 0);
+}
+
+void *
+skynet_realloc_tag(unsigned tag, void *ptr, size_t size) {
+	if (ptr == NULL) return skynet_malloc_tag(tag, size);
+
+	void* rawptr = clean_prefix(ptr);
+	void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
+	if(!newptr) malloc_oom(size);
+	return fill_prefix(newptr, tag);
+}
+
+void *
+skynet_realloc_raw(void *ptr, size_t size) {
 	if (ptr == NULL) return skynet_malloc(size);
 
 	void* rawptr = clean_prefix(ptr);
 	void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
 	if(!newptr) malloc_oom(size);
-	return fill_prefix(newptr);
+	return fill_prefix(newptr, 0);
 }
 
 void
@@ -206,31 +271,38 @@ skynet_free(void *ptr) {
 }
 
 void *
-skynet_calloc(size_t nmemb,size_t size) {
+skynet_calloc_tag(unsigned tag, size_t nmemb, size_t size) {
 	void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
 	if(!ptr) malloc_oom(size);
-	return fill_prefix(ptr);
+	return fill_prefix(ptr, tag);
+}
+
+void *
+skynet_calloc_raw(size_t nmemb, size_t size) {
+	void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
+	if(!ptr) malloc_oom(size);
+	return fill_prefix(ptr, 0);
 }
 
 void *
 skynet_memalign(size_t alignment, size_t size) {
 	void* ptr = je_memalign(alignment, size + PREFIX_SIZE);
 	if(!ptr) malloc_oom(size);
-	return fill_prefix(ptr);
+	return fill_prefix(ptr, 0);
 }
 
 void *
 skynet_aligned_alloc(size_t alignment, size_t size) {
 	void* ptr = je_aligned_alloc(alignment, size + (size_t)((PREFIX_SIZE + alignment -1) & ~(alignment-1)));
 	if(!ptr) malloc_oom(size);
-	return fill_prefix(ptr);
+	return fill_prefix(ptr, 0);
 }
 
 int
 skynet_posix_memalign(void **memptr, size_t alignment, size_t size) {
 	int err = je_posix_memalign(memptr, alignment, size + PREFIX_SIZE);
 	if (err) malloc_oom(size);
-	fill_prefix(*memptr);
+	fill_prefix(*memptr, 0);
 	return err;
 }
 
@@ -314,6 +386,17 @@ skynet_lalloc(void *ptr, size_t osize, size_t nsize) {
 	}
 }
 
+void *
+codecache_lalloc (void *ud, void *ptr, size_t osize, size_t nsize) {
+	if (ptr != NULL && osize > 0) {
+		update_xmalloc_stat_free(MEMORY_CODECACHE_HANDLE, (uint32_t)ud,  osize);
+	}
+	if (nsize > 0) {
+		update_xmalloc_stat_alloc(MEMORY_CODECACHE_HANDLE, (uint32_t)ud, nsize);
+	}
+	return skynet_lalloc(ptr, osize, nsize);
+}
+
 int
 dump_mem_lua(lua_State *L) {
 	int i;
@@ -321,11 +404,32 @@ dump_mem_lua(lua_State *L) {
 	for(i=0; i<SLOT_SIZE; i++) {
 		struct mem_data* data = &mem_stats[i];
 		if(data->handle != 0 && data->allocated != 0) {
+			lua_newtable(L);
 			lua_pushinteger(L, data->allocated);
+			lua_rawseti(L, -2, 1);
+			lua_pushinteger(L, data->blockalloc);
+			lua_rawseti(L, -2, 2);
+			lua_pushinteger(L, data->blockfree);
+			lua_rawseti(L, -2, 3);
 			lua_rawseti(L, -2, (lua_Integer)data->handle);
 		}
 	}
-	return 1;
+	lua_newtable(L);
+	for(i=0; i<TAG_SLOT_SIZE; i++) {
+		struct mem_data* data = &tag_stats[i];
+		if(data->allocated != 0) {
+			lua_newtable(L);
+			lua_pushinteger(L, data->allocated);
+			lua_rawseti(L, -2, 1);
+			lua_pushinteger(L, data->blockalloc);
+			lua_rawseti(L, -2, 2);
+			lua_pushinteger(L, data->blockfree);
+			lua_rawseti(L, -2, 3);
+			lua_rawseti(L, -2, (lua_Integer)data->handle);
+		}
+	}
+	lua_pushinteger(L, tag_handle);
+	return 3;
 }
 
 size_t
@@ -347,4 +451,10 @@ skynet_debug_memory(const char *info) {
 	uint32_t handle = skynet_current_handle();
 	size_t mem = malloc_current_memory();
 	fprintf(stderr, "[:%08x] %s %p\n", handle, info, (void *)mem);
+}
+
+void
+skynet_memory_watch(uint32_t handle) {
+	tag_handle = handle;
+	memset(tag_stats, 0, sizeof(tag_stats));
 }

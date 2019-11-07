@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 #include "atomic.h"
+#include "skynet_malloc.h"
 
 #define KEYTYPE_INTEGER 0
 #define KEYTYPE_STRING 1
@@ -150,7 +151,7 @@ setvalue(struct context * ctx, lua_State *L, int index, struct node *n) {
 		break;
 	case LUA_TTABLE: {
 		struct table *tbl = ctx->tbl;
-		ctx->tbl = (struct table *)malloc(sizeof(struct table));
+		ctx->tbl = (struct table *)skynet_malloc(sizeof(struct table));
 		if (ctx->tbl == NULL) {
 			ctx->tbl = tbl;
 			luaL_error(L, "memory error");
@@ -283,14 +284,14 @@ convtable(lua_State *L) {
 
 	int sizearray = lua_rawlen(L, 1);
 	if (sizearray) {
-		tbl->arraytype = (uint8_t *)malloc(sizearray * sizeof(uint8_t));
+		tbl->arraytype = (uint8_t *)skynet_malloc(sizearray * sizeof(uint8_t));
 		if (tbl->arraytype == NULL) {
 			goto memerror;
 		}
 		for (i=0;i<sizearray;i++) {
 			tbl->arraytype[i] = VALUETYPE_NIL;
 		}
-		tbl->array = (union value *)malloc(sizearray * sizeof(union value));
+		tbl->array = (union value *)skynet_malloc(sizearray * sizeof(union value));
 		if (tbl->array == NULL) {
 			goto memerror;
 		}
@@ -298,7 +299,7 @@ convtable(lua_State *L) {
 	}
 	int sizehash = countsize(L, sizearray);
 	if (sizehash) {
-		tbl->hash = (struct node *)malloc(sizehash * sizeof(struct node));
+		tbl->hash = (struct node *)skynet_malloc(sizehash * sizeof(struct node));
 		if (tbl->hash == NULL) {
 			goto memerror;
 		}
@@ -337,10 +338,10 @@ delete_tbl(struct table *tbl) {
 			delete_tbl(tbl->hash[i].v.tbl);
 		}
 	}
-	free(tbl->arraytype);
-	free(tbl->array);
-	free(tbl->hash);
-	free(tbl);
+	skynet_free(tbl->arraytype);
+	skynet_free(tbl->array);
+	skynet_free(tbl->hash);
+	skynet_free(tbl);
 }
 
 static int
@@ -414,7 +415,7 @@ lnewconf(lua_State *L) {
 		lua_pushliteral(L, "memory error");
 		goto error;
 	}
-	tbl = (struct table *)malloc(sizeof(struct table));
+	tbl = (struct table *)skynet_malloc(sizeof(struct table));
 	if (tbl == NULL) {
 		// lua_pushliteral may fail because of memory error, close first.
 		lua_close(ctx.L);

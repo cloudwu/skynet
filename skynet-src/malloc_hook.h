@@ -15,6 +15,7 @@ extern int    mallctl_cmd(const char* name);
 extern void   dump_c_mem(void);
 extern int    dump_mem_lua(lua_State *L);
 extern size_t malloc_current_memory(void);
+extern void   skynet_memory_watch(uint32_t handle);
 
 #endif /* SKYNET_MALLOC_HOOK_H */
 

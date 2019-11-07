@@ -162,6 +162,7 @@ function COMMAND.help()
 		netstat = "netstat : show netstat",
 		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
 		dumpheap = "dumpheap : dump heap profilling",
+		watchcmem = "watchcmem address : watch C memory info detail",
 	}
 end
 
@@ -330,16 +331,45 @@ function COMMAND.signal(address, sig)
 	end
 end
 
-function COMMAND.cmem()
-	local info = memory.info()
-	local tmp = {}
-	for k,v in pairs(info) do
-		tmp[skynet.address(k)] = v
+local function cmemtag(n)
+	if n < 1000000 then
+		return tostring(n)
+	else
+		return "@"..string.char(
+			n&0xFF,
+			(n>>8)&0xFF,
+			(n>>16)&0xFF,
+			(n>>24)&0xFF)
 	end
+end
+
+function COMMAND.cmem()
+	local info, watchinfo, watch = memory.info()
+	local tmp = {}
+	local sum = {0, 0, 0}
+	for k,v in pairs(info) do
+		tmp[skynet.address(k)] = string.format("%d\t%d\t%d\t%d", v[1], v[2], v[3], v[2]-v[3])
+		sum[1] = sum[1] + v[1]
+		sum[2] = sum[2] + v[2]
+		sum[3] = sum[3] + v[3]
+	end
+	for k,v in pairs(watchinfo) do
+		assert(tmp[cmemtag(k)] == nil)
+		tmp[cmemtag(k)] = string.format("%d\t%d\t%d\t%d", v[1], v[2], v[3], v[2]-v[3])
+		sum[1] = sum[1] + v[1]
+		sum[2] = sum[2] + v[2]
+		sum[3] = sum[3] + v[3]
+	end
+	tmp.watch = skynet.address(watch)
+	tmp.sum = string.format("%d\t%d\t%d\t%d", sum[1], sum[2], sum[3], sum[2]-sum[3])
 	tmp.total = memory.total()
 	tmp.block = memory.block()
 
 	return tmp
+end
+
+function COMMAND.watchcmem(address)
+	memory.watch(address)
 end
 
 function COMMAND.ping(address)
