@@ -537,7 +537,7 @@ get_buffer(lua_State *L, int index, struct socket_sendbuffer *buf) {
 		if (lua_isinteger(L, index+1)) {
 			buf->sz = lua_tointeger(L, index+1);
 		} else {
-			buf->sz = lua_rawlen(L, index+1);
+			buf->sz = lua_rawlen(L, index);
 		}
 		break;
 	case LUA_TLIGHTUSERDATA: {
