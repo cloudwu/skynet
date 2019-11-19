@@ -1,3 +1,16 @@
+v1.3.0 (2019-11-19)
+-----------
+* Improve mysql driver (@yxt945)
+* Improve cluster
+* Improve lua shared proto (@hongling0)
+* Improve socket.write
+* Add lua sharetable
+* Add https support (@lvzixun)
+* Add websocket support (@lvzixun)
+* Fix bug in dns
+* Fix some memory leaks
+* jemalloc update to 5.2.1
+
 v1.2.0 (2018-11-6)
 -----------
 * Improve cluster support
