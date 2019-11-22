@@ -315,7 +315,7 @@ local function _new_client_ws(socket_id, protocol)
             websocket = true,
             close = function ()
                 socket.close(socket_id)
-                tls.closefunc(tls_ctx) 
+                tls.closefunc(tls_ctx)() 
             end,
             read = tls.readfunc(socket_id, tls_ctx),
             write = tls.writefunc(socket_id, tls_ctx),
@@ -361,7 +361,7 @@ local function _new_server_ws(socket_id, handle, protocol)
         obj = {
             close = function ()
                 socket.close(socket_id)
-                tls.closefunc(tls_ctx) 
+                tls.closefunc(tls_ctx)() 
             end,
             read = tls.readfunc(socket_id, tls_ctx),
             write = tls.writefunc(socket_id, tls_ctx),
