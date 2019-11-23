@@ -19,7 +19,7 @@ $(LUA_STATICLIB) :
 
 # https : turn on TLS_MODULE to add https support
 
-# TLS_MODULE=ltls
+TLS_MODULE=ltls
 TLS_LIB=
 TLS_INC=
 
