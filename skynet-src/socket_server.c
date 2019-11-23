@@ -19,7 +19,7 @@
 
 #define MAX_INFO 128
 // MAX_SOCKET will be 2^MAX_SOCKET_P
-#define MAX_SOCKET_P 16
+#define MAX_SOCKET_P 6
 #define MAX_EVENT 64
 #define MIN_READ_BUFFER 64
 #define SOCKET_TYPE_INVALID 0
