@@ -421,7 +421,7 @@ local function resolve_replace(replace_map)
             if not info then
                 break
             end
-            info.level = level
+            info.level = is_self and level + 1 or level
             info.curco = co
             match_funcinfo(info)
             level = level + 1
