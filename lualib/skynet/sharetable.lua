@@ -304,6 +304,9 @@ local function resolve_replace(replace_map)
 
 
     local function match_table(t)
+        if t == replace_map then
+            return
+        end
         local keys = false
         for k,v in next, t do
             local tk = type(k)
