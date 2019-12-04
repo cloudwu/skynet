@@ -83,15 +83,14 @@ function command.changenode(host, port)
 	if channel then
 		channel:close()
 	end
+	channel = c
 	if succ then
-		channel = c
 		for k, co in ipairs(waiting) do
 			waiting[k] = nil
 			skynet.wakeup(co)
 		end
 		skynet.ret(skynet.pack(nil))
 	else
-		channel = nil	-- reset channel
 		skynet.response()(false)
 	end
 end
