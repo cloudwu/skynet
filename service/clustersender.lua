@@ -5,11 +5,9 @@ local cluster = require "skynet.cluster.core"
 
 local channel
 local session = 1
-local node, nodename = ...
+local node, nodename, init_host, init_port = ...
 
 local command = {}
-local waiting = {}
-
 
 local function send_request(addr, msg, sz)
 	-- msg is a local pointer, cluster.packrequest will free it
@@ -31,16 +29,7 @@ local function send_request(addr, msg, sz)
 	return channel:request(request, current_session, padding)
 end
 
-local function wait()
-	local co = coroutine.running()
-	table.insert(waiting, co)
-	skynet.wait(co)
-end
-
 function command.req(...)
-	if channel == nil then
-		wait()
-	end
 	local ok, msg = pcall(send_request, ...)
 	if ok then
 		if type(msg) == "table" then
@@ -55,9 +44,6 @@ function command.req(...)
 end
 
 function command.push(addr, msg, sz)
-	if channel == nil then
-		wait()
-	end
 	local request, new_session, padding = cluster.packpush(addr, session, msg, sz)
 	if padding then	-- is multi push
 		session = new_session
@@ -73,30 +59,18 @@ local function read_response(sock)
 end
 
 function command.changenode(host, port)
-	local c = sc.channel {
-			host = host,
-			port = tonumber(port),
-			response = read_response,
-			nodelay = true,
-		}
-	local succ, err = pcall(c.connect, c, true)
-	if channel then
-		channel:close()
-	end
-	if succ then
-		channel = c
-		for k, co in ipairs(waiting) do
-			waiting[k] = nil
-			skynet.wakeup(co)
-		end
-		skynet.ret(skynet.pack(nil))
-	else
-		channel = nil	-- reset channel
-		skynet.response()(false)
-	end
+	channel:changehost(host, tonumber(port))
+	channel:connect(true)
+	skynet.ret(skynet.pack(nil))
 end
 
 skynet.start(function()
+	channel = sc.channel {
+			host = init_host,
+			port = tonumber(init_port),
+			response = read_response,
+			nodelay = true,
+		}
 	skynet.dispatch("lua", function(session , source, cmd, ...)
 		local f = assert(command[cmd])
 		f(...)
