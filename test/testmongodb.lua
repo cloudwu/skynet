@@ -25,7 +25,7 @@ function test_auth()
 			host = host, port = port,
 		}
 	)
-	db = c[db_name]
+	local db = c[db_name]
 	db:auth(username, password)
 
 	db.testdb:dropIndex("*")
@@ -86,8 +86,8 @@ function test_find_and_remove()
 	assert(ret and ret.test_key2 == 1, err)
 
 	local ret = db[db_name].testdb:find({test_key2 = {['$gt'] = 0}}):sort({test_key = 1}, {test_key2 = -1}):skip(1):limit(1)
- 	assert(ret:count() == 3)
- 	assert(ret:count(true) == 1)
+	assert(ret:count() == 3)
+	assert(ret:count(true) == 1)
 	if ret:hasNext() then
 		ret = ret:next()
 	end
