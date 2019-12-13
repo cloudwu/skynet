@@ -89,7 +89,7 @@ function CMD.delete(name)
 end
 
 function CMD.query(name)
-	local v = assert(pool[name])
+	local v = assert(pool[name], name)
 	local obj = v.obj
 	sharedata.host.incref(obj)
 	return v.obj
