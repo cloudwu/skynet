@@ -33,7 +33,7 @@ struct worker_parm {
 	int weight;
 };
 
-static int SIG = 0;
+static volatile int SIG = 0;
 
 static void
 handle_hup(int signal) {

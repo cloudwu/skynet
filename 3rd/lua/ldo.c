@@ -290,7 +290,7 @@ static void callhook (lua_State *L, CallInfo *ci) {
 }
 
 
-static StkId adjust_varargs (lua_State *L, SharedProto *p, int actual) {
+static StkId adjust_varargs (lua_State *L, Proto *p, int actual) {
   int i;
   int nfixargs = p->numparams;
   StkId base, fixed;
@@ -439,7 +439,7 @@ int luaD_precall (lua_State *L, StkId func, int nresults) {
     }
     case LUA_TLCL: {  /* Lua function: prepare its call */
       StkId base;
-      SharedProto *p = clLvalue(func)->p->sp;
+      Proto *p = clLvalue(func)->p;
       int n = cast_int(L->top - func) - 1;  /* number of real arguments */
       int fsize = p->maxstacksize;  /* frame size */
       checkstackp(L, fsize, func);
@@ -775,7 +775,7 @@ static void f_parser (lua_State *L, void *ud) {
     checkmode(L, p->mode, "text");
     cl = luaY_parser(L, p->z, &p->buff, &p->dyd, p->name, c);
   }
-  lua_assert(cl->nupvalues == cl->p->sp->sizeupvalues);
+  lua_assert(cl->nupvalues == cl->p->sizeupvalues);
   luaF_initupvals(L, cl);
 }
 

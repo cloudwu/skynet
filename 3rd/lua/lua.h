@@ -234,6 +234,10 @@ LUA_API void  (lua_pushboolean) (lua_State *L, int b);
 LUA_API void  (lua_pushlightuserdata) (lua_State *L, void *p);
 LUA_API int   (lua_pushthread) (lua_State *L);
 
+LUA_API void  (lua_clonefunction) (lua_State *L, const void * fp);
+LUA_API void  (lua_sharefunction) (lua_State *L, int index);
+LUA_API void  (lua_sharestring) (lua_State *L, int index);
+LUA_API void  (lua_clonetable) (lua_State *L, const void * t);
 
 /*
 ** get functions (Lua -> stack)
@@ -281,8 +285,6 @@ LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
                           const char *chunkname, const char *mode);
 
 LUA_API int (lua_dump) (lua_State *L, lua_Writer writer, void *data, int strip);
-
-LUA_API void (lua_clonefunction) (lua_State *L, const void *eL);
 
 
 /*

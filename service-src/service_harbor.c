@@ -332,13 +332,19 @@ send_remote(struct skynet_context * ctx, int fd, const char * buffer, size_t sz,
 		skynet_error(ctx, "remote message from :%08x to :%08x is too large.", cookie->source, cookie->destination);
 		return;
 	}
-	uint8_t * sendbuf = skynet_malloc(sz_header+4);
+	uint8_t sendbuf[sz_header+4];
 	to_bigendian(sendbuf, (uint32_t)sz_header);
 	memcpy(sendbuf+4, buffer, sz);
 	header_to_message(cookie, sendbuf+4+sz);
 
+	struct socket_sendbuffer tmp;
+	tmp.id = fd;
+	tmp.type = SOCKET_BUFFER_RAWPOINTER;
+	tmp.buffer = sendbuf;
+	tmp.sz = sz_header+4;
+
 	// ignore send error, because if the connection is broken, the mainloop will recv a message.
-	skynet_socket_send(ctx, fd, sendbuf, sz_header+4);
+	skynet_socket_sendbuffer(ctx, &tmp);
 }
 
 static void
@@ -580,9 +586,13 @@ remote_send_name(struct harbor *h, uint32_t source, const char name[GLOBALNAME_L
 static void
 handshake(struct harbor *h, int id) {
 	struct slave *s = &h->s[id];
-	uint8_t * handshake = skynet_malloc(1);
-	handshake[0] = (uint8_t)h->id;
-	skynet_socket_send(h->ctx, s->fd, handshake, 1);
+	uint8_t handshake[1] = { (uint8_t)h->id };
+	struct socket_sendbuffer tmp;
+	tmp.id = s->fd;
+	tmp.type = SOCKET_BUFFER_RAWPOINTER;
+	tmp.buffer = handshake;
+	tmp.sz = 1;
+	skynet_socket_sendbuffer(h->ctx, &tmp);
 }
 
 static void
