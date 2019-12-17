@@ -68,6 +68,13 @@ local function test3( db)
         i=i+1
     end
 end
+local function test4( db)
+	local stmt = db:prepare("SELECT * FROM cats WHERE name=?")
+    print ( "test4 prepare result=",dump( stmt ) )
+	local res = db:execute(stmt,'Bob')
+    print ( "test4 query result=",dump( res ) )
+    db:stmt_close(stmt)
+end
 skynet.start(function()
 
 	local function on_connect(db)
@@ -102,6 +109,7 @@ skynet.start(function()
     -- test in another coroutine
 	skynet.fork( test2, db)
     skynet.fork( test3, db)
+	skynet.fork( test4, db)
 	-- multiresultset test
 	res = db:query("select * from cats order by id asc ; select * from cats")
 	print ("multiresultset test result=", dump( res ) )
