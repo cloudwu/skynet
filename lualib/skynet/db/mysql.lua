@@ -958,7 +958,6 @@ function _M.stmt_reset(self, stmt)
         if not self.query_resp then
         self.query_resp = _query_resp(self)
     end
-    return sockchannel:request(querypacket, self.query_resp)
 end
 
 local function _compose_stmt_close(self, stmt)
