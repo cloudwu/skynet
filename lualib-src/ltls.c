@@ -284,9 +284,9 @@ _lctx_cert(lua_State* L) {
         luaL_error(L, "need private key");
     }
 
-    int ret = SSL_CTX_use_certificate_file(ctx_p->ctx, certfile, SSL_FILETYPE_PEM);
+    int ret = SSL_CTX_use_certificate_chain_file(ctx_p->ctx, certfile);
     if(ret != 1) {
-        luaL_error(L, "SSL_CTX_use_certificate_file error:%d", ret);
+        luaL_error(L, "SSL_CTX_use_certificate_chain_file error:%d", ret);
     }
 
     ret = SSL_CTX_use_PrivateKey_file(ctx_p->ctx, key, SSL_FILETYPE_PEM);
