@@ -68,6 +68,55 @@ local function test3( db)
         i=i+1
     end
 end
+local function test4( db)
+	local stmt = db:prepare("SELECT * FROM cats WHERE name=?")
+    print ( "test4 prepare result=",dump( stmt ) )
+	local res = db:execute(stmt,'Bob')
+    print ( "test4 query result=",dump( res ) )
+    db:stmt_close(stmt)
+end
+
+-- 测试存储过程和blob读写
+local function test_sp_blob(db)
+	print("test stored procedure")
+	-- 创建测试表
+	db:query "DROP TABLE IF EXISTS `test`"
+	db:query [[
+		CREATE TABLE `test` (
+			`id` int(11) NOT NULL AUTO_INCREMENT,
+			`str` varchar(45) COLLATE utf8mb4_bin DEFAULT NULL,
+			`dt` timestamp NULL DEFAULT NULL,
+			`flt` double DEFAULT NULL,
+			`blb` mediumblob,
+			`num` int(11) DEFAULT NULL,
+			PRIMARY KEY (`id`),
+			UNIQUE KEY `id_UNIQUE` (`id`)
+			) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+	]]
+	-- 创建测试存储过程
+	db:query "DROP PROCEDURE IF EXISTS `get_test`"
+	db:query [[
+		CREATE PROCEDURE `get_test`(IN p_id int)
+		BEGIN
+			select * from test where id=p_id;
+		END
+	]]
+	local stmt_insert = db:prepare("INSERT test (str,dt,flt,num,blb) VALUES (?,?,?,?,?)")
+	local stmt_csp = db:prepare("call get_test(?)")
+	local test_blob = string.char(0x01,0x02,0x03,0x04,0x0a,0x0b,0x0d,0x0e,0x10,0x20,0x30,0x40)
+
+	local r = db:execute(stmt_insert,'test_str','2020-3-20 15:30:40',3.1415,89,test_blob)
+	print("insert result : insert_id",r.insert_id,"affected_rows",r.affected_rows
+		,"server_status",r.server_status,"warning_count",r.warning_count)
+
+	r = db:execute(stmt_csp,1)
+	local rs = r[1][1]
+	print("call get_test() result : str",rs.str,"dt",rs.dt,"flt",rs.flt,"num",rs.num
+		,"blb len",#rs.blb,"equal",test_blob==rs.blb)
+
+	print("test stored procedure ok")
+end
+
 skynet.start(function()
 
 	local function on_connect(db)
@@ -99,9 +148,13 @@ skynet.start(function()
 	res = db:query("select * from cats order by id asc")
 	print ( dump( res ) )
 
+	-- 测试存储过程和二进制blob
+	test_sp_blob(db)
+
     -- test in another coroutine
 	skynet.fork( test2, db)
     skynet.fork( test3, db)
+	skynet.fork( test4, db)
 	-- multiresultset test
 	res = db:query("select * from cats order by id asc ; select * from cats")
 	print ("multiresultset test result=", dump( res ) )

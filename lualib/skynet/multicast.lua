@@ -71,7 +71,8 @@ local function dispatch_subscribe(channel, source, pack, msg, sz)
 	local self = dispatch[channel]
 	if not self then
 		mc.close(pack)
-		error ("Unknown channel " .. channel)
+		-- This channel may unsubscribe first, see #1141
+		return
 	end
 
 	if self.__subscribe then

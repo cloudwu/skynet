@@ -28,6 +28,8 @@ local COM_QUERY = "\x03"
 local COM_PING = "\x0e"
 local COM_STMT_PREPARE = "\x16"
 local COM_STMT_EXECUTE = "\x17"
+local COM_STMT_CLOSE = "\x19"
+local COM_STMT_RESET = "\x1a"
 local CURSOR_TYPE_NO_CURSOR = 0x00
 local SERVER_MORE_RESULTS_EXISTS = 8
 
@@ -941,6 +943,38 @@ function _M.execute(self, stmt, ...)
     end
     return sockchannel:request(querypacket, self.execute_resp)
 end
+
+local function _compose_stmt_reset(self, stmt)
+	self.packet_no = -1
+
+	local cmd_packet = strpack("c1<I4", COM_STMT_RESET, stmt.prepare_id)
+	return _compose_packet(self, cmd_packet)
+end
+
+--重置预处理句柄
+function _M.stmt_reset(self, stmt)
+	local querypacket = _compose_stmt_reset(self, stmt)
+	local sockchannel = self.sockchannel
+		if not self.query_resp then
+		self.query_resp = _query_resp(self)
+	end
+	return sockchannel:request(querypacket, self.query_resp)
+end
+
+local function _compose_stmt_close(self, stmt)
+	self.packet_no = -1
+
+	local cmd_packet = strpack("c1<I4", COM_STMT_CLOSE, stmt.prepare_id)
+	return _compose_packet(self, cmd_packet)
+end
+
+--关闭预处理句柄
+function _M.stmt_close(self, stmt)
+	local querypacket = _compose_stmt_close(self, stmt)
+	local sockchannel = self.sockchannel
+	return sockchannel:request(querypacket)
+end
+
 
 function _M.ping(self)
     local querypacket, er = _compose_ping(self)

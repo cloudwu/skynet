@@ -141,7 +141,8 @@ static int
 mc_nextid(lua_State *L) {
 	uint32_t id = (uint32_t)luaL_checkinteger(L, 1);
 	id += 256;
-	lua_pushinteger(L, (uint32_t)id);
+	// remove the highest bit, see #1139
+	lua_pushinteger(L, id & 0x7fffffffu);
 
 	return 1;
 }
