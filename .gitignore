@@ -9,3 +9,5 @@
 *.so
 *.dSYM
 .DS_Store
+LuaDebug.lua
+LuaDebugjit.lua

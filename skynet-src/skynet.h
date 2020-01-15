@@ -27,6 +27,7 @@
 struct skynet_context;
 
 void skynet_error(struct skynet_context * context, const char *msg, ...);
+void skynet_log(struct skynet_context * context, const char *msg, ...);
 const char * skynet_command(struct skynet_context * context, const char * cmd , const char * parm);
 uint32_t skynet_queryname(struct skynet_context * context, const char * name);
 int skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * msg, size_t sz);

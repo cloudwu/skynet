@@ -474,6 +474,30 @@ ltrace(lua_State *L) {
 	return 0;
 }
 
+static int llog(lua_State *L){
+	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+	int n = lua_gettop(L);
+	if (n <= 1) {
+		lua_settop(L, 1);
+		const char * s = luaL_tolstring(L, 1, NULL);
+		skynet_log(context, "%s", s);
+		return 0;
+	}
+	luaL_Buffer b;
+	luaL_buffinit(L, &b);
+	int i;
+	for (i=1; i<=n; i++) {
+		luaL_tolstring(L, i, NULL);
+		luaL_addvalue(&b);
+		if (i<n) {
+			luaL_addchar(&b, ' ');
+		}
+	}
+	luaL_pushresult(&b);
+	skynet_log(context, "%s", lua_tostring(L, -1));
+	return 0;
+}
+
 LUAMOD_API int
 luaopen_skynet_core(lua_State *L) {
 	luaL_checkversion(L);
@@ -489,6 +513,7 @@ luaopen_skynet_core(lua_State *L) {
 		{ "harbor", lharbor },
 		{ "callback", lcallback },
 		{ "trace", ltrace },
+		{ "log", llog},
 		{ NULL, NULL },
 	};
 
