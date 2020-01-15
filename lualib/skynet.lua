@@ -682,6 +682,24 @@ end
 skynet.error = c.error
 skynet.tracelog = c.trace
 
+local log = function(key, level)
+	return function(...)
+		local loglevel = skynet.getenv("loglevel") or 0
+		if level >= loglevel then 
+			local info = debug.getinfo(2, "nSl")
+			local now = os.time()
+			local n = os.date("*t", now)
+			local s = string.format("[%02d:%02d:%02d][%s]:[%s.%d]", n.hour, n.min, n.sec, info.name, info.short_src, info.currentline)
+			c.log(key, s, ...)
+		end 
+	end 
+end
+
+skynet.logi = log("[I]", 3)
+skynet.loge = log("[E]", 2)
+skynet.loge = log("[W]", 1)
+skynet.logd = log("[D]", 0)
+
 -- true: force on
 -- false: force off
 -- nil: optional (use skynet.trace() to trace one message)
