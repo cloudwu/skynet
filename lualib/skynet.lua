@@ -225,10 +225,17 @@ end
 
 skynet.trace_timeout(false)	-- turn off by default
 
-function skynet.timeout(ti, func)
+function skynet.timeout(ti, func, ...)
 	local session = c.intcommand("TIMEOUT",ti)
 	assert(session)
-	local co = co_create_for_timeout(func, ti)
+	local n = select("#", ...)
+	local co
+	if n == 0 then
+		co = co_create_for_timeout(func, ti)
+	else
+		local args = { ... }
+		co = co_create_for_timeout(function() func(table.unpack(args,1,n)) end, ti)
+	end
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
 	return co	-- for debug
