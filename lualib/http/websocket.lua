@@ -247,6 +247,8 @@ local function resolve_accept(self)
         if not ok then
             error(s)
         end
+        try_handle(self, "close")
+        return
     end
 
     local header = err
