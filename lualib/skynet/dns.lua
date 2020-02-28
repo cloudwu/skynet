@@ -161,7 +161,7 @@ local function parse_resolv_conf()
 
 	local server
 	for line in f:lines() do
-		server = line:match("%s*nameserver%s+([^#;%s]+)")
+		server = line:match("^%s*nameserver%s+([^#;%s]+)")
 		if server then
 			break
 		end
