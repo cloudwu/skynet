@@ -267,7 +267,7 @@ local function resolve_accept(self)
             try_handle(self, "close", code, reason)
             break
         elseif op == "ping" then
-            write_frame(self, "pong")
+            write_frame(self, "pong", payload_data)
             try_handle(self, "ping")
         elseif op == "pong" then
             try_handle(self, "pong")
@@ -448,7 +448,7 @@ function M.read(id)
             _close_websocket(ws_obj)
             return false, payload_data
         elseif op == "ping" then
-            write_frame(ws_obj, "pong")
+            write_frame(ws_obj, "pong", payload_data)
         elseif op ~= "pong" then  -- op is frame, text binary
             if fin and not recv_buf then
                 return payload_data
