@@ -98,7 +98,7 @@ local function read_handshake(self)
         return 400, "host Required"
     end
 
-    if not header["connection"] or header["connection"]:lower() ~= "upgrade" then
+    if not header["connection"] or not header["connection"]:lower():find("upgrade", 1,true) then
         return 400, "Connection must Upgrade"
     end
 
