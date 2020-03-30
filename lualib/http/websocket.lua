@@ -273,7 +273,7 @@ local function resolve_accept(self)
             try_handle(self, "pong")
         else
             if fin and #recv_buf == 0 then
-                try_handle(self, "message", payload_data)
+                try_handle(self, "message", payload_data, op)
             else
                 recv_buf[#recv_buf+1] = payload_data
                 recv_count = recv_count + #payload_data
@@ -282,7 +282,7 @@ local function resolve_accept(self)
                 end
                 if fin then
                     local s = table.concat(recv_buf)
-                    try_handle(self, "message", s)
+                    try_handle(self, "message", s, op)
                     recv_buf = {}  -- clear recv_buf
                     recv_count = 0
                 end
