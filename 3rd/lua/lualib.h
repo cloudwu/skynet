@@ -1,5 +1,5 @@
 /*
-** $Id: lualib.h,v 1.45 2017/01/12 17:14:26 roberto Exp $
+** $Id: lualib.h,v 1.45.1.1 2017/04/19 17:20:42 roberto Exp $
 ** Lua standard libraries
 ** See Copyright Notice in lua.h
 */
@@ -49,6 +49,7 @@ LUAMOD_API int (luaopen_package) (lua_State *L);
 
 #define LUA_CACHELIB
 LUAMOD_API int (luaopen_cache) (lua_State *L);
+LUALIB_API void (luaL_initcodecache) (void);
 
 /* open all previous libraries */
 LUALIB_API void (luaL_openlibs) (lua_State *L);

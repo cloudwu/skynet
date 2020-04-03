@@ -253,6 +253,7 @@ fillcolliding(lua_State *L, struct context *ctx) {
 				for (i=emptyslot;i<sizehash;i++) {
 					if (tbl->hash[i].valuetype == VALUETYPE_NIL) {
 						n = &tbl->hash[i];
+						emptyslot = i + 1;
 						break;
 					}
 				}

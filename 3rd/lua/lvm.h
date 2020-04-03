@@ -1,5 +1,5 @@
 /*
-** $Id: lvm.h,v 2.41 2016/12/22 13:08:50 roberto Exp $
+** $Id: lvm.h,v 2.41.1.1 2017/04/19 17:20:42 roberto Exp $
 ** Lua virtual machine
 ** See Copyright Notice in lua.h
 */
@@ -81,7 +81,7 @@
   (!ttistable(t) \
    ? (slot = NULL, 0) \
    : (slot = f(hvalue(t), k), \
-     ttisnil(slot) ? 0 \
+     (ttisnil(slot) || isshared(hvalue(t))) ? 0 \
      : (luaC_barrierback(L, hvalue(t), v), \
         setobj2t(L, cast(TValue *,slot), v), \
         1)))

@@ -2,6 +2,7 @@ local skynet = require "skynet"
 local sc = require "skynet.socketchannel"
 local socket = require "skynet.socket"
 local cluster = require "skynet.cluster.core"
+local ignoreret = skynet.ignoreret
 
 local clusterd, gate, fd = ...
 clusterd = tonumber(clusterd)
@@ -9,27 +10,57 @@ gate = tonumber(gate)
 fd = tonumber(fd)
 
 local large_request = {}
-local register_name = {}
+local inquery_name = {}
 
-setmetatable(register_name, { __index =
+local register_name_mt = { __index =
 	function(self, name)
-		local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
-		if addr then
-			self[name] = addr
+		local waitco = inquery_name[name]
+		if waitco then
+			local co=coroutine.running()
+			table.insert(waitco, co)
+			skynet.wait(co)
+			return rawget(self, name)
+		else
+			waitco = {}
+			inquery_name[name] = waitco
+			local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
+			if addr then
+				self[name] = addr
+			end
+			inquery_name[name] = nil
+			for _, co in ipairs(waitco) do
+				skynet.wakeup(co)
+			end
+			return addr
 		end
-		return addr
 	end
-})
+}
+
+local function new_register_name()
+	return setmetatable({}, register_name_mt)
+end
+
+local register_name = new_register_name()
+
+local tracetag
 
 local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
+	ignoreret()	-- session is fd, don't call skynet.ret
+	if session == nil then
+		-- trace
+		tracetag = addr
+		return
+	end
 	if padding then
-		local req = large_request[session] or { addr = addr , is_push = is_push }
+		local req = large_request[session] or { addr = addr , is_push = is_push, tracetag = tracetag }
+		tracetag = nil
 		large_request[session] = req
 		cluster.append(req, msg, sz)
 		return
 	else
 		local req = large_request[session]
 		if req then
+			tracetag = req.tracetag
 			large_request[session] = nil
 			cluster.append(req, msg, sz)
 			msg,sz = cluster.concat(req)
@@ -37,6 +68,7 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 			is_push = req.is_push
 		end
 		if not msg then
+			tracetag = nil
 			local response = cluster.packresponse(session, false, "Invalid large req")
 			socket.write(fd, response)
 			return
@@ -49,11 +81,12 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 		local addr = register_name["@" .. name]
 		if addr then
 			ok = true
-			msg, sz = skynet.pack(addr)
+			msg = skynet.packstring(addr)
 		else
 			ok = false
 			msg = "name not found"
 		end
+		sz = nil
 	else
 		if cluster.isname(addr) then
 			addr = register_name[addr]
@@ -63,7 +96,12 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 				skynet.rawsend(addr, "lua", msg, sz)
 				return	-- no response
 			else
-				ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
+				if tracetag then
+					ok , msg, sz = pcall(skynet.tracecall, tracetag, addr, "lua", msg, sz)
+					tracetag = nil
+				else
+					ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
+				end
 			end
 		else
 			ok = false
@@ -100,7 +138,7 @@ skynet.start(function()
 			socket.close(fd)
 			skynet.exit()
 		elseif cmd == "namechange" then
-			register_name = {}
+			register_name = new_register_name()
 		else
 			skynet.error(string.format("Invalid command %s from %s", cmd, skynet.address(source)))
 		end

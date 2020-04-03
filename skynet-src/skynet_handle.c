@@ -39,8 +39,12 @@ skynet_handle_register(struct skynet_context *ctx) {
 	
 	for (;;) {
 		int i;
-		for (i=0;i<s->slot_size;i++) {
-			uint32_t handle = (i+s->handle_index) & HANDLE_MASK;
+		uint32_t handle = s->handle_index;
+		for (i=0;i<s->slot_size;i++,handle++) {
+			if (handle > HANDLE_MASK) {
+				// 0 is reserved
+				handle = 1;
+			}
 			int hash = handle & (s->slot_size-1);
 			if (s->slot[hash] == NULL) {
 				s->slot[hash] = ctx;

@@ -14,18 +14,15 @@ local function test_service()
 end
 
 local function timeout_call(ti, ...)
-	local co = coroutine.running()
+	local token = {}
 	local ret
 
 	skynet.fork(function(...)
 		ret = table.pack(pcall(skynet.call, ...))
-		if co then
-			skynet.wakeup(co)
-		end
+		skynet.wakeup(token)
 	end, ...)
 
-	skynet.sleep(ti)
-	co = nil	-- prevent wakeup after call
+	skynet.sleep(ti, token)
 	if ret then
 		if ret[1] then
 			return table.unpack(ret, 1, ret.n)
@@ -45,6 +42,8 @@ skynet.start(function()
 	skynet.error("2", skynet.now())
 	skynet.error(timeout_call(50, test, "lua"))
 	skynet.error("3", skynet.now())
+	skynet.error(timeout_call(150, test, "lua"))
+	skynet.error("4", skynet.now())
 	skynet.exit()
 end)
 

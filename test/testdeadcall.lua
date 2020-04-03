@@ -32,6 +32,6 @@ else
 		local dead = skynet.newservice(SERVICE_NAME, "dead")	-- launch self in dead mode
 
 		skynet.timeout(0, skynet.exit)	-- exit after a while, so the call never return
-		skynet.call(dead, "lua", "whould not return")
+		skynet.call(dead, "lua", "would not return")
 	end)
 end

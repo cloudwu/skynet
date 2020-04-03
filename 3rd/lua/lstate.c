@@ -1,5 +1,5 @@
 /*
-** $Id: lstate.c,v 2.133 2015/11/13 12:16:51 roberto Exp $
+** $Id: lstate.c,v 2.133.1.1 2017/04/19 17:39:34 roberto Exp $
 ** Global State
 ** See Copyright Notice in lua.h
 */
@@ -68,27 +68,6 @@ typedef struct LG {
 
 
 #define fromstate(L)	(cast(LX *, cast(lu_byte *, (L)) - offsetof(LX, l)))
-
-
-/*
-** Compute an initial seed as random as possible. Rely on Address Space
-** Layout Randomization (if present) to increase randomness..
-*/
-#define addbuff(b,p,e) \
-  { size_t t = cast(size_t, e); \
-    memcpy(b + p, &t, sizeof(t)); p += sizeof(t); }
-
-static unsigned int makeseed (lua_State *L) {
-  char buff[4 * sizeof(size_t)];
-  unsigned int h = luai_makeseed();
-  int p = 0;
-  addbuff(buff, p, L);  /* heap variable */
-  addbuff(buff, p, &h);  /* local variable */
-  addbuff(buff, p, luaO_nilobject);  /* global variable */
-  addbuff(buff, p, &lua_newstate);  /* public function */
-  lua_assert(p == sizeof(buff));
-  return luaS_hash(buff, p, h);
-}
 
 
 /*
@@ -308,7 +287,6 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->frealloc = f;
   g->ud = ud;
   g->mainthread = L;
-  g->seed = makeseed(L);
   g->gcrunning = 0;  /* no GC while building state */
   g->GCestimate = 0;
   g->strt.size = g->strt.nuse = 0;

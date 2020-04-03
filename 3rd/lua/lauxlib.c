@@ -1,5 +1,5 @@
 /*
-** $Id: lauxlib.c,v 1.289 2016/12/20 18:37:00 roberto Exp $
+** $Id: lauxlib.c,v 1.289.1.1 2017/04/19 17:20:42 roberto Exp $
 ** Auxiliary functions for building Lua libraries
 ** See Copyright Notice in lua.h
 */
@@ -699,8 +699,7 @@ static int skipcomment (LoadF *lf, int *cp) {
   else return 0;  /* no comment */
 }
 
-
-static int luaL_loadfilex_ (lua_State *L, const char *filename,
+LUALIB_API int luaL_loadfilex_ (lua_State *L, const char *filename,
                                              const char *mode) {
   LoadF lf;
   int status, readstatus;
@@ -1064,8 +1063,12 @@ clearcache() {
 
 static void
 init() {
-	SPIN_INIT(&CC);
 	CC.L = luaL_newstate();
+}
+
+LUALIB_API void
+luaL_initcodecache(void) {
+	SPIN_INIT(&CC);
 }
 
 static const void *
@@ -1091,21 +1094,20 @@ save(const char *key, const void * proto) {
   SPIN_LOCK(&CC)
     if (CC.L == NULL) {
       init();
-      L = CC.L;
-    } else {
-      L = CC.L;
-      lua_pushstring(L, key);
-      lua_pushvalue(L, -1);
-      lua_rawget(L, LUA_REGISTRYINDEX);
-      result = lua_touserdata(L, -1); /* stack: key oldvalue */
-      if (result == NULL) {
-        lua_pop(L,1);
-        lua_pushlightuserdata(L, (void *)proto);
-        lua_rawset(L, LUA_REGISTRYINDEX);
-      } else {
-        lua_pop(L,2);
-      }
     }
+    L = CC.L;
+    lua_pushstring(L, key);
+    lua_pushvalue(L, -1);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+    result = lua_touserdata(L, -1); /* stack: key oldvalue */
+    if (result == NULL) {
+      lua_pop(L,1);
+      lua_pushlightuserdata(L, (void *)proto);
+      lua_rawset(L, LUA_REGISTRYINDEX);
+    } else {
+      lua_pop(L,2);
+    }
+
   SPIN_UNLOCK(&CC)
   return result;
 }
@@ -1179,6 +1181,7 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
     lua_close(eL);
     return err;
   }
+  lua_sharefunction(eL, -1);
   proto = lua_topointer(eL, -1);
   const void * oldv = save(filename, proto);
   if (oldv) {

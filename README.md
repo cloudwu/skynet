@@ -1,6 +1,6 @@
 ## ![skynet logo](https://github.com/cloudwu/skynet/wiki/image/skynet_metro.jpg)
 
-Skynet is a lightweight online game framework, and it can be used in many other fields.
+Skynet is a lightweight online game framework which can be used in many other fields.
 
 ## Build
 
@@ -12,7 +12,7 @@ cd skynet
 make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd now
 ```
 
-Or you can:
+Or:
 
 ```
 export PLAT=linux
@@ -32,11 +32,11 @@ Run these in different consoles:
 
 ## About Lua version
 
-Skynet now uses a modified version of lua 5.3.4 ( https://github.com/ejoy/lua/tree/skynet ) for multiple lua states.
+Skynet now uses a modified version of lua 5.3.5 ( https://github.com/ejoy/lua/tree/skynet ) for multiple lua states.
 
-You can also use official Lua versions, just edit the Makefile by yourself.
+Official Lua versions can also be used as long as the Makefile is edited.
 
-## How To Use (Sorry, Only in Chinese now)
+## How To Use (Sorry, currently only available in Chinese)
 
 * Read Wiki for documents https://github.com/cloudwu/skynet/wiki
 * The FAQ in wiki https://github.com/cloudwu/skynet/wiki/FAQ

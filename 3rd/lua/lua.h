@@ -1,5 +1,5 @@
 /*
-** $Id: lua.h,v 1.332 2016/12/22 15:51:20 roberto Exp $
+** $Id: lua.h,v 1.332.1.2 2018/06/13 16:58:17 roberto Exp $
 ** Lua - A Scripting Language
 ** Lua.org, PUC-Rio, Brazil (http://www.lua.org)
 ** See Copyright Notice at the end of this file
@@ -19,11 +19,11 @@
 #define LUA_VERSION_MAJOR	"5"
 #define LUA_VERSION_MINOR	"3"
 #define LUA_VERSION_NUM		503
-#define LUA_VERSION_RELEASE	"4"
+#define LUA_VERSION_RELEASE	"5"
 
 #define LUA_VERSION	"Lua " LUA_VERSION_MAJOR "." LUA_VERSION_MINOR
 #define LUA_RELEASE	LUA_VERSION "." LUA_VERSION_RELEASE
-#define LUA_COPYRIGHT	LUA_RELEASE "  Copyright (C) 1994-2017 Lua.org, PUC-Rio"
+#define LUA_COPYRIGHT	LUA_RELEASE "  Copyright (C) 1994-2018 Lua.org, PUC-Rio"
 #define LUA_AUTHORS	"R. Ierusalimschy, L. H. de Figueiredo, W. Celes"
 
 
@@ -234,6 +234,10 @@ LUA_API void  (lua_pushboolean) (lua_State *L, int b);
 LUA_API void  (lua_pushlightuserdata) (lua_State *L, void *p);
 LUA_API int   (lua_pushthread) (lua_State *L);
 
+LUA_API void  (lua_clonefunction) (lua_State *L, const void * fp);
+LUA_API void  (lua_sharefunction) (lua_State *L, int index);
+LUA_API void  (lua_sharestring) (lua_State *L, int index);
+LUA_API void  (lua_clonetable) (lua_State *L, const void * t);
 
 /*
 ** get functions (Lua -> stack)
@@ -281,8 +285,6 @@ LUA_API int   (lua_load) (lua_State *L, lua_Reader reader, void *dt,
                           const char *chunkname, const char *mode);
 
 LUA_API int (lua_dump) (lua_State *L, lua_Writer writer, void *data, int strip);
-
-LUA_API void (lua_clonefunction) (lua_State *L, const void *eL);
 
 
 /*
@@ -467,7 +469,7 @@ LUA_API void (lua_checksig_)(lua_State *L);
 #define lua_checksig(L) if (skynet_sig_L) { lua_checksig_(L); }
 
 /******************************************************************************
-* Copyright (C) 1994-2017 Lua.org, PUC-Rio.
+* Copyright (C) 1994-2018 Lua.org, PUC-Rio.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
 * a copy of this software and associated documentation files (the

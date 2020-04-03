@@ -6,6 +6,7 @@ local string = string
 local services = {}
 local command = {}
 local instance = {} -- for confirm (function command.LAUNCH / command.ERROR / command.LAUNCHOK)
+local launch_session = {} -- for command.QUERY, service_address -> session
 
 local function handle_to_address(handle)
 	return tonumber("0x" .. string.sub(handle , 2))
@@ -45,7 +46,7 @@ end
 function command.MEM()
 	local list = {}
 	for k,v in pairs(services) do
-		local ok, kb, bytes = pcall(skynet.call,k,"debug","MEM")
+		local ok, kb = pcall(skynet.call,k,"debug","MEM")
 		if not ok then
 			list[skynet.address(k)] = string.format("ERROR (%s)",v)
 		else
@@ -69,6 +70,7 @@ function command.REMOVE(_, handle, kill)
 		-- instance is dead
 		response(not kill)	-- return nil to caller of newservice, when kill == false
 		instance[handle] = nil
+		launch_session[handle] = nil
 	end
 
 	-- don't return (skynet.ret) because the handle may exit
@@ -78,10 +80,12 @@ end
 local function launch_service(service, ...)
 	local param = table.concat({...}, " ")
 	local inst = skynet.launch(service, param)
+	local session = skynet.context()
 	local response = skynet.response()
 	if inst then
 		services[inst] = service .. " " .. param
 		instance[inst] = response
+		launch_session[inst] = session
 	else
 		response(false)
 		return
@@ -108,6 +112,7 @@ function command.ERROR(address)
 	local response = instance[address]
 	if response then
 		response(false)
+		launch_session[address] = nil
 		instance[address] = nil
 	end
 	services[address] = nil
@@ -120,9 +125,18 @@ function command.LAUNCHOK(address)
 	if response then
 		response(true, address)
 		instance[address] = nil
+		launch_session[address] = nil
 	end
 
 	return NORET
+end
+
+function command.QUERY(_, request_session)
+	for address, session in pairs(launch_session) do
+		if session == request_session then
+			return address
+		end
+	end
 end
 
 -- for historical reasons, launcher support text command (for C service)
