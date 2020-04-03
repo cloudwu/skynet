@@ -323,9 +323,14 @@ pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 		wb_string(b, str, (int)sz);
 		break;
 	}
-	case LUA_TLIGHTUSERDATA:
-		wb_pointer(b, lua_touserdata(L,index));
+	case LUA_TLIGHTUSERDATA: {
+		void * pUd = lua_touserdata(L,index);
+		if ( NULL == pUd )
+			wb_nil(b);
+		else
+			wb_pointer(b, pUd);
 		break;
+	}
 	case LUA_TTABLE: {
 		if (index < 0) {
 			index = lua_gettop(L) + index + 1;
@@ -480,9 +485,14 @@ push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 			lua_pushinteger(L, get_integer(L, rb, cookie));
 		}
 		break;
-	case TYPE_USERDATA:
-		lua_pushlightuserdata(L,get_pointer(L,rb));
+	case TYPE_USERDATA: {
+		void * pUd = get_pointer(L,rb);
+		if( NULL == pUd )
+			lua_pushnil(L);
+		else
+			lua_pushlightuserdata(L,pUd);
 		break;
+	}
 	case TYPE_SHORT_STRING:
 		get_buffer(L,rb,cookie);
 		break;
