@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define maxfilesize  524288000 	//单个文件大小
 #define filenamelen  128
@@ -77,7 +79,12 @@ newlogfile(struct logger * inst){
 	struct tm *local;
 	time_t now = time(NULL);
 	local = localtime(&now);
-	sprintf(inst->filename, "%s_%d_%02d_%02d_%02d%02d%02d.log", inst->prefix, local->tm_year + 1900, local->tm_mon + 1, local->tm_mday, local->tm_hour, local->tm_min, local->tm_sec);
+	char logdir[256] = { 0 };
+	mkdir("log/", 0755);
+	sprintf(logdir, "log/%d-%d/", local->tm_year + 1900, local->tm_mon + 1);
+	mkdir(logdir, 0755);
+	sprintf(inst->filename, "%s%s_%d_%02d_%02d_%02d%02d%02d.log", logdir, inst->prefix, local->tm_year + 1900, local->tm_mon + 1, local->tm_mday, local->tm_hour, local->tm_min, local->tm_sec);
+
 	inst->handle = fopen(inst->filename,"w");
 	inst->filestp = now;
 }
