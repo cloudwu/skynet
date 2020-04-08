@@ -23,6 +23,55 @@ local tointeger = math.tointeger
 
 local _M = {_VERSION = "0.14"}
 
+-- the following charset map is generated from the following mysql query:
+--   SELECT CHARACTER_SET_NAME, ID
+--   FROM information_schema.collations
+--   WHERE IS_DEFAULT = 'Yes' ORDER BY id;
+local CHARSET_MAP = {
+    _default  = 0,
+    big5      = 1,
+    dec8      = 3,
+    cp850     = 4,
+    hp8       = 6,
+    koi8r     = 7,
+    latin1    = 8,
+    latin2    = 9,
+    swe7      = 10,
+    ascii     = 11,
+    ujis      = 12,
+    sjis      = 13,
+    hebrew    = 16,
+    tis620    = 18,
+    euckr     = 19,
+    koi8u     = 22,
+    gb2312    = 24,
+    greek     = 25,
+    cp1250    = 26,
+    gbk       = 28,
+    latin5    = 30,
+    armscii8  = 32,
+    utf8      = 33,
+    ucs2      = 35,
+    cp866     = 36,
+    keybcs2   = 37,
+    macce     = 38,
+    macroman  = 39,
+    cp852     = 40,
+    latin7    = 41,
+    utf8mb4   = 45,
+    cp1251    = 51,
+    utf16     = 54,
+    utf16le   = 56,
+    cp1256    = 57,
+    cp1257    = 59,
+    utf32     = 60,
+    binary    = 63,
+    geostd8   = 92,
+    cp932     = 95,
+    eucjpms   = 97,
+    gb18030   = 248
+}
+
 -- constants
 local COM_QUERY = "\x03"
 local COM_PING = "\x0e"
@@ -366,7 +415,7 @@ local function _recv_decode_packet_resp(self)
     end
 end
 
-local function _mysql_login(self, user, password, database, on_connect)
+local function _mysql_login(self, user, password, charset, database, on_connect)
     return function(sockchannel)
         local dispatch_resp = _recv_decode_packet_resp(self)
         local packet = sockchannel:response(dispatch_resp)
@@ -410,10 +459,11 @@ local function _mysql_login(self, user, password, database, on_connect)
         local scramble = scramble1 .. scramble_part2
         local token = _compute_token(password, scramble)
         local client_flags = 260047
-        local req = strpack("<I4I4c24zs1z",
+        local req = strpack("<I4I4c1c23zs1z",
             client_flags,
             self._max_packet_size,
-            strrep("\0", 24), -- TODO: add support for charset encoding
+            strchar(charset),
+            strrep("\0", 23), -- TODO: add support for charset encoding
             user,
             token,
             database
@@ -624,12 +674,12 @@ function _M.connect(opts)
     local database = opts.database or ""
     local user = opts.user or ""
     local password = opts.password or ""
-
-    local channel =
+    local charset = CHARSET_MAP[opts.charset or "utf8mb4"]
+    local channel = 
         socketchannel.channel {
         host = opts.host,
         port = opts.port or 3306,
-        auth = _mysql_login(self, user, password, database, opts.on_connect),
+        auth = _mysql_login(self, user, password, charset, database, opts.on_connect),
         overload = opts.overload
     }
     self.sockchannel = channel
@@ -945,34 +995,34 @@ function _M.execute(self, stmt, ...)
 end
 
 local function _compose_stmt_reset(self, stmt)
-	self.packet_no = -1
+    self.packet_no = -1
 
-	local cmd_packet = strpack("c1<I4", COM_STMT_RESET, stmt.prepare_id)
-	return _compose_packet(self, cmd_packet)
+    local cmd_packet = strpack("c1<I4", COM_STMT_RESET, stmt.prepare_id)
+    return _compose_packet(self, cmd_packet)
 end
 
 --重置预处理句柄
 function _M.stmt_reset(self, stmt)
-	local querypacket = _compose_stmt_reset(self, stmt)
-	local sockchannel = self.sockchannel
-		if not self.query_resp then
-		self.query_resp = _query_resp(self)
-	end
-	return sockchannel:request(querypacket, self.query_resp)
+    local querypacket = _compose_stmt_reset(self, stmt)
+    local sockchannel = self.sockchannel
+        if not self.query_resp then
+        self.query_resp = _query_resp(self)
+    end
+    return sockchannel:request(querypacket, self.query_resp)
 end
 
 local function _compose_stmt_close(self, stmt)
-	self.packet_no = -1
+    self.packet_no = -1
 
-	local cmd_packet = strpack("c1<I4", COM_STMT_CLOSE, stmt.prepare_id)
-	return _compose_packet(self, cmd_packet)
+    local cmd_packet = strpack("c1<I4", COM_STMT_CLOSE, stmt.prepare_id)
+    return _compose_packet(self, cmd_packet)
 end
 
 --关闭预处理句柄
 function _M.stmt_close(self, stmt)
-	local querypacket = _compose_stmt_close(self, stmt)
-	local sockchannel = self.sockchannel
-	return sockchannel:request(querypacket)
+    local querypacket = _compose_stmt_close(self, stmt)
+    local sockchannel = self.sockchannel
+    return sockchannel:request(querypacket)
 end
 
 
