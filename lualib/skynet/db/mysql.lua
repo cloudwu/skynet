@@ -463,7 +463,7 @@ local function _mysql_login(self, user, password, charset, database, on_connect)
             client_flags,
             self._max_packet_size,
             strchar(charset),
-            strrep("\0", 23), -- TODO: add support for charset encoding
+            strrep("\0", 23),
             user,
             token,
             database
