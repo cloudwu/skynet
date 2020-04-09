@@ -674,7 +674,7 @@ function _M.connect(opts)
     local database = opts.database or ""
     local user = opts.user or ""
     local password = opts.password or ""
-    local charset = CHARSET_MAP[opts.charset or "utf8mb4"]
+    local charset = CHARSET_MAP[opts.charset or "_default"]
     local channel = 
         socketchannel.channel {
         host = opts.host,
