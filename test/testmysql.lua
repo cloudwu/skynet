@@ -128,6 +128,7 @@ skynet.start(function()
 		database="skynet",
 		user="root",
 		password="123456",
+        charset="utf8mb4",
 		max_packet_size = 1024 * 1024,
 		on_connect = on_connect
 	})
