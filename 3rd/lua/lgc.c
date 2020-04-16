@@ -66,7 +66,7 @@
 
 /* macro to erase all color bits then sets only the current white bit */
 #define makewhite(g,x)	\
- (x->marked = cast_byte((x->marked & maskcolors) | (x->marked & bitmask(SHAREBIT)) | luaC_white(g)))
+ (x->marked = cast_byte((x->marked & maskcolors) | luaC_white(g)))
 
 #define white2gray(x)	resetbits(x->marked, WHITEBITS)
 #define black2gray(x)	resetbit(x->marked, BLACKBIT)
@@ -192,7 +192,7 @@ static int iscleared (global_State *g, const GCObject *o) {
 */
 void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
   global_State *g = G(L);
-  lua_assert(isblack(o) && iswhite(v) && !isdead(g, v) && !isdead(g, o));
+  lua_assert(isblack(o) && iswhite(v) && !isdead(g, v) && !isdead(g, o) && !isshared(o));
   if (keepinvariant(g)) {  /* must keep invariant? */
     reallymarkobject(g, v);  /* restore invariant */
     if (isold(o)) {
@@ -213,7 +213,7 @@ void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
 */
 void luaC_barrierback_ (lua_State *L, GCObject *o) {
   global_State *g = G(L);
-  lua_assert(isblack(o) && !isdead(g, o));
+  lua_assert(isblack(o) && !isdead(g, o) && !isshared(o));
   lua_assert(g->gckind != KGC_GEN || (isold(o) && getage(o) != G_TOUCHED1));
   if (getage(o) != G_TOUCHED2)  /* not already in gray list? */
     linkobjgclist(o, g->grayagain);  /* link it in 'grayagain' */
@@ -226,7 +226,8 @@ void luaC_fix (lua_State *L, GCObject *o) {
   global_State *g = G(L);
   lua_assert(g->allgc == o);  /* object must be 1st in 'allgc' list! */
   white2gray(o);  /* they will be gray forever */
-  setage(o, G_OLD);  /* and old forever */
+  if (!isshared(o))
+    setage(o, G_OLD);  /* and old forever */
   g->allgc = o->next;  /* remove object from 'allgc' list */
   o->next = g->fixedgc;  /* link it to 'fixedgc' list */
   g->fixedgc = o;
@@ -757,7 +758,7 @@ static void freeobj (lua_State *L, GCObject *o) {
 static GCObject **sweeplist (lua_State *L, GCObject **p, int countin,
                              int *countout) {
   global_State *g = G(L);
-  int ow = otherwhite(g) | bitmask(SHAREBIT);  /* shared object never dead */
+  int ow = otherwhite(g);
   int i;
   int white = luaC_white(g);  /* current white */
   for (i = 0; *p != NULL && i < countin; i++) {
@@ -768,7 +769,7 @@ static GCObject **sweeplist (lua_State *L, GCObject **p, int countin,
       freeobj(L, curr);  /* erase 'curr' */
     }
     else {  /* change mark to 'white' */
-      curr->marked = cast_byte((marked & maskcolors) | (marked & bitmask(SHAREBIT)) | white);
+      curr->marked = cast_byte((marked & maskcolors) | white);
       p = &curr->next;  /* go to next element */
     }
   }
@@ -978,7 +979,9 @@ static void setpause (global_State *g);
 static void sweep2old (lua_State *L, GCObject **p) {
   GCObject *curr;
   while ((curr = *p) != NULL) {
-    if (iswhite(curr)) {  /* is 'curr' dead? */
+    if (isshared(curr))
+       p = &curr->next;  /* go to next element */
+    else if (iswhite(curr)) {  /* is 'curr' dead? */
       lua_assert(isdead(G(L), curr));
       *p = curr->next;  /* remove 'curr' from list */
       freeobj(L, curr);  /* erase 'curr' */
@@ -1012,7 +1015,9 @@ static GCObject **sweepgen (lua_State *L, global_State *g, GCObject **p,
   int white = luaC_white(g);
   GCObject *curr;
   while ((curr = *p) != limit) {
-    if (iswhite(curr)) {  /* is 'curr' dead? */
+    if (isshared(curr))
+      p = &curr->next;  /* go to next element */
+    else if (iswhite(curr)) {  /* is 'curr' dead? */
       lua_assert(!isold(curr) && isdead(g, curr));
       *p = curr->next;  /* remove 'curr' from list */
       freeobj(L, curr);  /* erase 'curr' */
