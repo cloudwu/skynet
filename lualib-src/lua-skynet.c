@@ -278,6 +278,11 @@ send_message(lua_State *L, int source, int idx_type) {
 		luaL_error(L, "invalid param %s", lua_typename(L, lua_type(L,idx_type+2)));
 	}
 	if (session < 0) {
+		if (session == -2) {
+			// package is too large
+			lua_pushboolean(L, 0);
+			return 1;
+		}
 		// send to invalid address
 		// todo: maybe throw an error would be better
 		return 0;

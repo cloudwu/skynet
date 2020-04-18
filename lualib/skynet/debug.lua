@@ -14,8 +14,8 @@ local function init(skynet, export)
 		dbgcmd = {}
 
 		function dbgcmd.MEM()
-			local kb, bytes = collectgarbage "count"
-			skynet.ret(skynet.pack(kb,bytes))
+			local kb = collectgarbage "count"
+			skynet.ret(skynet.pack(kb))
 		end
 
 		function dbgcmd.GC()
@@ -40,6 +40,10 @@ local function init(skynet, export)
 				skynet.task(task)
 				skynet.ret(skynet.pack(task))
 			end
+		end
+
+		function dbgcmd.UNIQTASK()
+			skynet.ret(skynet.pack(skynet.uniqtask()))
 		end
 
 		function dbgcmd.INFO(...)

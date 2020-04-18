@@ -49,6 +49,7 @@ LUAMOD_API int (luaopen_package) (lua_State *L);
 
 #define LUA_CACHELIB
 LUAMOD_API int (luaopen_cache) (lua_State *L);
+LUALIB_API void (luaL_initcodecache) (void);
 
 /* open all previous libraries */
 LUALIB_API void (luaL_openlibs) (lua_State *L);

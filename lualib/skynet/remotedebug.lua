@@ -14,6 +14,7 @@ local HOOK_FUNC = "raw_dispatch_message"
 local raw_dispatcher
 local print = _G.print
 local skynet_suspend
+local skynet_resume
 local prompt
 local newline
 
@@ -169,20 +170,20 @@ local dbgcmd = {}
 function dbgcmd.s(co)
 	local ctx = ctx_active[co]
 	ctx.next_mode = false
-	skynet_suspend(co, coroutine.resume(co))
+	skynet_suspend(co, skynet_resume(co))
 end
 
 function dbgcmd.n(co)
 	local ctx = ctx_active[co]
 	ctx.next_mode = true
-	skynet_suspend(co, coroutine.resume(co))
+	skynet_suspend(co, skynet_resume(co))
 end
 
 function dbgcmd.c(co)
 	sethook(co)
 	ctx_active[co] = nil
 	change_prompt(string.format(":%08x>", skynet.self()))
-	skynet_suspend(co, coroutine.resume(co))
+	skynet_suspend(co, skynet_resume(co))
 end
 
 local function hook_dispatch(dispatcher, resp, fd, channel)
@@ -259,6 +260,7 @@ end
 function M.start(import, fd, handle)
 	local dispatcher = import.dispatch
 	skynet_suspend = import.suspend
+	skynet_resume = import.resume
 	assert(raw_dispatcher == nil, "Already in debug mode")
 	skynet.error "Enter debug mode"
 	local channel = debugchannel.connect(handle)

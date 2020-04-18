@@ -82,6 +82,8 @@ LUALIB_API void (luaL_unref) (lua_State *L, int t, int ref);
 
 LUALIB_API int (luaL_loadfilex) (lua_State *L, const char *filename,
                                                const char *mode);
+LUALIB_API int (luaL_loadfilex_) (lua_State *L, const char *filename,
+                                               const char *mode);
 
 #define luaL_loadfile(L,f)	luaL_loadfilex(L,f,NULL)
 

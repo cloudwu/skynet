@@ -69,6 +69,13 @@ local skynet = require "skynet"
 local datasheet = {}
 local handles = {}	-- handle:{ ref:count , name:name , collect:resp }
 local dataset = {}	-- name:{ handle:handle, monitor:{monitors queue} }
+local customers = {} -- source: { handle:true }
+
+setmetatable(customers, { __index = function(c, source)
+	local v = {}
+	c[source] = v
+	return v
+end } )
 
 local function releasehandle(source, handle)
 	local h = handles[handle]
@@ -109,6 +116,7 @@ function datasheet.query(source, name)
 	local handle = t.handle
 	local h = handles[handle]
 	h.ref = h.ref + 1
+	customers[source][handle] = true
 	skynet.ret(skynet.pack(handle))
 end
 
@@ -117,17 +125,33 @@ function datasheet.monitor(source, handle)
 	local h = assert(handles[handle], "Invalid data handle")
 	local t = dataset[h.name]
 	if t.handle ~= handle then	-- already changes
+		customers[source][t.handle] = true
 		skynet.ret(skynet.pack(t.handle))
 	else
 		assert(not t.monitor[source])
-		t.monitor[source]=skynet.response()
+		local resp = skynet.response()
+		t.monitor[source]= function(ok, handle)
+			if ok then
+				customers[source][handle] = true
+			end
+			resp(ok, handle)
+		end
 	end
 end
 
 -- from customers, release handle , ref count - 1
 function datasheet.release(source, handle)
 	-- send message, don't ret
+	customers[source][handle] = nil
 	releasehandle(source, handle)
+end
+
+-- customer closed, clear all handles it queried
+function datasheet.close(source)
+	for handle in pairs(customers[source]) do
+		releasehandle(source, handle)
+	end
+	customers[source] = nil
 end
 
 -- from builder, monitor handle release

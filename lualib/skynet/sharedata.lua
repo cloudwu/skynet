@@ -18,6 +18,7 @@ local function monitor(name, obj, cobj)
 			break
 		end
 		sd.update(obj, newobj)
+		skynet.send(service, "lua", "confirm" , newobj)
 	end
 	if cache[name] == obj then
 		cache[name] = nil

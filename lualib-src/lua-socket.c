@@ -525,41 +525,59 @@ concat_table(lua_State *L, int index, void *buffer, size_t tlen) {
 	lua_pop(L,1);
 }
 
-static void *
-get_buffer(lua_State *L, int index, int *sz) {
+static void
+get_buffer(lua_State *L, int index, struct socket_sendbuffer *buf) {
 	void *buffer;
 	switch(lua_type(L, index)) {
-		const char * str;
 		size_t len;
 	case LUA_TUSERDATA:
-	case LUA_TLIGHTUSERDATA:
-		buffer = lua_touserdata(L,index);
-		*sz = luaL_checkinteger(L,index+1);
+		// lua full useobject must be a raw pointer, it can't be a socket object or a memory object.
+		buf->type = SOCKET_BUFFER_RAWPOINTER;
+		buf->buffer = lua_touserdata(L, index);
+		if (lua_isinteger(L, index+1)) {
+			buf->sz = lua_tointeger(L, index+1);
+		} else {
+			buf->sz = lua_rawlen(L, index);
+		}
 		break;
+	case LUA_TLIGHTUSERDATA: {
+		int sz = -1;
+		if (lua_isinteger(L, index+1)) {
+			sz = lua_tointeger(L,index+1);
+		}
+		if (sz < 0) {
+			buf->type = SOCKET_BUFFER_OBJECT;
+		} else {
+			buf->type = SOCKET_BUFFER_MEMORY;
+		}
+		buf->buffer = lua_touserdata(L,index);
+		buf->sz = (size_t)sz;
+		break;
+		}
 	case LUA_TTABLE:
 		// concat the table as a string
 		len = count_size(L, index);
 		buffer = skynet_malloc(len);
 		concat_table(L, index, buffer, len);
-		*sz = (int)len;
+		buf->type = SOCKET_BUFFER_MEMORY;
+		buf->buffer = buffer;
+		buf->sz = len;
 		break;
 	default:
-		str =  luaL_checklstring(L, index, &len);
-		buffer = skynet_malloc(len);
-		memcpy(buffer, str, len);
-		*sz = (int)len;
+		buf->type = SOCKET_BUFFER_RAWPOINTER;
+		buf->buffer = luaL_checklstring(L, index, &buf->sz);
 		break;
 	}
-	return buffer;
 }
 
 static int
 lsend(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
-	int sz = 0;
-	void *buffer = get_buffer(L, 2, &sz);
-	int err = skynet_socket_send(ctx, id, buffer, sz);
+	struct socket_sendbuffer buf;
+	buf.id = id;
+	get_buffer(L, 2, &buf);
+	int err = skynet_socket_sendbuffer(ctx, &buf);
 	lua_pushboolean(L, !err);
 	return 1;
 }
@@ -568,9 +586,10 @@ static int
 lsendlow(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
-	int sz = 0;
-	void *buffer = get_buffer(L, 2, &sz);
-	int err = skynet_socket_send_lowpriority(ctx, id, buffer, sz);
+	struct socket_sendbuffer buf;
+	buf.id = id;
+	get_buffer(L, 2, &buf);
+	int err = skynet_socket_sendbuffer_lowpriority(ctx, &buf);
 	lua_pushboolean(L, !err);
 	return 1;
 }
@@ -645,9 +664,10 @@ ludp_send(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
 	const char * address = luaL_checkstring(L, 2);
-	int sz = 0;
-	void *buffer = get_buffer(L, 3, &sz);
-	int err = skynet_socket_udp_send(ctx, id, address, buffer, sz);
+	struct socket_sendbuffer buf;
+	buf.id = id;
+	get_buffer(L, 3, &buf);
+	int err = skynet_socket_udp_sendbuffer(ctx, address, &buf);
 
 	lua_pushboolean(L, !err);
 
