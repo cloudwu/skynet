@@ -383,13 +383,13 @@ ldesencode(lua_State *L) {
 	int bytes = textsz - i;
 	uint8_t tail[8];
 	int j;
-	for (j=0;j<8;j++) {
+	for (j = 0; j < 8; j++) {
 		if (j < bytes) {
-			tail[j] = text[i+j];
-		} else if (j==bytes) {
-			tail[j] = 0x80;
-		} else {
-			tail[j] = 0;
+			tail[j] = text[i + j];
+		}
+		else {
+			memset(tail+j, 0x08-j*0x01, 8 - j);
+			break;
 		}
 	}
 	des_crypt(SK, tail, buffer+i);
@@ -421,13 +421,9 @@ ldesdecode(lua_State *L) {
 	for (i=0;i<textsz;i+=8) {
 		des_crypt(SK, text+i, buffer+i);
 	}
-	int padding = 1;
-	for (i=textsz-1;i>=textsz-8;i--) {
-		if (buffer[i] == 0) {
-			padding++;
-		} else if (buffer[i] == 0x80) {
-			break;
-		} else {
+	int padding = buffer[textsz-1];
+	for (i=textsz-1;i>=textsz-padding;i--) {
+		if (buffer[i] != padding) {
 			return luaL_error(L, "Invalid des crypt text");
 		}
 	}
