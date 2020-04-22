@@ -151,19 +151,22 @@ local function co_create(f)
 end
 
 local function dispatch_wakeup()
-	local token = tremove(wakeup_queue,1)
-	if token then
-		local session = sleep_session[token]
-		if session then
-			local co = session_id_coroutine[session]
-			local tag = session_coroutine_tracetag[co]
-			if tag then c.trace(tag, "resume") end
-			session_id_coroutine[session] = "BREAK"
-			return suspend(co, coroutine_resume(co, false, "BREAK"))
+	while true do
+		local token = tremove(wakeup_queue,1)
+		if token then
+			local session = sleep_session[token]
+			if session then
+				local co = session_id_coroutine[session]
+				local tag = session_coroutine_tracetag[co]
+				if tag then c.trace(tag, "resume") end
+				session_id_coroutine[session] = "BREAK"
+				return suspend(co, coroutine_resume(co, false, "BREAK"))
+			end
+		else
+			break
 		end
-	else
-		return dispatch_error_queue()
 	end
+	return dispatch_error_queue()
 end
 
 -- suspend is local function
