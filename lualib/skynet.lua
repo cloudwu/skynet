@@ -161,6 +161,8 @@ local function dispatch_wakeup()
 			session_id_coroutine[session] = "BREAK"
 			return suspend(co, coroutine_resume(co, false, "BREAK"))
 		end
+	else
+		return dispatch_error_queue()
 	end
 end
 
@@ -184,8 +186,7 @@ function suspend(co, result, command)
 		error(traceback(co,tostring(command)))
 	end
 	if command == "SUSPEND" then
-		dispatch_wakeup()
-		dispatch_error_queue()
+		return dispatch_wakeup()
 	elseif command == "QUIT" then
 		-- service exit
 		return
