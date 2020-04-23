@@ -100,8 +100,16 @@ local function _get_byte1(data, i)
     return strbyte(data, i), i + 1
 end
 
+local function _get_int1(data, i)
+    return strunpack("<i1", data, i)
+end
+
 local function _get_byte2(data, i)
     return strunpack("<I2", data, i)
+end
+
+local function _get_int2(data, i)
+    return strunpack("<i2", data, i)
 end
 
 local function _get_byte3(data, i)
@@ -112,8 +120,16 @@ local function _get_byte4(data, i)
     return strunpack("<I4", data, i)
 end
 
+local function _get_int4(data, i)
+    return strunpack("<i4", data, i)
+end
+
 local function _get_byte8(data, i)
     return strunpack("<I8", data, i)
+end
+
+local function _get_int8(data, i)
+    return strunpack("<i8", data, i)
 end
 
 local function _get_float(data, i)
@@ -138,6 +154,10 @@ end
 
 local function _set_byte8(n)
     return strpack("<I8", n)
+end
+
+local function _set_int8(n)
+    return strpack("<i8", n)
 end
 
 local function _set_float(n)
@@ -500,7 +520,7 @@ local store_types = {
         if not tointeger(v) then
             return _set_byte2(0x05), _set_double(v)
         else
-            return _set_byte2(0x08), _set_byte8(v)
+            return _set_byte2(0x08), _set_int8(v)
         end
     end,
     string = function(v)
@@ -783,14 +803,15 @@ local function _get_datetime(data, pos)
     return value, pos
 end
 
+-- 字段类型参考 https://dev.mysql.com/doc/dev/mysql-server/8.0.12/binary__log__types_8h.html enum_field_types 枚举类型定义
 local _binary_parser = {
-    [0x01] = _get_byte1,
-    [0x02] = _get_byte2,
-    [0x03] = _get_byte4,
+    [0x01] = _get_int1,
+    [0x02] = _get_int2,
+    [0x03] = _get_int4,
     [0x04] = _get_float,
     [0x05] = _get_double,
     [0x07] = _get_datetime,
-    [0x08] = _get_byte8,
+    [0x08] = _get_int8,
     [0x0c] = _get_datetime,
     [0x0f] = _from_length_coded_str,
     [0x10] = _from_length_coded_str,
