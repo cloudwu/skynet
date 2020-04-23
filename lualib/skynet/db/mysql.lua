@@ -803,6 +803,7 @@ local function _get_datetime(data, pos)
     return value, pos
 end
 
+-- 字段类型参考 https://dev.mysql.com/doc/dev/mysql-server/8.0.12/binary__log__types_8h.html enum_field_types 枚举类型定义
 local _binary_parser = {
     [0x01] = _get_int1,
     [0x02] = _get_int2,
