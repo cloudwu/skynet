@@ -117,6 +117,21 @@ local function test_sp_blob(db)
 	print("test stored procedure ok")
 end
 
+local function test_signed(db)
+    local res = db:query("drop table if exists test_i_u")
+    res = db:query("create table test_i_u (i tinyint primary key, u tinyint unsigned)")
+    print(dump(res))
+
+    res = db:query("insert into test_i_u (i,u) values (-1,1),(127,128),(-127,255)")
+    print(dump(res))
+
+    local prep = "SELECT * FROM test_i_u"
+    local stmt = db:prepare(prep)
+    local res = db:execute(stmt)
+    print("test_i_u: ", dump(res))
+    db:stmt_close(stmt)
+end
+
 skynet.start(function()
 
 	local function on_connect(db)
@@ -151,6 +166,8 @@ skynet.start(function()
 
 	-- 测试存储过程和二进制blob
 	test_sp_blob(db)
+	
+	test_signed(db)
 
     -- test in another coroutine
 	skynet.fork( test2, db)
