@@ -118,17 +118,17 @@ local function test_sp_blob(db)
 end
 
 local function test_signed(db)
-    local res = db:query("drop table if exists signed_cats")
-    res = db:query("create table signed_cats " .. "(id tinyint primary key, " .. "name varchar(5))")
+    local res = db:query("drop table if exists test_i_u")
+    res = db:query("create table test_i_u (i tinyint primary key, u tinyint unsigned)")
     print(dump(res))
 
-    res = db:query("insert into signed_cats (id,name) " .. "values (-1,'Bob'),(127,''),(-127,null)")
+    res = db:query("insert into test_i_u (i,u) values (-1,1),(127,128),(-127,255)")
     print(dump(res))
 
-    local prep = "SELECT * FROM signed_cats WHERE id!=?"
+    local prep = "SELECT * FROM test_i_u"
     local stmt = db:prepare(prep)
-    local res = db:execute(stmt, -100)
-    print("execute -100: ", dump(res))
+    local res = db:execute(stmt)
+    print("test_i_u: ", dump(res))
     db:stmt_close(stmt)
 end
 
