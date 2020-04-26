@@ -762,7 +762,7 @@ const TValue *luaH_get (Table *t, const TValue *key) {
 TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
   const TValue *p;
   if(isshared(t))
-    luaG_runerror(L,"attempt to change a shared table");
+    luaG_runerror(L, "attempt to change a shared table");
   p = luaH_get(t, key);
   if (!isabstkey(p))
     return cast(TValue *, p);
@@ -771,8 +771,11 @@ TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
 
 
 void luaH_setint (lua_State *L, Table *t, lua_Integer key, TValue *value) {
-  const TValue *p = luaH_getint(t, key);
+  const TValue *p;
   TValue *cell;
+  if(isshared(t))
+    luaG_runerror(L, "attempt to change a shared table");
+  p = luaH_getint(t, key);
   if (!isabstkey(p))
     cell = cast(TValue *, p);
   else {
