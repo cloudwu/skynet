@@ -764,7 +764,9 @@ static GCObject **sweeplist (lua_State *L, GCObject **p, int countin,
   for (i = 0; *p != NULL && i < countin; i++) {
     GCObject *curr = *p;
     int marked = curr->marked;
-    if (isdeadm(ow, marked)) {  /* is 'curr' dead? */
+    if (isshared(curr))
+      p = &curr->next;
+    else if (isdeadm(ow, marked)) {  /* is 'curr' dead? */
       *p = curr->next;  /* remove 'curr' from list */
       freeobj(L, curr);  /* erase 'curr' */
     }
