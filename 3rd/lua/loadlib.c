@@ -68,6 +68,13 @@ static const char *const CLIBS = "_CLIBS";
 
 
 /*
+** Special type equivalent to '(void*)' for functions in gcc
+** (to supress warnings when converting function pointers)
+*/
+typedef void (*voidf)(void);
+
+
+/*
 ** system-dependent functions
 */
 
@@ -206,7 +213,7 @@ static void *lsys_load (lua_State *L, const char *path, int seeglb) {
 
 
 static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym) {
-  lua_CFunction f = (lua_CFunction)(void (*)(void))GetProcAddress((HMODULE)lib, sym);
+  lua_CFunction f = (lua_CFunction)(voidf)GetProcAddress((HMODULE)lib, sym);
   if (f == NULL) pusherror(L);
   return f;
 }
@@ -268,8 +275,6 @@ static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym) {
 #define LUA_CPATH_VAR   "LUA_CPATH"
 #endif
 
-
-#define AUXMARK         "\1"	/* auxiliary mark */
 
 
 /*

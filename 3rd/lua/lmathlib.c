@@ -328,7 +328,7 @@ static Rand64 nextrand (Rand64 *state) {
 */
 
 /* must throw out the extra (64 - FIGS) bits */
-#define shift64_FIG  	(64 - FIGS)
+#define shift64_FIG	(64 - FIGS)
 
 /* to scale to [0, 1), multiply by scaleFIG = 2^(-FIGS) */
 #define scaleFIG	(l_mathop(0.5) / ((Rand64)1 << (FIGS - 1)))
