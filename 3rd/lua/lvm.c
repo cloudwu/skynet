@@ -79,17 +79,6 @@
 
 #endif
 
-/* Add by skynet */
-lua_State * skynet_sig_L = NULL;
-
-LUA_API void
-lua_checksig_(lua_State *L) {
-  if (skynet_sig_L == G(L)->mainthread) {
-    skynet_sig_L = NULL;
-    lua_pushnil(L);
-    lua_error(L);
-  }
-}
 
 /*
 ** Try to convert a value from string to a number value.
@@ -1551,7 +1540,6 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         vmbreak;
       }
       vmcase(OP_JMP) {
-        lua_checksig(L);
         dojump(ci, i, 0);
         vmbreak;
       }
@@ -1623,7 +1611,6 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
       vmcase(OP_CALL) {
         int b = GETARG_B(i);
         int nresults = GETARG_C(i) - 1;
-        lua_checksig(L);
         if (b != 0)  /* fixed number of arguments? */
           L->top = ra + b;  /* top signals number of arguments */
         /* else previous instruction set top */
@@ -1635,7 +1622,6 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         int nparams1 = GETARG_C(i);
         /* delat is virtual 'func' - real 'func' (vararg functions) */
         int delta = (nparams1) ? ci->u.l.nextraargs + nparams1 : 0;
-        lua_checksig(L);
         if (b != 0)
           L->top = ra + b;
         else  /* previous instruction set top */
@@ -1718,7 +1704,6 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         return;
       }
       vmcase(OP_FORLOOP) {
-        lua_checksig(L);
         if (ttisinteger(s2v(ra + 2))) {  /* integer loop? */
           lua_Unsigned count = l_castS2U(ivalue(s2v(ra + 1)));
           if (count > 0) {  /* still more iterations? */
@@ -1768,7 +1753,6 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
       }
       vmcase(OP_TFORLOOP) {
         l_tforloop:
-        lua_checksig(L);
         if (!ttisnil(s2v(ra + 4))) {  /* continue loop? */
           setobjs2s(L, ra + 2, ra + 4);  /* save control variable */
           pc -= GETARG_Bx(i);  /* jump back */
