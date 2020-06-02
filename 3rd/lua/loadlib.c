@@ -69,7 +69,7 @@ static const char *const CLIBS = "_CLIBS";
 
 /*
 ** Special type equivalent to '(void*)' for functions in gcc
-** (to supress warnings when converting function pointers)
+** (to suppress warnings when converting function pointers)
 */
 typedef void (*voidf)(void);
 

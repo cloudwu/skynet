@@ -422,7 +422,7 @@ void luaD_poscall (lua_State *L, CallInfo *ci, int nres) {
 
 
 
-#define next_ci(L)  (L->ci = (L->ci->next ? L->ci->next : luaE_extendCI(L)))
+#define next_ci(L)  (L->ci->next ? L->ci->next : luaE_extendCI(L))
 
 
 /*
@@ -466,13 +466,13 @@ void luaD_call (lua_State *L, StkId func, int nresults) {
       f = fvalue(s2v(func));
      Cfunc: {
       int n;  /* number of returns */
-      CallInfo *ci;
+      CallInfo *ci = next_ci(L);
       checkstackp(L, LUA_MINSTACK, func);  /* ensure minimum stack size */
-      ci = next_ci(L);
       ci->nresults = nresults;
       ci->callstatus = CIST_C;
       ci->top = L->top + LUA_MINSTACK;
       ci->func = func;
+      L->ci = ci;
       lua_assert(ci->top <= L->stack_last);
       if (L->hookmask & LUA_MASKCALL) {
         int narg = cast_int(L->top - func) - 1;
@@ -486,18 +486,18 @@ void luaD_call (lua_State *L, StkId func, int nresults) {
       break;
     }
     case LUA_VLCL: {  /* Lua function */
-      CallInfo *ci;
+      CallInfo *ci = next_ci(L);
       Proto *p = clLvalue(s2v(func))->p;
       int narg = cast_int(L->top - func) - 1;  /* number of real arguments */
       int nfixparams = p->numparams;
       int fsize = p->maxstacksize;  /* frame size */
       checkstackp(L, fsize, func);
-      ci = next_ci(L);
       ci->nresults = nresults;
       ci->u.l.savedpc = p->code;  /* starting point */
       ci->callstatus = 0;
       ci->top = func + 1 + fsize;
       ci->func = func;
+      L->ci = ci;
       for (; narg < nfixparams; narg++)
         setnilvalue(s2v(L->top++));  /* complete missing arguments */
       lua_assert(ci->top <= L->stack_last);

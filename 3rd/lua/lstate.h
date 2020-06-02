@@ -173,7 +173,7 @@ typedef struct CallInfo {
   union {
     struct {  /* only for Lua functions */
       const Instruction *savedpc;
-      l_signalT trap;
+      volatile l_signalT trap;
       int nextraargs;  /* # of extra arguments in vararg functions */
     } l;
     struct {  /* only for C functions */
@@ -299,7 +299,7 @@ struct lua_State {
   int stacksize;
   int basehookcount;
   int hookcount;
-  l_signalT hookmask;
+  volatile l_signalT hookmask;
 };
 
 

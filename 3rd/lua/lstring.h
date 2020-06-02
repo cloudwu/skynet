@@ -19,7 +19,11 @@
 #define MEMERRMSG       "not enough memory"
 
 
-#define sizelstring(l)  (sizeof(TString) + ((l) + 1) * sizeof(char))
+/*
+** Size of a TString: Size of the header plus space for the string
+** itself (including final '\0').
+*/
+#define sizelstring(l)  (offsetof(TString, contents) + ((l) + 1) * sizeof(char))
 
 #define luaS_newliteral(L, s)	(luaS_newlstr(L, "" s, \
                                  (sizeof(s)/sizeof(char))-1))

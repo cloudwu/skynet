@@ -212,27 +212,28 @@ static int new_localvar (LexState *ls, TString *name) {
 
 
 /*
-** Return the "variable description" (Vardesc) of a given
-** variable
+** Return the "variable description" (Vardesc) of a given variable.
+** (Unless noted otherwise, all variables are referred to by their
+** compiler indices.)
 */
-static Vardesc *getlocalvardesc (FuncState *fs, int i) {
-  return &fs->ls->dyd->actvar.arr[fs->firstlocal + i];
+static Vardesc *getlocalvardesc (FuncState *fs, int vidx) {
+  return &fs->ls->dyd->actvar.arr[fs->firstlocal + vidx];
 }
 
 
 /*
-** Convert 'nvar' (number of active variables at some point) to
-** number of variables in the stack at that point.
+** Convert 'nvar', a compiler index level, to it corresponding
+** stack index level. For that, search for the highest variable
+** below that level that is in the stack and uses its stack
+** index ('sidx').
 */
 static int stacklevel (FuncState *fs, int nvar) {
-  while (nvar > 0) {
-    Vardesc *vd = getlocalvardesc(fs, nvar - 1);
+  while (nvar-- > 0) {
+    Vardesc *vd = getlocalvardesc(fs, nvar);  /* get variable */
     if (vd->vd.kind != RDKCTC)  /* is in the stack? */
       return vd->vd.sidx + 1;
-    else
-      nvar--;  /* try previous variable */
   }
-  return 0;  /* no variables */
+  return 0;  /* no variables in the stack */
 }
 
 
@@ -245,10 +246,10 @@ int luaY_nvarstack (FuncState *fs) {
 
 
 /*
-** Get the debug-information entry for current variable 'i'.
+** Get the debug-information entry for current variable 'vidx'.
 */
-static LocVar *localdebuginfo (FuncState *fs, int i) {
-  Vardesc *vd = getlocalvardesc(fs, i);
+static LocVar *localdebuginfo (FuncState *fs, int vidx) {
+  Vardesc *vd = getlocalvardesc(fs,  vidx);
   if (vd->vd.kind == RDKCTC)
     return NULL;  /* no debug info. for constants */
   else {
@@ -259,14 +260,20 @@ static LocVar *localdebuginfo (FuncState *fs, int i) {
 }
 
 
-static void init_var (FuncState *fs, expdesc *e, int i) {
+/*
+** Create an expression representing variable 'vidx'
+*/
+static void init_var (FuncState *fs, expdesc *e, int vidx) {
   e->f = e->t = NO_JUMP;
   e->k = VLOCAL;
-  e->u.var.vidx = i;
-  e->u.var.sidx = getlocalvardesc(fs, i)->vd.sidx;
+  e->u.var.vidx = vidx;
+  e->u.var.sidx = getlocalvardesc(fs, vidx)->vd.sidx;
 }
 
 
+/*
+** Raises an error if variable described by 'e' is read only
+*/
 static void check_readonly (LexState *ls, expdesc *e) {
   FuncState *fs = ls->fs;
   TString *varname = NULL;  /* to be set if variable is const */
@@ -306,8 +313,8 @@ static void adjustlocalvars (LexState *ls, int nvars) {
   int stklevel = luaY_nvarstack(fs);
   int i;
   for (i = 0; i < nvars; i++) {
-    int varidx = fs->nactvar++;
-    Vardesc *var = getlocalvardesc(fs, varidx);
+    int vidx = fs->nactvar++;
+    Vardesc *var = getlocalvardesc(fs, vidx);
     var->vd.sidx = stklevel++;
     var->vd.pidx = registerlocalvar(ls, fs, var->vd.name);
   }
@@ -377,7 +384,8 @@ static int newupvalue (FuncState *fs, TString *name, expdesc *v) {
 
 /*
 ** Look for an active local variable with the name 'n' in the
-** function 'fs'.
+** function 'fs'. If found, initialize 'var' with it and return
+** its expression kind; otherwise return -1.
 */
 static int searchvar (FuncState *fs, TString *n, expdesc *var) {
   int i;
@@ -1592,7 +1600,7 @@ static void forlist (LexState *ls, TString *indexname) {
   line = ls->linenumber;
   adjust_assign(ls, 4, explist(ls, &e), &e);
   adjustlocalvars(ls, 4);  /* control variables */
-  markupval(fs, luaY_nvarstack(fs));  /* state may create an upvalue */
+  markupval(fs, fs->nactvar);  /* last control var. must be closed */
   luaK_checkstack(fs, 3);  /* extra space to call generator */
   forbody(ls, base, line, nvars - 4, 1);
 }
@@ -1730,7 +1738,7 @@ static int getlocalattribute (LexState *ls) {
       luaK_semerror(ls,
         luaO_pushfstring(ls->L, "unknown attribute '%s'", attr));
   }
-  return VDKREG;
+  return VDKREG;  /* regular variable */
 }
 
 
@@ -1739,7 +1747,7 @@ static void checktoclose (LexState *ls, int level) {
     FuncState *fs = ls->fs;
     markupval(fs, level + 1);
     fs->bl->insidetbc = 1;  /* in the scope of a to-be-closed variable */
-    luaK_codeABC(fs, OP_TBC, level, 0, 0);
+    luaK_codeABC(fs, OP_TBC, stacklevel(fs, level), 0, 0);
   }
 }
 
@@ -1749,18 +1757,18 @@ static void localstat (LexState *ls) {
   FuncState *fs = ls->fs;
   int toclose = -1;  /* index of to-be-closed variable (if any) */
   Vardesc *var;  /* last variable */
-  int ivar, kind;  /* index and kind of last variable */
+  int vidx, kind;  /* index and kind of last variable */
   int nvars = 0;
   int nexps;
   expdesc e;
   do {
-    ivar = new_localvar(ls, str_checkname(ls));
+    vidx = new_localvar(ls, str_checkname(ls));
     kind = getlocalattribute(ls);
-    getlocalvardesc(fs, ivar)->vd.kind = kind;
+    getlocalvardesc(fs, vidx)->vd.kind = kind;
     if (kind == RDKTOCLOSE) {  /* to-be-closed? */
       if (toclose != -1)  /* one already present? */
         luaK_semerror(ls, "multiple to-be-closed variables in local list");
-      toclose = luaY_nvarstack(fs) + nvars;
+      toclose = fs->nactvar + nvars;
     }
     nvars++;
   } while (testnext(ls, ','));
@@ -1770,7 +1778,7 @@ static void localstat (LexState *ls) {
     e.k = VVOID;
     nexps = 0;
   }
-  var = getlocalvardesc(fs, ivar);  /* get last variable */
+  var = getlocalvardesc(fs, vidx);  /* get last variable */
   if (nvars == nexps &&  /* no adjustments? */
       var->vd.kind == RDKCONST &&  /* last variable is const? */
       luaK_exp2const(fs, &e, &var->k)) {  /* compile-time constant? */

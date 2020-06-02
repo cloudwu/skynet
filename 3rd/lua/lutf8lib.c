@@ -97,9 +97,9 @@ static int utflen (lua_State *L) {
   lua_Integer posj = u_posrelat(luaL_optinteger(L, 3, -1), len);
   int lax = lua_toboolean(L, 4);
   luaL_argcheck(L, 1 <= posi && --posi <= (lua_Integer)len, 2,
-                   "initial position out of string");
+                   "initial position out of bounds");
   luaL_argcheck(L, --posj < (lua_Integer)len, 3,
-                   "final position out of string");
+                   "final position out of bounds");
   while (posi <= posj) {
     const char *s1 = utf8_decode(s + posi, NULL, !lax);
     if (s1 == NULL) {  /* conversion error? */
@@ -127,8 +127,8 @@ static int codepoint (lua_State *L) {
   int lax = lua_toboolean(L, 4);
   int n;
   const char *se;
-  luaL_argcheck(L, posi >= 1, 2, "out of range");
-  luaL_argcheck(L, pose <= (lua_Integer)len, 3, "out of range");
+  luaL_argcheck(L, posi >= 1, 2, "out of bounds");
+  luaL_argcheck(L, pose <= (lua_Integer)len, 3, "out of bounds");
   if (posi > pose) return 0;  /* empty interval; return no values */
   if (pose - posi >= INT_MAX)  /* (lua_Integer -> int) overflow? */
     return luaL_error(L, "string slice too long");
@@ -187,7 +187,7 @@ static int byteoffset (lua_State *L) {
   lua_Integer posi = (n >= 0) ? 1 : len + 1;
   posi = u_posrelat(luaL_optinteger(L, 3, posi), len);
   luaL_argcheck(L, 1 <= posi && --posi <= (lua_Integer)len, 3,
-                   "position out of range");
+                   "position out of bounds");
   if (n == 0) {
     /* find beginning of current byte sequence */
     while (posi > 0 && iscont(s + posi)) posi--;

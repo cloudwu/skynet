@@ -196,7 +196,7 @@ static void dumpFunction (DumpState *D, const Proto *f, TString *psource) {
 
 static void dumpHeader (DumpState *D) {
   dumpLiteral(D, LUA_SIGNATURE);
-  dumpInt(D, LUAC_VERSION);
+  dumpByte(D, LUAC_VERSION);
   dumpByte(D, LUAC_FORMAT);
   dumpLiteral(D, LUAC_DATA);
   dumpByte(D, sizeof(Instruction));

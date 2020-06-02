@@ -190,14 +190,15 @@ void luaE_freeCI (lua_State *L) {
 */
 void luaE_shrinkCI (lua_State *L) {
   CallInfo *ci = L->ci;
+  CallInfo *next;
   CallInfo *next2;  /* next's next */
   L->nCcalls += L->nci;  /* add removed elements back to 'nCcalls' */
   /* while there are two nexts */
-  while (ci->next != NULL && (next2 = ci->next->next) != NULL) {
-    luaM_free(L, ci->next);  /* free next */
-    L->nci--;
-    ci->next = next2;  /* remove 'next' from the list */
+  while ((next = ci->next) != NULL && (next2 = next->next) != NULL) {
+    ci->next = next2;  /* remove next from the list */
     next2->previous = ci;
+    luaM_free(L, next);  /* free next */
+    L->nci--;
     ci = next2;  /* keep next's next */
   }
   L->nCcalls -= L->nci;  /* adjust result */

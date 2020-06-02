@@ -270,6 +270,7 @@ static int io_open (lua_State *L) {
 */
 static int io_pclose (lua_State *L) {
   LStream *p = tolstream(L);
+  errno = 0;
   return luaL_execresult(L, l_pclose(L, p->f));
 }
 

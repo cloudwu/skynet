@@ -77,7 +77,7 @@ typedef struct expdesc {
     } ind;
     struct {  /* for local variables */
       lu_byte sidx;  /* index in the stack */
-      unsigned short vidx;  /* index in 'actvar.arr'  */
+      unsigned short vidx;  /* compiler index (in 'actvar.arr')  */
     } var;
   } u;
   int t;  /* patch list of 'exit when true' */
@@ -125,7 +125,7 @@ typedef struct Labellist {
 
 /* dynamic structures used by the parser */
 typedef struct Dyndata {
-  struct {  /* list of active local variables */
+  struct {  /* list of all active local variables */
     Vardesc *arr;
     int n;
     int size;

@@ -107,13 +107,15 @@ static int getcurrentline (CallInfo *ci) {
 
 
 /*
-** This function can be called asynchronously (e.g. during a signal),
-** under "reasonable" assumptions. A new 'ci' is completely linked
-** in the list before it becomes part of the "active" list, and
-** we assume that pointers are atomic (see comment in next function).
-** (If we traverse one more item, there is no problem. If we traverse
-** one less item, the worst that can happen is that the signal will
-** not interrupt the script.)
+** Set 'trap' for all active Lua frames.
+** This function can be called during a signal, under "reasonable"
+** assumptions. A new 'ci' is completely linked in the list before it
+** becomes part of the "active" list, and we assume that pointers are
+** atomic; see comment in next function.
+** (A compiler doing interprocedural optimizations could, theoretically,
+** reorder memory writes in such a way that the list could be
+** temporarily broken while inserting a new element. We simply assume it
+** has no good reasons to do that.)
 */
 static void settraps (CallInfo *ci) {
   for (; ci != NULL; ci = ci->previous)
@@ -123,8 +125,8 @@ static void settraps (CallInfo *ci) {
 
 
 /*
-** This function can be called asynchronously (e.g. during a signal),
-** under "reasonable" assumptions.
+** This function can be called during a signal, under "reasonable"
+** assumptions.
 ** Fields 'oldpc', 'basehookcount', and 'hookcount' (set by
 ** 'resethookcount') are for debug only, and it is no problem if they
 ** get arbitrary values (causes at most one wrong hook call). 'hookmask'

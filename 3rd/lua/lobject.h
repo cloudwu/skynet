@@ -356,7 +356,7 @@ typedef struct GCObject {
 
 
 /*
-** Header for string value; string bytes follow the end of this structure.
+** Header for a string value.
 */
 typedef struct TString {
   CommonHeader;
@@ -368,16 +368,15 @@ typedef struct TString {
     size_t lnglen;  /* length for long strings */
     struct TString *hnext;  /* linked list for hash table */
   } u;
+  char contents[1];
 } TString;
 
 
 
 /*
 ** Get the actual string (array of bytes) from a 'TString'.
-** (Access to 'extra' ensures that value is really a 'TString'.)
 */
-#define getstr(ts)  \
-  check_exp(sizeof((ts)->extra), cast_charp((ts)) + sizeof(TString))
+#define getstr(ts)  ((ts)->contents)
 
 
 /* get the actual string (array of bytes) from a Lua value */
