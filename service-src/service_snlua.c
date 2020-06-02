@@ -58,6 +58,17 @@ codecache(lua_State *L) {
 
 #endif
 
+static int
+lua_resumeX(lua_State *L, lua_State *from, int nargs, int *nresults) {
+	void *ud = NULL;
+	lua_getallocf(L, &ud);
+	struct snlua *l = (struct snlua *)ud;
+	l->activeL = L;
+	int err = lua_resume(L, from, nargs, nresults);
+	l->activeL = from;
+	return err;
+}
+
 static double
 get_time() {
 #if  !defined(__APPLE__)
@@ -105,7 +116,7 @@ static int auxresume (lua_State *L, lua_State *co, int narg) {
     return -1;  /* error flag */
   }
   lua_xmove(L, co, narg);
-  status = lua_resume(co, L, narg, &nres);
+  status = lua_resumeX(co, L, narg, &nres);
   if (status == LUA_OK || status == LUA_YIELD) {
     if (!lua_checkstack(L, nres + 1)) {
       lua_pop(co, nres);  /* remove results anyway */
@@ -341,16 +352,6 @@ optstring(struct skynet_context *ctx, const char *key, const char * str) {
 	return ret;
 }
 
-/*
-static int
-lua_resumeX(lua_State *L, lua_State *from, int nargs, int *nresults) {
-	void *ud = NULL;
-	lua_getallocf(L, &ud);
-	struct snlua *l = (struct snlua *)ud;
-	l->activeL = L;
-	return lua_resume(L, from, nargs, nresults);
-}
-*/
 static int
 init_cb(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz) {
 	lua_State *L = l->L;
@@ -486,14 +487,17 @@ snlua_release(struct snlua *l) {
 	skynet_free(l);
 }
 
+static void
+signal_hook(lua_State *L, lua_Debug *ar) {
+	lua_sethook (L, NULL, 0, 0);
+	luaL_error(L, "signal 0");
+}
+
 void
 snlua_signal(struct snlua *l, int signal) {
 	skynet_error(l->ctx, "recv a signal %d", signal);
 	if (signal == 0) {
-#ifdef lua_checksig
-	// If our lua support signal (modified lua version by skynet), trigger it.
-	skynet_sig_L = l->L;
-#endif
+		lua_sethook (l->activeL, signal_hook, LUA_MASKLINE, 0);
 	} else if (signal == 1) {
 		skynet_error(l->ctx, "Current Memory %.3fK", (float)l->mem / 1024);
 	}
