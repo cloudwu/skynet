@@ -25,10 +25,11 @@
 struct snlua {
 	lua_State * L;
 	struct skynet_context * ctx;
-	lua_State * activeL;
 	size_t mem;
 	size_t mem_report;
 	size_t mem_limit;
+	lua_State * activeL;
+	volatile int trap;
 };
 
 // LUA_CACHELIB may defined in patched lua for shared proto
@@ -58,14 +59,35 @@ codecache(lua_State *L) {
 
 #endif
 
+static void
+signal_hook(lua_State *L, lua_Debug *ar) {
+	void *ud = NULL;
+	lua_getallocf(L, &ud);
+	struct snlua *l = (struct snlua *)ud;
+
+	lua_sethook (L, NULL, 0, 0);
+	if (l->trap) {
+		l->trap = 0;
+		luaL_error(L, "signal 0");
+	}
+}
+
+static void
+switchL(lua_State *L, struct snlua *l) {
+	l->activeL = L;
+	if (l->trap) {
+		lua_sethook(L, signal_hook, LUA_MASKCOUNT, 1);
+	}
+}
+
 static int
 lua_resumeX(lua_State *L, lua_State *from, int nargs, int *nresults) {
 	void *ud = NULL;
 	lua_getallocf(L, &ud);
 	struct snlua *l = (struct snlua *)ud;
-	l->activeL = L;
+	switchL(L, l);
 	int err = lua_resume(L, from, nargs, nresults);
-	l->activeL = from;
+	switchL(from, l);
 	return err;
 }
 
@@ -478,6 +500,8 @@ snlua_create(void) {
 	l->mem_report = MEMORY_WARNING_REPORT;
 	l->mem_limit = 0;
 	l->L = lua_newstate(lalloc, l);
+	l->activeL = NULL;
+	l->trap = 0;
 	return l;
 }
 
@@ -487,17 +511,14 @@ snlua_release(struct snlua *l) {
 	skynet_free(l);
 }
 
-static void
-signal_hook(lua_State *L, lua_Debug *ar) {
-	lua_sethook (L, NULL, 0, 0);
-	luaL_error(L, "signal 0");
-}
-
 void
 snlua_signal(struct snlua *l, int signal) {
 	skynet_error(l->ctx, "recv a signal %d", signal);
 	if (signal == 0) {
-		lua_sethook (l->activeL, signal_hook, LUA_MASKLINE, 0);
+		if (l->trap == 0) {
+			l->trap = 1;
+			lua_sethook (l->activeL, signal_hook, LUA_MASKCOUNT, 1);
+		}
 	} else if (signal == 1) {
 		skynet_error(l->ctx, "Current Memory %.3fK", (float)l->mem / 1024);
 	}
