@@ -10,9 +10,7 @@ local tremove = table.remove
 local tinsert = table.insert
 local traceback = debug.traceback
 
-local profile = require "skynet.profile"
-
-local cresume = profile.resume
+local cresume = coroutine.resume
 local running_thread = nil
 local init_thread = nil
 
@@ -20,7 +18,7 @@ local function coroutine_resume(co, ...)
 	running_thread = co
 	return cresume(co, ...)
 end
-local coroutine_yield = profile.yield
+local coroutine_yield = coroutine.yield
 local coroutine_create = coroutine.create
 
 local proto = {}
