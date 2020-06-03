@@ -112,6 +112,10 @@ socket_message[5] = function(id, _, err)
 		skynet.error("socket: error on unknown", id, err)
 		return
 	end
+	if s.callback then
+		skynet.error("socket: accpet error:", err)	
+		return
+	end
 	if s.connected then
 		skynet.error("socket: error on", id, err)
 	elseif s.connecting then
