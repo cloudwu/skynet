@@ -1283,7 +1283,7 @@ sproto_pack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 	int ff_n = 0;
 	int size = 0;
 	const uint8_t * src = srcv;
-	const uint8_t * src_end = srcv + srcsz;
+	const uint8_t * src_end = (uint8_t *)srcv + srcsz;
 	uint8_t * buffer = bufferv;
 	for (i=0;i<srcsz;i+=8) {
 		int n;
@@ -1323,7 +1323,7 @@ sproto_pack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 		buffer += n;
 		size += n;
 	}
-	if(bufsz >= 0) {
+	if(bufsz >= 0 && ff_n > 0) {
 		write_ff(ff_srcstart, src_end, ff_desstart, ff_n);
 	}
 	return size;
