@@ -186,20 +186,26 @@ void luaE_freeCI (lua_State *L) {
 
 
 /*
-** free half of the CallInfo structures not in use by a thread
+** free half of the CallInfo structures not in use by a thread,
+** keeping the first one.
 */
 void luaE_shrinkCI (lua_State *L) {
-  CallInfo *ci = L->ci;
+  CallInfo *ci = L->ci->next;  /* first free CallInfo */
   CallInfo *next;
-  CallInfo *next2;  /* next's next */
+  if (ci == NULL)
+    return;  /* no extra elements */
   L->nCcalls += L->nci;  /* add removed elements back to 'nCcalls' */
-  /* while there are two nexts */
-  while ((next = ci->next) != NULL && (next2 = next->next) != NULL) {
+  while ((next = ci->next) != NULL) {  /* two extra elements? */
+    CallInfo *next2 = next->next;  /* next's next */
     ci->next = next2;  /* remove next from the list */
-    next2->previous = ci;
-    luaM_free(L, next);  /* free next */
     L->nci--;
-    ci = next2;  /* keep next's next */
+    luaM_free(L, next);  /* free next */
+    if (next2 == NULL)
+      break;  /* no more elements */
+    else {
+      next2->previous = ci;
+      ci = next2;  /* continue */
+    }
   }
   L->nCcalls -= L->nci;  /* adjust result */
 }
@@ -356,19 +362,18 @@ int lua_resetthread (lua_State *L) {
   CallInfo *ci;
   int status;
   lua_lock(L);
-  ci = &L->base_ci;
-  status = luaF_close(L, L->stack, CLOSEPROTECT);
+  L->ci = ci = &L->base_ci;  /* unwind CallInfo list */
   setnilvalue(s2v(L->stack));  /* 'function' entry for basic 'ci' */
+  ci->func = L->stack;
+  ci->callstatus = CIST_C;
+  status = luaF_close(L, L->stack, CLOSEPROTECT);
   if (status != CLOSEPROTECT)  /* real errors? */
     luaD_seterrorobj(L, status, L->stack + 1);
   else {
     status = LUA_OK;
     L->top = L->stack + 1;
   }
-  ci->callstatus = CIST_C;
-  ci->func = L->stack;
   ci->top = L->top + LUA_MINSTACK;
-  L->ci = ci;
   L->status = status;
   lua_unlock(L);
   return status;

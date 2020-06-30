@@ -417,7 +417,7 @@ static int db_debug (lua_State *L) {
       return 0;
     if (luaL_loadbuffer(L, buffer, strlen(buffer), "=(debug command)") ||
         lua_pcall(L, 0, 0, 0))
-      lua_writestringerror("%s\n", lua_tostring(L, -1));
+      lua_writestringerror("%s\n", luaL_tolstring(L, -1, NULL));
     lua_settop(L, 0);  /* remove eventual returns */
   }
 }

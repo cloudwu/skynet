@@ -737,6 +737,7 @@ static void open_func (LexState *ls, FuncState *fs, BlockCnt *bl) {
   fs->firstlabel = ls->dyd->label.n;
   fs->bl = NULL;
   f->source = ls->source;
+  luaC_objbarrier(ls->L, f, f->source);
   f->maxstacksize = 2;  /* registers 0/1 are always valid */
   enterblock(fs, bl, 0);
 }
@@ -1959,6 +1960,7 @@ static void mainfunc (LexState *ls, FuncState *fs) {
   env->idx = 0;
   env->kind = VDKREG;
   env->name = ls->envn;
+  luaC_objbarrier(ls->L, fs->f, env->name);
   luaX_next(ls);  /* read first token */
   statlist(ls);  /* parse main body */
   check(ls, TK_EOS);
@@ -1977,6 +1979,7 @@ LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
   sethvalue2s(L, L->top, lexstate.h);  /* anchor it */
   luaD_inctop(L);
   funcstate.f = cl->p = luaF_newproto(L);
+  luaC_objbarrier(L, cl, cl->p);
   funcstate.f->source = luaS_new(L, name);  /* create and anchor TString */
   luaC_objbarrier(L, funcstate.f, funcstate.f->source);
   lexstate.buff = buff;
