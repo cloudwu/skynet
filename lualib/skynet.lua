@@ -10,9 +10,7 @@ local tremove = table.remove
 local tinsert = table.insert
 local traceback = debug.traceback
 
-local profile = require "skynet.profile"
-
-local cresume = profile.resume
+local cresume = coroutine.resume
 local running_thread = nil
 local init_thread = nil
 
@@ -20,7 +18,7 @@ local function coroutine_resume(co, ...)
 	running_thread = co
 	return cresume(co, ...)
 end
-local coroutine_yield = profile.yield
+local coroutine_yield = coroutine.yield
 local coroutine_create = coroutine.create
 
 local proto = {}
@@ -151,17 +149,22 @@ local function co_create(f)
 end
 
 local function dispatch_wakeup()
-	local token = tremove(wakeup_queue,1)
-	if token then
-		local session = sleep_session[token]
-		if session then
-			local co = session_id_coroutine[session]
-			local tag = session_coroutine_tracetag[co]
-			if tag then c.trace(tag, "resume") end
-			session_id_coroutine[session] = "BREAK"
-			return suspend(co, coroutine_resume(co, false, "BREAK"))
+	while true do
+		local token = tremove(wakeup_queue,1)
+		if token then
+			local session = sleep_session[token]
+			if session then
+				local co = session_id_coroutine[session]
+				local tag = session_coroutine_tracetag[co]
+				if tag then c.trace(tag, "resume") end
+				session_id_coroutine[session] = "BREAK"
+				return suspend(co, coroutine_resume(co, false, "BREAK"))
+			end
+		else
+			break
 		end
 	end
+	return dispatch_error_queue()
 end
 
 -- suspend is local function
@@ -184,8 +187,7 @@ function suspend(co, result, command)
 		error(traceback(co,tostring(command)))
 	end
 	if command == "SUSPEND" then
-		dispatch_wakeup()
-		dispatch_error_queue()
+		return dispatch_wakeup()
 	elseif command == "QUIT" then
 		-- service exit
 		return
