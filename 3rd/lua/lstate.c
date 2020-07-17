@@ -318,9 +318,10 @@ static void close_state (lua_State *L) {
 
 
 LUA_API lua_State *lua_newthread (lua_State *L) {
-  global_State *g = G(L);
+  global_State *g;
   lua_State *L1;
   lua_lock(L);
+  g = G(L);
   luaC_checkGC(L);
   /* create new thread */
   L1 = &cast(LX *, luaM_newobject(L, LUA_TTHREAD, sizeof(LX)))->l;
@@ -395,6 +396,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->allgc = obj2gco(L);  /* by now, only object is the main thread */
   L->next = NULL;
   g->Cstacklimit = L->nCcalls = LUAI_MAXCSTACK + CSTACKERR;
+  incnny(L);  /* main thread is always non yieldable */
   g->frealloc = f;
   g->ud = ud;
   g->warnf = NULL;
@@ -435,8 +437,8 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
 
 
 LUA_API void lua_close (lua_State *L) {
-  L = G(L)->mainthread;  /* only the main thread can be closed */
   lua_lock(L);
+  L = G(L)->mainthread;  /* only the main thread can be closed */
   close_state(L);
 }
 

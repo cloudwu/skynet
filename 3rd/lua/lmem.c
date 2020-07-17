@@ -22,7 +22,7 @@
 #include "lstate.h"
 
 
-#if defined(HARDMEMTESTS)
+#if defined(EMERGENCYGCTESTS)
 /*
 ** First allocation will fail whenever not building initial state
 ** and not shrinking a block. (This fail will trigger 'tryagain' and

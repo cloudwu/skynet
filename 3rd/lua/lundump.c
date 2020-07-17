@@ -200,13 +200,20 @@ static void loadProtos (LoadState *S, Proto *f) {
 }
 
 
+/*
+** Load the upvalues for a function. The names must be filled first,
+** because the filling of the other fields can raise read errors and
+** the creation of the error message can call an emergency collection;
+** in that case all prototypes must be consistent for the GC.
+*/
 static void loadUpvalues (LoadState *S, Proto *f) {
   int i, n;
   n = loadInt(S);
   f->upvalues = luaM_newvectorchecked(S->L, n, Upvaldesc);
   f->sizeupvalues = n;
-  for (i = 0; i < n; i++) {
+  for (i = 0; i < n; i++)  /* make array valid for GC */
     f->upvalues[i].name = NULL;
+  for (i = 0; i < n; i++) {  /* following calls can raise errors */
     f->upvalues[i].instack = loadByte(S);
     f->upvalues[i].idx = loadByte(S);
     f->upvalues[i].kind = loadByte(S);

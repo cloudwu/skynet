@@ -97,8 +97,9 @@ static StkId index2stack (lua_State *L, int idx) {
 
 LUA_API int lua_checkstack (lua_State *L, int n) {
   int res;
-  CallInfo *ci = L->ci;
+  CallInfo *ci;
   lua_lock(L);
+  ci = L->ci;
   api_check(L, n >= 0, "negative 'n'");
   if (L->stack_last - L->top > n)  /* stack large enough? */
     res = 1;  /* yes; check is OK */
@@ -170,10 +171,12 @@ LUA_API int lua_gettop (lua_State *L) {
 
 
 LUA_API void lua_settop (lua_State *L, int idx) {
-  CallInfo *ci = L->ci;
-  StkId func = ci->func;
+  CallInfo *ci;
+  StkId func;
   ptrdiff_t diff;  /* difference for new top */
   lua_lock(L);
+  ci = L->ci;
+  func = ci->func;
   if (idx >= 0) {
     api_check(L, idx <= ci->top - (func + 1), "new top too large");
     diff = ((func + 1) + idx) - L->top;
@@ -376,20 +379,22 @@ LUA_API int lua_toboolean (lua_State *L, int idx) {
 
 
 LUA_API const char *lua_tolstring (lua_State *L, int idx, size_t *len) {
-  TValue *o = index2value(L, idx);
+  TValue *o;
+  lua_lock(L);
+  o = index2value(L, idx);
   if (!ttisstring(o)) {
     if (!cvt2str(o)) {  /* not convertible? */
       if (len != NULL) *len = 0;
+      lua_unlock(L);
       return NULL;
     }
-    lua_lock(L);  /* 'luaO_tostring' may create a new string */
     luaO_tostring(L, o);
     luaC_checkGC(L);
     o = index2value(L, idx);  /* previous call may reallocate the stack */
-    lua_unlock(L);
   }
   if (len != NULL)
     *len = vslen(o);
+  lua_unlock(L);
   return svalue(o);
 }
 
@@ -563,6 +568,7 @@ LUA_API void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n) {
     while (n--) {
       setobj2n(L, &cl->upvalue[n], s2v(L->top + n));
       /* does not need barrier because closure is white */
+      lua_assert(iswhite(cl));
     }
     setclCvalue(L, s2v(L->top), cl);
     api_incr_top(L);
@@ -624,8 +630,9 @@ static int auxgetstr (lua_State *L, const TValue *t, const char *k) {
 
 
 LUA_API int lua_getglobal (lua_State *L, const char *name) {
-  Table *reg = hvalue(&G(L)->l_registry);
+  Table *reg;
   lua_lock(L);
+  reg = hvalue(&G(L)->l_registry);
   return auxgetstr(L, luaH_getint(reg, LUA_RIDX_GLOBALS), name);
 }
 
@@ -804,8 +811,9 @@ static void auxsetstr (lua_State *L, const TValue *t, const char *k) {
 
 
 LUA_API void lua_setglobal (lua_State *L, const char *name) {
-  Table *reg = hvalue(&G(L)->l_registry);
+  Table *reg;
   lua_lock(L);  /* unlock done in 'auxsetstr' */
+  reg = hvalue(&G(L)->l_registry);
   auxsetstr(L, luaH_getint(reg, LUA_RIDX_GLOBALS), name);
 }
 
@@ -1139,8 +1147,9 @@ LUA_API int lua_status (lua_State *L) {
 LUA_API int lua_gc (lua_State *L, int what, ...) {
   va_list argp;
   int res = 0;
-  global_State *g = G(L);
+  global_State *g;
   lua_lock(L);
+  g = G(L);
   va_start(argp, what);
   switch (what) {
     case LUA_GCSTOP: {
@@ -1240,9 +1249,15 @@ LUA_API int lua_gc (lua_State *L, int what, ...) {
 
 
 LUA_API int lua_error (lua_State *L) {
+  TValue *errobj;
   lua_lock(L);
+  errobj = s2v(L->top - 1);
   api_checknelems(L, 1);
-  luaG_errormsg(L);
+  /* error object is the memory error message? */
+  if (ttisshrstring(errobj) && eqshrstr(tsvalue(errobj), G(L)->memerrmsg))
+    luaM_error(L);  /* raise a memory error */
+  else
+    luaG_errormsg(L);  /* raise a regular error */
   /* code unreachable; will unlock when control actually leaves the kernel */
   return 0;  /* to avoid warnings */
 }
@@ -1284,14 +1299,12 @@ LUA_API void lua_toclose (lua_State *L, int idx) {
 LUA_API void lua_concat (lua_State *L, int n) {
   lua_lock(L);
   api_checknelems(L, n);
-  if (n >= 2) {
+  if (n > 0)
     luaV_concat(L, n);
-  }
-  else if (n == 0) {  /* push empty string */
-    setsvalue2s(L, L->top, luaS_newlstr(L, "", 0));
+  else {  /* nothing to concatenate */
+    setsvalue2s(L, L->top, luaS_newlstr(L, "", 0));  /* push empty string */
     api_incr_top(L);
   }
-  /* else n == 1; nothing to do */
   luaC_checkGC(L);
   lua_unlock(L);
 }

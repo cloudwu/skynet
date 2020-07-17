@@ -215,37 +215,42 @@ static lua_Number lua_strx2number (const char *s, char **endptr) {
 /* }====================================================== */
 
 
-/* maximum length of a numeral */
+/* maximum length of a numeral to be converted to a number */
 #if !defined (L_MAXLENNUM)
 #define L_MAXLENNUM	200
 #endif
 
+/*
+** Convert string 's' to a Lua number (put in 'result'). Return NULL on
+** fail or the address of the ending '\0' on success. ('mode' == 'x')
+** means a hexadecimal numeral.
+*/
 static const char *l_str2dloc (const char *s, lua_Number *result, int mode) {
   char *endptr;
   *result = (mode == 'x') ? lua_strx2number(s, &endptr)  /* try to convert */
                           : lua_str2number(s, &endptr);
   if (endptr == s) return NULL;  /* nothing recognized? */
   while (lisspace(cast_uchar(*endptr))) endptr++;  /* skip trailing spaces */
-  return (*endptr == '\0') ? endptr : NULL;  /* OK if no trailing characters */
+  return (*endptr == '\0') ? endptr : NULL;  /* OK iff no trailing chars */
 }
 
 
 /*
-** Convert string 's' to a Lua number (put in 'result'). Return NULL
-** on fail or the address of the ending '\0' on success.
-** 'pmode' points to (and 'mode' contains) special things in the string:
-** - 'x'/'X' means a hexadecimal numeral
-** - 'n'/'N' means 'inf' or 'nan' (which should be rejected)
-** - '.' just optimizes the search for the common case (nothing special)
+** Convert string 's' to a Lua number (put in 'result') handling the
+** current locale.
 ** This function accepts both the current locale or a dot as the radix
 ** mark. If the conversion fails, it may mean number has a dot but
 ** locale accepts something else. In that case, the code copies 's'
 ** to a buffer (because 's' is read-only), changes the dot to the
 ** current locale radix mark, and tries to convert again.
+** The variable 'mode' checks for special characters in the string:
+** - 'n' means 'inf' or 'nan' (which should be rejected)
+** - 'x' means a hexadecimal numeral
+** - '.' just optimizes the search for the common case (no special chars)
 */
 static const char *l_str2d (const char *s, lua_Number *result) {
   const char *endptr;
-  const char *pmode = strpbrk(s, ".xXnN");
+  const char *pmode = strpbrk(s, ".xXnN");  /* look for special chars */
   int mode = pmode ? ltolower(cast_uchar(*pmode)) : 0;
   if (mode == 'n')  /* reject 'inf' and 'nan' */
     return NULL;
@@ -333,8 +338,15 @@ int luaO_utf8esc (char *buff, unsigned long x) {
 }
 
 
-/* maximum length of the conversion of a number to a string */
-#define MAXNUMBER2STR	50
+/*
+** Maximum length of the conversion of a number to a string. Must be
+** enough to accommodate both LUA_INTEGER_FMT and LUA_NUMBER_FMT.
+** (For a long long int, this is 19 digits plus a sign and a final '\0',
+** adding to 21. For a long double, it can go to a sign, 33 digits,
+** the dot, an exponent letter, an exponent sign, 5 exponent digits,
+** and a final '\0', adding to 43.)
+*/
+#define MAXNUMBER2STR	44
 
 
 /*
@@ -375,7 +387,7 @@ void luaO_tostring (lua_State *L, TValue *obj) {
 */
 
 /* size for buffer space used by 'luaO_pushvfstring' */
-#define BUFVFS		400
+#define BUFVFS		200
 
 /* buffer used by 'luaO_pushvfstring' */
 typedef struct BuffFS {
@@ -387,18 +399,16 @@ typedef struct BuffFS {
 
 
 /*
-** Push given string to the stack, as part of the buffer. If the stack
-** is almost full, join all partial strings in the stack into one.
+** Push given string to the stack, as part of the buffer, and
+** join the partial strings in the stack into one.
 */
 static void pushstr (BuffFS *buff, const char *str, size_t l) {
   lua_State *L = buff->L;
   setsvalue2s(L, L->top, luaS_newlstr(L, str, l));
   L->top++;  /* may use one extra slot */
   buff->pushed++;
-  if (buff->pushed > 1 && L->top + 1 >= L->stack_last) {
-    luaV_concat(L, buff->pushed);  /* join all partial results into one */
-    buff->pushed = 1;
-  }
+  luaV_concat(L, buff->pushed);  /* join partial results into one */
+  buff->pushed = 1;
 }
 
 
@@ -521,8 +531,7 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
   }
   addstr2buff(&buff, fmt, strlen(fmt));  /* rest of 'fmt' */
   clearbuff(&buff);  /* empty buffer into the stack */
-  if (buff.pushed > 1)
-    luaV_concat(L, buff.pushed);  /* join all partial results */
+  lua_assert(buff.pushed == 1);
   return svalue(s2v(L->top - 1));
 }
 

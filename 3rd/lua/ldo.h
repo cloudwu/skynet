@@ -17,6 +17,8 @@
 ** Macro to check stack size and grow stack if needed.  Parameters
 ** 'pre'/'pos' allow the macro to preserve a pointer into the
 ** stack across reallocations, doing the work only when needed.
+** It also allows the running of one GC step when the stack is
+** reallocated.
 ** 'condmovestack' is used in heavy tests to force a stack reallocation
 ** at every check.
 */
@@ -35,7 +37,7 @@
 
 
 /* macro to check stack size, preserving 'p' */
-#define checkstackp(L,n,p)  \
+#define checkstackGCp(L,n,p)  \
   luaD_checkstackaux(L, n, \
     ptrdiff_t t__ = savestack(L, p);  /* save 'p' */ \
     luaC_checkGC(L),  /* stack grow uses memory */ \
@@ -44,7 +46,7 @@
 
 /* macro to check stack size and GC */
 #define checkstackGC(L,fsize)  \
-	luaD_checkstackaux(L, (fsize), (void)0, luaC_checkGC(L))
+	luaD_checkstackaux(L, (fsize), luaC_checkGC(L), (void)0)
 
 
 /* type of protected functions, to be ran by 'runprotected' */
