@@ -79,6 +79,7 @@
 #define WHITE1BIT	1  /* object is white (type 1) */
 #define BLACKBIT	2  /* object is black */
 #define FINALIZEDBIT	3  /* object has been marked for finalization */
+#define SHAREBIT	4  /* object shared from other state */
 /* bit 7 is currently used by tests (luaL_checkmemory) */
 
 #define WHITEBITS	bit2mask(WHITE0BIT, WHITE1BIT)
@@ -91,9 +92,11 @@
 
 #define tofinalize(x)	testbit((x)->marked, FINALIZEDBIT)
 
+#define isshared(x)     testbit((x)->marked, SHAREBIT)
+#define makeshared(x)   l_setbit((x)->marked, SHAREBIT)
 #define otherwhite(g)	((g)->currentwhite ^ WHITEBITS)
 #define isdeadm(ow,m)	(!(((m) ^ WHITEBITS) & (ow)))
-#define isdead(g,v)	isdeadm(otherwhite(g), (v)->marked)
+#define isdead(g,v)	isdeadm(otherwhite(g) | bitmask(SHAREBIT), (v)->marked)
 
 #define changewhite(x)	((x)->marked ^= WHITEBITS)
 #define gray2black(x)	l_setbit((x)->marked, BLACKBIT)
@@ -116,15 +119,15 @@
 
 
 #define luaC_barrier(L,p,v) (  \
-	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ?  \
+	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v)) && !isshared(gcvalue(v))) ?  \
 	luaC_barrier_(L,obj2gco(p),gcvalue(v)) : cast_void(0))
 
 #define luaC_barrierback(L,p,v) (  \
-	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v))) ? \
+	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v)) && !isshared(gcvalue(v))) ? \
 	luaC_barrierback_(L,p) : cast_void(0))
 
 #define luaC_objbarrier(L,p,o) (  \
-	(isblack(p) && iswhite(o)) ? \
+	(isblack(p) && iswhite(o) && !isshared(o)) ? \
 	luaC_barrier_(L,obj2gco(p),obj2gco(o)) : cast_void(0))
 
 #define luaC_upvalbarrier(L,uv) ( \

@@ -88,6 +88,87 @@ local CACHE = {}
 
 local dns = {}
 local request_pool = {}
+local local_hosts -- local static table lookup for hostnames
+
+dns.DEFAULT_HOSTS = "/etc/hosts"
+dns.DEFAULT_RESOLV_CONF = "/etc/resolv.conf"
+
+-- return name type: 'ipv4', 'ipv6', or 'hostname'
+local function guess_name_type(name)
+	if name:match("^[%d%.]+$") then
+		return "ipv4"
+	end
+
+	if name:find(":") then
+		return "ipv6"
+	end
+
+	return "hostname"
+end
+
+-- http://man7.org/linux/man-pages/man5/hosts.5.html
+local function parse_hosts()
+	if not dns.DEFAULT_HOSTS then
+		return
+	end
+
+	local f = io.open(dns.DEFAULT_HOSTS)
+	if not f then
+		return
+	end
+
+	local rts = {}
+	for line in f:lines() do
+		local ip, hosts = string.match(line, "^%s*([%[%]%x%.%:]+)%s+([^#;]+)")
+		if not ip or not hosts then
+			goto continue
+		end
+
+		local family = guess_name_type(ip)
+		if family == "hostname" then
+			goto continue
+		end
+
+		for host in hosts:gmatch("%S+") do
+			host = host:lower()
+			local rt = rts[host]
+			if not rt then
+				rt = {}
+				rts[host] = rt
+			end
+
+			if not rt[family] then
+				rt[family] = {}
+			end
+			table.insert(rt[family], ip)
+		end
+		
+		::continue::
+	end
+	return rts
+end
+
+-- http://man7.org/linux/man-pages/man5/resolv.conf.5.html
+local function parse_resolv_conf()
+	if not dns.DEFAULT_RESOLV_CONF then
+		return
+	end
+
+	local f = io.open(dns.DEFAULT_RESOLV_CONF)
+	if not f then
+		return
+	end
+
+	local server
+	for line in f:lines() do
+		server = line:match("^%s*nameserver%s+([^#;%s]+)")
+		if server then
+			break
+		end
+	end
+	f:close()
+	return server
+end
 
 function dns.flush()
 	CACHE[QTYPE.A] = setmetatable({},weak)
@@ -290,6 +371,14 @@ local function connect_server()
 	local fd = socket.udp(function(str, from)
 		resolve(str)
 	end)
+
+	if not dns_server.address then
+		dns_server.address = parse_resolv_conf()
+		dns_server.port = 53
+	end
+
+	assert(dns_server.address, "Call dns.server first")
+
 	local ok, err = pcall(socket.udp_connect,fd, dns_server.address, dns_server.port)
 	if not ok then
 		socket.close(fd)
@@ -326,22 +415,8 @@ local function touch_server()
 end
 
 function dns.server(server, port)
-	if not server then
-		local f = assert(io.open "/etc/resolv.conf")
-		for line in f:lines() do
-			server = line:match("%s*nameserver%s+([^%s]+)")
-			if server then
-				break
-			end
-		end
-		f:close()
-		assert(server, "Can't get nameserver")
-	end
-	assert(dns_server.fd == nil)	-- only set dns.server once
 	dns_server.address = server
 	dns_server.port = port or 53
-	touch_server()
-	return dns_server.address
 end
 
 local function lookup_cache(name, qtype, ignorettl)
@@ -383,10 +458,30 @@ local function suspend(tid, name, qtype)
 	return req.answers[1], req.answers
 end
 
-function dns.resolve(name, ipv6)
+-- lookup local static table
+local function local_resolve(name, ipv6)
+	if not local_hosts then
+		local_hosts = parse_hosts()
+	end
+
+	if not local_hosts then
+		return
+	end
+
+	local family = ipv6 and "ipv6" or "ipv4"
+	local t = local_hosts[name]
+	if t then
+		local answers = t[family]
+		if answers then
+			return answers[1], answers
+		end
+	end
+	return nil
+end
+
+-- lookup dns server
+local function remote_resolve(name, ipv6)
 	local qtype = ipv6 and QTYPE.AAAA or QTYPE.A
-	local name = name:lower()
-	assert(verify_domain_name(name) , "illegal name")
 	local answers = lookup_cache(name, qtype)
 	if answers then
 		return answers[1], answers
@@ -397,10 +492,31 @@ function dns.resolve(name, ipv6)
 		qdcount = 1,
 	}
 	local req = pack_header(question_header) .. pack_question(name, qtype, QCLASS.IN)
-	assert(dns_server.address, "Call dns.server first")
 	touch_server()
 	socket.write(dns_server.fd, req)
 	return suspend(question_header.tid, name, qtype)
+end
+
+function dns.resolve(name, ipv6)
+	local name = name:lower()
+	local ntype = guess_name_type(name)
+	if ntype ~= "hostname" then
+		if (ipv6 and name == "ipv4") or (not ipv6 and name == "ipv6") then
+			return nil, "illegal ip address"
+		end
+		return name
+	end
+
+	if not verify_domain_name(name) then
+		return nil, "illegal name"
+	end
+
+	local answer, answers = local_resolve(name, ipv6)
+	if answer then
+		return answer, answers
+	end
+
+	return remote_resolve(name, ipv6)
 end
 
 return dns

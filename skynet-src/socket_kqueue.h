@@ -75,7 +75,7 @@ sp_wait(int kfd, struct event *e, int max) {
 		unsigned filter = ev[i].filter;
 		bool eof = (ev[i].flags & EV_EOF) != 0;
 		e[i].write = (filter == EVFILT_WRITE) && (!eof);
-		e[i].read = (filter == EVFILT_READ) && (!eof);
+		e[i].read = (filter == EVFILT_READ);
 		e[i].error = (ev[i].flags & EV_ERROR) != 0;
 		e[i].eof = eof;
 	}

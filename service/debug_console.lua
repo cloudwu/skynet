@@ -148,6 +148,7 @@ function COMMAND.help()
 		clearcache = "clear lua code cache",
 		service = "List unique service",
 		task = "task address : show service task detail",
+		uniqtask = "task address : show service unique task detail",
 		inject = "inject address luascript.lua",
 		logon = "logon address",
 		logoff = "logoff address",
@@ -155,11 +156,12 @@ function COMMAND.help()
 		debug = "debug address : debug a lua service",
 		signal = "signal address sig",
 		cmem = "Show C memory info",
-		shrtbl = "Show shared short string table info",
 		ping = "ping address",
 		call = "call address ...",
 		trace = "trace address [proto] [on|off]",
 		netstat = "netstat : show netstat",
+		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
+		dumpheap = "dumpheap : dump heap profilling",
 	}
 end
 
@@ -261,6 +263,11 @@ function COMMAND.task(address)
 	return skynet.call(address,"debug","TASK")
 end
 
+function COMMAND.uniqtask(address)
+	address = adjust_address(address)
+	return skynet.call(address,"debug","UNIQTASK")
+end
+
 function COMMAND.info(address, ...)
 	address = adjust_address(address)
 	return skynet.call(address,"debug","INFO", ...)
@@ -333,11 +340,6 @@ function COMMAND.cmem()
 	tmp.block = memory.block()
 
 	return tmp
-end
-
-function COMMAND.shrtbl()
-	local n, total, longest, space = memory.ssinfo()
-	return { n = n, total = total, longest = longest, space = space }
 end
 
 function COMMAND.ping(address)
@@ -421,4 +423,19 @@ function COMMAND.netstat()
 		convert_stat(info)
 	end
 	return stat
+end
+
+function COMMAND.dumpheap()
+	memory.dumpheap()
+end
+
+function COMMAND.profactive(flag)
+	if flag ~= nil then
+		if flag == "on" or flag == "off" then
+			flag = toboolean(flag)
+		end
+		memory.profactive(flag)
+	end
+	local active = memory.profactive()
+	return "heap profilling is ".. (active and "active" or "deactive")
 end

@@ -112,38 +112,15 @@ local function mongo_auth(mongoc)
 				mongoc.__sock:changebackup(backup)
 			end
 			if rs_data.ismaster	then
-				if rawget(mongoc, "__pickserver") then
-					rawset(mongoc, "__pickserver", nil)
-				end
 				return
+			elseif rs_data.primary then
+				local host,	port = __parse_addr(rs_data.primary)
+				mongoc.host	= host
+				mongoc.port	= port
+				mongoc.__sock:changehost(host, port)
 			else
-				if rs_data.primary then
-					local host,	port = __parse_addr(rs_data.primary)
-					mongoc.host	= host
-					mongoc.port	= port
-					mongoc.__sock:changehost(host, port)
-				else
-					skynet.error("WARNING: NO PRIMARY RETURN " .. rs_data.me)
-					-- determine the primary db using hosts
-					local pickserver = {}
-					if rawget(mongoc, "__pickserver") == nil then
-						for _, v in ipairs(rs_data.hosts) do
-							if v ~= rs_data.me then
-								table.insert(pickserver, v)
-							end
-							rawset(mongoc, "__pickserver", pickserver)
-						end
-					end
-					if #mongoc.__pickserver <= 0 then
-						error("CAN NOT DETERMINE THE PRIMARY DB")
-					end
-					skynet.error("INFO: TRY TO CONNECT " .. mongoc.__pickserver[1])
-					local host, port = __parse_addr(mongoc.__pickserver[1])
-					table.remove(mongoc.__pickserver, 1)
-					mongoc.host	= host
-					mongoc.port	= port
-					mongoc.__sock:changehost(host, port)
-				end
+				-- socketchannel would try the next host in backup list
+				error ("No primary return : " .. tostring(rs_data.me))
 			end
 		end
 	end
