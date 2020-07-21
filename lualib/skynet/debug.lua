@@ -29,6 +29,7 @@ local function init(skynet, export)
 			stat.mqlen = skynet.stat "mqlen"
 			stat.cpu = skynet.stat "cpu"
 			stat.message = skynet.stat "message"
+			stat.mem = collectgarbage "count"
 			skynet.ret(skynet.pack(stat))
 		end
 
