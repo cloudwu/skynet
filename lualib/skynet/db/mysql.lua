@@ -4,6 +4,8 @@
 -- The license is under the BSD license.
 -- Modified by Cloud Wu (remove bit32 for lua 5.3)
 
+-- protocol detail: https://mariadb.com/kb/en/clientserver-protocol/
+
 local socketchannel = require "skynet.socketchannel"
 local crypt = require "skynet.crypt"
 
@@ -22,6 +24,55 @@ local tonumber = tonumber
 local tointeger = math.tointeger
 
 local _M = {_VERSION = "0.14"}
+
+-- the following charset map is generated from the following mysql query:
+--   SELECT CHARACTER_SET_NAME, ID
+--   FROM information_schema.collations
+--   WHERE IS_DEFAULT = 'Yes' ORDER BY id;
+local CHARSET_MAP = {
+    _default  = 0,
+    big5      = 1,
+    dec8      = 3,
+    cp850     = 4,
+    hp8       = 6,
+    koi8r     = 7,
+    latin1    = 8,
+    latin2    = 9,
+    swe7      = 10,
+    ascii     = 11,
+    ujis      = 12,
+    sjis      = 13,
+    hebrew    = 16,
+    tis620    = 18,
+    euckr     = 19,
+    koi8u     = 22,
+    gb2312    = 24,
+    greek     = 25,
+    cp1250    = 26,
+    gbk       = 28,
+    latin5    = 30,
+    armscii8  = 32,
+    utf8      = 33,
+    ucs2      = 35,
+    cp866     = 36,
+    keybcs2   = 37,
+    macce     = 38,
+    macroman  = 39,
+    cp852     = 40,
+    latin7    = 41,
+    utf8mb4   = 45,
+    cp1251    = 51,
+    utf16     = 54,
+    utf16le   = 56,
+    cp1256    = 57,
+    cp1257    = 59,
+    utf32     = 60,
+    binary    = 63,
+    geostd8   = 92,
+    cp932     = 95,
+    eucjpms   = 97,
+    gb18030   = 248
+}
 
 -- constants
 local COM_QUERY = "\x03"
@@ -51,20 +102,55 @@ local function _get_byte1(data, i)
     return strbyte(data, i), i + 1
 end
 
+local function _get_int1(data, i, is_signed)
+    if not is_signed then
+        return strunpack("<I1", data, i)
+    end
+    return strunpack("<i1", data, i)
+end
+
 local function _get_byte2(data, i)
     return strunpack("<I2", data, i)
+end
+
+local function _get_int2(data, i, is_signed)
+    if not is_signed then
+        return strunpack("<I2", data, i)
+    end
+    return strunpack("<i2", data, i)
 end
 
 local function _get_byte3(data, i)
     return strunpack("<I3", data, i)
 end
 
+local function _get_int3(data, i, is_signed)
+    if not is_signed then
+        return strunpack("<I3", data, i)
+    end
+    return strunpack("<i3", data, i)
+end
+
 local function _get_byte4(data, i)
     return strunpack("<I4", data, i)
 end
 
+local function _get_int4(data, i, is_signed)
+    if not is_signed then
+        return strunpack("<I4", data, i)
+    end
+    return strunpack("<i4", data, i)
+end
+
 local function _get_byte8(data, i)
     return strunpack("<I8", data, i)
+end
+
+local function _get_int8(data, i, is_signed)
+    if not is_signed then
+        return strunpack("<I8", data, i)
+    end
+    return strunpack("<i8", data, i)
 end
 
 local function _get_float(data, i)
@@ -89,6 +175,10 @@ end
 
 local function _set_byte8(n)
     return strpack("<I8", n)
+end
+
+local function _set_int8(n)
+    return strpack("<i8", n)
 end
 
 local function _set_float(n)
@@ -285,10 +375,13 @@ local function _parse_field_packet(data)
     charsetnr, pos = _get_byte2(data, pos)
     length, pos = _get_byte4(data, pos)
     col.type = strbyte(data, pos)
+    pos = pos + 1
+    local flags, pos = _get_byte2(data, pos)
+    if flags & 0x20 == 0 then -- https://mariadb.com/kb/en/resultset/
+        col.is_signed = true
+    end
 
     --[[
-    pos = pos + 1
-    col.flags, pos = _get_byte2(data, pos)
     col.decimals = strbyte(data, pos)
     pos = pos + 1
     local default = sub(data, pos + 2)
@@ -366,7 +459,7 @@ local function _recv_decode_packet_resp(self)
     end
 end
 
-local function _mysql_login(self, user, password, database, on_connect)
+local function _mysql_login(self, user, password, charset, database, on_connect)
     return function(sockchannel)
         local dispatch_resp = _recv_decode_packet_resp(self)
         local packet = sockchannel:response(dispatch_resp)
@@ -410,10 +503,11 @@ local function _mysql_login(self, user, password, database, on_connect)
         local scramble = scramble1 .. scramble_part2
         local token = _compute_token(password, scramble)
         local client_flags = 260047
-        local req = strpack("<I4I4c24zs1z",
+        local req = strpack("<I4I4c1c23zs1z",
             client_flags,
             self._max_packet_size,
-            strrep("\0", 24), -- TODO: add support for charset encoding
+            strchar(charset),
+            strrep("\0", 23),
             user,
             token,
             database
@@ -450,7 +544,7 @@ local store_types = {
         if not tointeger(v) then
             return _set_byte2(0x05), _set_double(v)
         else
-            return _set_byte2(0x08), _set_byte8(v)
+            return _set_byte2(0x08), _set_int8(v)
         end
     end,
     string = function(v)
@@ -624,12 +718,12 @@ function _M.connect(opts)
     local database = opts.database or ""
     local user = opts.user or ""
     local password = opts.password or ""
-
-    local channel =
+    local charset = CHARSET_MAP[opts.charset or "_default"]
+    local channel = 
         socketchannel.channel {
         host = opts.host,
         port = opts.port or 3306,
-        auth = _mysql_login(self, user, password, database, opts.on_connect),
+        auth = _mysql_login(self, user, password, charset, database, opts.on_connect),
         overload = opts.overload
     }
     self.sockchannel = channel
@@ -733,14 +827,16 @@ local function _get_datetime(data, pos)
     return value, pos
 end
 
+-- 字段类型参考 https://dev.mysql.com/doc/dev/mysql-server/8.0.12/binary__log__types_8h.html enum_field_types 枚举类型定义
 local _binary_parser = {
-    [0x01] = _get_byte1,
-    [0x02] = _get_byte2,
-    [0x03] = _get_byte4,
+    [0x01] = _get_int1,
+    [0x02] = _get_int2,
+    [0x03] = _get_int4,
     [0x04] = _get_float,
     [0x05] = _get_double,
     [0x07] = _get_datetime,
-    [0x08] = _get_byte8,
+    [0x08] = _get_int8,
+    [0x09] = _get_int3,
     [0x0c] = _get_datetime,
     [0x0f] = _from_length_coded_str,
     [0x10] = _from_length_coded_str,
@@ -788,7 +884,7 @@ local function _parse_row_data_binary(data, cols, compact)
             if not parser then
                 error("_parse_row_data_binary()error,unsupported field type " .. typ)
             end
-            value, pos = parser(data, pos)
+            value, pos = parser(data, pos, col.is_signed)
             if compact then
                 row[i] = value
             else
@@ -945,34 +1041,34 @@ function _M.execute(self, stmt, ...)
 end
 
 local function _compose_stmt_reset(self, stmt)
-	self.packet_no = -1
+    self.packet_no = -1
 
-	local cmd_packet = strpack("c1<I4", COM_STMT_RESET, stmt.prepare_id)
-	return _compose_packet(self, cmd_packet)
+    local cmd_packet = strpack("c1<I4", COM_STMT_RESET, stmt.prepare_id)
+    return _compose_packet(self, cmd_packet)
 end
 
 --重置预处理句柄
 function _M.stmt_reset(self, stmt)
-	local querypacket = _compose_stmt_reset(self, stmt)
-	local sockchannel = self.sockchannel
-		if not self.query_resp then
-		self.query_resp = _query_resp(self)
-	end
-	return sockchannel:request(querypacket, self.query_resp)
+    local querypacket = _compose_stmt_reset(self, stmt)
+    local sockchannel = self.sockchannel
+        if not self.query_resp then
+        self.query_resp = _query_resp(self)
+    end
+    return sockchannel:request(querypacket, self.query_resp)
 end
 
 local function _compose_stmt_close(self, stmt)
-	self.packet_no = -1
+    self.packet_no = -1
 
-	local cmd_packet = strpack("c1<I4", COM_STMT_CLOSE, stmt.prepare_id)
-	return _compose_packet(self, cmd_packet)
+    local cmd_packet = strpack("c1<I4", COM_STMT_CLOSE, stmt.prepare_id)
+    return _compose_packet(self, cmd_packet)
 end
 
 --关闭预处理句柄
 function _M.stmt_close(self, stmt)
-	local querypacket = _compose_stmt_close(self, stmt)
-	local sockchannel = self.sockchannel
-	return sockchannel:request(querypacket)
+    local querypacket = _compose_stmt_close(self, stmt)
+    local sockchannel = self.sockchannel
+    return sockchannel:request(querypacket)
 end
 
 
