@@ -127,8 +127,8 @@ static void malloc_oom(size_t size) {
 }
 
 void
-memory_info_dump(void) {
-	je_malloc_stats_print(0,0,0);
+memory_info_dump(const char* opts) {
+	je_malloc_stats_print(0,0, opts);
 }
 
 bool
@@ -241,7 +241,7 @@ skynet_posix_memalign(void **memptr, size_t alignment, size_t size) {
 #define raw_free free
 
 void
-memory_info_dump(void) {
+memory_info_dump(const char* opts) {
 	skynet_error(NULL, "No jemalloc");
 }
 
