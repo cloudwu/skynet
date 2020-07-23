@@ -163,7 +163,7 @@ function COMMAND.help()
 		debug = "debug address : debug a lua service",
 		signal = "signal address sig",
 		cmem = "Show C memory info",
-		jmem = "Show jemalloc stats",
+    jmem = "Show jemalloc mem stats",
 		osmem = "Show OS memory stats like ps: vsz/rss",
 		ping = "ping address",
 		call = "call address ...",
