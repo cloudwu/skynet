@@ -285,7 +285,6 @@ struct lua_State {
   StkId top;  /* first free slot in the stack */
   global_State *l_G;
   CallInfo *ci;  /* call info for current function */
-  const Instruction *oldpc;  /* last pc traced */
   StkId stack_last;  /* last free slot in the stack */
   StkId stack;  /* stack base */
   UpVal *openupval;  /* list of open upvalues in this stack */
@@ -296,6 +295,7 @@ struct lua_State {
   volatile lua_Hook hook;
   ptrdiff_t errfunc;  /* current error handling function (stack index) */
   l_uint32 nCcalls;  /* number of allowed nested C calls - 'nci' */
+  int oldpc;  /* last pc traced */
   int stacksize;
   int basehookcount;
   int hookcount;

@@ -33,10 +33,8 @@
 
 #define noLuaClosure(f)		((f) == NULL || (f)->c.tt == LUA_VCCL)
 
-
-/* Active Lua function (given call info) */
-#define ci_func(ci)		(clLvalue(s2v((ci)->func)))
-
+/* inverse of 'pcRel' */
+#define invpcRel(pc, p)		((p)->code + (pc) + 1)
 
 static const char *funcnamefromcode (lua_State *L, CallInfo *ci,
                                     const char **name);
@@ -127,20 +125,18 @@ static void settraps (CallInfo *ci) {
 /*
 ** This function can be called during a signal, under "reasonable"
 ** assumptions.
-** Fields 'oldpc', 'basehookcount', and 'hookcount' (set by
-** 'resethookcount') are for debug only, and it is no problem if they
-** get arbitrary values (causes at most one wrong hook call). 'hookmask'
-** is an atomic value. We assume that pointers are atomic too (e.g., gcc
-** ensures that for all platforms where it runs). Moreover, 'hook' is
-** always checked before being called (see 'luaD_hook').
+** Fields 'basehookcount' and 'hookcount' (set by 'resethookcount')
+** are for debug only, and it is no problem if they get arbitrary
+** values (causes at most one wrong hook call). 'hookmask' is an atomic
+** value. We assume that pointers are atomic too (e.g., gcc ensures that
+** for all platforms where it runs). Moreover, 'hook' is always checked
+** before being called (see 'luaD_hook').
 */
 LUA_API void lua_sethook (lua_State *L, lua_Hook func, int mask, int count) {
   if (func == NULL || mask == 0) {  /* turn off hooks? */
     mask = 0;
     func = NULL;
   }
-  if (isLua(L->ci))
-    L->oldpc = L->ci->u.l.savedpc;
   L->hook = func;
   L->basehookcount = count;
   resethookcount(L);
@@ -795,10 +791,24 @@ static int changedline (const Proto *p, int oldpc, int newpc) {
 }
 
 
+/*
+** Traces the execution of a Lua function. Called before the execution
+** of each opcode, when debug is on. 'L->oldpc' stores the last
+** instruction traced, to detect line changes. When entering a new
+** function, 'npci' will be zero and will test as a new line without
+** the need for 'oldpc'; so, 'oldpc' does not need to be initialized
+** before. Some exceptional conditions may return to a function without
+** updating 'oldpc'. In that case, 'oldpc' may be invalid; if so, it is
+** reset to zero.  (A wrong but valid 'oldpc' at most causes an extra
+** call to a line hook.)
+*/
 int luaG_traceexec (lua_State *L, const Instruction *pc) {
   CallInfo *ci = L->ci;
   lu_byte mask = L->hookmask;
+  const Proto *p = ci_func(ci)->p;
   int counthook;
+  /* 'L->oldpc' may be invalid; reset it in this case */
+  int oldpc = (L->oldpc < p->sizecode) ? L->oldpc : 0;
   if (!(mask & (LUA_MASKLINE | LUA_MASKCOUNT))) {  /* no hooks? */
     ci->u.l.trap = 0;  /* don't need to stop again */
     return 0;  /* turn off 'trap' */
@@ -819,15 +829,14 @@ int luaG_traceexec (lua_State *L, const Instruction *pc) {
   if (counthook)
     luaD_hook(L, LUA_HOOKCOUNT, -1, 0, 0);  /* call count hook */
   if (mask & LUA_MASKLINE) {
-    const Proto *p = ci_func(ci)->p;
     int npci = pcRel(pc, p);
     if (npci == 0 ||  /* call linehook when enter a new function, */
-        pc <= L->oldpc ||  /* when jump back (loop), or when */
-        changedline(p, pcRel(L->oldpc, p), npci)) {  /* enter new line */
+        pc <= invpcRel(oldpc, p) ||  /* when jump back (loop), or when */
+        changedline(p, oldpc, npci)) {  /* enter new line */
       int newline = luaG_getfuncline(p, npci);
       luaD_hook(L, LUA_HOOKLINE, newline, 0, 0);  /* call line hook */
     }
-    L->oldpc = pc;  /* 'pc' of last call to line hook */
+    L->oldpc = npci;  /* 'pc' of last call to line hook */
   }
   if (L->status == LUA_YIELD) {  /* did hook yield? */
     if (counthook)

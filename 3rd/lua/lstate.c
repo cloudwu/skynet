@@ -301,6 +301,7 @@ static void preinit_thread (lua_State *L, global_State *g) {
   L->openupval = NULL;
   L->status = LUA_OK;
   L->errfunc = 0;
+  L->oldpc = 0;
 }
 
 

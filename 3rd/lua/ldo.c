@@ -327,7 +327,7 @@ static StkId rethook (lua_State *L, CallInfo *ci, StkId firstres, int nres) {
   ptrdiff_t oldtop = savestack(L, L->top);  /* hook may change top */
   int delta = 0;
   if (isLuacode(ci)) {
-    Proto *p = clLvalue(s2v(ci->func))->p;
+    Proto *p = ci_func(ci)->p;
     if (p->is_vararg)
       delta = ci->u.l.nextraargs + p->numparams + 1;
     if (L->top < ci->top)
@@ -340,8 +340,8 @@ static StkId rethook (lua_State *L, CallInfo *ci, StkId firstres, int nres) {
     luaD_hook(L, LUA_HOOKRET, -1, ftransfer, nres);  /* call it */
     ci->func -= delta;
   }
-  if (isLua(ci->previous))
-    L->oldpc = ci->previous->u.l.savedpc;  /* update 'oldpc' */
+  if (isLua(ci = ci->previous))
+    L->oldpc = pcRel(ci->u.l.savedpc, ci_func(ci)->p);  /* update 'oldpc' */
   return restorestack(L, oldtop);
 }
 
@@ -515,14 +515,13 @@ void luaD_call (lua_State *L, StkId func, int nresults) {
 
 /*
 ** Similar to 'luaD_call', but does not allow yields during the call.
-** If there is a stack overflow, freeing all CI structures will
-** force the subsequent call to invoke 'luaE_extendCI', which then
-** will raise any errors.
 */
 void luaD_callnoyield (lua_State *L, StkId func, int nResults) {
   incXCcalls(L);
-  if (getCcalls(L) <= CSTACKERR)  /* possible stack overflow? */
-    luaE_freeCI(L);
+  if (getCcalls(L) <= CSTACKERR) {  /* possible C stack overflow? */
+    luaE_exitCcall(L);  /* to compensate decrement in next call */
+    luaE_enterCcall(L);  /* check properly */
+  }
   luaD_call(L, func, nResults);
   decXCcalls(L);
 }

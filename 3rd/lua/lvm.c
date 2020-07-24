@@ -1796,7 +1796,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         ProtectNT(luaT_adjustvarargs(L, GETARG_A(i), ci, cl->p));
         if (trap) {
           luaD_hookcall(L, ci);
-          L->oldpc = pc + 1;  /* next opcode will be seen as a "new" line */
+          L->oldpc = 1;  /* next opcode will be seen as a "new" line */
         }
         updatebase(ci);  /* function has new base after adjustment */
         vmbreak;
