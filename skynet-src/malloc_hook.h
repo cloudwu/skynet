@@ -7,7 +7,7 @@
 
 extern size_t malloc_used_memory(void);
 extern size_t malloc_memory_block(void);
-extern void   memory_info_dump(void);
+extern void   memory_info_dump(const char *opts);
 extern size_t mallctl_int64(const char* name, size_t* newval);
 extern int    mallctl_opt(const char* name, int* newval);
 extern bool   mallctl_bool(const char* name, bool* newval);

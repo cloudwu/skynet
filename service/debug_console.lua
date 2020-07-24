@@ -156,6 +156,7 @@ function COMMAND.help()
 		debug = "debug address : debug a lua service",
 		signal = "signal address sig",
 		cmem = "Show C memory info",
+		jmem = "Show jemalloc mem stats",
 		ping = "ping address",
 		call = "call address ...",
 		trace = "trace address [proto] [on|off]",
@@ -339,6 +340,15 @@ function COMMAND.cmem()
 	tmp.total = memory.total()
 	tmp.block = memory.block()
 
+	return tmp
+end
+
+function COMMAND.jmem()
+	local info = memory.jestat()
+	local tmp = {}
+	for k,v in pairs(info) do
+		tmp[k] = string.format("%11d  %8.2f Mb", v, v/1048576)
+	end
 	return tmp
 end
 
