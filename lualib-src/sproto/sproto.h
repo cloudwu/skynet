@@ -13,7 +13,8 @@ struct sproto_type;
 #define SPROTO_TINTEGER 0
 #define SPROTO_TBOOLEAN 1
 #define SPROTO_TSTRING 2
-#define SPROTO_TSTRUCT 3
+#define SPROTO_DOUBLE 3
+#define SPROTO_TSTRUCT 4
 
 // sub type of string (sproto_arg.extra)
 #define SPROTO_TSTRING_STRING 0
