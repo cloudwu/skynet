@@ -97,7 +97,10 @@ local convert = {}
 function convert.protocol(all, obj)
 	local result = { tag = obj[2] }
 	for _, p in ipairs(obj[3]) do
-		assert(result[p[1]] == nil)
+		local pt = p[1]
+		if result[pt] ~= nil then
+			error(string.format("redefine %s in protocol %s", pt, obj[1]))
+		end
 		local typename = p[2]
 		if type(typename) == "table" then
 			local struct = typename
@@ -179,6 +182,7 @@ local buildin_types = {
 	boolean = 1,
 	string = 2,
 	binary = 2,	-- binary is a sub type of string
+	double = 3,
 }
 
 local function checktype(types, ptype, t)

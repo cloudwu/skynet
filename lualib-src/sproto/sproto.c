@@ -944,6 +944,7 @@ sproto_encode(const struct sproto_type *st, void * buffer, int size, sproto_call
 			args.type = type;
 			args.index = 0;
 			switch(type) {
+			case SPROTO_DOUBLE:
 			case SPROTO_TINTEGER:
 			case SPROTO_TBOOLEAN: {
 				union {
@@ -1177,6 +1178,7 @@ sproto_decode(const struct sproto_type *st, const void * data, int size, sproto_
 				}
 			} else {
 				switch (f->type) {
+				case SPROTO_DOUBLE:
 				case SPROTO_TINTEGER: {
 					uint32_t sz = todword(currentdata);
 					if (sz == SIZEOF_INT32) {
