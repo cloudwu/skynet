@@ -1101,11 +1101,9 @@ LUA_API void lua_sharefunction (lua_State *L, int index) {
 }
 
 LUA_API void lua_sharestring (lua_State *L, int index) {
-  const char *str = lua_tostring(L, index);
-  if (str == NULL)
+  if (lua_type(L,index) != LUA_TSTRING)
     luaG_runerror(L, "need a string to share");
-
-  TString *ts = (TString *)(str - sizeof(TString));
+  TString *ts = tsvalue(index2value(L,index));
   luaS_share(ts);
 }
 
