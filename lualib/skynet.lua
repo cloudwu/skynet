@@ -91,8 +91,7 @@ local function _error_dispatch(error_session, error_source)
 			end
 		end
 		for session, srv in pairs(watching_session) do
-			if srv == error_source or
-				(type(srv) == "string" and skynet.localname(srv) == error_source) then
+			if srv == error_source then
 				tinsert(error_queue, session)
 			end
 		end
