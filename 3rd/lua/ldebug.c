@@ -188,8 +188,8 @@ static const char *upvalname (const Proto *p, int uv) {
 static const char *findvararg (CallInfo *ci, int n, StkId *pos) {
   if (clLvalue(s2v(ci->func))->p->is_vararg) {
     int nextra = ci->u.l.nextraargs;
-    if (n <= nextra) {
-      *pos = ci->func - nextra + (n - 1);
+    if (n >= -nextra) {  /* 'n' is negative */
+      *pos = ci->func - nextra - (n + 1);
       return "(vararg)";  /* generic name for any vararg */
     }
   }
@@ -202,7 +202,7 @@ const char *luaG_findlocal (lua_State *L, CallInfo *ci, int n, StkId *pos) {
   const char *name = NULL;
   if (isLua(ci)) {
     if (n < 0)  /* access to vararg values? */
-      return findvararg(ci, -n, pos);
+      return findvararg(ci, n, pos);
     else
       name = luaF_getlocalname(ci_func(ci)->p, n, currentpc(ci));
   }
@@ -783,11 +783,13 @@ l_noret luaG_runerror (lua_State *L, const char *fmt, ...) {
 ** previous instruction 'oldpc'.
 */
 static int changedline (const Proto *p, int oldpc, int newpc) {
+  if (p->lineinfo == NULL)  /* no debug information? */
+    return 0;
   while (oldpc++ < newpc) {
     if (p->lineinfo[oldpc] != 0)
       return (luaG_getfuncline(p, oldpc - 1) != luaG_getfuncline(p, newpc));
   }
-  return 0;  /* no line changes in the way */
+  return 0;  /* no line changes between positions */
 }
 
 
