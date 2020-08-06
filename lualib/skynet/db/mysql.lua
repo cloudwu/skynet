@@ -560,6 +560,10 @@ local store_types = {
     end
 }
 
+store_types["nil"] = function(v)
+    return _set_byte2(0x06), ""
+end
+
 local function _compose_stmt_execute(self, stmt, cursor_type, args)
     local arg_num = #args
     if arg_num ~= stmt.param_count then
@@ -570,11 +574,29 @@ local function _compose_stmt_execute(self, stmt, cursor_type, args)
 
     local cmd_packet = strpack("<c1I4BI4", COM_STMT_EXECUTE, stmt.prepare_id, cursor_type, 0x01)
     if arg_num > 0 then
-        local null_count = (arg_num + 7) // 8
         local f, ts, vs
         local types_buf = ""
         local values_buf = ""
-        for _, v in pairs(args) do
+        --生成NULL位图
+        local null_count = (arg_num + 7) // 8
+        local null_map = ""
+        local field_index = 1
+        for i = 1, null_count do
+            local byte = 0
+            for j = 0, 7 do
+                if field_index < arg_num then
+                    if args[field_index] == nil then
+                        byte = byte | (1 << j)
+                    else
+                        byte = byte | (0 << j)
+                    end
+                end
+                field_index = field_index + 1
+            end
+            null_map = null_map .. strchar(byte)
+        end
+        for i = 1, arg_num do
+            local v = args[i]
             f = store_types[type(v)]
             if not f then
                 error("invalid parameter type", type(v))
@@ -583,7 +605,7 @@ local function _compose_stmt_execute(self, stmt, cursor_type, args)
             types_buf = types_buf .. ts
             values_buf = values_buf .. vs
         end
-        cmd_packet = cmd_packet .. strrep("\0", null_count) .. strchar(0x01) .. types_buf .. values_buf
+        cmd_packet = cmd_packet .. null_map .. strchar(0x01) .. types_buf .. values_buf
     end
 
     return _compose_packet(self, cmd_packet)
@@ -1011,20 +1033,6 @@ end
         err
 ]]
 function _M.execute(self, stmt, ...)
-    -- 检查参数，不能为nil
-    local p_n = select('#', ...)
-    local p_v
-    for i = 1, p_n do
-        p_v = select(i, ...)
-        if p_v == nil then
-            return {
-                badresult = true,
-                errno = 30902,
-                err = "parameter " .. i .. " is nil"
-            }
-        end
-    end
-
     local querypacket, er = _compose_stmt_execute(self, stmt, CURSOR_TYPE_NO_CURSOR, {...})
     if not querypacket then
         return {
