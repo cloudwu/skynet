@@ -257,8 +257,7 @@ local function resolve_replace(replace_map)
     end
 
     local function match_value(v)
-        assert(v ~= nil)
-        if record_map[v] or is_sharedtable(v) then
+        if v == nil or record_map[v] or is_sharedtable(v) then
             return
         end
 
@@ -385,13 +384,12 @@ local function resolve_replace(replace_map)
         match_funcinfo(info)
     end
 
-    local stack_values_tmp = {}
     local function match_thread(co, level)
         -- match stackvalues
-        local n = stackvalues(co, stack_values_tmp)
+        local values = {}
+        local n = stackvalues(co, values)
         for i=1,n do
-            local v = stack_values_tmp[i]
-            stack_values_tmp[i] = nil
+            local v = values[i]
             match_value(v)
         end
 
