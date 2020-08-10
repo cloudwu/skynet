@@ -544,7 +544,7 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 
 	s->id = id;
 	s->fd = fd;
-	s->reading = READING_PAUSE;
+	s->reading = add ? READING_RESUME : READING_PAUSE;
 	s->sending = ID_TAG16(id) << 16 | 0;
 	s->protocol = protocol;
 	s->p.size = MIN_READ_BUFFER;
@@ -1068,11 +1068,11 @@ resume_socket(struct socket_server *ss, struct request_resumepause *request, str
 	socket_lock_init(s, &l);
 	if (s->reading == READING_PAUSE) {
 		if (sp_add(ss->event_fd, s->fd, s)) {
-			s->reading = READING_RESUME;
 			force_close(ss, s, &l, result);
 			result->data = strerror(errno);
 			return SOCKET_ERR;
 		}
+		s->reading = READING_RESUME;
 	}
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
