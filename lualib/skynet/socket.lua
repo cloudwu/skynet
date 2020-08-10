@@ -113,7 +113,7 @@ socket_message[5] = function(id, _, err)
 		return
 	end
 	if s.callback then
-		skynet.error("socket: accpet error:", err)	
+		skynet.error("socket: accpet error:", err)
 		return
 	end
 	if s.connected then
