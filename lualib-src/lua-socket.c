@@ -14,11 +14,13 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include "skynet.h"
 #include "skynet_socket.h"
 
 #define BACKLOG 32
 // 2 ** 12 == 4096
 #define LARGE_PAGE_NODE 12
+#define POOL_SIZE_WARNING 32
 #define BUFFER_LIMIT (256 * 1024)
 
 struct buffer_node {
@@ -124,6 +126,9 @@ lpushbuffer(lua_State *L) {
 		lnewpool(L, size);	
 		free_node = lua_touserdata(L,-1);
 		lua_rawseti(L, pool_index, tsz+1);
+		if (tsz > POOL_SIZE_WARNING) {
+			skynet_error(NULL, "Too many socket pool (%d)", tsz);
+		}
 	}
 	lua_pushlightuserdata(L, free_node->next);	
 	lua_rawseti(L, pool_index, 1);	// sb poolt msg size
