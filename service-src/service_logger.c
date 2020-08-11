@@ -69,7 +69,7 @@ logger_cb(struct skynet_context * context, void *ud, int type, int session, uint
 int
 logger_init(struct logger * inst, struct skynet_context *ctx, const char * parm) {
 	if (parm) {
-		inst->handle = fopen(parm,"w");
+		inst->handle = fopen(parm,"a");
 		if (inst->handle == NULL) {
 			return 1;
 		}
