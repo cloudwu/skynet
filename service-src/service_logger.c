@@ -38,7 +38,6 @@ static int
 timestring(struct logger *inst, char tmp[SIZETIMEFMT]) {
 	uint64_t now = skynet_now();
 	time_t ti = now/100 + inst->starttime;
-	time(&ti);
 	struct tm *info = localtime(&ti);
 	strftime(tmp, SIZETIMEFMT, "%D %T", info);
 	return now % 100;
