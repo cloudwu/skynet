@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 struct logger {
 	FILE * handle;
@@ -30,6 +31,17 @@ logger_release(struct logger * inst) {
 	skynet_free(inst);
 }
 
+#define SIZETIMEFMT	250
+
+static const char *
+timestring(char tmp[SIZETIMEFMT]) {
+	time_t ti;
+	time(&ti);
+	struct tm *info = localtime(&ti);
+	strftime(tmp, SIZETIMEFMT, "%D %T ", info);
+	return tmp;
+}
+
 static int
 logger_cb(struct skynet_context * context, void *ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct logger * inst = ud;
@@ -40,7 +52,11 @@ logger_cb(struct skynet_context * context, void *ud, int type, int session, uint
 		}
 		break;
 	case PTYPE_TEXT:
-		fprintf(inst->handle, "[:%08x] ",source);
+		if (inst->filename) {
+			char tmp[SIZETIMEFMT];
+			fprintf(inst->handle, "%s", timestring(tmp));
+		}
+		fprintf(inst->handle, "[:%08x] ", source);
 		fwrite(msg, sz , 1, inst->handle);
 		fprintf(inst->handle, "\n");
 		fflush(inst->handle);
