@@ -184,7 +184,7 @@ pop_lstring(lua_State *L, struct socket_buffer *sb, int sz, int skip) {
 	}
 
 	luaL_Buffer b;
-	luaL_buffinit(L, &b);
+	luaL_buffinitsize(L, &b, sz);
 	for (;;) {
 		int bytes = current->sz - sb->offset;
 		if (bytes >= sz) {
