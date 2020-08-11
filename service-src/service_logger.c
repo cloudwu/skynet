@@ -56,8 +56,8 @@ logger_cb(struct skynet_context * context, void *ud, int type, int session, uint
 	case PTYPE_TEXT:
 		if (inst->filename) {
 			char tmp[SIZETIMEFMT];
-			int msec = timestring(ud, tmp);
-			fprintf(inst->handle, "%s.%02d ", tmp, msec);
+			int csec = timestring(ud, tmp);
+			fprintf(inst->handle, "%s.%02d ", tmp, csec);
 		}
 		fprintf(inst->handle, "[:%08x] ", source);
 		fwrite(msg, sz , 1, inst->handle);
