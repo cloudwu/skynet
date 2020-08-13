@@ -242,7 +242,7 @@ encode(const struct sproto_arg *args) {
 			return 8;
 		}
 	}
-	case SPROTO_DOUBLE: {
+	case SPROTO_TDOUBLE: {
 		lua_Number v = lua_tonumber(L, -1);
 		*(double*)args->value = (double)v;
 		return 8;
@@ -407,7 +407,7 @@ decode(const struct sproto_arg *args) {
 		}
 		break;
 	}
-	case SPROTO_DOUBLE: {
+	case SPROTO_TDOUBLE: {
 		double v = *(double*)args->value;
 		lua_pushnumber(L, v);
 		break;
@@ -688,7 +688,7 @@ push_default(const struct sproto_arg *args, int array) {
 		else
 			lua_pushinteger(L, 0);
 		break;
-	case SPROTO_DOUBLE:
+	case SPROTO_TDOUBLE:
 		lua_pushnumber(L, 0.0);
 		break;
 	case SPROTO_TBOOLEAN:

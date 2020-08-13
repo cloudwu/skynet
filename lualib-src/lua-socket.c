@@ -14,11 +14,13 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include "skynet.h"
 #include "skynet_socket.h"
 
 #define BACKLOG 32
 // 2 ** 12 == 4096
 #define LARGE_PAGE_NODE 12
+#define POOL_SIZE_WARNING 32
 #define BUFFER_LIMIT (256 * 1024)
 
 struct buffer_node {
@@ -124,6 +126,9 @@ lpushbuffer(lua_State *L) {
 		lnewpool(L, size);	
 		free_node = lua_touserdata(L,-1);
 		lua_rawseti(L, pool_index, tsz+1);
+		if (tsz > POOL_SIZE_WARNING) {
+			skynet_error(NULL, "Too many socket pool (%d)", tsz);
+		}
 	}
 	lua_pushlightuserdata(L, free_node->next);	
 	lua_rawseti(L, pool_index, 1);	// sb poolt msg size
@@ -179,7 +184,7 @@ pop_lstring(lua_State *L, struct socket_buffer *sb, int sz, int skip) {
 	}
 
 	luaL_Buffer b;
-	luaL_buffinit(L, &b);
+	luaL_buffinitsize(L, &b, sz);
 	for (;;) {
 		int bytes = current->sz - sb->offset;
 		if (bytes >= sz) {
@@ -612,6 +617,14 @@ lstart(lua_State *L) {
 }
 
 static int
+lpause(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	skynet_socket_pause(ctx,id);
+	return 0;
+}
+
+static int
 lnodelay(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
@@ -794,6 +807,7 @@ luaopen_skynet_socketdriver(lua_State *L) {
 		{ "lsend", lsendlow },
 		{ "bind", lbind },
 		{ "start", lstart },
+		{ "pause", lpause },
 		{ "nodelay", lnodelay },
 		{ "udp", ludp },
 		{ "udp_connect", ludp_connect },

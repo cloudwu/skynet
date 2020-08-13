@@ -849,6 +849,7 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 	size -= SIZEOF_LENGTH;
 	buffer = data + SIZEOF_LENGTH;
 	switch (args->type) {
+	case SPROTO_TDOUBLE:
 	case SPROTO_TINTEGER: {
 		int noarray;
 		buffer = encode_integer_array(cb,args,buffer,size, &noarray);
@@ -944,7 +945,7 @@ sproto_encode(const struct sproto_type *st, void * buffer, int size, sproto_call
 			args.type = type;
 			args.index = 0;
 			switch(type) {
-			case SPROTO_DOUBLE:
+			case SPROTO_TDOUBLE:
 			case SPROTO_TINTEGER:
 			case SPROTO_TBOOLEAN: {
 				union {
@@ -1067,6 +1068,7 @@ decode_array(sproto_callback cb, struct sproto_arg *args, uint8_t * stream) {
 	}	
 	stream += SIZEOF_LENGTH;
 	switch (type) {
+	case SPROTO_TDOUBLE:
 	case SPROTO_TINTEGER: {
 		int len = *stream;
 		++stream;
@@ -1178,7 +1180,7 @@ sproto_decode(const struct sproto_type *st, const void * data, int size, sproto_
 				}
 			} else {
 				switch (f->type) {
-				case SPROTO_DOUBLE:
+				case SPROTO_TDOUBLE:
 				case SPROTO_TINTEGER: {
 					uint32_t sz = todword(currentdata);
 					if (sz == SIZEOF_INT32) {

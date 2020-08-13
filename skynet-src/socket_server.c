@@ -37,6 +37,10 @@
 #define PRIORITY_HIGH 0
 #define PRIORITY_LOW 1
 
+#define READING_PAUSE 0
+#define READING_RESUME 1
+#define READING_CLOSE 2
+
 #define HASH_ID(id) (((unsigned)id) % MAX_SOCKET)
 #define ID_TAG16(id) ((id>>MAX_SOCKET_P) & 0xffff)
 
@@ -95,7 +99,8 @@ struct socket {
 	int id;
 	uint8_t protocol;
 	uint8_t type;
-	uint16_t udpconnecting;
+	uint8_t reading;
+	int udpconnecting;
 	int64_t warn_size;
 	union {
 		int size;
@@ -166,7 +171,7 @@ struct request_bind {
 	uintptr_t opaque;
 };
 
-struct request_start {
+struct request_resumepause {
 	int id;
 	uintptr_t opaque;
 };
@@ -212,7 +217,7 @@ struct request_package {
 		struct request_close close;
 		struct request_listen listen;
 		struct request_bind bind;
-		struct request_start start;
+		struct request_resumepause resumepause;
 		struct request_setopt setopt;
 		struct request_udp udp;
 		struct request_setudp set_udp;
@@ -477,9 +482,10 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_lock *l, s
 	assert(s->type != SOCKET_TYPE_RESERVE);
 	free_wb_list(ss,&s->high);
 	free_wb_list(ss,&s->low);
-	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
+	if (s->reading == READING_RESUME) {
 		sp_del(ss->event_fd, s->fd);
 	}
+	s->reading = READING_CLOSE;
 	socket_lock(l);
 	if (s->type != SOCKET_TYPE_BIND) {
 		if (close(s->fd) < 0) {
@@ -538,6 +544,7 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 
 	s->id = id;
 	s->fd = fd;
+	s->reading = add ? READING_RESUME : READING_PAUSE;
 	s->sending = ID_TAG16(id) << 16 | 0;
 	s->protocol = protocol;
 	s->p.size = MIN_READ_BUFFER;
@@ -1046,7 +1053,7 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 }
 
 static int
-start_socket(struct socket_server *ss, struct request_start *request, struct socket_message *result) {
+resume_socket(struct socket_server *ss, struct request_resumepause *request, struct socket_message *result) {
 	int id = request->id;
 	result->id = id;
 	result->opaque = request->opaque;
@@ -1059,12 +1066,15 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	}
 	struct socket_lock l;
 	socket_lock_init(s, &l);
-	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
+	if (s->reading == READING_PAUSE) {
 		if (sp_add(ss->event_fd, s->fd, s)) {
 			force_close(ss, s, &l, result);
 			result->data = strerror(errno);
 			return SOCKET_ERR;
 		}
+		s->reading = READING_RESUME;
+	}
+	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
 		s->opaque = request->opaque;
 		result->data = "start";
@@ -1077,6 +1087,19 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	}
 	// if s->type == SOCKET_TYPE_HALFCLOSE , SOCKET_CLOSE message will send later
 	return -1;
+}
+
+static void
+pause_socket(struct socket_server *ss, struct request_resumepause *request) {
+	int id = request->id;
+	struct socket *s = &ss->slot[HASH_ID(id)];
+	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
+		return;
+	}
+	if (s->reading == READING_RESUME) {
+		sp_del(ss->event_fd, s->fd);
+		s->reading = READING_PAUSE;
+	}
 }
 
 static void
@@ -1210,8 +1233,11 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	block_readpipe(fd, buffer, len);
 	// ctrl command only exist in local fd, so don't worry about endian.
 	switch (type) {
+	case 'R':
+		return resume_socket(ss,(struct request_resumepause *)buffer, result);
 	case 'S':
-		return start_socket(ss,(struct request_start *)buffer, result);
+		pause_socket(ss,(struct request_resumepause *)buffer);
+		return -1;
 	case 'B':
 		return bind_socket(ss,(struct request_bind *)buffer, result);
 	case 'L':
@@ -1841,12 +1867,20 @@ socket_server_bind(struct socket_server *ss, uintptr_t opaque, int fd) {
 	return id;
 }
 
-void 
+void
 socket_server_start(struct socket_server *ss, uintptr_t opaque, int id) {
 	struct request_package request;
-	request.u.start.id = id;
-	request.u.start.opaque = opaque;
-	send_request(ss, &request, 'S', sizeof(request.u.start));
+	request.u.resumepause.id = id;
+	request.u.resumepause.opaque = opaque;
+	send_request(ss, &request, 'R', sizeof(request.u.resumepause));
+}
+
+void
+socket_server_pause(struct socket_server *ss, uintptr_t opaque, int id) {
+	struct request_package request;
+	request.u.resumepause.id = id;
+	request.u.resumepause.opaque = opaque;
+	send_request(ss, &request, 'S', sizeof(request.u.resumepause));
 }
 
 void
