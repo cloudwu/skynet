@@ -96,7 +96,8 @@ typedef struct TValue {
 /*
 ** Any value being manipulated by the program either is non
 ** collectable, or the collectable object has the right tag
-** and it is not dead.
+** and it is not dead. The option 'L == NULL' allows other
+** macros using this one to be used where L is not available.
 */
 #define checkliveness(L,obj) \
 	((void)L, lua_longassert(!iscollectable(obj) || \
