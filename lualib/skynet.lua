@@ -66,6 +66,59 @@ local watching_session = {}
 local error_queue = {}
 local fork_queue = {}
 
+local request_session = {}
+
+---- request/select
+
+function skynet.request(addr, typename, ...)
+	local p = proto[typename]
+	local session = c.send(addr, p.id , nil , p.pack(...))
+	if session == nil then
+		error("request invalid address " .. skynet.address(addr))
+	end
+	watching_session[session] = addr
+	local unpack = p.unpack
+	request_session[session] = function(msg, sz)
+		watching_session[session] = nil
+		return unpack(msg, sz)
+	end
+	session_id_coroutine[session] = running_thread
+	return session
+end
+
+local function timer_unpack() end	-- dummy function
+
+function skynet.timer(ti)
+	local session = c.intcommand("TIMEOUT",ti)
+	assert(session)
+	request_session[session] = timer_unpack
+	session_id_coroutine[session] = running_thread
+	return session
+end
+
+local function select_iter()
+	if next(request_session) == nil then
+		return
+	end
+	local succ, msg, sz, session = coroutine_yield "SUSPEND"
+	local unpack = request_session[session]
+	request_session[session] = nil
+	return session, succ, unpack(msg, sz)
+end
+
+
+function skynet.select()
+	return select_iter
+end
+
+function skynet.select_discard()
+	for session in pairs(request_session) do
+		watching_session[session] = nil
+		session_id_coroutine[session] = "BREAK"
+		request_session[session] = nil
+	end
+end
+
 -- suspend is function
 local suspend
 
@@ -567,12 +620,17 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
 		elseif co == nil then
-			unknown_response(session, source, msg, sz)
+			if request_session[session] then
+				request_session[session] = nil
+				skynet.error(string.format("Unselect request session %d from %s" , session, skynet.address))
+			else
+				unknown_response(session, source, msg, sz)
+			end
 		else
 			local tag = session_coroutine_tracetag[co]
 			if tag then c.trace(tag, "resume") end
 			session_id_coroutine[session] = nil
-			suspend(co, coroutine_resume(co, true, msg, sz))
+			suspend(co, coroutine_resume(co, true, msg, sz, session))
 		end
 	else
 		local p = proto[prototype]

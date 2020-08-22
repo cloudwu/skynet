@@ -24,12 +24,15 @@ end
 
 function command.STAT()
 	local list = {}
-	for k,v in pairs(services) do
-		local ok, stat = pcall(skynet.call,k,"debug","STAT")
+	local sessions = {}
+	for addr in pairs(services) do
+		sessions[skynet.request(addr, "debug", "STAT")] = skynet.address(addr)
+	end
+	for session, ok, stat in skynet.select() do
 		if not ok then
-			stat = string.format("ERROR (%s)",v)
+			stat = string.format("ERROR (%s)",stat)
 		end
-		list[skynet.address(k)] = stat
+		list[sessions[session]] = stat
 	end
 	return list
 end
