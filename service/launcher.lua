@@ -22,19 +22,36 @@ function command.LIST()
 	return list
 end
 
-function command.STAT()
+local function list_srv(ti, fmt_func, ...)
 	local list = {}
 	local sessions = {}
+	local timeout_session
+	if ti > 0 then
+		timeout_session = skynet.timer(ti)
+	end
 	for addr in pairs(services) do
-		sessions[skynet.request(addr, "debug", "STAT")] = skynet.address(addr)
+		sessions[skynet.request(addr, "debug", ...)] = addr
 	end
 	for session, ok, stat in skynet.select() do
+		if session == timeout_session then
+			for session, addr in pairs(sessions) do
+				list[addr] = fmt_func("TIMEOUT", addr)
+			end
+			skynet.select_discard()
+			break
+		end
 		if not ok then
 			stat = string.format("ERROR (%s)",stat)
 		end
-		list[sessions[session]] = stat
+		local addr = sessions[session]
+		list[skynet.address(addr)] = fmt_func(stat, addr)
+		sessions[session] = nil
 	end
 	return list
+end
+
+function command.STAT(ti)
+	return list_srv(ti, function(v) return v end, "STAT")
 end
 
 function command.KILL(_, handle)
@@ -45,24 +62,22 @@ function command.KILL(_, handle)
 	return ret
 end
 
-function command.MEM()
-	local list = {}
-	for k,v in pairs(services) do
-		local ok, kb = pcall(skynet.call,k,"debug","MEM")
-		if not ok then
-			list[skynet.address(k)] = string.format("ERROR (%s)",v)
+function command.MEM(ti)
+	return list_srv(ti, function(kb, addr)
+		local v = services[addr]
+		if kb == "TIMEOUT" then
+			return string.format("TIMEOUT (%s)",v)
 		else
-			list[skynet.address(k)] = string.format("%.2f Kb (%s)",kb,v)
+			return string.format("%.2f Kb (%s)",kb,v)
 		end
-	end
-	return list
+	end, "MEM")
 end
 
-function command.GC()
+function command.GC(ti)
 	for k,v in pairs(services) do
 		skynet.send(k,"debug","GC")
 	end
-	return command.MEM()
+	return command.MEM(ti)
 end
 
 function command.REMOVE(_, handle, kill)
