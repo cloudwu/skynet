@@ -36,7 +36,28 @@ skynet.start(function()
 	end
 
 	for session, ok, resp in skynet.select() do
-		skynet.error(string.format("RESP %s session %d", resp, session)
+		skynet.error(string.format("RESP %s session %d", resp, session))
+	end
+
+	-- test error and timeout
+
+	for i = 10, 100, 10 do
+		local session = skynet.request(slave, "lua", "ping", i, "SLEEP " .. i)
+		skynet.error(string.format("Request %d session = %d", i, session))
+	end
+	local timeout_session = skynet.timer(50)
+	local error_session = skynet.request(slave, "lua", "error")
+	skynet.error(string.format("Error session = %d", error_session))
+
+	for session, ok, resp in skynet.select() do
+		if not ok then
+			skynet.error(string.format("Error session = %d , %s", session, resp))
+		elseif session == timeout_session then
+			skynet.select_discard()
+			break
+		else
+			skynet.error(string.format("RESP %s session %d", resp, session))
+		end
 	end
 
 	skynet.send(slave, "lua", "exit")
