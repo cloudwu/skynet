@@ -130,7 +130,7 @@ local function dispatch_error_queue()
 	if session then
 		local co = session_id_coroutine[session]
 		session_id_coroutine[session] = nil
-		return suspend(co, coroutine_resume(co, false))
+		return suspend(co, coroutine_resume(co, false, nil, nil, session))
 	end
 end
 
@@ -212,7 +212,7 @@ local function dispatch_wakeup()
 			local tag = session_coroutine_tracetag[co]
 			if tag then c.trace(tag, "resume") end
 			session_id_coroutine[session] = "BREAK"
-			return suspend(co, coroutine_resume(co, false, "BREAK"))
+			return suspend(co, coroutine_resume(co, false, "BREAK", nil, session))
 		end
 	end
 end
