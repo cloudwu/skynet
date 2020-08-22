@@ -51,7 +51,7 @@ skynet.start(function()
 
 	for session, ok, resp in skynet.select() do
 		if not ok then
-			skynet.error(string.format("Error session = %d , %s", session, resp))
+			skynet.error(string.format("Error session = %d", session))
 		elseif session == timeout_session then
 			skynet.select_discard()
 			break
