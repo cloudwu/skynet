@@ -228,9 +228,13 @@ end
 local function timeout(ti)
 	if ti then
 		ti = tonumber(ti)
+		if ti <= 0 then
+			ti = nil
+		end
 	else
 		ti = TIMEOUT
 	end
+	return ti
 end
 
 function COMMAND.stat(ti)
