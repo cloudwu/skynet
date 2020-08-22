@@ -67,6 +67,7 @@ local error_queue = {}
 local fork_queue = {}
 
 local request_session = {}
+local request_timeout_session = nil
 
 ---- request/select
 
@@ -86,14 +87,16 @@ function skynet.request(addr, typename, ...)
 	return session
 end
 
-local function timer_unpack() end	-- dummy function
-
-function skynet.timer(ti)
-	local session = c.intcommand("TIMEOUT",ti)
-	assert(session)
-	request_session[session] = timer_unpack
-	session_id_coroutine[session] = running_thread
-	return session
+function skynet.select_discard()
+	for session in pairs(request_session) do
+		session_id_coroutine[session] = "BREAK"
+		watching_session[session] = nil
+		request_session[session] = nil
+	end
+	if request_timeout_session then
+		session_id_coroutine[request_timeout_session] = "BREAK"
+		request_timeout_session = nil
+	end
 end
 
 local function select_iter()
@@ -106,16 +109,34 @@ local function select_iter()
 	return session, succ, unpack(msg, sz)
 end
 
-
-function skynet.select()
-	return select_iter
+local function select_timeout()
+	if next(request_session) == nil then
+		-- discard timeout session
+		session_id_coroutine[request_timeout_session] = "BREAK"
+		request_timeout_session = nil
+		return
+	end
+	local succ, msg, sz, session = coroutine_yield "SUSPEND"
+	if session == request_timeout_session then
+		-- timeout
+		request_timeout_session = nil
+		skynet.select_discard()
+		return
+	else
+		local unpack = request_session[session]
+		request_session[session] = nil
+		return session, succ, unpack(msg, sz)
+	end
 end
 
-function skynet.select_discard()
-	for session in pairs(request_session) do
-		watching_session[session] = nil
-		session_id_coroutine[session] = "BREAK"
-		request_session[session] = nil
+function skynet.select(ti)
+	if ti then
+		assert(request_timeout_session == nil)
+		request_timeout_session = c.intcommand("TIMEOUT",ti)
+		session_id_coroutine[request_timeout_session] = running_thread
+		return select_timeout
+	else
+		return select_iter
 	end
 end
 
