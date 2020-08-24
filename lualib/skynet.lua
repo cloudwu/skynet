@@ -71,13 +71,13 @@ do ---- request/select
 		local request_n = 0
 		local err
 		for i = 1, #self do
+			local req = self[i]
+			local addr = req[1]
 			local tag = session_coroutine_tracetag[running_thread]
 			if tag then
 				c.trace(tag, "call", 4)
 				c.send(addr, skynet.PTYPE_TRACE, 0, tag)
 			end
-			local req = self[i]
-			local addr = req[1]
 			local p = proto[req[2]]
 			assert(p.unpack)
 			local session = c.send(addr, p.id , nil , p.pack(table.unpack(req, 3, req.n)))
