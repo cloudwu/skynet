@@ -6,8 +6,11 @@ local assert = assert
 local pairs = pairs
 local pcall = pcall
 local table = table
+local next = next
 local tremove = table.remove
 local tinsert = table.insert
+local tpack = table.pack
+local tunpack = table.unpack
 local traceback = debug.traceback
 
 local cresume = coroutine.resume
@@ -80,7 +83,7 @@ do ---- request/select
 			end
 			local p = proto[req[2]]
 			assert(p.unpack)
-			local session = c.send(addr, p.id , nil , p.pack(table.unpack(req, 3, req.n)))
+			local session = c.send(addr, p.id , nil , p.pack(tunpack(req, 3, req.n)))
 			if session == nil then
 				err = err or {}
 				err[#err+1] = req
@@ -106,7 +109,7 @@ do ---- request/select
 				local req = self._sessions[session]
 				local p = proto[req[2]]
 				if succ then
-					self._resp[session] = table.pack( p.unpack(msg, sz) )
+					self._resp[session] = tpack( p.unpack(msg, sz) )
 				else
 					self._resp[session] = false
 				end
@@ -118,7 +121,7 @@ do ---- request/select
 	local function request_iter(self)
 		if self._error then
 			-- invalid address
-			local e = table.remove(self._error)
+			local e = tremove(self._error)
 			if e then
 				self.ok = nil
 				return self, e
