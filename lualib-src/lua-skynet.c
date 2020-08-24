@@ -88,9 +88,6 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	case LUA_ERRERR:
 		skynet_error(context, "lua error in error : [%x to %s : %d]", source , self, session);
 		break;
-	case LUA_ERRGCMM:
-		skynet_error(context, "lua gc error : [%x to %s : %d]", source , self, session);
-		break;
 	};
 
 	lua_pop(L,1);
