@@ -110,8 +110,8 @@ do ---- request/select
 				else
 					self._resp[session] = false
 				end
-				skynet.wakeup(self)
 			end
+			skynet.wakeup(self)
 		end
 	end
 
@@ -120,20 +120,19 @@ do ---- request/select
 			-- invalid address
 			local e = table.remove(self._error)
 			if e then
-				self.req = e
 				self.ok = nil
-				return self
+				return self, e
 			end
 			self._error = nil
 		end
-		if self.timeout then
-			return
-		end
 		while self._request > 0 do
 			skynet.wait(self)
+			if self.timeout then
+				return
+			end
 			self._request = self._request - 1
 			local session, resp = assert(next(self._resp))
-			self.req = self._sessions[session]
+			local req = self._sessions[session]
 			self._resp[session] = nil
 			self._sessions[session] = nil
 			local old_n = self.n
@@ -150,7 +149,7 @@ do ---- request/select
 			for i = self.n+1, old_n do
 				self[i] = nil
 			end
-			return self
+			return self, req
 		end
 	end
 

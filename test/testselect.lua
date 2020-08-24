@@ -52,8 +52,8 @@ skynet.start(function()
 		req:add { slave, "lua", "ping", i*10, "SLEEP " .. i, token = i }
 	end
 
-	for resp in req:select(50) do
-		info("RESP %s token<%s>", resp[1], resp.req.token)
+	for resp, req in req:select(50) do
+		info("RESP %s token<%s>", resp[1], req.token)
 	end
 
 	-- test error

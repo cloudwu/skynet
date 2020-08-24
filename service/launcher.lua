@@ -25,17 +25,21 @@ end
 local function list_srv(ti, fmt_func, ...)
 	local list = {}
 	local sessions = {}
-	local timeout_session
+	local req = skynet.request()
 	for addr in pairs(services) do
-		sessions[skynet.request(addr, "debug", ...)] = addr
+		local r = { addr, "debug", ... }
+		req:add(r)
+		sessions[r] = addr
 	end
-	for session, ok, stat in skynet.select(ti) do
-		if not ok then
-			stat = string.format("ERROR (%s)",stat)
+	for resp, req in req:select(ti) do
+		local stat = resp[1]
+		local addr = req[1]
+		if resp.ok then
+			list[skynet.address(addr)] = fmt_func(stat, addr)
+		else
+			list[skynet.address(addr)] = fmt_func("ERROR", addr)
 		end
-		local addr = sessions[session]
-		list[skynet.address(addr)] = fmt_func(stat, addr)
-		sessions[session] = nil
+		sessions[req] = nil
 	end
 	for session, addr in pairs(sessions) do
 		list[skynet.address(addr)] = fmt_func("TIMEOUT", addr)
