@@ -64,81 +64,149 @@ local watching_session = {}
 local error_queue = {}
 local fork_queue = {}
 
-local request_session = {}
-local request_timeout_session = nil
-
----- request/select
-
-function skynet.request(addr, typename, ...)
-	local p = proto[typename]
-	local session = c.send(addr, p.id , nil , p.pack(...))
-	if session == nil then
-		error("request invalid address " .. skynet.address(addr))
+do ---- request/select
+	local function send_requests(self)
+		local sessions = {}
+		self._sessions = sessions
+		local request_n = 0
+		local err
+		for i = 1, #self do
+			local tag = session_coroutine_tracetag[running_thread]
+			if tag then
+				c.trace(tag, "call", 4)
+				c.send(addr, skynet.PTYPE_TRACE, 0, tag)
+			end
+			local req = self[i]
+			local addr = req[1]
+			local p = proto[req[2]]
+			assert(p.unpack)
+			local session = c.send(addr, p.id , nil , p.pack(table.unpack(req, 3, req.n)))
+			if session == nil then
+				err = err or {}
+				err[#err+1] = req
+			else
+				sessions[session] = req
+				watching_session[session] = addr
+				session_id_coroutine[session] = self._thread
+				request_n = request_n + 1
+			end
+		end
+		self._request = request_n
+		return err
 	end
-	watching_session[session] = addr
-	local unpack = p.unpack
-	request_session[session] = function(msg, sz)
-		watching_session[session] = nil
-		return unpack(msg, sz)
-	end
-	session_id_coroutine[session] = running_thread
-	return session
-end
 
-function skynet.select_discard()
-	for session in pairs(request_session) do
-		session_id_coroutine[session] = "BREAK"
-		watching_session[session] = nil
-		request_session[session] = nil
+	local function request_thread(self)
+		while true do
+			local succ, msg, sz, session = coroutine_yield "SUSPEND"
+			if session == self._timeout then
+				self._timeout = nil
+				self.timeout = true
+			else
+				watching_session[session] = nil
+				local req = self._sessions[session]
+				local p = proto[req[2]]
+				if succ then
+					self._resp[session] = table.pack( p.unpack(msg, sz) )
+				else
+					self._resp[session] = false
+				end
+				skynet.wakeup(self)
+			end
+		end
 	end
-	if request_timeout_session then
-		session_id_coroutine[request_timeout_session] = "BREAK"
-		request_timeout_session = nil
-	end
-end
 
-local close_select = setmetatable({}, { __close = skynet.select_discard })
-
-local function select_iter()
-	if next(request_session) == nil then
-		return
+	local function request_iter(self)
+		if self._error then
+			-- invalid address
+			local e = table.remove(self._error)
+			if e then
+				self.req = e
+				self.ok = nil
+				return self
+			end
+			self._error = nil
+		end
+		if self.timeout then
+			return
+		end
+		while self._request > 0 do
+			skynet.wait(self)
+			self._request = self._request - 1
+			local session, resp = assert(next(self._resp))
+			self.req = self._sessions[session]
+			self._resp[session] = nil
+			self._sessions[session] = nil
+			local old_n = self.n
+			if resp then
+				self.ok = true
+				for i = 1, resp.n do
+					self[i] = resp[i]
+				end
+				self.n = resp.n
+			else
+				self.ok = false
+				self.n = 0
+			end
+			for i = self.n+1, old_n do
+				self[i] = nil
+			end
+			return self
+		end
 	end
-	local succ, msg, sz, session = coroutine_yield "SUSPEND"
-	local unpack = request_session[session]
-	request_session[session] = nil
-	return session, succ, unpack(msg, sz)
-end
 
-local function select_timeout()
-	if next(request_session) == nil then
-		return
-	end
-	local succ, msg, sz, session = coroutine_yield "SUSPEND"
-	if session == request_timeout_session then
-		-- timeout
-		request_timeout_session = nil
-		return
-	else
-		local unpack = request_session[session]
-		request_session[session] = nil
-		return session, succ, unpack(msg, sz)
-	end
-end
+	local request_meta = {}	; request_meta.__index = request_meta
 
-function skynet.select(ti)
-	if ti then
-		assert(request_timeout_session == nil)
-		request_timeout_session = c.intcommand("TIMEOUT",ti)
-		session_id_coroutine[request_timeout_session] = running_thread
-		return select_timeout, nil, nil, close_select
-	else
-		return select_iter, nil, nil, close_select
+	function request_meta:add(obj)
+		assert(type(obj) == "table")
+		self[#self+1] = obj
+		return self
+	end
+
+	request_meta.__call = request_meta.add
+
+	function request_meta:__close()
+		if self._request > 0 then
+			local resp = self._resp
+			for session, req in pairs(self._sessions) do
+				if not resp[session] then
+					session_id_coroutine[session] = "BREAK"
+					watching_session[session] = nil
+				end
+			end
+		end
+		if self._timeout then
+			session_id_coroutine[self._timeout] = "BREAK"
+			self._timeout = nil
+		end
+	end
+
+	function request_meta:select(timeout)
+		self._thread = coroutine_create(request_thread)
+		self._error = send_requests(self)
+		self._resp = {}
+		self.n = 0
+		if timeout then
+			self._timeout = c.intcommand("TIMEOUT",timeout)
+			session_id_coroutine[self._timeout] = self._thread
+		end
+
+		local running = running_thread
+		coroutine_resume(self._thread, self)
+		running_thread = running
+		return request_iter, self, nil, self
+	end
+
+	function skynet.request(obj)
+		local ret = setmetatable({}, request_meta)
+		if obj then
+			return ret(obj)
+		end
+		return ret
 	end
 end
 
 -- suspend is function
 local suspend
-
 
 ----- monitor exit
 
@@ -641,12 +709,7 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
 		elseif co == nil then
-			if request_session[session] then
-				request_session[session] = nil
-				skynet.error(string.format("Unselect request session %d from %s" , session, skynet.address))
-			else
-				unknown_response(session, source, msg, sz)
-			end
+			unknown_response(session, source, msg, sz)
 		else
 			local tag = session_coroutine_tracetag[co]
 			if tag then c.trace(tag, "resume") end

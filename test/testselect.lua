@@ -27,34 +27,49 @@ end)
 
 else
 
+local function info(fmt, ...)
+	skynet.error(string.format(fmt, ...))
+end
+
 skynet.start(function()
 	local slave = skynet.newservice(SERVICE_NAME, "slave")
 
-	for i = 10, 1, -1 do
-		local session = skynet.request(slave, "lua", "ping", i, "SLEEP " .. i)
-		skynet.error(string.format("Request %d session = %d", i, session))
+	for resp in skynet.request
+		{ slave, "lua", "ping", 6, "SLEEP 6" }
+		{ slave, "lua", "ping", 5, "SLEEP 5" }
+		{ slave, "lua", "ping", 4, "SLEEP 4" }
+		{ slave, "lua", "ping", 3, "SLEEP 3" }
+		{ slave, "lua", "ping", 2, "SLEEP 2" }
+		{ slave, "lua", "ping", 1, "SLEEP 1" }
+		:select() do
+		info("RESP %s", resp[1])
 	end
 
-	for session, ok, resp in skynet.select() do
-		skynet.error(string.format("RESP %s session %d", resp, session))
+	-- test timeout
+	local req = skynet.request()
+
+	for i = 1, 10 do
+		req:add { slave, "lua", "ping", i*10, "SLEEP " .. i, token = i }
 	end
 
-	-- test error and timeout
-
-	for i = 10, 100, 10 do
-		local session = skynet.request(slave, "lua", "ping", i, "SLEEP " .. i)
-		skynet.error(string.format("Request %d session = %d", i, session))
+	for resp in req:select(50) do
+		info("RESP %s token<%s>", resp[1], resp.req.token)
 	end
-	local error_session = skynet.request(slave, "lua", "error")
-	skynet.error(string.format("Error session = %d", error_session))
 
-	for session, ok, resp in skynet.select(50) do
-		if not ok then
-			skynet.error(string.format("Error session = %d", session))
-		else
-			skynet.error(string.format("RESP %s session %d", resp, session))
-		end
+	-- test error
+
+	for resp in skynet.request { slave, "lua", "error" } : select() do
+		info("Ok : %s", resp.ok)
 	end
+
+	-- timeout call
+
+	local req = skynet.request { slave, "lua", "ping", 100 , "PING" }
+	for resp in req:select(10) do
+		info("%s", resp[1])
+	end
+
+	info("Timeout : %s", req.timeout)
 
 	skynet.send(slave, "lua", "exit")
 	skynet.exit()
