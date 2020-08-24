@@ -125,7 +125,7 @@ do ---- request/select
 			end
 			self._error = nil
 		end
-		while self._request > 0 do
+		if self._request > 0 then
 			skynet.wait(self)
 			if self.timeout then
 				return
