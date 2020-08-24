@@ -97,6 +97,8 @@ function skynet.select_discard()
 	end
 end
 
+local close_select = setmetatable({}, { __close = skynet.select_discard })
+
 local function select_iter()
 	if next(request_session) == nil then
 		return
@@ -109,16 +111,12 @@ end
 
 local function select_timeout()
 	if next(request_session) == nil then
-		-- discard timeout session
-		session_id_coroutine[request_timeout_session] = "BREAK"
-		request_timeout_session = nil
 		return
 	end
 	local succ, msg, sz, session = coroutine_yield "SUSPEND"
 	if session == request_timeout_session then
 		-- timeout
 		request_timeout_session = nil
-		skynet.select_discard()
 		return
 	else
 		local unpack = request_session[session]
@@ -132,9 +130,9 @@ function skynet.select(ti)
 		assert(request_timeout_session == nil)
 		request_timeout_session = c.intcommand("TIMEOUT",ti)
 		session_id_coroutine[request_timeout_session] = running_thread
-		return select_timeout
+		return select_timeout, nil, nil, close_select
 	else
-		return select_iter
+		return select_iter, nil, nil, close_select
 	end
 end
 
