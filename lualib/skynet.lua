@@ -76,13 +76,13 @@ do ---- request/select
 		for i = 1, #self do
 			local req = self[i]
 			local addr = req[1]
+			local p = proto[req[2]]
+			assert(p.unpack)
 			local tag = session_coroutine_tracetag[running_thread]
 			if tag then
 				c.trace(tag, "call", 4)
 				c.send(addr, skynet.PTYPE_TRACE, 0, tag)
 			end
-			local p = proto[req[2]]
-			assert(p.unpack)
 			local session = c.send(addr, p.id , nil , p.pack(tunpack(req, 3, req.n)))
 			if session == nil then
 				err = err or {}
@@ -119,54 +119,49 @@ do ---- request/select
 	end
 
 	local function request_iter(self)
-		if self._error then
-			-- invalid address
-			local e = tremove(self._error)
-			if e then
-				self.ok = nil
-				return self, e
+		return function()
+			if self._error then
+				-- invalid address
+				local e = tremove(self._error)
+				if e then
+					return e
+				end
+				self._error = nil
 			end
-			self._error = nil
-		end
-		if self._request > 0 then
-			skynet.wait(self)
-			if self.timeout then
-				return
+			local session, resp = next(self._resp)
+			if session == nil then
+				if self._request == 0 then
+					return
+				end
+				if self.timeout then
+					return
+				end
+				skynet.wait(self)
+				if self.timeout then
+					return
+				end
+				session, resp = next(self._resp)
 			end
+
 			self._request = self._request - 1
-			local session, resp = assert(next(self._resp))
 			local req = self._sessions[session]
 			self._resp[session] = nil
 			self._sessions[session] = nil
-			local old_n = self.n
-			if resp then
-				self.ok = true
-				for i = 1, resp.n do
-					self[i] = resp[i]
-				end
-				self.n = resp.n
-			else
-				self.ok = false
-				self.n = 0
-			end
-			for i = self.n+1, old_n do
-				self[i] = nil
-			end
-			return self, req
+			return req, resp
 		end
 	end
 
 	local request_meta = {}	; request_meta.__index = request_meta
 
 	function request_meta:add(obj)
-		assert(type(obj) == "table")
+		assert(type(obj) == "table" and not self._thread)
 		self[#self+1] = obj
 		return self
 	end
 
 	request_meta.__call = request_meta.add
 
-	function request_meta:__close()
+	function request_meta:close()
 		if self._request > 0 then
 			local resp = self._resp
 			for session, req in pairs(self._sessions) do
@@ -175,6 +170,7 @@ do ---- request/select
 					watching_session[session] = nil
 				end
 			end
+			self._request = 0
 		end
 		if self._timeout then
 			session_id_coroutine[self._timeout] = "BREAK"
@@ -182,11 +178,13 @@ do ---- request/select
 		end
 	end
 
+	request_meta.__close = request_meta.close
+
 	function request_meta:select(timeout)
+		assert(self._thread == nil)
 		self._thread = coroutine_create(request_thread)
 		self._error = send_requests(self)
 		self._resp = {}
-		self.n = 0
 		if timeout then
 			self._timeout = c.intcommand("TIMEOUT",timeout)
 			session_id_coroutine[self._timeout] = self._thread
@@ -195,7 +193,7 @@ do ---- request/select
 		local running = running_thread
 		coroutine_resume(self._thread, self)
 		running_thread = running
-		return request_iter, self, nil, self
+		return request_iter(self), nil, nil, self
 	end
 
 	function skynet.request(obj)
