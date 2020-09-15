@@ -397,7 +397,7 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz, int depth)
 				break;
 			case BSON_INT64: {
 				if (len != 2 + 8) {
-					luaL_error(L, "Invalid date");
+					luaL_error(L, "Invalid int64");
 				}
 				const int64_t * v = (const int64_t *)(str + 2);
 				write_int64(bs, *v);
