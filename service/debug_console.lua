@@ -55,11 +55,17 @@ local function split_cmdline(cmdline)
 	return split
 end
 
+local function htime()
+	return skynet.hpc() / 1000000000
+end
+
 local function docmd(cmdline, print, fd)
 	local split = split_cmdline(cmdline)
 	local command = split[1]
 	local cmd = COMMAND[command]
 	local ok, list
+	local t_start = htime()
+	print(string.format("<CMD: %s>\n---------------------------------", command))
 	if cmd then
 		ok, list = pcall(cmd, table.unpack(split,2))
 	else
@@ -73,6 +79,7 @@ local function docmd(cmdline, print, fd)
 		end
 	end
 
+	local t_cost = htime() - t_start
 	if ok then
 		if list then
 			if type(list) == "string" then
@@ -81,10 +88,10 @@ local function docmd(cmdline, print, fd)
 				dump_list(print, list)
 			end
 		end
-		print("<CMD OK>")
+		print(string.format("<CMD OK> cost=%.4f sec", t_cost))
 	else
 		print(list)
-		print("<CMD Error>")
+		print(string.format("<CMD Error> cost=%.4f sec", t_cost))
 	end
 end
 
@@ -94,7 +101,7 @@ local function console_main_loop(stdin, print)
 	local ok, err = pcall(function()
 		while true do
 			local cmdline = socket.readline(stdin, "\n")
-			if not cmdline then
+			if not cmdline or cmdline == "q" or cmdline == "q\r" then
 				break
 			end
 			if cmdline:sub(1,4) == "GET " then
@@ -156,13 +163,16 @@ function COMMAND.help()
 		debug = "debug address : debug a lua service",
 		signal = "signal address sig",
 		cmem = "Show C memory info",
-		jmem = "Show jemalloc mem stats",
+    jmem = "Show jemalloc mem stats",
+		osmem = "Show OS memory stats like ps: vsz/rss",
 		ping = "ping address",
 		call = "call address ...",
 		trace = "trace address [proto] [on|off]",
 		netstat = "netstat : show netstat",
 		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
 		dumpheap = "dumpheap : dump heap profilling",
+		i = "info of this server",
+		q = "close console connection, bye",
 	}
 end
 
@@ -335,9 +345,10 @@ function COMMAND.cmem()
 	local info = memory.info()
 	local tmp = {}
 	for k,v in pairs(info) do
-		tmp[skynet.address(k)] = v
+		tmp[skynet.address(k)] = string.format("%11d  %8.2f Mb", v, v/1048576)
 	end
-	tmp.total = memory.total()
+	local total = memory.total()
+	tmp.total = string.format("%d  %.2f Mb", total, total/1048576)
 	tmp.block = memory.block()
 
 	return tmp
@@ -350,6 +361,30 @@ function COMMAND.jmem()
 		tmp[k] = string.format("%11d  %8.2f Mb", v, v/1048576)
 	end
 	return tmp
+end
+
+function COMMAND.osmem()
+    local info = {}
+    local fproc = io.open("/proc/self/statm")
+    if fproc then
+        info['vsz'],info['rss'],info['shr'],info['txt'],info['dat'] = string.match(
+                    fproc:read("a"),
+                    '(%d+)%s+(%d+)%s+(%d+)%s+(%d+)%s+%d+%s+(%d+)%s+%d+')
+        if info['vsz'] then
+            for k,v in pairs(info) do
+                info[k] = string.format("%8d Kb  %5d Mb", v*4, math.ceil(v*4/1024))
+            end
+        end
+    end
+    return info
+end
+
+function COMMAND.i()
+    local info = {}
+	info.harbor = skynet.getenv("harbor")
+	info.address = skynet.getenv("address")
+	info.path = os.getenv("PWD")
+    return info
 end
 
 function COMMAND.ping(address)
