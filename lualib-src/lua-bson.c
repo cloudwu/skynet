@@ -397,7 +397,7 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz, int depth)
 				break;
 			case BSON_INT64: {
 				if (len != 2 + 8) {
-					luaL_error(L, "Invalid int64");
+					luaL_error(L, "Invalid date");
 				}
 				const int64_t * v = (const int64_t *)(str + 2);
 				write_int64(bs, *v);
@@ -1025,7 +1025,7 @@ ldate(lua_State *L) {
 
 static int
 lint64(lua_State *L) {
-	lua_Integer d = luaL_checkinteger(L, 1);
+	int64_t d = luaL_checkinteger(L, 1);
 	luaL_Buffer b;
 	luaL_buffinit(L, &b);
 	luaL_addchar(&b, 0);
@@ -1173,7 +1173,7 @@ lsubtype(lua_State *L, int subtype, const uint8_t * buf, size_t sz) {
 		if (sz != 8) {
 			return luaL_error(L, "Invalid int64");
 		}
-		int d = *(const int *)buf;
+		int64_t d = *(const int64_t *)buf;
 		lua_pushvalue(L, lua_upvalueindex(13));
 		lua_pushinteger(L, d);
 		return 2;
