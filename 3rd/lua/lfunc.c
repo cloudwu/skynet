@@ -236,7 +236,7 @@ int luaF_close (lua_State *L, StkId level, int status) {
     setobj(L, slot, uv->v);  /* move value to upvalue slot */
     uv->v = slot;  /* now current value lives here */
     if (!iswhite(uv)) {  /* neither white nor dead? */
-      gray2black(uv);  /* closed upvalues cannot be gray */
+      nw2black(uv);  /* closed upvalues cannot be gray */
       luaC_barrier(L, uv, slot);
     }
   }

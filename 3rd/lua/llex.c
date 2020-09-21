@@ -81,7 +81,6 @@ void luaX_init (lua_State *L) {
 
 const char *luaX_token2str (LexState *ls, int token) {
   if (token < FIRST_RESERVED) {  /* single-byte symbols? */
-    lua_assert(token == cast_uchar(token));
     if (lisprint(token))
       return luaO_pushfstring(ls->L, "'%c'", token);
     else  /* control character */

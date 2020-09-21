@@ -705,9 +705,9 @@ typedef union Node {
 */
 
 #define BITRAS		(1 << 7)
-#define isrealasize(t)		(!((t)->marked & BITRAS))
-#define setrealasize(t)		((t)->marked &= cast_byte(~BITRAS))
-#define setnorealasize(t)	((t)->marked |= BITRAS)
+#define isrealasize(t)		(!((t)->flags & BITRAS))
+#define setrealasize(t)		((t)->flags &= cast_byte(~BITRAS))
+#define setnorealasize(t)	((t)->flags |= BITRAS)
 
 
 typedef struct Table {
