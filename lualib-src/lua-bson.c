@@ -395,6 +395,14 @@ append_one(struct bson *bs, lua_State *L, const char *key, size_t sz, int depth)
 			case BSON_MAXKEY:
 			case BSON_NULL:
 				break;
+			case BSON_INT64: {
+				if (len != 2 + 8) {
+					luaL_error(L, "Invalid int64");
+				}
+				const int64_t * v = (const int64_t *)(str + 2);
+				write_int64(bs, *v);
+				break;
+			}
 			default:
 				luaL_error(L,"Invalid subtype %d", subt);
 			}
@@ -1016,6 +1024,19 @@ ldate(lua_State *L) {
 }
 
 static int
+lint64(lua_State *L) {
+	int64_t d = luaL_checkinteger(L, 1);
+	luaL_Buffer b;
+	luaL_buffinit(L, &b);
+	luaL_addchar(&b, 0);
+	luaL_addchar(&b, BSON_INT64);
+	luaL_addlstring(&b, (const char *)&d, sizeof(d));
+	luaL_pushresult(&b);
+
+	return 1;
+}
+
+static int
 ltimestamp(lua_State *L) {
 	int d = luaL_checkinteger(L,1);
 	luaL_Buffer b;
@@ -1145,9 +1166,18 @@ lsubtype(lua_State *L, int subtype, const uint8_t * buf, size_t sz) {
 	case BSON_DBPOINTER:
 	case BSON_SYMBOL:
 	case BSON_CODEWS:
-		lua_pushvalue(L, lua_upvalueindex(13));
+		lua_pushvalue(L, lua_upvalueindex(14));
 		lua_pushlstring(L, (const char *)buf, sz);
 		return 2;
+	case BSON_INT64: {
+		if (sz != 8) {
+			return luaL_error(L, "Invalid int64");
+		}
+		int64_t d = *(const int64_t *)buf;
+		lua_pushvalue(L, lua_upvalueindex(13));
+		lua_pushinteger(L, d);
+		return 2;
+	}
 	default:
 		return luaL_error(L, "Invalid subtype %d", subtype);
 	}
@@ -1203,7 +1233,8 @@ typeclosure(lua_State *L) {
 		"regex",	// 10
 		"minkey",	// 11
 		"maxkey",	// 12
-		"unsupported", // 13
+		"int64",	// 13
+		"unsupported", // 14
 	};
 	int i;
 	int n = sizeof(typename)/sizeof(typename[0]);
@@ -1305,6 +1336,7 @@ luaopen_bson(lua_State *L) {
 		{ "regex", lregex },
 		{ "binary", lbinary },
 		{ "objectid", lobjectid },
+		{ "int64", lint64 },
 		{ "decode", ldecode },
 		{ NULL,  NULL },
 	};

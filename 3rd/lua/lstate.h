@@ -63,7 +63,7 @@
 ** can become gray have such a field. The field is not the same
 ** in all objects, but it always has this name.)  Any gray object
 ** must belong to one of these lists, and all objects in these lists
-** must be gray (with one exception explained below):
+** must be gray (with two exceptions explained below):
 **
 ** 'gray': regular gray objects, still waiting to be visited.
 ** 'grayagain': objects that must be revisited at the atomic phase.
@@ -75,11 +75,13 @@
 ** 'ephemeron': ephemeron tables with white->white entries;
 ** 'allweak': tables with weak keys and/or weak values to be cleared.
 **
-** The exception to that "gray rule" is the TOUCHED2 objects in
-** generational mode. Those objects stay in a gray list (because they
-** must be visited again at the end of the cycle), but they are marked
-** black (because assignments to them must activate barriers, to move
-** them back to TOUCHED1).
+** The exceptions to that "gray rule" are:
+** - TOUCHED2 objects in generational mode stay in a gray list (because
+** they must be visited again at the end of the cycle), but they are
+** marked black because assignments to them must activate barriers (to
+** move them back to TOUCHED1).
+** - Open upvales are kept gray to avoid barriers, but they stay out
+** of gray lists. (They don't even have a 'gclist' field.)
 */
 
 
@@ -331,6 +333,12 @@ struct lua_State {
 
 /*
 ** Union of all collectable objects (only for conversions)
+** ISO C99, 6.5.2.3 p.5:
+** "if a union contains several structures that share a common initial
+** sequence [...], and if the union object currently contains one
+** of these structures, it is permitted to inspect the common initial
+** part of any of them anywhere that a declaration of the complete type
+** of the union is visible."
 */
 union GCUnion {
   GCObject gc;  /* common header */
@@ -344,6 +352,11 @@ union GCUnion {
 };
 
 
+/*
+** ISO C99, 6.7.2.1 p.14:
+** "A pointer to a union object, suitably converted, points to each of
+** its members [...], and vice versa."
+*/
 #define cast_u(o)	cast(union GCUnion *, (o))
 
 /* macros to convert a GCObject into a specific value */

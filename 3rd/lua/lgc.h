@@ -12,16 +12,16 @@
 #include "lstate.h"
 
 /*
-** Collectable objects may have one of three colors: white, which
-** means the object is not marked; gray, which means the
-** object is marked, but its references may be not marked; and
-** black, which means that the object and all its references are marked.
-** The main invariant of the garbage collector, while marking objects,
-** is that a black object can never point to a white one. Moreover,
-** any gray object must be in a "gray list" (gray, grayagain, weak,
-** allweak, ephemeron) so that it can be visited again before finishing
-** the collection cycle. These lists have no meaning when the invariant
-** is not being enforced (e.g., sweep phase).
+** Collectable objects may have one of three colors: white, which means
+** the object is not marked; gray, which means the object is marked, but
+** its references may be not marked; and black, which means that the
+** object and all its references are marked.  The main invariant of the
+** garbage collector, while marking objects, is that a black object can
+** never point to a white one. Moreover, any gray object must be in a
+** "gray list" (gray, grayagain, weak, allweak, ephemeron) so that it
+** can be visited again before finishing the collection cycle. (Open
+** upvalues are an exception to this rule.)  These lists have no meaning
+** when the invariant is not being enforced (e.g., sweep phase).
 */
 
 
@@ -69,13 +69,15 @@
 
 /*
 ** Layout for bit use in 'marked' field. First three bits are
-** used for object "age" in generational mode. Last bit is free
-** to be used by respective objects.
+** used for object "age" in generational mode. Last bit is used
+** by tests.
 */
 #define WHITE0BIT	3  /* object is white (type 0) */
 #define WHITE1BIT	4  /* object is white (type 1) */
 #define BLACKBIT	5  /* object is black */
 #define FINALIZEDBIT	6  /* object has been marked for finalization */
+
+#define TESTBIT		7
 
 
 
@@ -94,7 +96,8 @@
 #define isdead(g,v)	isdeadm(otherwhite(g), (v)->marked)
 
 #define changewhite(x)	((x)->marked ^= WHITEBITS)
-#define gray2black(x)	l_setbit((x)->marked, BLACKBIT)
+#define nw2black(x)  \
+	check_exp(!iswhite(x), l_setbit((x)->marked, BLACKBIT))
 
 #define luaC_white(g)	cast_byte((g)->currentwhite & WHITEBITS)
 

@@ -3,6 +3,7 @@ local skynet = require "skynet"
 local skynet_core = require "skynet.core"
 local assert = assert
 
+local BUFFER_LIMIT = 128 * 1024
 local socket = {}	-- api
 local buffer_pool = {}	-- store all message buffer object
 local socket_pool = setmetatable( -- store all socket object
@@ -30,6 +31,10 @@ end
 local function suspend(s)
 	assert(not s.co)
 	s.co = coroutine.running()
+	if s.pause then
+		driver.start(s.id)
+		s.pause = nil
+	end
 	skynet.wait(s.co)
 	-- wakeup closing corouting every time suspend,
 	-- because socket.close() will wait last socket buffer operation before clear the buffer.
@@ -56,6 +61,10 @@ socket_message[1] = function(id, size, data)
 		if sz >= rr then
 			s.read_required = nil
 			wakeup(s)
+			if sz > BUFFER_LIMIT then
+				driver.pause(id)
+				s.pause = true
+			end
 		end
 	else
 		if s.buffer_limit and sz > s.buffer_limit then
@@ -69,7 +78,14 @@ socket_message[1] = function(id, size, data)
 			if driver.readline(s.buffer,nil,rr) then
 				s.read_required = nil
 				wakeup(s)
+				if sz > BUFFER_LIMIT then
+					driver.pause(id)
+					s.pause = true
+				end
 			end
+		elseif sz > BUFFER_LIMIT and not s.pause then
+			driver.pause(id)
+			s.pause = true
 		end
 	end
 end
@@ -81,8 +97,10 @@ socket_message[2] = function(id, _ , addr)
 		return
 	end
 	-- log remote addr
-	s.connected = true
-	wakeup(s)
+	if not s.connected then	-- resume may also post connect message
+		s.connected = true
+		wakeup(s)
+	end
 end
 
 -- SKYNET_SOCKET_TYPE_CLOSE = 3

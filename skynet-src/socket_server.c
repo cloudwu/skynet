@@ -594,7 +594,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 	status = getaddrinfo( request->host, port, &ai_hints, &ai_list );
 	if ( status != 0 ) {
 		result->data = (void *)gai_strerror(status);
-		goto _failed;
+		goto _failed_getaddrinfo;
 	}
 	int sock= -1;
 	for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next ) {
@@ -643,6 +643,7 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 	return -1;
 _failed:
 	freeaddrinfo( ai_list );
+_failed_getaddrinfo:
 	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
 	return SOCKET_ERR;
 }
