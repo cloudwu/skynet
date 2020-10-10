@@ -6,7 +6,6 @@
 
 #include "sproto.h"
 
-#define SPROTO_TARRAY 0x80
 #define CHUNK_SIZE 1000
 #define SIZEOF_LENGTH 4
 #define SIZEOF_HEADER 2
@@ -20,6 +19,7 @@ struct field {
 	const char * name;
 	struct sproto_type * st;
 	int key;
+	int map; // interpreted two fields struct as map
 	int extra;
 };
 
@@ -206,6 +206,7 @@ import_field(struct sproto *s, struct field *f, const uint8_t * stream) {
 	f->name = NULL;
 	f->st = NULL;
 	f->key = -1;
+	f->map = -1;
 	f->extra = 0;
 
 	sz = todword(stream);
@@ -262,6 +263,10 @@ import_field(struct sproto *s, struct field *f, const uint8_t * stream) {
 		case 5:	// key
 			f->key = value;
 			break;
+		case 6: // map
+			if (value)
+				f->map = 1;
+			break;
 		default:
 			return NULL;
 		}
@@ -281,6 +286,8 @@ import_field(struct sproto *s, struct field *f, const uint8_t * stream) {
 		type 2 : integer
 		tag 3 : integer
 		array 4 : boolean
+		key 5 : integer
+		map 6 : boolean // Interpreted two fields struct as map when decoding
 	}
 	name 0 : string
 	fields 1 : *field
@@ -487,6 +494,32 @@ sproto_release(struct sproto * s) {
 	pool_release(&s->memory);
 }
 
+static const char *
+get_typename(int type, struct field *f) {
+	if (type == SPROTO_TSTRUCT) {
+		return f->st->name;
+	} else {
+		switch (type) {
+		case SPROTO_TINTEGER:
+			if (f->extra)
+				return "decimal";
+			else
+				return "integer";
+		case SPROTO_TBOOLEAN:
+			return "boolean";
+		case SPROTO_TSTRING:
+			if (f->extra == SPROTO_TSTRING_BINARY)
+				return "binary";
+			else
+				return "string";
+		case SPROTO_TDOUBLE:
+			return "double";
+		default:
+			return "invalid";
+		}
+	}
+}
+
 void
 sproto_dump(struct sproto *s) {
 	int i,j;
@@ -495,50 +528,30 @@ sproto_dump(struct sproto *s) {
 		struct sproto_type *t = &s->type[i];
 		printf("%s\n", t->name);
 		for (j=0;j<t->n;j++) {
-			char array[2] = { 0, 0 };
-			const char * type_name = NULL;
+			char container[2] = { 0, 0 };
+			const char * typename = NULL;
 			struct field *f = &t->f[j];
 			int type = f->type & ~SPROTO_TARRAY;
 			if (f->type & SPROTO_TARRAY) {
-				array[0] = '*';
+				container[0] = '*';
 			} else {
-				array[0] = 0;
+				container[0] = 0;
 			}
-			if (type == SPROTO_TSTRUCT) {
-				type_name = f->st->name;
-			} else {
-				switch(type) {
-				case SPROTO_TINTEGER:
-					if (f->extra) {
-						type_name = "decimal";
-					} else {
-						type_name = "integer";
-					}
-					break;
-				case SPROTO_TBOOLEAN:
-					type_name = "boolean";
-					break;
-				case SPROTO_TSTRING:
-					if (f->extra == SPROTO_TSTRING_BINARY)
-						type_name = "binary";
-					else
-						type_name = "string";
-					break;
-				default:
-					type_name = "invalid";
-					break;
-				}
-			}
-			printf("\t%s (%d) %s%s", f->name, f->tag, array, type_name);
+			typename = get_typename(type, f);
+			printf("\t%s (%d) %s%s", f->name, f->tag, container, typename);
 			if (type == SPROTO_TINTEGER && f->extra > 0) {
 				printf("(%d)", f->extra);
 			}
 			if (f->key >= 0) {
-				printf("[%d]", f->key);
+				printf(" key[%d]", f->key);
+				if (f->map >= 0) {
+					printf(" value[%d]", f->st->f[1].tag);
+				}
 			}
 			printf("\n");
 		}
 	}
+
 	printf("=== %d protocol ===\n", s->protocol_n);
 	for (i=0;i<s->protocol_n;i++) {
 		struct protocol *p = &s->proto[i];
@@ -840,6 +853,36 @@ encode_integer_array(sproto_callback cb, struct sproto_arg *args, uint8_t *buffe
 	return buffer;
 }
 
+static uint8_t *
+encode_array_object(sproto_callback cb, struct sproto_arg *args, uint8_t *buffer, int size, int *noarray) {
+	int sz;
+	*noarray = 0;
+	args->index = 1;
+	for (;;) {
+		if (size < SIZEOF_LENGTH)
+			return NULL;
+		size -= SIZEOF_LENGTH;
+		args->value = buffer + SIZEOF_LENGTH;
+		args->length = size;
+		sz = cb(args);
+		if (sz < 0) {
+			if (sz == SPROTO_CB_NIL) {
+				break;
+			}
+			if (sz == SPROTO_CB_NOARRAY) {	// no array, don't encode it
+				*noarray = 1;
+				break;
+			}
+			return NULL;	// sz == SPROTO_CB_ERROR
+		}
+		fill_size(buffer, sz);
+		buffer += SIZEOF_LENGTH+sz;
+		size -= sz;
+		++args->index;
+	}
+	return buffer;
+}
+
 static int
 encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int size) {
 	uint8_t * buffer;
@@ -883,29 +926,15 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 			++args->index;
 		}
 		break;
-	default:
-		args->index = 1;
-		for (;;) {
-			if (size < SIZEOF_LENGTH)
-				return -1;
-			size -= SIZEOF_LENGTH;
-			args->value = buffer+SIZEOF_LENGTH;
-			args->length = size;
-			sz = cb(args);
-			if (sz < 0) {
-				if (sz == SPROTO_CB_NIL) {
-					break;
-				}
-				if (sz == SPROTO_CB_NOARRAY)	// no array, don't encode it
-					return 0;
-				return -1;	// sz == SPROTO_CB_ERROR
-			}
-			fill_size(buffer, sz);
-			buffer += SIZEOF_LENGTH+sz;
-			size -=sz;
-			++args->index;
-		}
+	default: {
+		int noarray;
+		buffer = encode_array_object(cb, args, buffer, size, &noarray);
+		if (buffer == NULL)
+			return -1;
+		if (noarray)
+			return 0;
 		break;
+	}
 	}
 	sz = buffer - (data + SIZEOF_LENGTH);
 	return fill_size(data, sz);
@@ -938,8 +967,14 @@ sproto_encode(const struct sproto_type *st, void * buffer, int size, sproto_call
 		args.subtype = f->st;
 		args.mainindex = f->key;
 		args.extra = f->extra;
+		args.ktagname = NULL;
+		args.vtagname = NULL;
 		if (type & SPROTO_TARRAY) {
-			args.type = type & ~SPROTO_TARRAY;
+			args.type = type & (~SPROTO_TARRAY);
+			if (f->map > 0) {
+				args.ktagname = f->st->f[0].name;
+				args.vtagname = f->st->f[1].name;
+			}
 			sz = encode_array(cb, &args, data, size);
 		} else {
 			args.type = type;
@@ -1168,13 +1203,20 @@ sproto_decode(const struct sproto_type *st, const void * data, int size, sproto_
 			continue;
 		args.tagname = f->name;
 		args.tagid = f->tag;
-		args.type = f->type & ~SPROTO_TARRAY;
+		args.type = f->type;
 		args.subtype = f->st;
 		args.index = 0;
 		args.mainindex = f->key;
 		args.extra = f->extra;
+		args.ktagname = NULL;
+		args.vtagname = NULL;
 		if (value < 0) {
 			if (f->type & SPROTO_TARRAY) {
+				args.type = f->type & (~SPROTO_TARRAY);
+				if (f->map > 0) {
+					args.ktagname = f->st->f[0].name;
+					args.vtagname = f->st->f[1].name;
+				}
 				if (decode_array(cb, &args, currentdata)) {
 					return -1;
 				}

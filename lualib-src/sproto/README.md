@@ -165,6 +165,7 @@ The schema text is like this:
     phone 3 : *PhoneNumber	# *PhoneNumber means an array of PhoneNumber.
     height 4 : integer(2)	# (2) means a 1/100 fixed-point number.
     data 5 : binary		# Some binary data
+    weight 6 : double   # floating number
 }
 
 .AddressBook {
@@ -216,17 +217,22 @@ Types
 * **string** : string
 * **binary** : binary string (it's a sub type of string)
 * **integer** : integer, the max length of an integer is signed 64bit. It can be a fixed-point number with specified precision.
+* **double** : double, floating-point number.
 * **boolean** : true or false
 
-You can add * before the typename to declare an array. 
+You can add * before the typename to declare an array.
 
-You can also specify a main index, the array whould be encode as an unordered map.
+You can also specify a main index with the syntax likes `*array(id)`, the array would be encode as an unordered map with the `id` field as key.
+
+For empty main index likes `*array()`, the array would be encoded as an unordered map with the first field as key and the second field as value.
 
 User defined type can be any name in alphanumeric characters except the build-in typenames, and nested types are supported.
 
 * Where are double or real types?
 
 I have been using Google protocol buffers for many years in many projects, and I found the real types were seldom used. If you really need it, you can use string to serialize the double numbers. When you need decimal, you can specify the fixed-point presision.
+
+**NOTE** : `double` is supported now.
 
 * Where is enum?
 
