@@ -470,7 +470,7 @@ ldesencode(lua_State *L) {
 	uint8_t tmp[SMALL_CHUNK];
 	uint8_t *buffer = tmp;
 	if (chunksz > SMALL_CHUNK) {
-		buffer = lua_newuserdata(L, chunksz);
+		buffer = lua_newuserdatauv(L, chunksz, 0);
 	}
 	int i;
 	for (i=0;i<(int)textsz-7;i+=8) {
@@ -503,7 +503,7 @@ ldesdecode(lua_State *L) {
 	uint8_t tmp[SMALL_CHUNK];
 	uint8_t *buffer = tmp;
 	if (textsz > SMALL_CHUNK) {
-		buffer = lua_newuserdata(L, textsz);
+		buffer = lua_newuserdatauv(L, textsz, 0);
 	}
 	for (i=0;i<textsz;i+=8) {
 		des_crypt(SK, text+i, buffer+i);
@@ -558,7 +558,7 @@ ltohex(lua_State *L) {
 	char tmp[SMALL_CHUNK];
 	char *buffer = tmp;
 	if (sz > SMALL_CHUNK/2) {
-		buffer = lua_newuserdata(L, sz * 2);
+		buffer = lua_newuserdatauv(L, sz * 2, 0);
 	}
 	int i;
 	for (i=0;i<sz;i++) {
@@ -581,7 +581,7 @@ lfromhex(lua_State *L) {
 	char tmp[SMALL_CHUNK];
 	char *buffer = tmp;
 	if (sz > SMALL_CHUNK*2) {
-		buffer = lua_newuserdata(L, sz / 2);
+		buffer = lua_newuserdatauv(L, sz / 2, 0);
 	}
 	int i;
 	for (i=0;i<sz;i+=2) {
@@ -898,7 +898,7 @@ lb64encode(lua_State *L) {
 	char tmp[SMALL_CHUNK];
 	char *buffer = tmp;
 	if (encode_sz > SMALL_CHUNK) {
-		buffer = lua_newuserdata(L, encode_sz);
+		buffer = lua_newuserdatauv(L, encode_sz, 0);
 	}
 	int i,j;
 	j=0;
@@ -953,7 +953,7 @@ lb64decode(lua_State *L) {
 	char tmp[SMALL_CHUNK];
 	char *buffer = tmp;
 	if (decode_sz > SMALL_CHUNK) {
-		buffer = lua_newuserdata(L, decode_sz);
+		buffer = lua_newuserdatauv(L, decode_sz, 0);
 	}
 	int i,j;
 	int output = 0;

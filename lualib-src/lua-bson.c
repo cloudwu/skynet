@@ -818,7 +818,7 @@ lmakeindex(lua_State *L) {
 			lua_rawset(L,-3);
 		}
 	}
-	lua_setuservalue(L,1);
+	lua_setiuservalue(L,1,1);
 	lua_settop(L,1);
 
 	return 1;
@@ -862,7 +862,7 @@ replace_object(lua_State *L, int type, struct bson * bs) {
 
 static int
 lreplace(lua_State *L) {
-	lua_getuservalue(L,1);
+	lua_getiuservalue(L,1,1);
 	if (!lua_istable(L,-1)) {
 		return luaL_error(L, "call makeindex first");
 	}
@@ -954,7 +954,7 @@ encode_bson(lua_State *L) {
 	} else {
 		pack_simple_dict(L, b, 0);
 	}
-	void * ud = lua_newuserdata(L, b->size);
+	void * ud = lua_newuserdatauv(L, b->size, 1);
 	memcpy(ud, b->ptr, b->size);
 	return 1;
 }
@@ -984,7 +984,7 @@ encode_bson_byorder(lua_State *L) {
 	lua_settop(L, --n);
 	pack_ordered_dict(L, b, n, 0);
 	lua_settop(L,0);
-	void * ud = lua_newuserdata(L, b->size);
+	void * ud = lua_newuserdatauv(L, b->size, 1);
 	memcpy(ud, b->ptr, b->size);
 	return 1;
 }

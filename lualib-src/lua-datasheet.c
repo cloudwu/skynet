@@ -68,7 +68,7 @@ create_proxy(lua_State *L, const void *data, int index) {
 	// NODECACHE, table, PROXYCACHE
 	lua_pushvalue(L, -2);
 	// NODECACHE, table, PROXYCACHE, table
-	struct proxy * p = lua_newuserdata(L, sizeof(struct proxy));
+	struct proxy * p = lua_newuserdatauv(L, sizeof(struct proxy), 0);
 	// NODECACHE, table, PROXYCACHE, table, proxy
 	p->data = data;
 	p->index = index;

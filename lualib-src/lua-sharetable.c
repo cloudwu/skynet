@@ -151,7 +151,7 @@ get_size(lua_State *L) {
 
 static int
 box_state(lua_State *L, lua_State *mL) {
-	struct state_ud *ud = (struct state_ud *)lua_newuserdata(L, sizeof(*ud));
+	struct state_ud *ud = (struct state_ud *)lua_newuserdatauv(L, sizeof(*ud), 0);
 	ud->L = mL;
 	if (luaL_newmetatable(L, "BOXMATRIXSTATE")) {
 		lua_pushvalue(L, -1);

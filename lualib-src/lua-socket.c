@@ -53,7 +53,7 @@ lfreepool(lua_State *L) {
 
 static int
 lnewpool(lua_State *L, int sz) {
-	struct buffer_node * pool = lua_newuserdata(L, sizeof(struct buffer_node) * sz);
+	struct buffer_node * pool = lua_newuserdatauv(L, sizeof(struct buffer_node) * sz, 0);
 	int i;
 	for (i=0;i<sz;i++) {
 		pool[i].msg = NULL;
@@ -71,7 +71,7 @@ lnewpool(lua_State *L, int sz) {
 
 static int
 lnewbuffer(lua_State *L) {
-	struct socket_buffer * sb = lua_newuserdata(L, sizeof(*sb));	
+	struct socket_buffer * sb = lua_newuserdatauv(L, sizeof(*sb), 0);
 	sb->size = 0;
 	sb->offset = 0;
 	sb->head = NULL;
