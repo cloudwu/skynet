@@ -11,6 +11,7 @@ local arg = table.pack(...)
 assert(arg.n <= 2)
 local ip = (arg.n == 2 and arg[1] or "127.0.0.1")
 local port = tonumber(arg[arg.n])
+local TIMEOUT = 300 -- 3 sec
 
 local COMMAND = {}
 local COMMANDX = {}
@@ -224,20 +225,32 @@ function COMMAND.list()
 	return skynet.call(".launcher", "lua", "LIST")
 end
 
-function COMMAND.stat()
-	return skynet.call(".launcher", "lua", "STAT")
+local function timeout(ti)
+	if ti then
+		ti = tonumber(ti)
+		if ti <= 0 then
+			ti = nil
+		end
+	else
+		ti = TIMEOUT
+	end
+	return ti
 end
 
-function COMMAND.mem()
-	return skynet.call(".launcher", "lua", "MEM")
+function COMMAND.stat(ti)
+	return skynet.call(".launcher", "lua", "STAT", timeout(ti))
+end
+
+function COMMAND.mem(ti)
+	return skynet.call(".launcher", "lua", "MEM", timeout(ti))
 end
 
 function COMMAND.kill(address)
 	return skynet.call(".launcher", "lua", "KILL", address)
 end
 
-function COMMAND.gc()
-	return skynet.call(".launcher", "lua", "GC")
+function COMMAND.gc(ti)
+	return skynet.call(".launcher", "lua", "GC", timeout(ti))
 end
 
 function COMMAND.exit(address)
