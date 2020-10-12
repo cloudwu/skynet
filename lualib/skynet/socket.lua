@@ -229,6 +229,15 @@ function socket.start(id, func)
 	return connect(id, func)
 end
 
+function socket.pause(id)
+	local s = socket_pool[id]
+	if s == nil or s.pause then
+		return
+	end
+	driver.pause(id)
+	s.pause = true
+end
+
 function socket.shutdown(id)
 	local s = socket_pool[id]
 	if s then
