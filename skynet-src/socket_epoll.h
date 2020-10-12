@@ -42,9 +42,9 @@ sp_del(int efd, int sock) {
 }
 
 static void 
-sp_write(int efd, int sock, void *ud, bool enable) {
+sp_enable(int efd, int sock, void *ud, bool read_enable, bool write_enable) {
 	struct epoll_event ev;
-	ev.events = EPOLLIN | (enable ? EPOLLOUT : 0);
+	ev.events = (read_enable ? EPOLLIN : 0) | (write_enable ? EPOLLOUT : 0);
 	ev.data.ptr = ud;
 	epoll_ctl(efd, EPOLL_CTL_MOD, sock, &ev);
 }
