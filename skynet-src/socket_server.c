@@ -524,34 +524,6 @@ check_wb_list(struct wb_list *s) {
 	assert(s->tail == NULL);
 }
 
-static struct socket *
-new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque, bool reading) {
-	struct socket * s = &ss->slot[HASH_ID(id)];
-	assert(s->type == SOCKET_TYPE_RESERVE);
-
-	if (sp_add(ss->event_fd, fd, s)) {
-		s->type = SOCKET_TYPE_INVALID;
-		return NULL;
-	}
-
-	s->id = id;
-	s->fd = fd;
-	s->reading = reading;
-	s->writing = false;
-	s->sending = ID_TAG16(id) << 16 | 0;
-	s->protocol = protocol;
-	s->p.size = MIN_READ_BUFFER;
-	s->opaque = opaque;
-	s->wb_size = 0;
-	s->warn_size = 0;
-	check_wb_list(&s->high);
-	check_wb_list(&s->low);
-	s->dw_buffer = NULL;
-	s->dw_size = 0;
-	memset(&s->stat, 0, sizeof(s->stat));
-	return s;
-}
-
 static inline void
 enable_write(struct socket_server *ss, struct socket *s, bool enable) {
 	if (s->writing != enable) {
@@ -566,6 +538,35 @@ enable_read(struct socket_server *ss, struct socket *s, bool enable) {
 		s->reading = enable;
 		sp_enable(ss->event_fd, s->fd, s, enable, s->writing);
 	}
+}
+
+static struct socket *
+new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque, bool reading) {
+	struct socket * s = &ss->slot[HASH_ID(id)];
+	assert(s->type == SOCKET_TYPE_RESERVE);
+
+	if (sp_add(ss->event_fd, fd, s)) {
+		s->type = SOCKET_TYPE_INVALID;
+		return NULL;
+	}
+
+	s->id = id;
+	s->fd = fd;
+	s->reading = true;
+	s->writing = false;
+	s->sending = ID_TAG16(id) << 16 | 0;
+	s->protocol = protocol;
+	s->p.size = MIN_READ_BUFFER;
+	s->opaque = opaque;
+	s->wb_size = 0;
+	s->warn_size = 0;
+	check_wb_list(&s->high);
+	check_wb_list(&s->low);
+	s->dw_buffer = NULL;
+	s->dw_size = 0;
+	memset(&s->stat, 0, sizeof(s->stat));
+	enable_read(ss, s, reading);
+	return s;
 }
 
 static inline void
