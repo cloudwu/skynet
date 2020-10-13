@@ -4,6 +4,7 @@
 #include "socket_poll.h"
 #include "atomic.h"
 #include "spinlock.h"
+#include "skynet.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -373,17 +374,17 @@ socket_server_create(uint64_t time) {
 	int fd[2];
 	poll_fd efd = sp_create();
 	if (sp_invalid(efd)) {
-		fprintf(stderr, "socket-server: create event pool failed.\n");
+		skynet_error(NULL, "socket-server: create event pool failed.");
 		return NULL;
 	}
 	if (pipe(fd)) {
 		sp_release(efd);
-		fprintf(stderr, "socket-server: create socket pair failed.\n");
+		skynet_error(NULL, "socket-server: create socket pair failed.");
 		return NULL;
 	}
 	if (sp_add(efd, fd[0], NULL)) {
 		// add recvctrl_fd to event poll
-		fprintf(stderr, "socket-server: can't add server fd to event pool.\n");
+		skynet_error(NULL, "socket-server: can't add server fd to event pool.");
 		close(fd[0]);
 		close(fd[1]);
 		sp_release(efd);
@@ -739,7 +740,7 @@ send_list_udp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 		union sockaddr_all sa;
 		socklen_t sasz = udp_socket_address(s, tmp->udp_address, &sa);
 		if (sasz == 0) {
-			fprintf(stderr, "socket-server : udp (%d) type mismatch.\n", s->id);
+			skynet_error(NULL, "socket-server : udp (%d) type mismatch.", s->id);
 			drop_udp(ss, s, list, tmp);
 			return -1;
 		}
@@ -750,7 +751,7 @@ send_list_udp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 			case AGAIN_WOULDBLOCK:
 				return -1;
 			}
-			fprintf(stderr, "socket-server : udp (%d) sendto error %s.\n",s->id, strerror(errno));
+			skynet_error(NULL, "socket-server : udp (%d) sendto error %s.",s->id, strerror(errno));
 			drop_udp(ss, s, list, tmp);
 			return -1;
 		}
@@ -931,6 +932,21 @@ append_sendbuffer_low(struct socket_server *ss,struct socket *s, struct request_
 	s->wb_size += buf->sz;
 }
 
+static int
+trigger_write(struct socket_server *ss, struct request_send * request, struct socket_message *result) {
+	int id = request->id;
+	struct socket * s = &ss->slot[HASH_ID(id)];
+	if (s->type == SOCKET_TYPE_INVALID || s->id != id)
+		return -1;
+	if (enable_write(ss, s, true)) {
+		result->opaque = s->opaque;
+		result->id = s->id;
+		result->ud = 0;
+		result->data = "enable write failed";
+		return SOCKET_ERR;
+	}
+	return -1;
+}
 
 /*
 	When send a package , we can assign the priority : PRIORITY_HIGH or PRIORITY_LOW
@@ -952,7 +968,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		return -1;
 	}
 	if (s->type == SOCKET_TYPE_PLISTEN || s->type == SOCKET_TYPE_LISTEN) {
-		fprintf(stderr, "socket-server: write to listen fd %d.\n", id);
+		skynet_error(NULL, "socket-server: write to listen fd %d.", id);
 		so.free_func((void *)request->buffer);
 		return -1;
 	}
@@ -968,7 +984,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			socklen_t sasz = udp_socket_address(s, udp_address, &sa);
 			if (sasz == 0) {
 				// udp type mismatch, just drop it.
-				fprintf(stderr, "socket-server: udp socket (%d) type mistach.\n", id);
+				skynet_error(NULL, "socket-server: udp socket (%d) type mistach.", id);
 				so.free_func((void *)request->buffer);
 				return -1;
 			}
@@ -1154,7 +1170,7 @@ block_readpipe(int pipefd, void *buffer, int sz) {
 		if (n<0) {
 			if (errno == EINTR)
 				continue;
-			fprintf(stderr, "socket-server : read pipe error %s.\n",strerror(errno));
+			skynet_error(NULL, "socket-server : read pipe error %s.",strerror(errno));
 			return;
 		}
 		// must atomic read from a pipe
@@ -1285,6 +1301,8 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 		result->ud = 0;
 		result->data = NULL;
 		return SOCKET_EXIT;
+	case 'W':
+		return trigger_write(ss, (struct request_send *)buffer, result);
 	case 'D':
 	case 'P': {
 		int priority = (type == 'D') ? PRIORITY_HIGH : PRIORITY_LOW;
@@ -1306,7 +1324,7 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 		add_udp_socket(ss, (struct request_udp *)buffer);
 		return -1;
 	default:
-		fprintf(stderr, "socket-server: Unknown ctrl %c.\n",type);
+		skynet_error(NULL, "socket-server: Unknown ctrl %c.",type);
 		return -1;
 	};
 
@@ -1325,7 +1343,7 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		case EINTR:
 			break;
 		case AGAIN_WOULDBLOCK:
-			fprintf(stderr, "socket-server: EAGAIN capture.\n");
+			skynet_error(NULL, "socket-server: EAGAIN capture.");
 			break;
 		default:
 			// close when error
@@ -1590,7 +1608,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			break;
 		}
 		case SOCKET_TYPE_INVALID:
-			fprintf(stderr, "socket-server: invalid socket\n");
+			skynet_error(NULL, "socket-server: invalid socket");
 			break;
 		default:
 			if (e->read) {
@@ -1654,7 +1672,7 @@ send_request(struct socket_server *ss, struct request_package *request, char typ
 		ssize_t n = write(ss->sendctrl_fd, &request->header[6], len+2);
 		if (n<0) {
 			if (errno != EINTR) {
-				fprintf(stderr, "socket-server : send ctrl command error %s.\n", strerror(errno));
+				skynet_error(NULL, "socket-server : send ctrl command error %s.", strerror(errno));
 			}
 			continue;
 		}
@@ -1667,7 +1685,7 @@ static int
 open_request(struct socket_server *ss, struct request_package *req, uintptr_t opaque, const char *addr, int port) {
 	int len = strlen(addr);
 	if (len + sizeof(req->u.open) >= 256) {
-		fprintf(stderr, "socket-server : Invalid addr %s.\n",addr);
+		skynet_error(NULL, "socket-server : Invalid addr %s.",addr);
 		return -1;
 	}
 	int id = reserve_id(ss);
@@ -1723,7 +1741,7 @@ socket_server_send(struct socket_server *ss, struct socket_sendbuffer *buf) {
 				union sockaddr_all sa;
 				socklen_t sasz = udp_socket_address(s, s->p.udp_address, &sa);
 				if (sasz == 0) {
-					fprintf(stderr, "socket-server : set udp (%d) address first.\n", id);
+					skynet_error(NULL, "socket-server : set udp (%d) address first.", id);
 					socket_unlock(&l);
 					so.free_func((void *)buf->buffer);
 					return -1;
@@ -1745,14 +1763,18 @@ socket_server_send(struct socket_server *ss, struct socket_sendbuffer *buf) {
 			s->dw_buffer = clone_buffer(buf, &s->dw_size);
 			s->dw_offset = n;
 
-			int err = enable_write(ss, s, true);
-
 			socket_unlock(&l);
 
-			if (err) {
-				fprintf(stderr, "socket-server : enable write (%d) failed.\n", id);
-				return -1;
-			}
+			inc_sending_ref(s, id);
+
+			struct request_package request;
+			request.u.send.id = id;
+			request.u.send.sz = 0;
+			request.u.send.buffer = NULL;
+
+			// let socket thread enable write event
+			send_request(ss, &request, 'W', sizeof(request.u.send));
+
 			return 0;
 		}
 		socket_unlock(&l);
