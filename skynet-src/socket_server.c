@@ -524,20 +524,22 @@ check_wb_list(struct wb_list *s) {
 	assert(s->tail == NULL);
 }
 
-static inline void
+static inline int
 enable_write(struct socket_server *ss, struct socket *s, bool enable) {
 	if (s->writing != enable) {
 		s->writing = enable;
-		sp_enable(ss->event_fd, s->fd, s, s->reading, enable);
+		return sp_enable(ss->event_fd, s->fd, s, s->reading, enable);
 	}
+	return 0;
 }
 
-static inline void
+static inline int
 enable_read(struct socket_server *ss, struct socket *s, bool enable) {
 	if (s->reading != enable) {
 		s->reading = enable;
-		sp_enable(ss->event_fd, s->fd, s, enable, s->writing);
+		return sp_enable(ss->event_fd, s->fd, s, enable, s->writing);
 	}
+	return 0;
 }
 
 static struct socket *
@@ -565,7 +567,10 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 	s->dw_buffer = NULL;
 	s->dw_size = 0;
 	memset(&s->stat, 0, sizeof(s->stat));
-	enable_read(ss, s, reading);
+	if (enable_read(ss, s, reading)) {
+		s->type = SOCKET_TYPE_INVALID;
+		return NULL;
+	}
 	return s;
 }
 
@@ -646,7 +651,10 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		return SOCKET_OPEN;
 	} else {
 		ns->type = SOCKET_TYPE_CONNECTING;
-		enable_write(ss, ns, true);
+		if (enable_write(ss, ns, true)) {
+			result->data = "enable write failed";
+			goto _failed;
+		}
 	}
 
 	freeaddrinfo( ai_list );
@@ -827,12 +835,21 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 		} 
 		// step 4
 		assert(send_buffer_empty(s) && s->wb_size == 0);
-		enable_write(ss, s, false);
+		int err = enable_write(ss, s, false);
 
 		if (s->type == SOCKET_TYPE_HALFCLOSE) {
 				force_close(ss, s, l, result);
 				return SOCKET_CLOSE;
 		}
+
+		if (err) {
+			result->opaque = s->opaque;
+			result->id = s->id;
+			result->ud = 0;
+			result->data = "disable write failed";
+			return SOCKET_ERR;
+		}
+
 		if(s->warn_size > 0){
 				s->warn_size = 0;
 				result->opaque = s->opaque;
@@ -964,7 +981,13 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 				return -1;
 			}
 		}
-		enable_write(ss, s, true);
+		if (enable_write(ss, s, true)) {
+			result->opaque = s->opaque;
+			result->id = s->id;
+			result->ud = 0;
+			result->data = "enable write failed";
+			return SOCKET_ERR;
+		}
 	} else {
 		if (s->protocol == PROTOCOL_TCP) {
 			if (priority == PRIORITY_LOW) {
@@ -1077,7 +1100,10 @@ resume_socket(struct socket_server *ss, struct request_resumepause *request, str
 	}
 	struct socket_lock l;
 	socket_lock_init(s, &l);
-	enable_read(ss, s, true);
+	if (enable_read(ss, s, true)) {
+		result->data = "enable read failed";
+		return SOCKET_ERR;
+	}
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
 		s->opaque = request->opaque;
@@ -1093,14 +1119,21 @@ resume_socket(struct socket_server *ss, struct request_resumepause *request, str
 	return -1;
 }
 
-static void
-pause_socket(struct socket_server *ss, struct request_resumepause *request) {
+static int
+pause_socket(struct socket_server *ss, struct request_resumepause *request, struct socket_message *result) {
 	int id = request->id;
 	struct socket *s = &ss->slot[HASH_ID(id)];
 	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
-		return;
+		return -1;
 	}
-	enable_read(ss, s, false);
+	if (enable_read(ss, s, false)) {
+		result->id = id;
+		result->opaque = request->opaque;
+		result->ud = 0;
+		result->data = "enable read failed";
+		return SOCKET_ERR;
+	}
+	return -1;
 }
 
 static void
@@ -1237,8 +1270,7 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	case 'R':
 		return resume_socket(ss,(struct request_resumepause *)buffer, result);
 	case 'S':
-		pause_socket(ss,(struct request_resumepause *)buffer);
-		return -1;
+		return pause_socket(ss,(struct request_resumepause *)buffer, result);
 	case 'B':
 		return bind_socket(ss,(struct request_bind *)buffer, result);
 	case 'L':
@@ -1408,7 +1440,11 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_lock *l
 		result->id = s->id;
 		result->ud = 0;
 		if (nomore_sending_data(s)) {
-			enable_write(ss, s, false);
+			if (enable_write(ss, s, false)) {
+				force_close(ss,s,l, result);
+				result->data = "disable write failed";
+				return SOCKET_ERR;
+			}
 		}
 		union sockaddr_all u;
 		socklen_t slen = sizeof(u);
@@ -1709,9 +1745,14 @@ socket_server_send(struct socket_server *ss, struct socket_sendbuffer *buf) {
 			s->dw_buffer = clone_buffer(buf, &s->dw_size);
 			s->dw_offset = n;
 
-			enable_write(ss, s, true);
+			int err = enable_write(ss, s, true);
 
 			socket_unlock(&l);
+
+			if (err) {
+				fprintf(stderr, "socket-server : enable write (%d) failed.\n", id);
+				return -1;
+			}
 			return 0;
 		}
 		socket_unlock(&l);
