@@ -56,7 +56,7 @@ sp_add(int kfd, int sock, void *ud) {
 }
 
 static void 
-sp_write(int kfd, int sock, void *ud, bool read_enable, bool write_enable) {
+sp_enable(int kfd, int sock, void *ud, bool read_enable, bool write_enable) {
 	struct kevent ke;
 	EV_SET(&ke, sock, EVFILT_READ, read_enable ? EV_ENABLE : EV_DISABLE, 0, 0, ud);
 	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1 || ke.flags & EV_ERROR) {
