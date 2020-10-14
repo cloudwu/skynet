@@ -89,9 +89,9 @@ local function docmd(cmdline, print, fd)
 	end
 end
 
-local function console_main_loop(stdin, print)
+local function console_main_loop(stdin, print, addr)
 	print("Welcome to skynet console")
-	skynet.error(stdin, "connected")
+	skynet.error(addr, "connected")
 	local ok, err = pcall(function()
 		while true do
 			local cmdline = socket.readline(stdin, "\n")
@@ -113,7 +113,7 @@ local function console_main_loop(stdin, print)
 	if not ok then
 		skynet.error(stdin, err)
 	end
-	skynet.error(stdin, "disconnected")
+	skynet.error(addr, "disconnect")
 	socket.close(stdin)
 end
 
@@ -130,7 +130,7 @@ skynet.start(function()
 			socket.write(id, "\n")
 		end
 		socket.start(id)
-		skynet.fork(console_main_loop, id , print)
+		skynet.fork(console_main_loop, id , print, addr)
 	end)
 end)
 
