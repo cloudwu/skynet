@@ -18,9 +18,21 @@ local function init(skynet, export)
 			skynet.ret(skynet.pack(kb))
 		end
 
+		local gcing = false
 		function dbgcmd.GC()
-
+			if gcing then
+				return
+			end
+			gcing = true
+			local before = collectgarbage "count"
+			local before_time = skynet.now()
 			collectgarbage "collect"
+			-- skip subsequent GC message
+			skynet.yield()
+			local after = collectgarbage "count"
+			local after_time = skynet.now()
+			skynet.error(string.format("GC %.2f Kb -> %.2f Kb, cost %.2f sec", before, after, (after_time - before_time) / 100))
+			gcing = false
 		end
 
 		function dbgcmd.STAT()
