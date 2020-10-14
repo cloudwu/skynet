@@ -164,6 +164,7 @@ function COMMAND.help()
 		netstat = "netstat : show netstat",
 		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
 		dumpheap = "dumpheap : dump heap profilling",
+		killtask = "killtask address threadname : threadname listed by task",
 	}
 end
 
@@ -275,6 +276,11 @@ end
 function COMMAND.task(address)
 	address = adjust_address(address)
 	return skynet.call(address,"debug","TASK")
+end
+
+function COMMAND.killtask(address, threadname)
+	address = adjust_address(address)
+	return skynet.call(address, "debug", "KILLTASK", threadname)
 end
 
 function COMMAND.uniqtask(address)

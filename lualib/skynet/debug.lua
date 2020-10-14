@@ -44,6 +44,17 @@ local function init(skynet, export)
 			skynet.ret(skynet.pack(stat))
 		end
 
+		function dbgcmd.KILLTASK(threadname)
+			local co = skynet.killthread(threadname)
+			if co then
+				skynet.error(string.format("Kill %s", co))
+				skynet.ret()
+			else
+				skynet.error(string.format("Kill %s : Not found", threadname))
+				skynet.ret(skynet.pack "Not found")
+			end
+		end
+
 		function dbgcmd.TASK(session)
 			if session then
 				skynet.ret(skynet.pack(skynet.task(session)))

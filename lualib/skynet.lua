@@ -414,6 +414,59 @@ function skynet.wait(token)
 	session_id_coroutine[session] = nil
 end
 
+function skynet.killthread(thread)
+	local session
+	-- find session
+	if type(thread) == "string" then
+		for k,v in pairs(session_id_coroutine) do
+			local thread_string = tostring(v)
+			if thread_string:find(thread) then
+				session = k
+				break
+			end
+		end
+	else
+		for i = 1, #fork_queue do
+			if fork_queue[i] == thread then
+				tremove(fork_queue, i)
+				return thread
+			end
+		end
+		for k,v in pairs(session_id_coroutine) do
+			if v == thread then
+				session = k
+				break
+			end
+		end
+	end
+	local co = session_id_coroutine[session]
+	if co == nil then
+		return
+	end
+	watching_session[session] = nil
+	local addr = session_coroutine_address[co]
+	if addr then
+		session_coroutine_address[co] = nil
+		session_coroutine_tracetag[co] = nil
+		c.send(addr, skynet.PTYPE_ERROR, session_coroutine_id[co], "")
+		session_coroutine_id[co] = nil
+	end
+	if watching_session[session] then
+		session_id_coroutine[session] = "BREAK"
+		watching_session[session] = nil
+	else
+		session_id_coroutine[session] = nil
+	end
+	for k,v in pairs(sleep_session) do
+		if v == session then
+			sleep_session[k] = nil
+			break
+		end
+	end
+	coroutine.close(co)
+	return co
+end
+
 function skynet.self()
 	return c.addresscommand "REG"
 end
@@ -941,10 +994,11 @@ function skynet.task(ret)
 	local tt = type(ret)
 	if tt == "table" then
 		for session,co in pairs(session_id_coroutine) do
+			local key = string.format("%s session: %d", tostring(co), session)
 			if timeout_traceback and timeout_traceback[co] then
-				ret[session] = timeout_traceback[co]
+				ret[key] = timeout_traceback[co]
 			else
-				ret[session] = traceback(co)
+				ret[key] = traceback(co)
 			end
 		end
 		return
