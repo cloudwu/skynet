@@ -247,7 +247,7 @@ function COMMAND.mem(ti)
 end
 
 function COMMAND.kill(address)
-	return skynet.call(".launcher", "lua", "KILL", address)
+	return skynet.call(".launcher", "lua", "KILL", adjust_address(address))
 end
 
 function COMMAND.gc(ti)

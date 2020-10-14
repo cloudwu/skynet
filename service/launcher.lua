@@ -52,7 +52,6 @@ function command.STAT(addr, ti)
 end
 
 function command.KILL(_, handle)
-	handle = handle_to_address(handle)
 	skynet.kill(handle)
 	local ret = { [skynet.address(handle)] = tostring(services[handle]) }
 	services[handle] = nil
