@@ -1069,6 +1069,7 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 	struct socket_lock l;
 	socket_lock_init(s, &l);
 	if (!nomore_sending_data(s)) {
+		enable_read(ss,s,true);
 		int type = send_buffer(ss,s,&l,result);
 		// type : -1 or SOCKET_WARNING or SOCKET_CLOSE, SOCKET_WARNING means nomore_sending_data
 		if (type != -1 && type != SOCKET_WARNING)
