@@ -27,6 +27,9 @@ local function wakeup(s)
 end
 
 local function pause_socket(s, size)
+	if s.pause then
+		return
+	end
 	if size then
 		skynet.error(string.format("Pause socket (%d) size : %d" , s.id, size))
 	else
