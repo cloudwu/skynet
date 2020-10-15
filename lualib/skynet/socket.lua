@@ -46,9 +46,11 @@ local function suspend(s)
 		skynet.yield()	-- there are subsequent socket messages in mqueue, maybe.
 		skynet.error(string.format("Resume socket (%d)", s.id))
 		driver.start(s.id)
+		skynet.wait(s.co)
 		s.pause = nil
+	else
+		skynet.wait(s.co)
 	end
-	skynet.wait(s.co)
 	-- wakeup closing corouting every time suspend,
 	-- because socket.close() will wait last socket buffer operation before clear the buffer.
 	if s.closing then
