@@ -150,7 +150,7 @@ static unsigned int luai_makeseed(lua_State *L) {
 	buff[1] = cast(size_t, &STRSEED);
 	buff[2] = cast(size_t, &luai_makeseed);
 	buff[3] = cast(size_t, L);
-	return luaS_hash((const char*)buff, sizeof(buff), h, 1);
+	return luaS_hash((const char*)buff, sizeof(buff), h);
 }
 
 #endif
