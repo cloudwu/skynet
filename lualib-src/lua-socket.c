@@ -758,6 +758,10 @@ getinfo(lua_State *L, struct socket_info *si) {
 	lua_setfield(L, -2, "rtime");
 	lua_pushinteger(L, si->wtime);
 	lua_setfield(L, -2, "wtime");
+	lua_pushboolean(L, si->reading);
+	lua_setfield(L, -2, "reading");
+	lua_pushboolean(L, si->writing);
+	lua_setfield(L, -2, "writing");
 	if (si->name[0]) {
 		lua_pushstring(L, si->name);
 		lua_setfield(L, -2, "peer");

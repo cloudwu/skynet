@@ -2185,6 +2185,8 @@ query_info(struct socket *s, struct socket_info *si) {
 	si->rtime = s->stat.rtime;
 	si->wtime = s->stat.wtime;
 	si->wbuffer = s->wb_size;
+	si->reading = s->reading;
+	si->writing = s->writing;
 
 	return 1;
 }

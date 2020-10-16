@@ -18,6 +18,8 @@ struct socket_info {
 	uint64_t rtime;
 	uint64_t wtime;
 	int64_t wbuffer;
+	uint8_t reading;
+	uint8_t writing;
 	char name[128];
 	struct socket_info *next;
 };
