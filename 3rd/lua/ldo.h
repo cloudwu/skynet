@@ -59,6 +59,7 @@ LUAI_FUNC void luaD_hook (lua_State *L, int event, int line,
                                         int fTransfer, int nTransfer);
 LUAI_FUNC void luaD_hookcall (lua_State *L, CallInfo *ci);
 LUAI_FUNC void luaD_pretailcall (lua_State *L, CallInfo *ci, StkId func, int n);
+LUAI_FUNC CallInfo *luaD_precall (lua_State *L, StkId func, int nResults);
 LUAI_FUNC void luaD_call (lua_State *L, StkId func, int nResults);
 LUAI_FUNC void luaD_callnoyield (lua_State *L, StkId func, int nResults);
 LUAI_FUNC void luaD_tryfuncTM (lua_State *L, StkId func);

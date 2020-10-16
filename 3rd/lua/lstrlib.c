@@ -1365,7 +1365,6 @@ typedef union Ftypes {
   float f;
   double d;
   lua_Number n;
-  char buff[5 * sizeof(lua_Number)];  /* enough for any float type */
 } Ftypes;
 
 
@@ -1535,12 +1534,10 @@ static void packint (luaL_Buffer *b, lua_Unsigned n,
 ** Copy 'size' bytes from 'src' to 'dest', correcting endianness if
 ** given 'islittle' is different from native endianness.
 */
-static void copywithendian (volatile char *dest, volatile const char *src,
+static void copywithendian (char *dest, const char *src,
                             int size, int islittle) {
-  if (islittle == nativeendian.little) {
-    while (size-- != 0)
-      *(dest++) = *(src++);
-  }
+  if (islittle == nativeendian.little)
+    memcpy(dest, src, size);
   else {
     dest += size - 1;
     while (size-- != 0)
@@ -1584,14 +1581,14 @@ static int str_pack (lua_State *L) {
         break;
       }
       case Kfloat: {  /* floating-point options */
-        volatile Ftypes u;
+        Ftypes u;
         char *buff = luaL_prepbuffsize(&b, size);
         lua_Number n = luaL_checknumber(L, arg);  /* get argument */
         if (size == sizeof(u.f)) u.f = (float)n;  /* copy it into 'u' */
         else if (size == sizeof(u.d)) u.d = (double)n;
         else u.n = n;
         /* move 'u' to final result, correcting endianness if needed */
-        copywithendian(buff, u.buff, size, h.islittle);
+        copywithendian(buff, (char *)&u, size, h.islittle);
         luaL_addsize(&b, size);
         break;
       }
@@ -1717,9 +1714,9 @@ static int str_unpack (lua_State *L) {
         break;
       }
       case Kfloat: {
-        volatile Ftypes u;
+        Ftypes u;
         lua_Number num;
-        copywithendian(u.buff, data + pos, size, h.islittle);
+        copywithendian((char *)&u, data + pos, size, h.islittle);
         if (size == sizeof(u.f)) num = (lua_Number)u.f;
         else if (size == sizeof(u.d)) num = (lua_Number)u.d;
         else num = u.n;
@@ -1738,7 +1735,7 @@ static int str_unpack (lua_State *L) {
         break;
       }
       case Kzstr: {
-        size_t len = (int)strlen(data + pos);
+        size_t len = strlen(data + pos);
         luaL_argcheck(L, pos + len < ld, 2,
                          "unfinished string for format 'z'");
         lua_pushlstring(L, data + pos, len);

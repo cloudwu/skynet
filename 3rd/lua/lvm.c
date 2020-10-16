@@ -229,7 +229,7 @@ static int forprep (lua_State *L, StkId ra) {
         count /= l_castS2U(-(step + 1)) + 1u;
       }
       /* store the counter in place of the limit (which won't be
-         needed anymore */
+         needed anymore) */
       setivalue(plimit, l_castU2S(count));
     }
   }
@@ -1134,7 +1134,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
 #if LUA_USE_JUMPTABLE
 #include "ljumptab.h"
 #endif
- tailcall:
+ execute:
   trap = L->hookmask;
   cl = clLvalue(s2v(ci->func));
   k = cl->p->k;
@@ -1153,7 +1153,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
     StkId ra;  /* instruction's A register */
     vmfetch();
     lua_assert(base == ci->func + 1);
-    lua_assert(base <= L->top && L->top < L->stack + L->stacksize);
+    lua_assert(base <= L->top && L->top < L->stack_last);
     /* invalidate top for instructions not expecting it */
     lua_assert(isIT(i) || (cast_void(L->top = base), 1));
     vmdispatch (GET_OPCODE(i)) {
@@ -1608,18 +1608,26 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         vmbreak;
       }
       vmcase(OP_CALL) {
+        CallInfo *newci;
         int b = GETARG_B(i);
         int nresults = GETARG_C(i) - 1;
         if (b != 0)  /* fixed number of arguments? */
           L->top = ra + b;  /* top signals number of arguments */
         /* else previous instruction set top */
-        ProtectNT(luaD_call(L, ra, nresults));
+        savepc(L);  /* in case of errors */
+        if ((newci = luaD_precall(L, ra, nresults)) == NULL)
+          updatetrap(ci);  /* C call; nothing else to be done */
+        else {  /* Lua call: run function in this same invocation */
+          ci = newci;
+          ci->callstatus = 0;  /* call re-uses 'luaV_execute' */
+          goto execute;
+        }
         vmbreak;
       }
       vmcase(OP_TAILCALL) {
         int b = GETARG_B(i);  /* number of arguments + 1 (function) */
         int nparams1 = GETARG_C(i);
-        /* delat is virtual 'func' - real 'func' (vararg functions) */
+        /* delta is virtual 'func' - real 'func' (vararg functions) */
         int delta = (nparams1) ? ci->u.l.nextraargs + nparams1 : 0;
         if (b != 0)
           L->top = ra + b;
@@ -1639,16 +1647,16 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
           checkstackGCp(L, 1, ra);
         }
         if (!ttisLclosure(s2v(ra))) {  /* C function? */
-          luaD_call(L, ra, LUA_MULTRET);  /* call it */
+          luaD_precall(L, ra, LUA_MULTRET);  /* call it */
           updatetrap(ci);
           updatestack(ci);  /* stack may have been relocated */
-          ci->func -= delta;
-          luaD_poscall(L, ci, cast_int(L->top - ra));
-          return;
+          ci->func -= delta;  /* restore 'func' (if vararg) */
+          luaD_poscall(L, ci, cast_int(L->top - ra));  /* finish caller */
+          goto ret;  /* caller returns after the tail call */
         }
-        ci->func -= delta;
+        ci->func -= delta;  /* restore 'func' (if vararg) */
         luaD_pretailcall(L, ci, ra, b);  /* prepare call frame */
-        goto tailcall;
+        goto execute;  /* execute the callee */
       }
       vmcase(OP_RETURN) {
         int n = GETARG_B(i) - 1;  /* number of results */
@@ -1667,7 +1675,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
           ci->func -= ci->u.l.nextraargs + nparams1;
         L->top = ra + n;  /* set call for 'luaD_poscall' */
         luaD_poscall(L, ci, n);
-        return;
+        goto ret;
       }
       vmcase(OP_RETURN0) {
         if (L->hookmask) {
@@ -1681,7 +1689,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
           while (nres-- > 0)
             setnilvalue(s2v(L->top++));  /* all results are nil */
         }
-        return;
+        goto ret;
       }
       vmcase(OP_RETURN1) {
         if (L->hookmask) {
@@ -1700,7 +1708,13 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
               setnilvalue(s2v(L->top++));
           }
         }
-        return;
+       ret:
+        if (ci->callstatus & CIST_FRESH)
+          return;  /* end this frame */
+        else {
+          ci = ci->previous;
+          goto execute;  /* continue running caller in this frame */
+        }
       }
       vmcase(OP_FORLOOP) {
         if (ttisinteger(s2v(ra + 2))) {  /* integer loop? */

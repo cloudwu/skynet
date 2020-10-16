@@ -281,25 +281,33 @@ static int db_setupvalue (lua_State *L) {
 ** Check whether a given upvalue from a given closure exists and
 ** returns its index
 */
-static int checkupval (lua_State *L, int argf, int argnup) {
+static void *checkupval (lua_State *L, int argf, int argnup, int *pnup) {
+  void *id;
   int nup = (int)luaL_checkinteger(L, argnup);  /* upvalue index */
   luaL_checktype(L, argf, LUA_TFUNCTION);  /* closure */
-  luaL_argcheck(L, (lua_getupvalue(L, argf, nup) != NULL), argnup,
-                   "invalid upvalue index");
-  return nup;
+  id = lua_upvalueid(L, argf, nup);
+  if (pnup) {
+    luaL_argcheck(L, id != NULL, argnup, "invalid upvalue index");
+    *pnup = nup;
+  }
+  return id;
 }
 
 
 static int db_upvalueid (lua_State *L) {
-  int n = checkupval(L, 1, 2);
-  lua_pushlightuserdata(L, lua_upvalueid(L, 1, n));
+  void *id = checkupval(L, 1, 2, NULL);
+  if (id != NULL)
+    lua_pushlightuserdata(L, id);
+  else
+    luaL_pushfail(L);
   return 1;
 }
 
 
 static int db_upvaluejoin (lua_State *L) {
-  int n1 = checkupval(L, 1, 2);
-  int n2 = checkupval(L, 3, 4);
+  int n1, n2;
+  checkupval(L, 1, 2, &n1);
+  checkupval(L, 3, 4, &n2);
   luaL_argcheck(L, !lua_iscfunction(L, 1), 1, "Lua function expected");
   luaL_argcheck(L, !lua_iscfunction(L, 3), 3, "Lua function expected");
   lua_upvaluejoin(L, 1, n1, 3, n2);
@@ -440,10 +448,7 @@ static int db_traceback (lua_State *L) {
 static int db_setcstacklimit (lua_State *L) {
   int limit = (int)luaL_checkinteger(L, 1);
   int res = lua_setcstacklimit(L, limit);
-  if (res == 0)
-    lua_pushboolean(L, 0);
-  else
-    lua_pushinteger(L, res);
+  lua_pushinteger(L, res);
   return 1;
 }
 

@@ -235,6 +235,17 @@ typedef l_uint32 Instruction;
 
 
 /*
+** Maximum depth for nested C calls, syntactical nested non-terminals,
+** and other features implemented through recursion in C. (Value must
+** fit in a 16-bit unsigned integer. It must also be compatible with
+** the size of the C stack.)
+*/
+#if !defined(LUAI_MAXCCALLS)
+#define LUAI_MAXCCALLS		200
+#endif
+
+
+/*
 ** macros that are executed whenever program enters the Lua core
 ** ('lua_lock') and leaves the core ('lua_unlock')
 */

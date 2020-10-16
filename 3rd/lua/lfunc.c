@@ -54,7 +54,7 @@ void luaF_initupvals (lua_State *L, LClosure *cl) {
     uv->v = &uv->u.value;  /* make it closed */
     setnilvalue(uv->v);
     cl->upvals[i] = uv;
-    luaC_objbarrier(L, cl, o);
+    luaC_objbarrier(L, cl, uv);
   }
 }
 

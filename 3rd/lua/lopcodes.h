@@ -261,7 +261,7 @@ OP_MMBINK,/*	A B C k		call C metamethod over R[A] and K[B]	*/
 OP_UNM,/*	A B	R[A] := -R[B]					*/
 OP_BNOT,/*	A B	R[A] := ~R[B]					*/
 OP_NOT,/*	A B	R[A] := not R[B]				*/
-OP_LEN,/*	A B	R[A] := length of R[B]				*/
+OP_LEN,/*	A B	R[A] := #R[B] (length operator)			*/
 
 OP_CONCAT,/*	A B	R[A] := R[A].. ... ..R[A + B - 1]		*/
 
@@ -297,7 +297,7 @@ OP_TFORPREP,/*	A Bx	create upvalue for R[A + 3]; pc+=Bx		*/
 OP_TFORCALL,/*	A C	R[A+4], ... ,R[A+3+C] := R[A](R[A+1], R[A+2]);	*/
 OP_TFORLOOP,/*	A Bx	if R[A+2] ~= nil then { R[A]=R[A+2]; pc -= Bx }	*/
 
-OP_SETLIST,/*	A B C k	R[A][(C-1)*FPF+i] := R[A+i], 1 <= i <= B	*/
+OP_SETLIST,/*	A B C k	R[A][C+i] := R[A+i], 1 <= i <= B		*/
 
 OP_CLOSURE,/*	A Bx	R[A] := closure(KPROTO[Bx])			*/
 

@@ -21,10 +21,12 @@
 */
 #define LUA_TUPVAL	LUA_NUMTYPES  /* upvalues */
 #define LUA_TPROTO	(LUA_NUMTYPES+1)  /* function prototypes */
+#define LUA_TDEADKEY	(LUA_NUMTYPES+2)  /* removed keys in tables */
+
 
 
 /*
-** number of all possible types (including LUA_TNONE)
+** number of all possible types (including LUA_TNONE but excluding DEADKEY)
 */
 #define LUA_TOTALTYPES		(LUA_TPROTO + 2)
 
@@ -556,7 +558,7 @@ typedef struct Proto {
 
 /*
 ** {==================================================================
-** Closures
+** Functions
 ** ===================================================================
 */
 
@@ -744,13 +746,13 @@ typedef struct Table {
 
 
 /*
-** Use a "nil table" to mark dead keys in a table. Those keys serve
-** to keep space for removed entries, which may still be part of
-** chains. Note that the 'keytt' does not have the BIT_ISCOLLECTABLE
-** set, so these values are considered not collectable and are different
-** from any valid value.
+** Dead keys in tables have the tag DEADKEY but keep their original
+** gcvalue. This distinguishes them from regular keys but allows them to
+** be found when searched in a special way. ('next' needs that to find
+** keys removed from a table during a traversal.)
 */
-#define setdeadkey(n)	(keytt(n) = LUA_TTABLE, gckey(n) = NULL)
+#define setdeadkey(node)	(keytt(node) = LUA_TDEADKEY)
+#define keyisdead(node)		(keytt(node) == LUA_TDEADKEY)
 
 /* }================================================================== */
 

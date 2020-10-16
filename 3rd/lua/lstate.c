@@ -76,7 +76,7 @@ static unsigned int luai_makeseed (lua_State *L) {
   addbuff(buff, p, &h);  /* local variable */
   addbuff(buff, p, &lua_newstate);  /* public function */
   lua_assert(p == sizeof(buff));
-  return luaS_hash(buff, p, h, 1);
+  return luaS_hash(buff, p, h);
 }
 
 #endif
@@ -97,66 +97,14 @@ void luaE_setdebt (global_State *g, l_mem debt) {
 
 
 LUA_API int lua_setcstacklimit (lua_State *L, unsigned int limit) {
-  global_State *g = G(L);
-  int ccalls;
-  luaE_freeCI(L);  /* release unused CIs */
-  ccalls = getCcalls(L);
-  if (limit >= 40000)
-    return 0;  /* out of bounds */
-  limit += CSTACKERR;
-  if (L != g-> mainthread)
-    return 0;  /* only main thread can change the C stack */
-  else if (ccalls <= CSTACKERR)
-    return 0;  /* handling overflow */
-  else {
-    int diff = limit - g->Cstacklimit;
-    if (ccalls + diff <= CSTACKERR)
-      return 0;  /* new limit would cause an overflow */
-    g->Cstacklimit = limit;  /* set new limit */
-    L->nCcalls += diff;  /* correct 'nCcalls' */
-    return limit - diff - CSTACKERR;  /* success; return previous limit */
-  }
-}
-
-
-/*
-** Decrement count of "C calls" and check for overflows. In case of
-** a stack overflow, check appropriate error ("regular" overflow or
-** overflow while handling stack overflow).  If 'nCcalls' is smaller
-** than CSTACKERR but larger than CSTACKMARK, it means it has just
-** entered the "overflow zone", so the function raises an overflow
-** error.  If 'nCcalls' is smaller than CSTACKMARK (which means it is
-** already handling an overflow) but larger than CSTACKERRMARK, does
-** not report an error (to allow message handling to work). Otherwise,
-** report a stack overflow while handling a stack overflow (probably
-** caused by a repeating error in the message handling function).
-*/
-
-void luaE_enterCcall (lua_State *L) {
-  int ncalls = getCcalls(L);
-  L->nCcalls--;
-  if (ncalls <= CSTACKERR) {  /* possible overflow? */
-    luaE_freeCI(L);  /* release unused CIs */
-    ncalls = getCcalls(L);  /* update call count */
-    if (ncalls <= CSTACKERR) {  /* still overflow? */
-      if (ncalls <= CSTACKERRMARK)  /* below error-handling zone? */
-        luaD_throw(L, LUA_ERRERR);  /* error while handling stack error */
-      else if (ncalls >= CSTACKMARK) {
-        /* not in error-handling zone; raise the error now */
-        L->nCcalls = (CSTACKMARK - 1);  /* enter error-handling zone */
-        luaG_runerror(L, "C stack overflow");
-      }
-      /* else stack is in the error-handling zone;
-         allow message handler to work */
-    }
-  }
+  UNUSED(L); UNUSED(limit);
+  return LUAI_MAXCCALLS;  /* warning?? */
 }
 
 
 CallInfo *luaE_extendCI (lua_State *L) {
   CallInfo *ci;
   lua_assert(L->ci->next == NULL);
-  luaE_enterCcall(L);
   ci = luaM_new(L, CallInfo);
   lua_assert(L->ci->next == NULL);
   L->ci->next = ci;
@@ -175,13 +123,11 @@ void luaE_freeCI (lua_State *L) {
   CallInfo *ci = L->ci;
   CallInfo *next = ci->next;
   ci->next = NULL;
-  L->nCcalls += L->nci;  /* add removed elements back to 'nCcalls' */
   while ((ci = next) != NULL) {
     next = ci->next;
     luaM_free(L, ci);
     L->nci--;
   }
-  L->nCcalls -= L->nci;  /* adjust result */
 }
 
 
@@ -194,7 +140,6 @@ void luaE_shrinkCI (lua_State *L) {
   CallInfo *next;
   if (ci == NULL)
     return;  /* no extra elements */
-  L->nCcalls += L->nci;  /* add removed elements back to 'nCcalls' */
   while ((next = ci->next) != NULL) {  /* two extra elements? */
     CallInfo *next2 = next->next;  /* next's next */
     ci->next = next2;  /* remove next from the list */
@@ -207,19 +152,39 @@ void luaE_shrinkCI (lua_State *L) {
       ci = next2;  /* continue */
     }
   }
-  L->nCcalls -= L->nci;  /* adjust result */
+}
+
+
+/*
+** Called when 'getCcalls(L)' larger or equal to LUAI_MAXCCALLS.
+** If equal, raises an overflow error. If value is larger than
+** LUAI_MAXCCALLS (which means it is handling an overflow) but
+** not much larger, does not report an error (to allow overflow
+** handling to work).
+*/
+void luaE_checkcstack (lua_State *L) {
+  if (getCcalls(L) == LUAI_MAXCCALLS)
+    luaG_runerror(L, "C stack overflow");
+  else if (getCcalls(L) >= (LUAI_MAXCCALLS / 10 * 11))
+    luaD_throw(L, LUA_ERRERR);  /* error while handing stack error */
+}
+
+
+LUAI_FUNC void luaE_incCstack (lua_State *L) {
+  L->nCcalls++;
+  if (unlikely(getCcalls(L) >= LUAI_MAXCCALLS))
+    luaE_checkcstack(L);
 }
 
 
 static void stack_init (lua_State *L1, lua_State *L) {
   int i; CallInfo *ci;
   /* initialize stack array */
-  L1->stack = luaM_newvector(L, BASIC_STACK_SIZE, StackValue);
-  L1->stacksize = BASIC_STACK_SIZE;
+  L1->stack = luaM_newvector(L, BASIC_STACK_SIZE + EXTRA_STACK, StackValue);
   for (i = 0; i < BASIC_STACK_SIZE; i++)
     setnilvalue(s2v(L1->stack + i));  /* erase new stack */
   L1->top = L1->stack;
-  L1->stack_last = L1->stack + L1->stacksize - EXTRA_STACK;
+  L1->stack_last = L1->stack + BASIC_STACK_SIZE;
   /* initialize first ci */
   ci = &L1->base_ci;
   ci->next = ci->previous = NULL;
@@ -240,7 +205,7 @@ static void freestack (lua_State *L) {
   L->ci = &L->base_ci;  /* free the entire 'ci' list */
   luaE_freeCI(L);
   lua_assert(L->nci == 0);
-  luaM_freearray(L, L->stack, L->stacksize);  /* free stack array */
+  luaM_freearray(L, L->stack, stacksize(L) + EXTRA_STACK);  /* free stack */
 }
 
 
@@ -290,7 +255,6 @@ static void preinit_thread (lua_State *L, global_State *g) {
   L->stack = NULL;
   L->ci = NULL;
   L->nci = 0;
-  L->stacksize = 0;
   L->twups = L;  /* thread has no upvalues */
   L->errorJmp = NULL;
   L->hook = NULL;
@@ -335,7 +299,7 @@ LUA_API lua_State *lua_newthread (lua_State *L) {
   setthvalue2s(L, L->top, L1);
   api_incr_top(L);
   preinit_thread(L1, g);
-  L1->nCcalls = getCcalls(L);
+  L1->nCcalls = 0;
   L1->hookmask = L->hookmask;
   L1->basehookcount = L->basehookcount;
   L1->hook = L->hook;
@@ -396,7 +360,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   preinit_thread(L, g);
   g->allgc = obj2gco(L);  /* by now, only object is the main thread */
   L->next = NULL;
-  g->Cstacklimit = L->nCcalls = LUAI_MAXCSTACK + CSTACKERR;
+  L->nCcalls = 0;
   incnny(L);  /* main thread is always non yieldable */
   g->frealloc = f;
   g->ud = ud;

@@ -1427,13 +1427,16 @@ LUA_API const char *lua_setupvalue (lua_State *L, int funcindex, int n) {
 
 
 static UpVal **getupvalref (lua_State *L, int fidx, int n, LClosure **pf) {
+  static const UpVal *const nullup = NULL;
   LClosure *f;
   TValue *fi = index2value(L, fidx);
   api_check(L, ttisLclosure(fi), "Lua function expected");
   f = clLvalue(fi);
-  api_check(L, (1 <= n && n <= f->p->sizeupvalues), "invalid upvalue index");
   if (pf) *pf = f;
-  return &f->upvals[n - 1];  /* get its upvalue pointer */
+  if (1 <= n && n <= f->p->sizeupvalues)
+    return &f->upvals[n - 1];  /* get its upvalue pointer */
+  else
+    return (UpVal**)&nullup;
 }
 
 
@@ -1445,11 +1448,14 @@ LUA_API void *lua_upvalueid (lua_State *L, int fidx, int n) {
     }
     case LUA_VCCL: {  /* C closure */
       CClosure *f = clCvalue(fi);
-      api_check(L, 1 <= n && n <= f->nupvalues, "invalid upvalue index");
-      return &f->upvalue[n - 1];
-    }
+      if (1 <= n && n <= f->nupvalues)
+        return &f->upvalue[n - 1];
+      /* else */
+    }  /* FALLTHROUGH */
+    case LUA_VLCF:
+      return NULL;  /* light C functions have no upvalues */
     default: {
-      api_check(L, 0, "closure expected");
+      api_check(L, 0, "function expected");
       return NULL;
     }
   }
@@ -1461,6 +1467,7 @@ LUA_API void lua_upvaluejoin (lua_State *L, int fidx1, int n1,
   LClosure *f1;
   UpVal **up1 = getupvalref(L, fidx1, n1, &f1);
   UpVal **up2 = getupvalref(L, fidx2, n2, NULL);
+  api_check(L, *up1 != NULL && *up2 != NULL, "invalid upvalue index");
   *up1 = *up2;
   luaC_objbarrier(L, f1, *up1);
 }
