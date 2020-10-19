@@ -1,3 +1,15 @@
+v1.4.0 (2020-10-10)
+-----------
+* Update Lua to 5.4.1
+* Add skynet.select
+* Improve mysql driver (@zero-rp @xiaojin @yxt945)
+* Improve websocket and ssl (@lvzixun)
+* Improve sproto (double @lvzixun map @t0350)
+* Add padding mode PKCS7 for DES
+* Add jmem in debug console
+* Add skynet_socket_pause for net traffic control
+* Add timestamp to default logger
+
 v1.3.0 (2019-11-19)
 -----------
 * Improve mysql driver (@yxt945)

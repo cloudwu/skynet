@@ -32,6 +32,7 @@ void socket_server_exit(struct socket_server *);
 void socket_server_close(struct socket_server *, uintptr_t opaque, int id);
 void socket_server_shutdown(struct socket_server *, uintptr_t opaque, int id);
 void socket_server_start(struct socket_server *, uintptr_t opaque, int id);
+void socket_server_pause(struct socket_server *, uintptr_t opaque, int id);
 
 // return -1 when error
 int socket_server_send(struct socket_server *, struct socket_sendbuffer *buffer);

@@ -381,7 +381,7 @@ convert_stringmap(struct context *ctx, struct table *tbl) {
 	lua_checkstack(L, ctx->string_index + LUA_MINSTACK);
 	lua_settop(L, ctx->string_index + 1);
 	lua_pushvalue(L, 1);
-	struct state * s = lua_newuserdata(L, sizeof(*s));
+	struct state * s = lua_newuserdatauv(L, sizeof(*s), 1);
 	s->dirty = 0;
 	s->ref = 0;
 	s->root = tbl;
@@ -678,7 +678,7 @@ lboxconf(lua_State *L) {
 	struct state * s = lua_touserdata(tbl->L, 1);
 	ATOM_INC(&s->ref);
 
-	struct ctrl * c = lua_newuserdata(L, sizeof(*c));
+	struct ctrl * c = lua_newuserdatauv(L, sizeof(*c), 1);
 	c->root = tbl;
 	c->update = NULL;
 	if (luaL_newmetatable(L, "confctrl")) {
@@ -742,7 +742,7 @@ lneedupdate(lua_State *L) {
 	struct ctrl * c = lua_touserdata(L, 1);
 	if (c->update) {
 		lua_pushlightuserdata(L, c->update);
-		lua_getuservalue(L, 1);
+		lua_getiuservalue(L, 1, 1);
 		return 2;
 	}
 	return 0;
@@ -759,7 +759,7 @@ lupdate(lua_State *L) {
 		return luaL_error(L, "You should update a new object");
 	}
 	lua_settop(L, 3);
-	lua_setuservalue(L, 1);
+	lua_setiuservalue(L, 1, 1);
 	c->update = n;
 
 	return 0;

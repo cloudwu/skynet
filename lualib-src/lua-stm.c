@@ -140,7 +140,7 @@ lnewwriter(lua_State *L) {
 		msg = skynet_malloc(sz);
 		memcpy(msg, tmp, sz);
 	}
-	struct boxstm * box = lua_newuserdata(L, sizeof(*box));
+	struct boxstm * box = lua_newuserdatauv(L, sizeof(*box), 0);
 	box->obj = stm_new(msg,sz);
 	lua_pushvalue(L, lua_upvalueindex(1));
 	lua_setmetatable(L, -2);
@@ -182,7 +182,7 @@ struct boxreader {
 
 static int
 lnewreader(lua_State *L) {
-	struct boxreader * box = lua_newuserdata(L, sizeof(*box));
+	struct boxreader * box = lua_newuserdatauv(L, sizeof(*box), 0);
 	box->obj = lua_touserdata(L, 1);
 	box->lastcopy = NULL;
 	lua_pushvalue(L, lua_upvalueindex(1));

@@ -11,6 +11,7 @@ local arg = table.pack(...)
 assert(arg.n <= 2)
 local ip = (arg.n == 2 and arg[1] or "127.0.0.1")
 local port = tonumber(arg[arg.n])
+local TIMEOUT = 300 -- 3 sec
 
 local COMMAND = {}
 local COMMANDX = {}
@@ -88,9 +89,9 @@ local function docmd(cmdline, print, fd)
 	end
 end
 
-local function console_main_loop(stdin, print)
+local function console_main_loop(stdin, print, addr)
 	print("Welcome to skynet console")
-	skynet.error(stdin, "connected")
+	skynet.error(addr, "connected")
 	local ok, err = pcall(function()
 		while true do
 			local cmdline = socket.readline(stdin, "\n")
@@ -112,7 +113,7 @@ local function console_main_loop(stdin, print)
 	if not ok then
 		skynet.error(stdin, err)
 	end
-	skynet.error(stdin, "disconnected")
+	skynet.error(addr, "disconnect")
 	socket.close(stdin)
 end
 
@@ -129,7 +130,7 @@ skynet.start(function()
 			socket.write(id, "\n")
 		end
 		socket.start(id)
-		skynet.fork(console_main_loop, id , print)
+		skynet.fork(console_main_loop, id , print, addr)
 	end)
 end)
 
@@ -156,12 +157,14 @@ function COMMAND.help()
 		debug = "debug address : debug a lua service",
 		signal = "signal address sig",
 		cmem = "Show C memory info",
+		jmem = "Show jemalloc mem stats",
 		ping = "ping address",
 		call = "call address ...",
 		trace = "trace address [proto] [on|off]",
 		netstat = "netstat : show netstat",
 		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
 		dumpheap = "dumpheap : dump heap profilling",
+		killtask = "killtask address threadname : threadname listed by task",
 	}
 end
 
@@ -223,20 +226,32 @@ function COMMAND.list()
 	return skynet.call(".launcher", "lua", "LIST")
 end
 
-function COMMAND.stat()
-	return skynet.call(".launcher", "lua", "STAT")
+local function timeout(ti)
+	if ti then
+		ti = tonumber(ti)
+		if ti <= 0 then
+			ti = nil
+		end
+	else
+		ti = TIMEOUT
+	end
+	return ti
 end
 
-function COMMAND.mem()
-	return skynet.call(".launcher", "lua", "MEM")
+function COMMAND.stat(ti)
+	return skynet.call(".launcher", "lua", "STAT", timeout(ti))
+end
+
+function COMMAND.mem(ti)
+	return skynet.call(".launcher", "lua", "MEM", timeout(ti))
 end
 
 function COMMAND.kill(address)
-	return skynet.call(".launcher", "lua", "KILL", address)
+	return skynet.call(".launcher", "lua", "KILL", adjust_address(address))
 end
 
-function COMMAND.gc()
-	return skynet.call(".launcher", "lua", "GC")
+function COMMAND.gc(ti)
+	return skynet.call(".launcher", "lua", "GC", timeout(ti))
 end
 
 function COMMAND.exit(address)
@@ -261,6 +276,11 @@ end
 function COMMAND.task(address)
 	address = adjust_address(address)
 	return skynet.call(address,"debug","TASK")
+end
+
+function COMMAND.killtask(address, threadname)
+	address = adjust_address(address)
+	return skynet.call(address, "debug", "KILLTASK", threadname)
 end
 
 function COMMAND.uniqtask(address)
@@ -339,6 +359,15 @@ function COMMAND.cmem()
 	tmp.total = memory.total()
 	tmp.block = memory.block()
 
+	return tmp
+end
+
+function COMMAND.jmem()
+	local info = memory.jestat()
+	local tmp = {}
+	for k,v in pairs(info) do
+		tmp[k] = string.format("%11d  %8.2f Mb", v, v/1048576)
+	end
 	return tmp
 end
 

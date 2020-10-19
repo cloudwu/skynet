@@ -18,9 +18,21 @@ local function init(skynet, export)
 			skynet.ret(skynet.pack(kb))
 		end
 
+		local gcing = false
 		function dbgcmd.GC()
-
+			if gcing then
+				return
+			end
+			gcing = true
+			local before = collectgarbage "count"
+			local before_time = skynet.now()
 			collectgarbage "collect"
+			-- skip subsequent GC message
+			skynet.yield()
+			local after = collectgarbage "count"
+			local after_time = skynet.now()
+			skynet.error(string.format("GC %.2f Kb -> %.2f Kb, cost %.2f sec", before, after, (after_time - before_time) / 100))
+			gcing = false
 		end
 
 		function dbgcmd.STAT()
@@ -30,6 +42,17 @@ local function init(skynet, export)
 			stat.cpu = skynet.stat "cpu"
 			stat.message = skynet.stat "message"
 			skynet.ret(skynet.pack(stat))
+		end
+
+		function dbgcmd.KILLTASK(threadname)
+			local co = skynet.killthread(threadname)
+			if co then
+				skynet.error(string.format("Kill %s", co))
+				skynet.ret()
+			else
+				skynet.error(string.format("Kill %s : Not found", threadname))
+				skynet.ret(skynet.pack "Not found")
+			end
 		end
 
 		function dbgcmd.TASK(session)

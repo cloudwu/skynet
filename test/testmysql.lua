@@ -103,7 +103,7 @@ local function test_sp_blob(db)
 	]]
 	local stmt_insert = db:prepare("INSERT test (str,dt,flt,num,blb) VALUES (?,?,?,?,?)")
 	local stmt_csp = db:prepare("call get_test(?)")
-	local test_blob = string.char(0x01,0x02,0x03,0x04,0x0a,0x0b,0x0d,0x0e,0x10,0x20,0x30,0x40)
+	local test_blob = string.char(0xFF,0x8F,0x03,0x04,0x0a,0x0b,0x0d,0x0e,0x10,0x20,0x30,0x40)
 
 	local r = db:execute(stmt_insert,'test_str','2020-3-20 15:30:40',3.1415,89,test_blob)
 	print("insert result : insert_id",r.insert_id,"affected_rows",r.affected_rows
@@ -117,17 +117,33 @@ local function test_sp_blob(db)
 	print("test stored procedure ok")
 end
 
+local function test_signed(db)
+    local res = db:query("drop table if exists test_i_u")
+    res = db:query("create table test_i_u (i tinyint primary key, u tinyint unsigned)")
+    print(dump(res))
+
+    res = db:query("insert into test_i_u (i,u) values (-1,1),(127,128),(-127,255)")
+    print(dump(res))
+
+    local prep = "SELECT * FROM test_i_u"
+    local stmt = db:prepare(prep)
+    local res = db:execute(stmt)
+    print("test_i_u: ", dump(res))
+    db:stmt_close(stmt)
+end
+
 skynet.start(function()
 
 	local function on_connect(db)
-		db:query("set charset utf8");
+		db:query("set charset utf8mb4");
 	end
 	local db=mysql.connect({
 		host="127.0.0.1",
 		port=3306,
 		database="skynet",
 		user="root",
-		password="1",
+		password="123456",
+                charset="utf8mb4",
 		max_packet_size = 1024 * 1024,
 		on_connect = on_connect
 	})
@@ -150,6 +166,8 @@ skynet.start(function()
 
 	-- 测试存储过程和二进制blob
 	test_sp_blob(db)
+	
+	test_signed(db)
 
     -- test in another coroutine
 	skynet.fork( test2, db)
