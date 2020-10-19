@@ -369,7 +369,9 @@ ldesencode(lua_State *L) {
 	des_key(L, SK);
 
 	size_t textsz = 0;
+	size_t ecbsz = 0;
 	const uint8_t * text = (const uint8_t *)luaL_checklstring(L, 2, &textsz);
+	const char * ecb = (const char *)luaL_checklstring(L, 3, &ecbsz);
 	size_t chunksz = (textsz + 8) & ~7;
 	uint8_t tmp[SMALL_CHUNK];
 	uint8_t *buffer = tmp;
@@ -383,15 +385,31 @@ ldesencode(lua_State *L) {
 	int bytes = textsz - i;
 	uint8_t tail[8];
 	int j;
-	for (j=0;j<8;j++) {
-		if (j < bytes) {
-			tail[j] = text[i+j];
-		} else if (j==bytes) {
-			tail[j] = 0x80;
-		} else {
-			tail[j] = 0;
+
+	// pkcs5-padding ecb 
+	if (ecbsz > 0 && ecb && (strcmp(ecb, "ecb") == 0)){
+		uint8_t pending = (8-bytes);
+		for (j=0;j<8;j++) {
+			if (j < bytes) {
+				tail[j] = text[i+j];
+			} else {
+				tail[j] = pending;
+			}
+		}
+
+	}else{ 
+		for (j=0;j<8;j++) {
+			if (j < bytes) {
+				tail[j] = text[i+j];
+			} else if (j==bytes) {
+				tail[j] = 0x80;
+			} else {
+				tail[j] = 0;
+			}
 		}
 	}
+	
+
 	des_crypt(SK, tail, buffer+i);
 	lua_pushlstring(L, (const char *)buffer, chunksz);
 
@@ -403,7 +421,8 @@ ldesdecode(lua_State *L) {
 	uint32_t ESK[32];
 	des_key(L, ESK);
 	uint32_t SK[32];
-	int i;
+
+	int i,j,x;
 	for( i = 0; i < 32; i += 2 ) {
 		SK[i] = ESK[30 - i];
 		SK[i + 1] = ESK[31 - i];
@@ -428,11 +447,23 @@ ldesdecode(lua_State *L) {
 		} else if (buffer[i] == 0x80) {
 			break;
 		} else {
-			return luaL_error(L, "Invalid des crypt text");
+			// pkcs5-padding ecb
+			if (buffer[textsz-1] <= 0x08){
+				j = (int)(buffer[textsz-1]);
+				for(x=(textsz-j); x<=(textsz-1); x++){
+					if (buffer[x] != buffer[textsz-1]){
+						return luaL_error(L, "Invalid ecb format text");
+					}
+				}
+				padding = j;
+				break;
+			}
+			//des crypt succeed
+			return luaL_error(L, "Invalid des crypt text ");
 		}
 	}
 	if (padding > 8) {
-		return luaL_error(L, "Invalid des crypt text");
+		return luaL_error(L, "Invalid des crypt text ");
 	}
 	lua_pushlstring(L, (const char *)buffer, textsz - padding);
 	return 1;
