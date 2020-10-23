@@ -1082,6 +1082,7 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 		return SOCKET_CLOSE;
 	}
 	s->type = SOCKET_TYPE_HALFCLOSE;
+	shutdown(s->fd, SHUT_RD);
 
 	return -1;
 }
