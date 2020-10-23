@@ -525,8 +525,8 @@ snlua_signal(struct snlua *l, int signal) {
 			if (!ATOM_CAS(&l->trap, 0, 1))
 				return;
 			lua_sethook (l->activeL, signal_hook, LUA_MASKCOUNT, 1);
-			// set finish ( l->trap 1 -> -1 )
-			l->trap = -1;
+			// finish set ( l->trap 1 -> -1 )
+			ATOM_CAS(&l->trap, 1, -1);
 		}
 	} else if (signal == 1) {
 		skynet_error(l->ctx, "Current Memory %.3fK", (float)l->mem / 1024);
