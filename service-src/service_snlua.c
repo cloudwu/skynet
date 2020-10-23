@@ -1,4 +1,5 @@
 #include "skynet.h"
+#include "atomic.h"
 
 #include <lua.h>
 #include <lualib.h>
@@ -87,6 +88,10 @@ lua_resumeX(lua_State *L, lua_State *from, int nargs, int *nresults) {
 	struct snlua *l = (struct snlua *)ud;
 	switchL(L, l);
 	int err = lua_resume(L, from, nargs, nresults);
+	if (l->trap) {
+		// wait for lua_sethook. (l->trap == -1)
+		while (l->trap >= 0) ;
+	}
 	switchL(from, l);
 	return err;
 }
@@ -516,8 +521,12 @@ snlua_signal(struct snlua *l, int signal) {
 	skynet_error(l->ctx, "recv a signal %d", signal);
 	if (signal == 0) {
 		if (l->trap == 0) {
-			l->trap = 1;
+			// only one thread can set trap ( l->trap 0->1 )
+			if (!ATOM_CAS(&l->trap, 0, 1))
+				return;
 			lua_sethook (l->activeL, signal_hook, LUA_MASKCOUNT, 1);
+			// set finish ( l->trap 1 -> -1 )
+			l->trap = -1;
 		}
 	} else if (signal == 1) {
 		skynet_error(l->ctx, "Current Memory %.3fK", (float)l->mem / 1024);
