@@ -108,6 +108,37 @@ function test_find_and_remove()
 	assert(ret == nil)
 end
 
+function test_runcommand()
+	local ok, err, ret
+	local c = _create_client()
+	local db = c[db_name]
+
+	db.testcoll:dropIndex("*")
+	db.testcoll:drop()
+
+	ok, err, ret = db.testcoll:safe_insert({test_key = 1, test_key2 = 1})
+	assert(ok and ret and ret.n == 1, err)
+
+	ok, err, ret = db.testcoll:safe_insert({test_key = 1, test_key2 = 2})
+	assert(ok and ret and ret.n == 1, err)
+
+	ok, err, ret = db.testcoll:safe_insert({test_key = 2, test_key2 = 3})
+	assert(ok and ret and ret.n == 1, err)
+
+	local pipeline = {
+		{
+			["$group"] = {
+				_id = mongo.null,
+				test_key_total = { ["$sum"] = "$test_key"},
+				test_key2_total = { ["$sum"] = "$test_key2" },
+			}
+		}
+	}
+	ret = db:runCommand("aggregate", "testcoll", "pipeline", pipeline, "cursor", {})
+	assert(ret and ret.cursor.firstBatch[1].test_key_total == 4)
+	assert(ret and ret.cursor.firstBatch[1].test_key2_total == 6)
+end
+
 function test_expire_index()
 	local ok, err, ret
 	local c = _create_client()
@@ -148,6 +179,8 @@ skynet.start(function()
 	test_insert_with_index()
 	print("Test find and remove")
 	test_find_and_remove()
+	print("Test runCommand")
+	test_runcommand()
 	print("Test expire index")
 	test_expire_index()
 	print("mongodb test finish.");
