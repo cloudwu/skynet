@@ -166,17 +166,24 @@ static Node *mainpositionTV (const Table *t, const TValue *key) {
 
 
 /*
-** Check whether key 'k1' is equal to the key in node 'n2'.
-** This equality is raw, so there are no metamethods. Floats
-** with integer values have been normalized, so integers cannot
-** be equal to floats. It is assumed that 'eqshrstr' is simply
-** pointer equality, so that short strings are handled in the
-** default case.
+** Check whether key 'k1' is equal to the key in node 'n2'. This
+** equality is raw, so there are no metamethods. Floats with integer
+** values have been normalized, so integers cannot be equal to
+** floats. It is assumed that 'eqshrstr' is simply pointer equality, so
+** that short strings are handled in the default case.
 ** A true 'deadok' means to accept dead keys as equal to their original
-** values, which can only happen if the original key was collectable.
-** All dead values are compared in the default case, by pointer
-** identity.  (Note that dead long strings are also compared by
-** identity).
+** values. All dead keys are compared in the default case, by pointer
+** identity. (Only collectable objects can produce dead keys.) Note that
+** dead long strings are also compared by identity.
+** Once a key is dead, its corresponding value may be collected, and
+** then another value can be created with the same address. If this
+** other value is given to 'next', 'equalkey' will signal a false
+** positive. In a regular traversal, this situation should never happen,
+** as all keys given to 'next' came from the table itself, and therefore
+** could not have been collected. Outside a regular traversal, we
+** have garbage in, garbage out. What is relevant is that this false
+** positive does not break anything.  (In particular, 'next' will return
+** some other valid item on the table or nil.)
 */
 static int equalkey (const TValue *k1, const Node *n2, int deadok) {
   if ((rawtt(k1) != keytt(n2)) &&  /* not the same variants? */

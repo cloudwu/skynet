@@ -1094,14 +1094,10 @@ void luaV_finishOp (lua_State *L) {
 #define ProtectNT(exp)  (savepc(L), (exp), updatetrap(ci))
 
 /*
-** Protect code that will finish the loop (returns) or can only raise
-** errors. (That is, it will not return to the interpreter main loop
-** after changing the stack or hooks.)
+** Protect code that can only raise errors. (That is, it cannnot change
+** the stack or hooks.)
 */
 #define halfProtect(exp)  (savestate(L,ci), (exp))
-
-/* idem, but without changing the stack */
-#define halfProtectNT(exp)  (savepc(L), (exp))
 
 /* 'c' is the limit of live values in the stack */
 #define checkGC(L,c)  \
@@ -1134,17 +1130,20 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
 #if LUA_USE_JUMPTABLE
 #include "ljumptab.h"
 #endif
- execute:
+ startfunc:
   trap = L->hookmask;
+ returning:  /* trap already set */
   cl = clLvalue(s2v(ci->func));
   k = cl->p->k;
   pc = ci->u.l.savedpc;
   if (trap) {
-    if (cl->p->is_vararg)
-      trap = 0;  /* hooks will start after VARARGPREP instruction */
-    else if (pc == cl->p->code)  /* first instruction (not resuming)? */
-      luaD_hookcall(L, ci);
-    ci->u.l.trap = 1;  /* there may be other hooks */
+    if (pc == cl->p->code) {  /* first instruction (not resuming)? */
+      if (cl->p->is_vararg)
+        trap = 0;  /* hooks will start after VARARGPREP instruction */
+      else  /* check 'call' hook */
+        luaD_hookcall(L, ci);
+    }
+    ci->u.l.trap = 1;  /* assume trap is on, for now */
   }
   base = ci->func + 1;
   /* main loop of interpreter */
@@ -1617,10 +1616,10 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         savepc(L);  /* in case of errors */
         if ((newci = luaD_precall(L, ra, nresults)) == NULL)
           updatetrap(ci);  /* C call; nothing else to be done */
-        else {  /* Lua call: run function in this same invocation */
+        else {  /* Lua call: run function in this same C frame */
           ci = newci;
           ci->callstatus = 0;  /* call re-uses 'luaV_execute' */
-          goto execute;
+          goto startfunc;
         }
         vmbreak;
       }
@@ -1633,7 +1632,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
           L->top = ra + b;
         else  /* previous instruction set top */
           b = cast_int(L->top - ra);
-        savepc(ci);  /* some calls here can raise errors */
+        savepc(ci);  /* several calls here can raise errors */
         if (TESTARG_k(i)) {
           /* close upvalues from current call; the compiler ensures
              that there are no to-be-closed variables here, so this
@@ -1652,11 +1651,12 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
           updatestack(ci);  /* stack may have been relocated */
           ci->func -= delta;  /* restore 'func' (if vararg) */
           luaD_poscall(L, ci, cast_int(L->top - ra));  /* finish caller */
+          updatetrap(ci);  /* 'luaD_poscall' can change hooks */
           goto ret;  /* caller returns after the tail call */
         }
         ci->func -= delta;  /* restore 'func' (if vararg) */
         luaD_pretailcall(L, ci, ra, b);  /* prepare call frame */
-        goto execute;  /* execute the callee */
+        goto startfunc;  /* execute the callee */
       }
       vmcase(OP_RETURN) {
         int n = GETARG_B(i) - 1;  /* number of results */
@@ -1675,12 +1675,15 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
           ci->func -= ci->u.l.nextraargs + nparams1;
         L->top = ra + n;  /* set call for 'luaD_poscall' */
         luaD_poscall(L, ci, n);
+        updatetrap(ci);  /* 'luaD_poscall' can change hooks */
         goto ret;
       }
       vmcase(OP_RETURN0) {
         if (L->hookmask) {
           L->top = ra;
-          halfProtectNT(luaD_poscall(L, ci, 0));  /* no hurry... */
+          savepc(ci);
+          luaD_poscall(L, ci, 0);  /* no hurry... */
+          trap = 1;
         }
         else {  /* do the 'poscall' here */
           int nres = ci->nresults;
@@ -1694,7 +1697,9 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
       vmcase(OP_RETURN1) {
         if (L->hookmask) {
           L->top = ra + 1;
-          halfProtectNT(luaD_poscall(L, ci, 1));  /* no hurry... */
+          savepc(ci);
+          luaD_poscall(L, ci, 1);  /* no hurry... */
+          trap = 1;
         }
         else {  /* do the 'poscall' here */
           int nres = ci->nresults;
@@ -1708,12 +1713,12 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
               setnilvalue(s2v(L->top++));
           }
         }
-       ret:
+       ret:  /* return from a Lua function */
         if (ci->callstatus & CIST_FRESH)
           return;  /* end this frame */
         else {
           ci = ci->previous;
-          goto execute;  /* continue running caller in this frame */
+          goto returning;  /* continue running caller in this frame */
         }
       }
       vmcase(OP_FORLOOP) {

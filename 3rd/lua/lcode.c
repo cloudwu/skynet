@@ -753,7 +753,7 @@ void luaK_setoneret (FuncState *fs, expdesc *e) {
 
 
 /*
-** Ensure that expression 'e' is not a variable (nor a constant).
+** Ensure that expression 'e' is not a variable (nor a <const>).
 ** (Expression still may have jump lists.)
 */
 void luaK_dischargevars (FuncState *fs, expdesc *e) {
@@ -805,8 +805,8 @@ void luaK_dischargevars (FuncState *fs, expdesc *e) {
 
 
 /*
-** Ensures expression value is in register 'reg' (and therefore
-** 'e' will become a non-relocatable expression).
+** Ensure expression value is in register 'reg', making 'e' a
+** non-relocatable expression.
 ** (Expression still may have jump lists.)
 */
 static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
@@ -860,7 +860,8 @@ static void discharge2reg (FuncState *fs, expdesc *e, int reg) {
 
 
 /*
-** Ensures expression value is in any register.
+** Ensure expression value is in a register, making 'e' a
+** non-relocatable expression.
 ** (Expression still may have jump lists.)
 */
 static void discharge2anyreg (FuncState *fs, expdesc *e) {
@@ -946,8 +947,11 @@ int luaK_exp2anyreg (FuncState *fs, expdesc *e) {
       exp2reg(fs, e, e->u.info);  /* put final result in it */
       return e->u.info;
     }
+    /* else expression has jumps and cannot change its register
+       to hold the jump values, because it is a local variable.
+       Go through to the default case. */
   }
-  luaK_exp2nextreg(fs, e);  /* otherwise, use next available register */
+  luaK_exp2nextreg(fs, e);  /* default: use next available register */
   return e->u.info;
 }
 

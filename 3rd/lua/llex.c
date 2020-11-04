@@ -254,9 +254,10 @@ static int read_numeral (LexState *ls, SemInfo *seminfo) {
 
 
 /*
-** reads a sequence '[=*[' or ']=*]', leaving the last bracket.
-** If sequence is well formed, return its number of '='s + 2; otherwise,
-** return 1 if there is no '='s or 0 otherwise (an unfinished '[==...').
+** read a sequence '[=*[' or ']=*]', leaving the last bracket. If
+** sequence is well formed, return its number of '='s + 2; otherwise,
+** return 1 if it is a single bracket (no '='s and no 2nd bracket);
+** otherwise (an unfinished '[==...') return 0.
 */
 static size_t skip_sep (LexState *ls) {
   size_t count = 0;
@@ -481,34 +482,34 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       }
       case '=': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_EQ;
+        if (check_next1(ls, '=')) return TK_EQ;  /* '==' */
         else return '=';
       }
       case '<': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_LE;
-        else if (check_next1(ls, '<')) return TK_SHL;
+        if (check_next1(ls, '=')) return TK_LE;  /* '<=' */
+        else if (check_next1(ls, '<')) return TK_SHL;  /* '<<' */
         else return '<';
       }
       case '>': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_GE;
-        else if (check_next1(ls, '>')) return TK_SHR;
+        if (check_next1(ls, '=')) return TK_GE;  /* '>=' */
+        else if (check_next1(ls, '>')) return TK_SHR;  /* '>>' */
         else return '>';
       }
       case '/': {
         next(ls);
-        if (check_next1(ls, '/')) return TK_IDIV;
+        if (check_next1(ls, '/')) return TK_IDIV;  /* '//' */
         else return '/';
       }
       case '~': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_NE;
+        if (check_next1(ls, '=')) return TK_NE;  /* '~=' */
         else return '~';
       }
       case ':': {
         next(ls);
-        if (check_next1(ls, ':')) return TK_DBCOLON;
+        if (check_next1(ls, ':')) return TK_DBCOLON;  /* '::' */
         else return ':';
       }
       case '"': case '\'': {  /* short literal strings */
@@ -547,7 +548,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
             return TK_NAME;
           }
         }
-        else {  /* single-char tokens (+ - / ...) */
+        else {  /* single-char tokens ('+', '*', '%', '{', '}', ...) */
           int c = ls->current;
           next(ls);
           return c;

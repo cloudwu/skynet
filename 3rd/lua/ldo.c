@@ -534,11 +534,11 @@ CallInfo *luaD_precall (lua_State *L, StkId func, int nresults) {
 
 
 /*
-** Call a function (C or Lua). 'inc' can be 1 (increment number
-** of recursive invocations in the C stack) or nyci (the same plus
-** increment number of non-yieldable calls).
+** Call a function (C or Lua) through C. 'inc' can be 1 (increment
+** number of recursive invocations in the C stack) or nyci (the same
+** plus increment number of non-yieldable calls).
 */
-static void docall (lua_State *L, StkId func, int nResults, int inc) {
+static void ccall (lua_State *L, StkId func, int nResults, int inc) {
   CallInfo *ci;
   L->nCcalls += inc;
   if (unlikely(getCcalls(L) >= LUAI_MAXCCALLS))
@@ -552,10 +552,10 @@ static void docall (lua_State *L, StkId func, int nResults, int inc) {
 
 
 /*
-** External interface for 'docall'
+** External interface for 'ccall'
 */
 void luaD_call (lua_State *L, StkId func, int nResults) {
-  return docall(L, func, nResults, 1);
+  ccall(L, func, nResults, 1);
 }
 
 
@@ -563,7 +563,7 @@ void luaD_call (lua_State *L, StkId func, int nResults) {
 ** Similar to 'luaD_call', but does not allow yields during the call.
 */
 void luaD_callnoyield (lua_State *L, StkId func, int nResults) {
-  return docall(L, func, nResults, nyci);
+  ccall(L, func, nResults, nyci);
 }
 
 
@@ -678,7 +678,7 @@ static void resume (lua_State *L, void *ud) {
   StkId firstArg = L->top - n;  /* first argument */
   CallInfo *ci = L->ci;
   if (L->status == LUA_OK)  /* starting a coroutine? */
-    docall(L, firstArg - 1, LUA_MULTRET, 1);  /* just call its body */
+    ccall(L, firstArg - 1, LUA_MULTRET, 1);  /* just call its body */
   else {  /* resuming from previous yield */
     lua_assert(L->status == LUA_YIELD);
     L->status = LUA_OK;  /* mark that it is running (again) */

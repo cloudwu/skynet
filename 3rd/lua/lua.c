@@ -416,14 +416,18 @@ static int handle_luainit (lua_State *L) {
 
 
 /*
-** Returns the string to be used as a prompt by the interpreter.
+** Return the string to be used as a prompt by the interpreter. Leave
+** the string (or nil, if using the default value) on the stack, to keep
+** it anchored.
 */
 static const char *get_prompt (lua_State *L, int firstline) {
-  const char *p;
-  lua_getglobal(L, firstline ? "_PROMPT" : "_PROMPT2");
-  p = lua_tostring(L, -1);
-  if (p == NULL) p = (firstline ? LUA_PROMPT : LUA_PROMPT2);
-  return p;
+  if (lua_getglobal(L, firstline ? "_PROMPT" : "_PROMPT2") == LUA_TNIL)
+    return (firstline ? LUA_PROMPT : LUA_PROMPT2);  /* use the default */
+  else {  /* apply 'tostring' over the value */
+    const char *p = luaL_tolstring(L, -1, NULL);
+    lua_remove(L, -2);  /* remove original value */
+    return p;
+  }
 }
 
 /* mark in error messages for incomplete statements */
