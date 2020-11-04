@@ -139,7 +139,7 @@ struct lua_longjmp;  /* defined in ldo.c */
 
 #define BASIC_STACK_SIZE        (2*LUA_MINSTACK)
 
-#define stacksize(th)  cast_int((th)->stack_last + EXTRA_STACK - (th)->stack)
+#define stacksize(th)	cast_int((th)->stack_last - (th)->stack)
 
 
 /* kinds of Garbage Collection */
