@@ -283,10 +283,10 @@ LUALIB_API int luaL_fileresult (lua_State *L, int stat, const char *fname) {
 
 
 LUALIB_API int luaL_execresult (lua_State *L, int stat) {
-  const char *what = "exit";  /* type of termination */
   if (stat != 0 && errno != 0)  /* error with an 'errno'? */
     return luaL_fileresult(L, 0, NULL);
   else {
+    const char *what = "exit";  /* type of termination */
     l_inspectstat(stat, what);  /* interpret result */
     if (*what == 'e' && stat == 0)  /* successful termination? */
       lua_pushboolean(L, 1);
@@ -1006,43 +1006,67 @@ static int panic (lua_State *L) {
 
 
 /*
-** Emit a warning. '*warnstate' means:
-** 0 - warning system is off;
-** 1 - ready to start a new message;
-** 2 - previous message is to be continued.
+** Warning functions:
+** warnfoff: warning system is off
+** warnfon: ready to start a new message
+** warnfcont: previous message is to be continued
 */
-static void warnf (void *ud, const char *message, int tocont) {
-  int *warnstate = (int *)ud;
-  if (*warnstate != 2 && !tocont && *message == '@') {  /* control message? */
-    if (strcmp(message, "@off") == 0)
-      *warnstate = 0;
-    else if (strcmp(message, "@on") == 0)
-      *warnstate = 1;
-    return;
+static void warnfoff (void *ud, const char *message, int tocont);
+static void warnfon (void *ud, const char *message, int tocont);
+static void warnfcont (void *ud, const char *message, int tocont);
+
+
+/*
+** Check whether message is a control message. If so, execute the
+** control or ignore it if unknown.
+*/
+static int checkcontrol (lua_State *L, const char *message, int tocont) {
+  if (tocont || *(message++) != '@')  /* not a control message? */
+    return 0;
+  else {
+    if (strcmp(message, "off") == 0)
+      lua_setwarnf(L, warnfoff, L);  /* turn warnings off */
+    else if (strcmp(message, "on") == 0)
+      lua_setwarnf(L, warnfon, L);   /* turn warnings on */
+    return 1;  /* it was a control message */
   }
-  else if (*warnstate == 0)  /* warnings off? */
-    return;
-  if (*warnstate == 1)  /* previous message was the last? */
-    lua_writestringerror("%s", "Lua warning: ");  /* start a new warning */
+}
+
+
+static void warnfoff (void *ud, const char *message, int tocont) {
+  checkcontrol((lua_State *)ud, message, tocont);
+}
+
+
+/*
+** Writes the message and handle 'tocont', finishing the message
+** if needed and setting the next warn function.
+*/
+static void warnfcont (void *ud, const char *message, int tocont) {
+  lua_State *L = (lua_State *)ud;
   lua_writestringerror("%s", message);  /* write message */
   if (tocont)  /* not the last part? */
-    *warnstate = 2;  /* to be continued */
+    lua_setwarnf(L, warnfcont, L);  /* to be continued */
   else {  /* last part */
     lua_writestringerror("%s", "\n");  /* finish message with end-of-line */
-    *warnstate = 1;  /* ready to start a new message */
+    lua_setwarnf(L, warnfon, L);  /* next call is a new message */
   }
+}
+
+
+static void warnfon (void *ud, const char *message, int tocont) {
+  if (checkcontrol((lua_State *)ud, message, tocont))  /* control message? */
+    return;  /* nothing else to be done */
+  lua_writestringerror("%s", "Lua warning: ");  /* start a new warning */
+  warnfcont(ud, message, tocont);  /* finish processing */
 }
 
 
 LUALIB_API lua_State *luaL_newstate (void) {
   lua_State *L = lua_newstate(l_alloc, NULL);
   if (L) {
-    int *warnstate;  /* space for warning state */
     lua_atpanic(L, &panic);
-    warnstate = (int *)lua_newuserdatauv(L, sizeof(int), 0);
-    luaL_ref(L, LUA_REGISTRYINDEX);  /* make sure it won't be collected */
-    *warnstate = 0;  /* default is warnings off */
-    lua_setwarnf(L, warnf, warnstate);
+    lua_setwarnf(L, warnfoff, L);  /* default is warnings off */
   }
   return L;
 }

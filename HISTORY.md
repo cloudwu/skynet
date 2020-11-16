@@ -1,6 +1,6 @@
-v1.4.0 (2020-10-10)
+v1.4.0 (2020-11-16)
 -----------
-* Update Lua to 5.4.1
+* Update Lua to 5.4.2
 * Add skynet.select
 * Improve mysql driver (@zero-rp @xiaojin @yxt945)
 * Improve websocket and ssl (@lvzixun)
