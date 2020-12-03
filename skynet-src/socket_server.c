@@ -1357,8 +1357,14 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 	}
 	if (n==0) {
 		FREE(buffer);
-		force_close(ss, s, l, result);
-		return SOCKET_CLOSE;
+		if (nomore_sending_data(s)) {
+			force_close(ss,s,l,result); 
+			return SOCKET_CLOSE;
+		} else { 
+			s->type = SOCKET_TYPE_HALFCLOSE;
+			shutdown(s->fd, SHUT_RD);
+			return -1; 
+		}
 	}
 
 	if (s->type == SOCKET_TYPE_HALFCLOSE) {
