@@ -30,6 +30,10 @@ function sharedata.query(name)
 		return cache[name]
 	end
 	local obj = skynet.call(service, "lua", "query", name)
+	if cache[name] and cache[name].__obj == obj then
+		skynet.send(service, "lua", "confirm" , obj)
+		return cache[name]
+	end
 	local r = sd.box(obj)
 	skynet.send(service, "lua", "confirm" , obj)
 	skynet.fork(monitor,name, r, obj)
