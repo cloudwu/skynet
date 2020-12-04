@@ -14,20 +14,12 @@ local tunpack = table.unpack
 local traceback = debug.traceback
 
 local cresume = coroutine.resume
-local coroutine_close = coroutine.close
 local running_thread = nil
 local init_thread = nil
 
-local function coroutine_ret(co, ok, ...)
-	if not ok then
-		coroutine_close(co)
-	end
-	return ok, ...
-end
-
 local function coroutine_resume(co, ...)
 	running_thread = co
-	return coroutine_ret(co, cresume(co, ...))
+	return cresume(co, ...)
 end
 local coroutine_yield = coroutine.yield
 local coroutine_create = coroutine.create
@@ -332,12 +324,14 @@ function suspend(co, result, command)
 		session_coroutine_address[co] = nil
 		session_coroutine_tracetag[co] = nil
 		skynet.fork(function() end)	-- trigger command "SUSPEND"
-		error(traceback(co,tostring(command)))
+		local tb = traceback(co,tostring(command))
+		coroutine.close(co)
+		error(tb)
 	end
 	if command == "SUSPEND" then
 		return dispatch_wakeup()
 	elseif command == "QUIT" then
-		coroutine_close(co)
+		coroutine.close(co)
 		-- service exit
 		return
 	elseif command == "USER" then
@@ -534,7 +528,7 @@ function skynet.exit()
 	end
 	for session, co in pairs(session_id_coroutine) do
 		if type(co) == "thread" then
-			coroutine_close(co)
+			coroutine.close(co)
 		end
 	end
 	for resp in pairs(unresponse) do
