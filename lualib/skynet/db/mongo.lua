@@ -82,18 +82,24 @@ local function __parse_addr(addr)
 	return host, tonumber(port)
 end
 
+local auth_method = {}
+
 local function mongo_auth(mongoc)
 	local user = rawget(mongoc,	"username")
 	local pass = rawget(mongoc,	"password")
 	local authmod = rawget(mongoc, "authmod") or "scram_sha1"
 	authmod = "auth_" ..  authmod
+	local authdb = rawget(mongoc, "authdb")
+	if authdb then
+		authdb = mongo_client.getDB(mongoc, authdb)	-- mongoc has not set metatable yet
+	end
 
 	return function()
 		if user	~= nil and pass	~= nil then
 			-- autmod can be "mongodb_cr" or "scram_sha1"
-			local auth_func = mongoc[authmod]
+			local auth_func = auth_method[authmod]
 			assert(auth_func , "Invalid authmod")
-			assert(auth_func(mongoc,user, pass))
+			assert(auth_func(authdb or mongoc, user, pass))
 		end
 		local rs_data =	mongoc:runCommand("ismaster")
 		if rs_data.ok == 1 then
@@ -106,38 +112,15 @@ local function mongo_auth(mongoc)
 				mongoc.__sock:changebackup(backup)
 			end
 			if rs_data.ismaster	then
-				if rawget(mongoc, "__pickserver") then
-					rawset(mongoc, "__pickserver", nil)
-				end
 				return
+			elseif rs_data.primary then
+				local host,	port = __parse_addr(rs_data.primary)
+				mongoc.host	= host
+				mongoc.port	= port
+				mongoc.__sock:changehost(host, port)
 			else
-				if rs_data.primary then
-					local host,	port = __parse_addr(rs_data.primary)
-					mongoc.host	= host
-					mongoc.port	= port
-					mongoc.__sock:changehost(host, port)
-				else
-					skynet.error("WARNING: NO PRIMARY RETURN " .. rs_data.me)
-					-- determine the primary db using hosts
-					local pickserver = {}
-					if rawget(mongoc, "__pickserver") == nil then
-						for _, v in ipairs(rs_data.hosts) do
-							if v ~= rs_data.me then
-								table.insert(pickserver, v)
-							end
-							rawset(mongoc, "__pickserver", pickserver)
-						end
-					end
-					if #mongoc.__pickserver <= 0 then
-						error("CAN NOT DETERMINE THE PRIMARY DB")
-					end
-					skynet.error("INFO: TRY TO CONNECT " .. mongoc.__pickserver[1])
-					local host, port = __parse_addr(mongoc.__pickserver[1])
-					table.remove(mongoc.__pickserver, 1)
-					mongoc.host	= host
-					mongoc.port	= port
-					mongoc.__sock:changehost(host, port)
-				end
+				-- socketchannel would try the next host in backup list
+				error ("No primary return : " .. tostring(rs_data.me))
 			end
 		end
 	end
@@ -156,6 +139,7 @@ function mongo.client( conf	)
 		username = first.username,
 		password = first.password,
 		authmod = first.authmod,
+		authdb = first.authdb,
 	}
 
 	obj.__id = 0
@@ -166,6 +150,7 @@ function mongo.client( conf	)
 		auth = mongo_auth(obj),
 		backup = backup,
 		nodelay = true,
+		overload = conf.overload,
 	}
 	setmetatable(obj, client_meta)
 	obj.__sock:connect(true)	-- try connect only	once
@@ -206,7 +191,7 @@ function mongo_client:runCommand(...)
 	return self.admin:runCommand(...)
 end
 
-function mongo_client:auth_mongodb_cr(user,password)
+function auth_method:auth_mongodb_cr(user,password)
 	local password = md5.sumhexa(string.format("%s:mongo:%s",user,password))
 	local result= self:runCommand "getnonce"
 	if result.ok ~=1 then
@@ -229,7 +214,7 @@ local function salt_password(password, salt, iter)
 	return output
 end
 
-function mongo_client:auth_scram_sha1(username,password)
+function auth_method:auth_scram_sha1(username,password)
 	local user = string.gsub(string.gsub(username, '=', '=3D'), ',' , '=2C')
 	local nonce = crypt.base64encode(crypt.randomkey())
 	local first_bare = "n="  .. user .. ",r="  .. nonce
@@ -300,6 +285,13 @@ function mongo_client:logout()
 	return result.ok ==	1
 end
 
+function mongo_db:auth(user, pass)
+	local authmod = rawget(self.connection, "authmod") or "scram_sha1"
+	local auth_func = auth_method["auth_" .. authmod]
+	assert(auth_func , "Invalid authmod")
+	return auth_func(self, user, pass)
+end
+
 function mongo_db:runCommand(cmd,cmd_v,...)
 	local conn = self.connection
 	local request_id = conn:genId()
@@ -340,8 +332,23 @@ function mongo_collection:insert(doc)
 	sock:request(pack)
 end
 
+local function werror(r)
+	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError)
+
+	local err
+	if not ok then
+		if r.writeErrors then
+			err = r.writeErrors[1].errmsg
+		else
+			err = r.writeConcernError.errmsg
+		end
+	end
+	return ok, err, r
+end
+
 function mongo_collection:safe_insert(doc)
-	return self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
+	local r = self.database:runCommand("insert", self.name, "documents", {bson_encode(doc)})
+	return werror(r)
 end
 
 function mongo_collection:batch_insert(docs)
@@ -363,10 +370,28 @@ function mongo_collection:update(selector,update,upsert,multi)
 	sock:request(pack)
 end
 
+function mongo_collection:safe_update(selector, update, upsert, multi)
+	local r = self.database:runCommand("update", self.name, "updates", {bson_encode({
+		q = selector,
+		u = update,
+		upsert = upsert,
+		multi = multi,
+	})})
+	return werror(r)
+end
+
 function mongo_collection:delete(selector, single)
 	local sock = self.connection.__sock
 	local pack = driver.delete(self.full_name, single, bson_encode(selector))
 	sock:request(pack)
+end
+
+function mongo_collection:safe_delete(selector, single)
+	local r = self.database:runCommand("delete", self.name, "deletes", {bson_encode({
+		q = selector,
+		limit = single and 1 or 0,
+	})})
+	return werror(r)
 end
 
 function mongo_collection:findOne(query, selector)

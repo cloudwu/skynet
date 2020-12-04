@@ -8,24 +8,60 @@ local crc16 = require "skynet.db.redis.crc16"
 local RedisClusterHashSlots = 16384
 local RedisClusterRequestTTL = 16
 
+local sync = {
+	once = {
+		tasks = {},
+	}
+}
+
+function sync.once.Do(id,func,...)
+	local tasks = sync.once.tasks
+	local task = tasks[id]
+	if not task then
+		task = {
+			waiting = {},
+			result = nil,
+		}
+		tasks[id] = task
+		local rettbl = table.pack(xpcall(func,debug.traceback,...))
+		task.result = rettbl
+		local waiting = task.waiting
+		tasks[id] = nil
+		if next(waiting) then
+			for i,co in ipairs(waiting) do
+				skynet.wakeup(co)
+			end
+		end
+		return table.unpack(task.result,1,task.result.n)
+	else
+		local co = coroutine.running()
+		table.insert(task.waiting,co)
+		skynet.wait(co)
+		return table.unpack(task.result,1,task.result.n)
+	end
+end
+
 
 local _M = {}
 
 local rediscluster = {}
 rediscluster.__index = rediscluster
-_M.rediscluster = rediscluster
 
-function _M.new(startup_nodes,opt)
+function _M.new(startup_nodes,opt,onmessage)
 	if #startup_nodes == 0 then
 		startup_nodes = {startup_nodes,}
 	end
 	opt = opt or {}
 	local self = {
 		startup_nodes = startup_nodes,
-		max_connections = opt.max_connections or 16,
-		connections = setmetatable({},{__mode = "kv"}),
+		max_connections = opt.max_connections or 256,
+		connections = {},
 		opt = opt,
 		refresh_table_asap = false,
+
+		-- for subscribe/publish
+		__onmessage = onmessage,
+		__watching = {},
 	}
 	setmetatable(self,rediscluster)
 	self:initialize_slots_cache()
@@ -53,13 +89,6 @@ function rediscluster:set_node_name(node)
 	if not node.name then
 		node.name = nodename(node)
 	end
-	if not node.slaves then
-		local oldnode = self.name_node[node.name]
-		if oldnode then
-			node.slaves = oldnode.slaves
-		end
-	end
-	self.name_node[node.name] = node
 end
 
 -- Contact the startup nodes and try to fetch the hash slots -> instances
@@ -67,11 +96,9 @@ end
 function rediscluster:initialize_slots_cache()
 	self.slots = {}
 	self.nodes = {}
-	self.name_node = {}
 	for _,startup_node in ipairs(self.startup_nodes) do
 		local ok = pcall(function ()
-			local name = nodename(startup_node)
-			local conn = self.connections[name] or self:get_redis_link(startup_node)
+			local conn = self:get_connection(startup_node)
 			local list = conn:cluster("slots")
 			for _,result in ipairs(list) do
 				local ip,port = table.unpack(result[3])
@@ -100,9 +127,6 @@ function rediscluster:initialize_slots_cache()
 				end
 			end
 			self.refresh_table_asap = false
-			if not self.connections[name] then
-				self.connections[name] = conn
-			end
 		end)
 		-- Exit the loop as long as the first node replies
 		if ok then
@@ -154,6 +178,21 @@ function rediscluster:get_key_from_command(argv)
 		cmd == "shutdown" then
 		return nil
 	end
+	if cmd == "eval" or cmd == "evalsha" then
+		-- eval script numkeys key [key...] arg [arg...]
+		local numkeys = argv[3]
+		local firstkey_slot = nil
+		for i=4,4+numkeys-1 do
+			local slot = self:keyslot(argv[i])
+			if not firstkey_slot then
+				firstkey_slot = slot
+			elseif firstkey_slot ~= slot then
+				error(string.format("%s - all keys must map to the same key slot",cmd))
+			end
+		end
+		-- numkeys <=0 will return nil
+		return argv[4]
+	end
 	-- Unknown commands, and all the commands having the key
 	-- as first argument are handled here:
 	-- set, get, ...
@@ -179,21 +218,28 @@ end
 
 function rediscluster:close_all_connection()
 	local connections = self.connections
-	self.connections = setmetatable({},{__mode = "kv"})
+	self.connections = {}
 	for name,conn in pairs(connections) do
 		pcall(conn.disconnect,conn)
 	end
 end
 
 function rediscluster:get_connection(node)
-	node.port = assert(tonumber(node.port))
-	local name = node.name or nodename(node)
-	local conn = self.connections[name]
-	if not conn then
-		conn = self:get_redis_link(node)
-		self.connections[name] = conn
+	if not node.name then
+		node.name = nodename(node)
 	end
-	return self.connections[name]
+	local name = node.name
+	local ok,conn = sync.once.Do(name,function ()
+		local conn = self.connections[name]
+		if not conn then
+			self:close_existing_connection()
+			conn = self:get_redis_link(node)
+			self.connections[name] = conn
+		end
+		return conn
+	end)
+	assert(ok,conn)
+	return conn
 end
 
 -- Return a link to a random node, or raise an error if no node can be
@@ -219,25 +265,15 @@ function rediscluster:get_random_connection()
 	for i,idx in ipairs(shuffle_idx) do
 		local ok,conn = pcall(function ()
 			local node = self.nodes[idx]
-			local conn = self.connections[node.name]
-			if not conn then
-				-- Connect the node if it is not connected
-				conn = self:get_redis_link(node)
-				if conn:ping() == "PONG" then
-					self:close_existing_connection()
-					self.connections[node.name] = conn
-					return conn
-				else
-					-- If the connection is not good close it ASAP in order
-					-- to avoid waiting for the GC finalizer. File
-					-- descriptors are a rare resource.
-					conn:disconnect()
-				end
+			local conn = self:get_connection(node)
+			if conn:ping() == "PONG" then
+				return conn
 			else
-				-- The node was already connected, test the connection.
-				if conn:ping() == "PONG" then
-					return conn
-				end
+				-- If the connection is not good close it ASAP in order
+				-- to avoid waiting for the GC finalizer. File
+				-- descriptors are a rare resource.
+				self.connetions[node.name] = nil
+				conn:disconnect()
 			end
 		end)
 		if ok and conn then
@@ -256,33 +292,40 @@ function rediscluster:get_connection_by_slot(slot)
 	if not node then
 		return self:get_random_connection()
 	end
-	if not self.connections[node.name] then
-		local ok = pcall(function ()
-			self:close_existing_connection()
-			self.connections[node.name] = self:get_redis_link(node)
-		end)
-		if not ok then
-			if self.opt.read_slave and node.slaves and #node.slaves > 0 then
-				local slave_node = node.slaves[math.random(1,#node.slaves)]
-				local ok2,conn = pcall(self.get_connection,self,slave_node)
-				if ok2 then
-					conn:readonly()		-- allow this connection read-slave
-					return conn
-				end
+	local ok,conn = pcall(self.get_connection,self,node)
+	if not ok then
+		if self.opt.read_slave and node.slaves and #node.slaves > 0 then
+			local slave_node = node.slaves[math.random(1,#node.slaves)]
+			local ok2,conn = pcall(self.get_connection,self,slave_node)
+			if ok2 then
+				conn:readonly()		-- allow this connection read-slave
+				return conn
 			end
-			-- This will probably never happen with recent redis-rb
-			-- versions because the connection is enstablished in a lazy
-			-- way only when a command is called. However it is wise to
-			-- handle an instance creation error of some kind.
-			return self:get_random_connection()
 		end
+		-- This will probably never happen with recent redis-rb
+		-- versions because the connection is enstablished in a lazy
+		-- way only when a command is called. However it is wise to
+		-- handle an instance creation error of some kind.
+		return self:get_random_connection()
 	end
-	return self.connections[node.name]
+	return conn
 end
 
 -- Dispatch commands.
 function rediscluster:call(...)
 	local argv = table.pack(...)
+	local cmd = argv[1]
+	local key = self:get_key_from_command(argv)
+	if not key then
+		error("No way to dispatch this command to Redis Cluster: " .. tostring(argv[1]))
+	end
+	if cmd == "subscribe" or cmd == "unsubscribe" or cmd == "psubscribe" or cmd == "punsubscribe" then
+		local slot = self:keyslot(key)
+		local conn = self:get_watch_connection_by_slot(slot)
+		local func = conn[cmd]
+		return func(conn,table.unpack(argv,2))
+	end
+
 	if self.refresh_table_asap then
 		self:initialize_slots_cache()
 	end
@@ -292,10 +335,6 @@ function rediscluster:call(...)
 	local try_random_node = false
 	while ttl > 0 do
 		ttl = ttl - 1
-		local key = self:get_key_from_command(argv)
-		if not key then
-			error("No way to dispatch this command to Redis Cluster: " .. tostring(argv[1]))
-		end
 		local conn
 		local slot = self:keyslot(key)
 		if asking then
@@ -312,7 +351,6 @@ function rediscluster:call(...)
 				conn:asking()
 			end
 			asking = false
-			local cmd = argv[1]
 			local func = conn[cmd]
 			return func(conn,table.unpack(argv,2))
 		end)}
@@ -321,7 +359,7 @@ function rediscluster:call(...)
 			err = table.unpack(result,2)
 			err = tostring(err)
 			if err == "[Error: socket]" then
-				-- may be nerver come here?
+				-- may be never come here?
 				try_random_node = true
 				if ttl < RedisClusterRequestTTL/2 then
 					skynet.sleep(10)
@@ -351,6 +389,10 @@ function rediscluster:call(...)
 						port = node_port,
 					}
 					if not asking then
+						local oldnode = self.slots[newslot]
+						if oldnode then
+							node.slaves = oldnode.slaves
+						end
 						self:set_node_name(node)
 						self.slots[newslot] = node
 					else
@@ -363,6 +405,44 @@ function rediscluster:call(...)
 		end
 	end
 	error(string.format("Too many Cluster redirections?,maybe node is disconnected (last error: %q)",err))
+end
+
+function rediscluster:get_watch_connection_by_slot(slot)
+	if not self.slots[slot] then
+		self:initialize_slots_cache()
+	end
+	local node = assert(self.slots[slot])
+	return self:get_watch_connection(node)
+end
+
+function rediscluster:get_watch_connection(node)
+	local name = node.name
+	local ok,conn = sync.once.Do(name,function ()
+		if not self.__watching[name] then
+			local conf = {
+				host = node.host,
+				port = node.port,
+				auth = self.opt.auth,
+				db = self.opt.db or 0,
+			}
+			local db = redis.watch(conf)
+			self.__watching[name] = db
+			local onmessage = rawget(self,"__onmessage")
+			skynet.fork(function ()
+				while true do
+					local ok,data,channel,pchannel = pcall(db.message,db)
+					if ok then
+						if data and onmessage then
+							pcall(onmessage,data,channel,pchannel)
+						end
+					end
+				end
+			end)
+		end
+		return self.__watching[name]
+	end)
+	assert(ok,conn)
+	return conn
 end
 
 -- Currently we handle all the commands using method_missing for
@@ -378,6 +458,5 @@ setmetatable(rediscluster,{
 		return t[cmd]
 	end,
 })
-
 
 return _M

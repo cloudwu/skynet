@@ -8,7 +8,7 @@ local NORET = {}
 local pool = {}
 local pool_count = {}
 local objmap = {}
-local collect_tick = 600
+local collect_tick = 10
 
 local function newobj(name, tbl)
 	assert(pool[name] == nil)
@@ -20,17 +20,17 @@ local function newobj(name, tbl)
 	pool_count[name] = { n = 0, threshold = 16 }
 end
 
-local function collect10sec()
-	if collect_tick > 10 then
-		collect_tick = 10
+local function collect1min()
+	if collect_tick > 1 then
+		collect_tick = 1
 	end
 end
 
 local function collectobj()
 	while true do
-		skynet.sleep(100)	-- sleep 1s
+		skynet.sleep(60*100)	-- sleep 1min
 		if collect_tick <= 0 then
-			collect_tick = 600	-- reset tick count to 600 sec
+			collect_tick = 10	-- reset tick count to 10 min
 			collectgarbage()
 			for obj, v in pairs(objmap) do
 				if v == true then
@@ -89,7 +89,7 @@ function CMD.delete(name)
 end
 
 function CMD.query(name)
-	local v = assert(pool[name])
+	local v = assert(pool[name], name)
 	local obj = v.obj
 	sharedata.host.incref(obj)
 	return v.obj
@@ -118,10 +118,11 @@ function CMD.update(name, t, ...)
 	if watch then
 		sharedata.host.markdirty(oldcobj)
 		for _,response in pairs(watch) do
+			sharedata.host.incref(newobj)
 			response(true, newobj)
 		end
 	end
-	collect10sec()	-- collect in 10 sec
+	collect1min()	-- collect in 1 min
 end
 
 local function check_watch(queue)
@@ -138,6 +139,7 @@ end
 function CMD.monitor(name, obj)
 	local v = assert(pool[name])
 	if obj ~= v.obj then
+		sharedata.host.incref(v.obj)
 		return v.obj
 	end
 

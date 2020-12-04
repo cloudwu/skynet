@@ -152,7 +152,7 @@ new_channel(lua_State *L, struct channel *c) {
 		luaL_error(L, "new channel failed");
 		// never go here
 	}
-	struct channel_box * cb = lua_newuserdata(L, sizeof(*cb));
+	struct channel_box * cb = lua_newuserdatauv(L, sizeof(*cb), 0);
 	cb->c = c;
 	if (luaL_newmetatable(L, METANAME)) {
 		luaL_Reg l[]={

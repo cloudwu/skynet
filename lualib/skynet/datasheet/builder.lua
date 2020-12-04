@@ -69,8 +69,15 @@ local skynet = require "skynet"
 local datasheet = {}
 local handles = {}	-- handle:{ ref:count , name:name , collect:resp }
 local dataset = {}	-- name:{ handle:handle, monitor:{monitors queue} }
+local customers = {} -- source: { handle:true }
 
-local function releasehandle(handle)
+setmetatable(customers, { __index = function(c, source)
+	local v = {}
+	c[source] = v
+	return v
+end } )
+
+local function releasehandle(source, handle)
 	local h = handles[handle]
 	h.ref = h.ref - 1
 	if h.ref == 0 and h.collect then
@@ -78,10 +85,12 @@ local function releasehandle(handle)
 		h.collect = nil
 		handles[handle] = nil
 	end
+	local t=dataset[h.name]
+	t.monitor[source]=nil
 end
 
 -- from builder, create or update handle
-function datasheet.update(name, handle)
+function datasheet.update(source, name, handle)
 	local t = dataset[name]
 	if not t then
 		-- new datasheet
@@ -89,11 +98,11 @@ function datasheet.update(name, handle)
 		dataset[name] = t
 		handles[handle] = { ref = 1, name = name }
 	else
-		t.handle = handle
 		-- report update to customers
-		handles[handle] = { ref = 1 + #t.monitor, name = name }
+		handles[handle] = { ref = handles[t.handle].ref, name = name }
+		t.handle = handle
 
-		for k,v in ipairs(t.monitor) do
+		for k,v in pairs(t.monitor) do
 			v(true, handle)
 			t.monitor[k] = nil
 		end
@@ -102,34 +111,51 @@ function datasheet.update(name, handle)
 end
 
 -- from customers
-function datasheet.query(name)
+function datasheet.query(source, name)
 	local t = assert(dataset[name], "create data first")
 	local handle = t.handle
 	local h = handles[handle]
 	h.ref = h.ref + 1
+	customers[source][handle] = true
 	skynet.ret(skynet.pack(handle))
 end
 
 -- from customers, monitor handle change
-function datasheet.monitor(handle)
+function datasheet.monitor(source, handle)
 	local h = assert(handles[handle], "Invalid data handle")
 	local t = dataset[h.name]
 	if t.handle ~= handle then	-- already changes
+		customers[source][t.handle] = true
 		skynet.ret(skynet.pack(t.handle))
 	else
-		h.ref = h.ref + 1
-		table.insert(t.monitor, skynet.response())
+		assert(not t.monitor[source])
+		local resp = skynet.response()
+		t.monitor[source]= function(ok, handle)
+			if ok then
+				customers[source][handle] = true
+			end
+			resp(ok, handle)
+		end
 	end
 end
 
 -- from customers, release handle , ref count - 1
-function datasheet.release(handle)
+function datasheet.release(source, handle)
 	-- send message, don't ret
-	releasehandle(handle)
+	customers[source][handle] = nil
+	releasehandle(source, handle)
+end
+
+-- customer closed, clear all handles it queried
+function datasheet.close(source)
+	for handle in pairs(customers[source]) do
+		releasehandle(source, handle)
+	end
+	customers[source] = nil
 end
 
 -- from builder, monitor handle release
-function datasheet.collect(handle)
+function datasheet.collect(source, handle)
 	local h = assert(handles[handle], "Invalid data handle")
 	if h.ref == 0 then
 		handles[handle] = nil
@@ -140,8 +166,8 @@ function datasheet.collect(handle)
 	end
 end
 
-skynet.dispatch("lua", function(_,_,cmd,...)
-	datasheet[cmd](...)
+skynet.dispatch("lua", function(_,source,cmd,...)
+	datasheet[cmd](source,...)
 end)
 
 skynet.info_func(function()
@@ -155,7 +181,7 @@ skynet.info_func(function()
 		tmp[v.handle] = nil
 		info[k] = {
 			handle = v.handle,
-			monitors = #v.monitor,
+			monitors = h.ref,
 		}
 	end
 	for k,v in pairs(tmp) do

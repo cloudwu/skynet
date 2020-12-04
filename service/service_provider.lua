@@ -41,6 +41,9 @@ end
 
 function provider.launch(name, code, ...)
 	local s = svr[name]
+	if s.address then
+		return skynet.ret(skynet.pack(s.address))
+	end
 	if s.booting then
 		table.insert(s.queue, skynet.response())
 	else

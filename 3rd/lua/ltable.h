@@ -1,5 +1,5 @@
 /*
-** $Id: ltable.h,v 2.23 2016/12/22 13:08:50 roberto Exp $
+** $Id: ltable.h $
 ** Lua tables (hash)
 ** See Copyright Notice in lua.h
 */
@@ -12,19 +12,15 @@
 
 #define gnode(t,i)	(&(t)->node[i])
 #define gval(n)		(&(n)->i_val)
-#define gnext(n)	((n)->i_key.nk.next)
+#define gnext(n)	((n)->u.next)
 
-
-/* 'const' to avoid wrong writings that can mess up field 'next' */
-#define gkey(n)		cast(const TValue*, (&(n)->i_key.tvk))
 
 /*
-** writable version of 'gkey'; allows updates to individual fields,
-** but not to the whole (which has incompatible type)
+** Clear all bits of fast-access metamethods, which means that the table
+** may have any of these metamethods. (First access that fails after the
+** clearing will set the bit again.)
 */
-#define wgkey(n)		(&(n)->i_key.nk)
-
-#define invalidateTMcache(t)	((t)->flags = 0)
+#define invalidateTMcache(t)	((t)->flags &= ~maskflags)
 
 
 /* true when 't' is using 'dummynode' as its hash part */
@@ -35,9 +31,8 @@
 #define allocsizenode(t)	(isdummy(t) ? 0 : sizenode(t))
 
 
-/* returns the key, given the value of a table entry */
-#define keyfromval(v) \
-  (gkey(cast(Node *, cast(char *, (v)) - offsetof(Node, i_val))))
+/* returns the Node, given the value of a table entry */
+#define nodefromval(v)	cast(Node *, (v))
 
 
 LUAI_FUNC const TValue *luaH_getint (Table *t, lua_Integer key);
@@ -54,7 +49,8 @@ LUAI_FUNC void luaH_resize (lua_State *L, Table *t, unsigned int nasize,
 LUAI_FUNC void luaH_resizearray (lua_State *L, Table *t, unsigned int nasize);
 LUAI_FUNC void luaH_free (lua_State *L, Table *t);
 LUAI_FUNC int luaH_next (lua_State *L, Table *t, StkId key);
-LUAI_FUNC int luaH_getn (Table *t);
+LUAI_FUNC lua_Unsigned luaH_getn (Table *t);
+LUAI_FUNC unsigned int luaH_realasize (const Table *t);
 
 
 #if defined(LUA_DEBUG)

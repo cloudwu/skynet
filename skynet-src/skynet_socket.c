@@ -15,7 +15,7 @@ static struct socket_server * SOCKET_SERVER = NULL;
 
 void 
 skynet_socket_init() {
-	SOCKET_SERVER = socket_server_create();
+	SOCKET_SERVER = socket_server_create(skynet_now());
 }
 
 void
@@ -27,6 +27,11 @@ void
 skynet_socket_free() {
 	socket_server_release(SOCKET_SERVER);
 	SOCKET_SERVER = NULL;
+}
+
+void
+skynet_socket_updatetime() {
+	socket_server_updatetime(SOCKET_SERVER, skynet_now());
 }
 
 // mainloop thread
@@ -112,13 +117,13 @@ skynet_socket_poll() {
 }
 
 int
-skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz) {
-	return socket_server_send(SOCKET_SERVER, id, buffer, sz);
+skynet_socket_sendbuffer(struct skynet_context *ctx, struct socket_sendbuffer *buffer) {
+	return socket_server_send(SOCKET_SERVER, buffer);
 }
 
 int
-skynet_socket_send_lowpriority(struct skynet_context *ctx, int id, void *buffer, int sz) {
-	return socket_server_send_lowpriority(SOCKET_SERVER, id, buffer, sz);
+skynet_socket_sendbuffer_lowpriority(struct skynet_context *ctx, struct socket_sendbuffer *buffer) {
+	return socket_server_send_lowpriority(SOCKET_SERVER, buffer);
 }
 
 int 
@@ -158,6 +163,13 @@ skynet_socket_start(struct skynet_context *ctx, int id) {
 }
 
 void
+skynet_socket_pause(struct skynet_context *ctx, int id) {
+	uint32_t source = skynet_context_handle(ctx);
+	socket_server_pause(SOCKET_SERVER, source, id);
+}
+
+
+void
 skynet_socket_nodelay(struct skynet_context *ctx, int id) {
 	socket_server_nodelay(SOCKET_SERVER, id);
 }
@@ -174,8 +186,8 @@ skynet_socket_udp_connect(struct skynet_context *ctx, int id, const char * addr,
 }
 
 int 
-skynet_socket_udp_send(struct skynet_context *ctx, int id, const char * address, const void *buffer, int sz) {
-	return socket_server_udp_send(SOCKET_SERVER, id, (const struct socket_udp_address *)address, buffer, sz);
+skynet_socket_udp_sendbuffer(struct skynet_context *ctx, const char * address, struct socket_sendbuffer *buffer) {
+	return socket_server_udp_send(SOCKET_SERVER, (const struct socket_udp_address *)address, buffer);
 }
 
 const char *
@@ -189,4 +201,9 @@ skynet_socket_udp_address(struct skynet_socket_message *msg, int *addrsz) {
 	sm.ud = msg->ud;
 	sm.data = msg->buffer;
 	return (const char *)socket_server_udp_address(SOCKET_SERVER, &sm, addrsz);
+}
+
+struct socket_info *
+skynet_socket_info() {
+	return socket_server_info(SOCKET_SERVER);
 }

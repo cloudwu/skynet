@@ -11,9 +11,7 @@ end)
 local datasheet = {}
 local sheets = setmetatable({}, {
 	__gc = function(t)
-		for _,v in pairs(t) do
-			skynet.send(datasheet_svr, "lua", "release", v.handle)
-		end
+		skynet.send(datasheet_svr, "lua", "close")
 	end,
 })
 
