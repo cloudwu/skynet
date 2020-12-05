@@ -9,10 +9,18 @@ function skynet.launch(...)
 end
 
 function skynet.kill(name)
-	if type(name) == "number" then
-		skynet.send(".launcher","lua","REMOVE",name, true)
-		name = skynet.address(name)
+	if type(name) == "string" then
+		local prefix = string.sub(name, 1, 1)
+		if prefix == '.' then
+			name = skynet.localname(name)
+		elseif prefix == ':' then
+			name = tonumber("0x" .. string.sub(name, 2))
+		end
 	end
+	assert(type(name) == "number", "Invalid address")
+
+	skynet.send(".launcher","lua","REMOVE",name, true)
+	name = skynet.address(name)
 	c.command("KILL",name)
 end
 
