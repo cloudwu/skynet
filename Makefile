@@ -19,9 +19,14 @@ $(LUA_STATICLIB) :
 
 # https : turn on TLS_MODULE to add https support
 
-# TLS_MODULE=ltls
-TLS_LIB=
-TLS_INC=
+TLS_INC ?=
+TLS_LIB ?=
+
+ifneq ($(TLS_INC)$(TLS_LIB),)
+  TLS_MODULE = ltls
+else
+  TLS_MODULE =
+endif
 
 # jemalloc
 
