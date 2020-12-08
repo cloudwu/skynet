@@ -333,14 +333,16 @@ function mongo_collection:insert(doc)
 end
 
 local function werror(r)
-	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError)
+	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError and not r.errmsg)
 
 	local err
 	if not ok then
 		if r.writeErrors then
 			err = r.writeErrors[1].errmsg
-		else
+		elseif r.writeConcernError then
 			err = r.writeConcernError.errmsg
+		else
+			err = r.errmsg
 		end
 	end
 	return ok, err, r
