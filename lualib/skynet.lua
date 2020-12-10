@@ -801,6 +801,24 @@ function skynet.memlimit(bytes)
 	skynet.memlimit = nil	-- set only once
 end
 
+function skynet.register_serialize_type(userdata_type,serialize,deserialize)
+	-- see MAX_COOKIE in lua-seria.c#L36
+	assert(userdata_type < 32);
+	assert(type(serialize) == "function")
+	assert(type(deserialize) == "function")
+	local registry = debug.getregistry()
+	if not registry.__serializes then
+		registry.__serializes = {}
+	end
+	if not registry.__deserializes then
+		registry.__deserializes = {}
+	end
+	assert(registry.__serializes[userdata_type] == nil)
+	registry.__serializes[userdata_type] = serialize
+	assert(registry.__deserializes[userdata_type] == nil)
+	registry.__deserializes[userdata_type] = deserialize
+end
+
 -- Inject internal debug framework
 local debug = require "skynet.debug"
 debug.init(skynet, {

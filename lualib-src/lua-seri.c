@@ -25,11 +25,13 @@
 #define TYPE_NUMBER_QWORD 6
 #define TYPE_NUMBER_REAL 8
 
-#define TYPE_USERDATA 3
+#define TYPE_LIGHTUSERDATA 3
 #define TYPE_SHORT_STRING 4
 // hibits 0~31 : len
 #define TYPE_LONG_STRING 5
 #define TYPE_TABLE 6
+// hibits 0~31 : userdata's type
+#define TYPE_USERDATA 7
 
 #define MAX_COOKIE 32
 #define COMBINE_TYPE(t,v) ((t) | (v) << 3)
@@ -182,7 +184,7 @@ wb_real(struct write_block *wb, double v) {
 
 static inline void
 wb_pointer(struct write_block *wb, void *v) {
-	uint8_t n = TYPE_USERDATA;
+	uint8_t n = TYPE_LIGHTUSERDATA;
 	wb_push(wb, &n, 1);
 	wb_push(wb, &v, sizeof(v));
 }
@@ -293,11 +295,51 @@ wb_table(lua_State *L, struct write_block *wb, int index, int depth) {
 	}
 }
 
+static int
+wb_userdata(lua_State* L, struct write_block *wb, int index, int depth) {
+	int oldtop = lua_gettop(L);
+	int result = 0;
+	// if registry.__serializes[type] is function
+	if (luaL_getmetafield(L,index,"__type") != LUA_TNIL) {
+		int type = luaL_checkinteger(L,-1);
+		lua_pop(L,1);
+		if (type < MAX_COOKIE) {
+			lua_pushstring(L,"__serializes");
+			if (lua_rawget(L,LUA_REGISTRYINDEX) == LUA_TTABLE) {
+				if (lua_rawgeti(L,-1,type) == LUA_TFUNCTION) {
+					lua_pushvalue(L,index);
+					int r = lua_pcall(L, 1, 1, 0);
+					if (r == LUA_OK) {
+						result = 1;
+						// will push a string/nil in stack top
+						size_t len = 0;
+						const char* str = luaL_checklstring(L,-1,&len);
+						uint8_t n = COMBINE_TYPE(TYPE_USERDATA,type);
+						wb_push(wb,&n,1);
+						wb_push(wb, &len, 4);
+						wb_push(wb, str, len);
+						uint8_t hasuservalue = lua_getuservalue(L,index) == LUA_TNIL ? 0 : 1;
+						wb_push(wb,&hasuservalue,1);
+						if (hasuservalue) {
+							pack_one(L, wb, lua_gettop(L), depth);
+						}
+						lua_pop(L,1);
+					} else {
+						return luaL_error(L, "serialize userdata error: %s",lua_tostring(L,-1));
+					}
+				}
+			}
+		}
+	}
+	lua_settop(L,oldtop);
+	return result;
+}
+
 static void
 pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 	if (depth > MAX_DEPTH) {
 		wb_free(b);
-		luaL_error(L, "serialize can't pack too depth table");
+		luaL_error(L, "serialize can't pack too depth table/userdata");
 	}
 	int type = lua_type(L,index);
 	switch(type) {
@@ -333,6 +375,13 @@ pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 		wb_table(L, b, index, depth+1);
 		break;
 	}
+	case LUA_TUSERDATA:
+		if (index < 0) {
+			index = lua_gettop(L) + index + 1;
+		}
+		if (wb_userdata(L, b, index, depth+1)) {
+			break;
+		}
 	default:
 		wb_free(b);
 		luaL_error(L, "Unsupport type %s to serialize", lua_typename(L, type));
@@ -464,6 +513,45 @@ unpack_table(lua_State *L, struct read_block *rb, int array_size) {
 	}
 }
 
+static int
+get_userdata(lua_State *L, struct read_block *rb, int type) {
+	// if registry.__deserializes[type] is function
+	lua_pushstring(L,"__deserializes");
+	int t = lua_rawget(L,LUA_REGISTRYINDEX);
+	if (t == LUA_TTABLE) {
+		t = lua_rawgeti(L,-1,type);
+		if (t == LUA_TFUNCTION) {
+			lua_replace(L,-2);
+			uint32_t *plen = rb_read(rb, 4);
+			if (plen == NULL) {
+				invalid_stream(L,rb);
+			}
+			uint32_t len = *plen;
+			get_buffer(L,rb,len);
+			int r = lua_pcall(L, 1, 1,0);
+			if (r == LUA_OK) {
+				// will push a userdata/nil in stack top
+				if (lua_isnil(L,-1)) {
+					return 0;
+				}
+				uint8_t *pb = rb_read(rb,1);
+				uint8_t hasuservalue = *pb;
+				if (hasuservalue) {
+					unpack_one(L,rb);
+					lua_setuservalue(L,-2);
+				}
+				return 1;
+			} else {
+				return luaL_error(L, "deserialize userdata error: %s",lua_tostring(L,-1));
+			}
+		} else {
+			lua_pop(L,2);
+		}
+	}
+	lua_pop(L,1);
+	return 0;
+}
+
 static void
 push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 	switch(type) {
@@ -480,7 +568,7 @@ push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 			lua_pushinteger(L, get_integer(L, rb, cookie));
 		}
 		break;
-	case TYPE_USERDATA:
+	case TYPE_LIGHTUSERDATA:
 		lua_pushlightuserdata(L,get_pointer(L,rb));
 		break;
 	case TYPE_SHORT_STRING:
@@ -512,6 +600,11 @@ push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 	case TYPE_TABLE: {
 		unpack_table(L,rb,cookie);
 		break;
+	}
+	case TYPE_USERDATA: {
+		if (get_userdata(L,rb,cookie)) {
+			break;
+		}
 	}
 	default: {
 		invalid_stream(L,rb);
@@ -561,7 +654,7 @@ luaseri_unpack(lua_State *L) {
 	int len;
 	if (lua_type(L,1) == LUA_TSTRING) {
 		size_t sz;
-		 buffer = (void *)lua_tolstring(L,1,&sz);
+		buffer = (void *)lua_tolstring(L,1,&sz);
 		len = (int)sz;
 	} else {
 		buffer = lua_touserdata(L,1);
