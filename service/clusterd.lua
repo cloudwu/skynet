@@ -60,10 +60,10 @@ local function open_channel(t, key)
 	for _, co in ipairs(ct) do
 		skynet.wakeup(co)
 	end
-	assert(succ, err)
 	if node_address[key] ~= address then
 		return open_channel(t,key)
 	end
+	assert(succ, err)
 	return c
 end
 
