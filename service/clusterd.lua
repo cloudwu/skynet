@@ -89,8 +89,9 @@ local function loadconfig(tmp)
 			assert(address == false or type(address) == "string")
 			if node_address[name] ~= address then
 				-- address changed
-				if rawget(node_channel, name) then
-					node_channel[name] = nil	-- reset connection
+				if node_sender[name] then
+					-- reset connection if node_sender[name] exist
+					node_channel[name] = nil
 					table.insert(reload, name)
 				end
 				node_address[name] = address
