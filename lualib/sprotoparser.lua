@@ -348,6 +348,7 @@ local function packtype(name, t, alltypes)
 		else
 			tmp.type = nil
 		end
+		tmp.map = nil
 		if f.key then
 			assert(f.array)
 			if f.key == "" then
