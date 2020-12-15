@@ -827,8 +827,14 @@ end
 
 function skynet.dispatch_message(...)
 	local succ, err = pcall(raw_dispatch_message,...)
+	local q = {}
+	local len = #fork_queue
+	for i=1, len do
+		q[i] = fork_queue[len - i + 1]
+	end
+	fork_queue = {}
 	while true do
-		local co = tremove(fork_queue,1)
+		local co = tremove(q)
 		if co == nil then
 			break
 		end
