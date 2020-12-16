@@ -65,7 +65,9 @@ local sleep_session = {}
 
 local watching_session = {}
 local error_queue = {}
-local fork_queue = {}
+-- local fork_queue = {}
+local fork_queue_first
+local fork_queue_last
 
 do ---- request/select
 	local function send_requests(self)
@@ -429,11 +431,22 @@ function skynet.killthread(thread)
 			end
 		end
 	else
-		for i = 1, #fork_queue do
-			if fork_queue[i] == thread then
-				tremove(fork_queue, i)
+		local pre_node
+		local cur_node = fork_queue_first
+		while cur_node do
+			if cur_node.co == thread then
+				if pre_node then
+					pre_node.next = cur_node.next
+				else
+					fork_queue_first = fork_queue_first.next
+				end
+				if not fork_queue_first then
+					fork_queue_last = nil
+				end
 				return thread
 			end
+			pre_node = cur_node
+			cur_node = cur_node.next
 		end
 		for k,v in pairs(session_id_coroutine) do
 			if v == thread then
@@ -517,7 +530,9 @@ function skynet.time()
 end
 
 function skynet.exit()
-	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit
+	-- fork_queue = {}	-- no fork coroutine can be execute after skynet.exit
+	fork_queue_first = nil
+	fork_queue_last = nil
 	skynet.send(".launcher","lua","REMOVE",skynet.self(), false)
 	-- report the sources that call me
 	for co, session in pairs(session_coroutine_id) do
@@ -757,7 +772,14 @@ function skynet.fork(func,...)
 		local args = { ... }
 		co = co_create(function() func(table.unpack(args,1,n)) end)
 	end
-	tinsert(fork_queue, co)
+	local old_last = fork_queue_last
+	fork_queue_last = {co = co}
+	if old_last then
+		old_last.next = fork_queue_last
+	else
+		fork_queue_first = fork_queue_last
+	end
+	-- tinsert(fork_queue, co)
 	return co
 end
 
@@ -827,16 +849,11 @@ end
 
 function skynet.dispatch_message(...)
 	local succ, err = pcall(raw_dispatch_message,...)
-	local q = {}
-	local len = #fork_queue
-	for i=1, len do
-		q[i] = fork_queue[len - i + 1]
-	end
-	fork_queue = {}
-	while true do
-		local co = tremove(q)
-		if co == nil then
-			break
+	while fork_queue_first do
+		local co = fork_queue_first.co
+		fork_queue_first = fork_queue_first.next
+		if not fork_queue_first then
+			fork_queue_last = nil
 		end
 		local fork_succ, fork_err = pcall(suspend,co,coroutine_resume(co))
 		if not fork_succ then
