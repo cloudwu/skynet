@@ -67,26 +67,32 @@ local function write_handshake(self, host, url, header)
 end
 
 
-local function read_handshake(self)
-    local tmpline = {}
-    local header_body = internal.recvheader(self.read, tmpline, "")
-    if not header_body then
-        return 413
+local function read_handshake(self, upgrade_ops)
+    local header, method, url
+    if upgrade_ops then
+        header, method, url = upgrade_ops.header, upgrade_ops.method, upgrade_ops.url
+    else
+        local tmpline = {}
+        local header_body = internal.recvheader(self.read, tmpline, "")
+        if not header_body then
+            return 413
+        end
+
+        local request = assert(tmpline[1])
+        local httpver
+        method, url, httpver = request:match "^(%a+)%s+(.-)%s+HTTP/([%d%.]+)$"
+        assert(method and url and httpver)
+        if method ~= "GET" then
+            return 400, "need GET method"
+        end
+
+        httpver = assert(tonumber(httpver))
+        if httpver < 1.1 then
+            return 505  -- HTTP Version not supported
+        end
+        header = internal.parseheader(tmpline, 2, {})
     end
 
-    local request = assert(tmpline[1])
-    local method, url, httpver = request:match "^(%a+)%s+(.-)%s+HTTP/([%d%.]+)$"
-    assert(method and url and httpver)
-    if method ~= "GET" then
-        return 400, "need GET method"
-    end
-
-    httpver = assert(tonumber(httpver))
-    if httpver < 1.1 then
-        return 505  -- HTTP Version not supported
-    end
-
-    local header = internal.parseheader(tmpline, 2, {})
     if not header then
         return 400  -- Bad request
     end
@@ -239,9 +245,9 @@ local function read_frame(self)
 end
 
 
-local function resolve_accept(self)
+local function resolve_accept(self, options)
     try_handle(self, "connect")
-    local code, err, url = read_handshake(self)
+    local code, err, url = read_handshake(self, options and options.upgrade)
     if code then
         local ok, s = httpd.write_response(self.write, code, err)
         if not ok then
@@ -384,8 +390,10 @@ end
 
 -- handle interface
 -- connect / handshake / message / ping / pong / close / error
-function M.accept(socket_id, handle, protocol, addr)
-    socket.start(socket_id)
+function M.accept(socket_id, handle, protocol, addr, options)
+    if not (options and options.upgrade) then
+        socket.start(socket_id)
+    end
     protocol = protocol or "ws"
     local ws_obj = _new_server_ws(socket_id, handle, protocol)
     ws_obj.addr = addr
@@ -396,7 +404,7 @@ function M.accept(socket_id, handle, protocol, addr)
         end)
     end
 
-    local ok, err = xpcall(resolve_accept, debug.traceback, ws_obj)
+    local ok, err = xpcall(resolve_accept, debug.traceback, ws_obj, options)
     local closed = _isws_closed(socket_id)
     if not closed then
         _close_websocket(ws_obj)
