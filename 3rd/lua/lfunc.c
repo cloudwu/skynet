@@ -301,7 +301,7 @@ const char *luaF_getlocalname (const Proto *f, int local_number, int pc) {
 
 void luaF_shareproto (Proto *f) {
   int i;
-  if (f == NULL)
+  if (f == NULL || isshared(f))
     return;
   makeshared(f);
   luaS_share(f->source);
