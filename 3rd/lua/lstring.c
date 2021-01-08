@@ -23,7 +23,7 @@
 #include "atomic.h"
 
 static unsigned int STRSEED;
-static size_t STRID = 0;
+static ATOM_SIZET STRID = 0;
 
 /*
 ** Maximum size for string table.
@@ -60,7 +60,7 @@ void luaS_share (TString *ts) {
   if (ts == NULL || isshared(ts))
     return;
   makeshared(ts);
-  ts->id = ATOM_DEC(&STRID);
+  ts->id = ATOM_FDEC(&STRID) - 1;
 }
 
 unsigned int luaS_hash (const char *str, size_t l, unsigned int seed) {
