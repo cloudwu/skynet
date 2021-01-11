@@ -46,7 +46,7 @@ struct skynet_context {
 	void * cb_ud;
 	skynet_cb cb;
 	struct message_queue *queue;
-	FILE * logfile;
+	ATOM_POINTER logfile;
 	uint64_t cpu_cost;	// in microsec
 	uint64_t cpu_start;	// in microsec
 	char result[32];
@@ -141,7 +141,7 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
 	ctx->session_id = 0;
-	ATOM_INIT(&ctx->logfile, NULL);
+	ATOM_INIT(&ctx->logfile, (uintptr_t)NULL);
 
 	ctx->init = false;
 	ctx->endless = false;
@@ -207,7 +207,7 @@ skynet_context_reserve(struct skynet_context *ctx) {
 
 static void 
 delete_context(struct skynet_context *ctx) {
-	FILE *f = ATOM_LOAD(&ctx->logfile);
+	FILE *f = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (f) {
 		fclose(f);
 	}
@@ -265,7 +265,7 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx->handle));
 	int type = msg->sz >> MESSAGE_TYPE_SHIFT;
 	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
-	FILE *f = ATOM_LOAD(&ctx->logfile);
+	FILE *f = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (f) {
 		skynet_log_output(f, msg->source, type, msg->session, msg->data, sz);
 	}
@@ -591,12 +591,12 @@ cmd_logon(struct skynet_context * context, const char * param) {
 	if (ctx == NULL)
 		return NULL;
 	FILE *f = NULL;
-	FILE * lastf = ATOM_LOAD(&ctx->logfile);
+	FILE * lastf = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (lastf == NULL) {
 		f = skynet_log_open(context, handle);
 		if (f) {
 			uintptr_t exp = 0;
-			if (!ATOM_CAS_POINTER(&ctx->logfile, exp, f)) {
+			if (!ATOM_CAS_POINTER(&ctx->logfile, exp, (uintptr_t)f)) {
 				// logfile opens in other thread, close this one.
 				fclose(f);
 			}
@@ -614,11 +614,11 @@ cmd_logoff(struct skynet_context * context, const char * param) {
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL)
 		return NULL;
-	FILE * f = ATOM_LOAD(&ctx->logfile);
+	FILE * f = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (f) {
 		// logfile may close in other thread
 		uintptr_t fptr = (uintptr_t)f;
-		if (ATOM_CAS_POINTER(&ctx->logfile, fptr, NULL)) {
+		if (ATOM_CAS_POINTER(&ctx->logfile, fptr, (uintptr_t)NULL)) {
 			skynet_log_close(context, f, handle);
 		}
 	}
