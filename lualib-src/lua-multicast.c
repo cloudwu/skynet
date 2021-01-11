@@ -10,7 +10,7 @@
 #include "atomic.h"
 
 struct mc_package {
-	int reference;
+	ATOM_INT reference;
 	uint32_t size;
 	void *data;
 };
@@ -18,7 +18,7 @@ struct mc_package {
 static int
 pack(lua_State *L, void *data, size_t size) {
 	struct mc_package * pack = skynet_malloc(sizeof(struct mc_package));
-	pack->reference = 0;
+	ATOM_INIT(&pack->reference, 0);
 	pack->size = (uint32_t)size;
 	pack->data = data;
 	struct mc_package ** ret = skynet_malloc(sizeof(*ret));
@@ -91,10 +91,10 @@ static int
 mc_bindrefer(lua_State *L) {
 	struct mc_package ** pack = lua_touserdata(L,1);
 	int ref = luaL_checkinteger(L,2);
-	if ((*pack)->reference != 0) {
+	if (ATOM_LOAD(&(*pack)->reference) != 0) {
 		return luaL_error(L, "Can't bind a multicast package more than once");
 	}
-	(*pack)->reference = ref;
+	ATOM_STORE(&(*pack)->reference , ref);
 
 	lua_pushlightuserdata(L, *pack);
 
@@ -110,7 +110,7 @@ static int
 mc_closelocal(lua_State *L) {
 	struct mc_package *pack = lua_touserdata(L,1);
 
-	int ref = ATOM_DEC(&pack->reference);
+	int ref = ATOM_FDEC(&pack->reference)-1;
 	if (ref <= 0) {
 		skynet_free(pack->data);
 		skynet_free(pack);

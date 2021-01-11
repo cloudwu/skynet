@@ -13,7 +13,7 @@
 
 struct stm_object {
 	struct rwlock lock;
-	int reference;
+	ATOM_INT reference;
 	struct stm_copy * copy;
 };
 
@@ -27,7 +27,7 @@ struct stm_copy {
 static struct stm_copy *
 stm_newcopy(void * msg, int32_t sz) {
 	struct stm_copy * copy = skynet_malloc(sizeof(*copy));
-	copy->reference = 1;
+	ATOM_INIT(&copy->reference, 1);
 	copy->sz = sz;
 	copy->msg = msg;
 
@@ -38,7 +38,7 @@ static struct stm_object *
 stm_new(void * msg, int32_t sz) {
 	struct stm_object * obj = skynet_malloc(sizeof(*obj));
 	rwlock_init(&obj->lock);
-	obj->reference = 1;
+	ATOM_INIT(&obj->reference , 1);
 	obj->copy = stm_newcopy(msg, sz);
 
 	return obj;
@@ -48,7 +48,7 @@ static void
 stm_releasecopy(struct stm_copy *copy) {
 	if (copy == NULL)
 		return;
-	if (ATOM_DEC(&copy->reference) == 0) {
+	if (ATOM_FDEC(&copy->reference) <= 1) {
 		skynet_free(copy->msg);
 		skynet_free(copy);
 	}
@@ -61,7 +61,7 @@ stm_release(struct stm_object *obj) {
 	// writer release the stm object, so release the last copy .
 	stm_releasecopy(obj->copy);
 	obj->copy = NULL;
-	if (--obj->reference > 0) {
+	if (ATOM_FDEC(&obj->reference) > 1) {
 		// stm object grab by readers, reset the copy to NULL.
 		rwlock_wunlock(&obj->lock);
 		return;
@@ -73,7 +73,7 @@ stm_release(struct stm_object *obj) {
 static void
 stm_releasereader(struct stm_object *obj) {
 	rwlock_rlock(&obj->lock);
-	if (ATOM_DEC(&obj->reference) == 0) {
+	if (ATOM_FDEC(&obj->reference) == 1) {
 		// last reader, no writer. so no need to unlock
 		assert(obj->copy == NULL);
 		skynet_free(obj);

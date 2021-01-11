@@ -8,28 +8,46 @@
 
 #ifndef USE_PTHREAD_LOCK
 
+#ifdef NO_STDATOMIC
+
+#define atomic_flag_ int
+#define ATOMIC_FLAG_INIT_ 0
+#define atomic_flag_test_and_set_(ptr) __sync_lock_test_and_set(ptr, 1)
+#define atomic_flag_clear_(ptr) __sync_lock_release(ptr)
+
+#else
+
+#include <stdatomic.h>
+#define atomic_flag_ atomic_flag
+#define ATOMIC_FLAG_INIT_ ATOMIC_FLAG_INIT
+#define atomic_flag_test_and_set_ atomic_flag_test_and_set
+#define atomic_flag_clear_ atomic_flag_clear
+
+#endif
+
 struct spinlock {
-	int lock;
+	atomic_flag_ lock;
 };
 
 static inline void
 spinlock_init(struct spinlock *lock) {
-	lock->lock = 0;
+	atomic_flag_ v = ATOMIC_FLAG_INIT_;
+	lock->lock = v;
 }
 
 static inline void
 spinlock_lock(struct spinlock *lock) {
-	while (__sync_lock_test_and_set(&lock->lock,1)) {}
+	while (atomic_flag_test_and_set_(&lock->lock)) {}
 }
 
 static inline int
 spinlock_trylock(struct spinlock *lock) {
-	return __sync_lock_test_and_set(&lock->lock,1) == 0;
+	return atomic_flag_test_and_set_(&lock->lock) == 0;
 }
 
 static inline void
 spinlock_unlock(struct spinlock *lock) {
-	__sync_lock_release(&lock->lock);
+	atomic_flag_clear_(&lock->lock);
 }
 
 static inline void

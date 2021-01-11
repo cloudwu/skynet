@@ -3,26 +3,26 @@
 
 #ifndef USE_PTHREAD_LOCK
 
+#include "atomic.h"
+
 struct rwlock {
-	int write;
-	int read;
+	ATOM_INT write;
+	ATOM_INT read;
 };
 
 static inline void
 rwlock_init(struct rwlock *lock) {
-	lock->write = 0;
-	lock->read = 0;
+	ATOM_INIT(&lock->write, 0);
+	ATOM_INIT(&lock->read, 0);
 }
 
 static inline void
 rwlock_rlock(struct rwlock *lock) {
 	for (;;) {
-		while(lock->write) {
-			__sync_synchronize();
-		}
-		__sync_add_and_fetch(&lock->read,1);
-		if (lock->write) {
-			__sync_sub_and_fetch(&lock->read,1);
+		while(ATOM_LOAD(&lock->write)) {}
+		ATOM_FINC(&lock->read);
+		if (ATOM_LOAD(&lock->write)) {
+			ATOM_FDEC(&lock->read);
 		} else {
 			break;
 		}
@@ -31,20 +31,20 @@ rwlock_rlock(struct rwlock *lock) {
 
 static inline void
 rwlock_wlock(struct rwlock *lock) {
-	while (__sync_lock_test_and_set(&lock->write,1)) {}
-	while(lock->read) {
-		__sync_synchronize();
-	}
+	ATOM_INT clear;
+	ATOM_INIT(&clear, 0);
+	while (!ATOM_CAS(&lock->write,clear,1)) {}
+	while(ATOM_LOAD(&lock->read)) {}
 }
 
 static inline void
 rwlock_wunlock(struct rwlock *lock) {
-	__sync_lock_release(&lock->write);
+	ATOM_STORE(&lock->write, 0);
 }
 
 static inline void
 rwlock_runlock(struct rwlock *lock) {
-	__sync_sub_and_fetch(&lock->read,1);
+	ATOM_FDEC(&lock->read);
 }
 
 #else

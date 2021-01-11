@@ -15,8 +15,8 @@
 #define MEMORY_ALLOCTAG 0x20140605
 #define MEMORY_FREETAG 0x0badf00d
 
-static size_t _used_memory = 0;
-static size_t _memory_block = 0;
+static ATOM_SIZET _used_memory = 0;
+static ATOM_SIZET _memory_block = 0;
 
 struct mem_data {
 	uint32_t handle;
@@ -67,21 +67,21 @@ get_allocated_field(uint32_t handle) {
 
 inline static void
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
-	ATOM_ADD(&_used_memory, __n);
-	ATOM_INC(&_memory_block);
+	ATOM_FADD(&_used_memory, __n);
+	ATOM_FINC(&_memory_block);
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
-		ATOM_ADD(allocated, __n);
+		ATOM_FADD(allocated, __n);
 	}
 }
 
 inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
-	ATOM_SUB(&_used_memory, __n);
-	ATOM_DEC(&_memory_block);
+	ATOM_FSUB(&_used_memory, __n);
+	ATOM_FDEC(&_memory_block);
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
-		ATOM_SUB(allocated, __n);
+		ATOM_FSUB(allocated, __n);
 	}
 }
 
@@ -273,12 +273,12 @@ mallctl_cmd(const char* name) {
 
 size_t
 malloc_used_memory(void) {
-	return _used_memory;
+	return ATOM_LOAD(&_used_memory);
 }
 
 size_t
 malloc_memory_block(void) {
-	return _memory_block;
+	return ATOM_LOAD(&_memory_block);
 }
 
 void

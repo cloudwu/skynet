@@ -9,7 +9,7 @@
 #include <string.h>
 
 struct skynet_monitor {
-	int version;
+	ATOM_INT version;
 	int check_version;
 	uint32_t source;
 	uint32_t destination;
@@ -31,7 +31,7 @@ void
 skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t destination) {
 	sm->source = source;
 	sm->destination = destination;
-	ATOM_INC(&sm->version);
+	ATOM_FINC(&sm->version);
 }
 
 void 
