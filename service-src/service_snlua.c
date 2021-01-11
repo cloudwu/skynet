@@ -521,15 +521,13 @@ snlua_signal(struct snlua *l, int signal) {
 	skynet_error(l->ctx, "recv a signal %d", signal);
 	if (signal == 0) {
 		if (ATOM_LOAD(&l->trap) == 0) {
-			ATOM_INT zero;
-			ATOM_INIT(&zero, 0);
+			int zero = 0;
 			// only one thread can set trap ( l->trap 0->1 )
 			if (!ATOM_CAS(&l->trap, zero, 1))
 				return;
-			ATOM_INT one;
-			ATOM_INIT(&one, 1);
 			lua_sethook (l->activeL, signal_hook, LUA_MASKCOUNT, 1);
 			// finish set ( l->trap 1 -> -1 )
+			int one = 1;
 			ATOM_CAS(&l->trap, one, -1);
 		}
 	} else if (signal == 1) {
