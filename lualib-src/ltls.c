@@ -381,7 +381,7 @@ lnew_tls(lua_State* L) {
 int
 luaopen_ltls_c(lua_State* L) {
     if(!TLS_IS_INIT) {
-        luaL_error(L, "ltls need init.");
+        luaL_error(L, "ltls need init, Put enablessl = true in you config file.");
     }
     luaL_Reg l[] = {
         {"newctx", lnew_ctx},
