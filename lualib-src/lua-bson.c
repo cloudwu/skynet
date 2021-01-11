@@ -1269,7 +1269,7 @@ init_oid_header() {
 	oid_header[3] = pid & 0xff;
 	oid_header[4] = (pid >> 8) & 0xff;
 	
-	uint32_t c = h ^ time(NULL) ^ (uintptr_t)&h;
+	unsigned long c = h ^ time(NULL) ^ (uintptr_t)&h;
 	if (c == 0) {
 		c = 1;
 	}
