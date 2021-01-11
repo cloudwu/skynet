@@ -8,7 +8,7 @@
 
 #ifndef USE_PTHREAD_LOCK
 
-#ifdef NO_STDATOMIC
+#ifdef __STDC_NO_ATOMICS__
 
 #define atomic_flag_ int
 #define ATOMIC_FLAG_INIT_ 0

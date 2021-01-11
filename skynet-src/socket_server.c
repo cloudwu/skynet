@@ -91,14 +91,14 @@ struct socket {
 	struct wb_list low;
 	int64_t wb_size;
 	struct socket_stat stat;
-	volatile uint32_t sending;
+	ATOM_ULONG sending;
 	int fd;
 	int id;
 	uint8_t protocol;
 	ATOM_BYTE type;
 	bool reading;
 	bool writing;
-	int udpconnecting;
+	ATOM_INT udpconnecting;
 	int64_t warn_size;
 	union {
 		int size;
@@ -356,7 +356,7 @@ reserve_id(struct socket_server *ss) {
 				s->protocol = PROTOCOL_UNKNOWN;
 				// socket_server_udp_connect may inc s->udpconncting directly (from other thread, before new_fd), 
 				// so reset it to 0 here rather than in new_fd.
-				s->udpconnecting = 0;
+				ATOM_INIT(&s->udpconnecting, 0);
 				s->fd = -1;
 				return id;
 			} else {
@@ -564,7 +564,7 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 	s->fd = fd;
 	s->reading = true;
 	s->writing = false;
-	s->sending = ID_TAG16(id) << 16 | 0;
+	ATOM_INIT(&s->sending , ID_TAG16(id) << 16 | 0);
 	s->protocol = protocol;
 	s->p.size = MIN_READ_BUFFER;
 	s->opaque = opaque;
@@ -1060,7 +1060,7 @@ _failed:
 
 static inline int
 nomore_sending_data(struct socket *s) {
-	return send_buffer_empty(s) && s->dw_buffer == NULL && (s->sending & 0xffff) == 0;
+	return send_buffer_empty(s) && s->dw_buffer == NULL && (ATOM_LOAD(&s->sending) & 0xffff) == 0;
 }
 
 static int
@@ -1254,7 +1254,7 @@ inc_sending_ref(struct socket *s, int id) {
 	if (s->protocol != PROTOCOL_TCP)
 		return;
 	for (;;) {
-		uint32_t sending = s->sending;
+		unsigned long sending = ATOM_LOAD(&s->sending);
 		if ((sending >> 16) == ID_TAG16(id)) {
 			if ((sending & 0xffff) == 0xffff) {
 				// s->sending may overflow (rarely), so busy waiting here for socket thread dec it. see issue #794
@@ -1276,7 +1276,7 @@ dec_sending_ref(struct socket_server *ss, int id) {
 	struct socket * s = &ss->slot[HASH_ID(id)];
 	// Notice: udp may inc sending while type == SOCKET_TYPE_RESERVE
 	if (s->id == id && s->protocol == PROTOCOL_TCP) {
-		assert((s->sending & 0xffff) != 0);
+		assert((ATOM_LOAD(&s->sending) & 0xffff) != 0);
 		ATOM_FDEC(&s->sending);
 	}
 }
@@ -1729,7 +1729,7 @@ socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * a
 
 static inline int
 can_direct_write(struct socket *s, int id) {
-	return s->id == id && nomore_sending_data(s) && ATOM_LOAD(&s->type) == SOCKET_TYPE_CONNECTED && s->udpconnecting == 0;
+	return s->id == id && nomore_sending_data(s) && ATOM_LOAD(&s->type) == SOCKET_TYPE_CONNECTED && ATOM_LOAD(&s->udpconnecting) == 0;
 }
 
 // return -1 when error, 0 when success

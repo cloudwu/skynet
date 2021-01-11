@@ -1,12 +1,13 @@
 #ifndef SKYNET_ATOMIC_H
 #define SKYNET_ATOMIC_H
 
-#ifdef NO_STDATOMIC
+#ifdef __STDC_NO_ATOMICS__
 
 #define ATOM_BYTE unsigned char
 #define ATOM_INT int
 #define ATOM_POINTER void *
 #define ATOM_SIZET size_t
+#define ATOM_ULONG unsigned long
 #define ATOM_INIT(ptr, v) (*(ptr) = v)
 #define ATOM_LOAD(ptr) (*(ptr))
 #define ATOM_STORE(ptr, v) (*(ptr) = v)
@@ -26,6 +27,7 @@
 #define ATOM_INT atomic_int
 #define ATOM_POINTER atomic_uintptr_t
 #define ATOM_SIZET atomic_size_t
+#define ATOM_ULONG atomic_ulong
 #define ATOM_INIT(ref, v) atomic_init(ref, v)
 #define ATOM_LOAD(ptr) atomic_load(ptr)
 #define ATOM_STORE(ptr, v) atomic_store(ptr, v)

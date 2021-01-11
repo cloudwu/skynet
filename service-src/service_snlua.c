@@ -30,7 +30,7 @@ struct snlua {
 	size_t mem_report;
 	size_t mem_limit;
 	lua_State * activeL;
-	volatile ATOM_INT trap;
+	ATOM_INT trap;
 };
 
 // LUA_CACHELIB may defined in patched lua for shared proto
