@@ -410,6 +410,7 @@ ltls_init_constructor(lua_State* L) {
 
 static int
 ltls_init_destructor(lua_State* L) {
+#ifndef OPENSSL_EXTERNAL_INITIALIZATION
     if(TLS_IS_INIT) {
         ENGINE_cleanup();
         CONF_modules_unload(1);
@@ -418,6 +419,7 @@ ltls_init_destructor(lua_State* L) {
         sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
         CRYPTO_cleanup_all_ex_data();
     }
+#endif
     TLS_IS_INIT = false;
     return 0;
 }
