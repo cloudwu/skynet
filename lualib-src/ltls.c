@@ -378,9 +378,11 @@ lnew_tls(lua_State* L) {
     return 1;
 }
 
-
 int
 luaopen_ltls_c(lua_State* L) {
+    if(!TLS_IS_INIT) {
+        luaL_error(L, "ltls need init, Put enablessl = true in you config file.");
+    }
     luaL_Reg l[] = {
         {"newctx", lnew_ctx},
         {"newtls", lnew_tls},
@@ -391,18 +393,24 @@ luaopen_ltls_c(lua_State* L) {
     return 1;
 }
 
-void __attribute__((constructor)) ltls_init(void) {
+// for ltls init
+static int
+ltls_init_constructor(lua_State* L) {
 #ifndef OPENSSL_EXTERNAL_INITIALIZATION
-    SSL_library_init();
-    SSL_load_error_strings();
-    ERR_load_BIO_strings();
-    OpenSSL_add_all_algorithms();
-    TLS_IS_INIT = true;
+    if(!TLS_IS_INIT) {
+        SSL_library_init();
+        SSL_load_error_strings();
+        ERR_load_BIO_strings();
+        OpenSSL_add_all_algorithms();
+    }
 #endif
+    TLS_IS_INIT = true;
+    return 0;
 }
 
-
-void __attribute__((destructor)) ltls_destory(void) {
+static int
+ltls_init_destructor(lua_State* L) {
+#ifndef OPENSSL_EXTERNAL_INITIALIZATION
     if(TLS_IS_INIT) {
         ENGINE_cleanup();
         CONF_modules_unload(1);
@@ -411,4 +419,19 @@ void __attribute__((destructor)) ltls_destory(void) {
         sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
         CRYPTO_cleanup_all_ex_data();
     }
+#endif
+    TLS_IS_INIT = false;
+    return 0;
+}
+
+int
+luaopen_ltls_init_c(lua_State* L) {
+    luaL_Reg l[] = {
+        {"constructor", ltls_init_constructor},
+        {"destructor", ltls_init_destructor},
+        {NULL, NULL},
+    };
+    luaL_checkversion(L);
+    luaL_newlib(L, l);
+    return 1;
 }
