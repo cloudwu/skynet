@@ -18,7 +18,7 @@ struct stm_object {
 };
 
 struct stm_copy {
-	int reference;
+	ATOM_INT reference;
 	uint32_t sz;
 	void * msg;
 };
