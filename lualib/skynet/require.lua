@@ -29,6 +29,7 @@ do
 			for _, f in ipairs(init_list) do
 				f()
 			end
+			context[co] = old_init_list
 			return ret
 		end
 	end
