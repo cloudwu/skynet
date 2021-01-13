@@ -931,8 +931,11 @@ skynet.init = skynet_require.init
 skynet.pcall = pcall
 
 function skynet.init_service(start)
-	skynet_require.init_all()
-	local ok, err = xpcall(start, traceback)
+	local function main()
+		skynet_require.init_all()
+		start()
+	end
+	local ok, err = xpcall(main, traceback)
 	if not ok then
 		skynet.error("init service failed: " .. tostring(err))
 		skynet.send(".launcher","lua", "ERROR")
