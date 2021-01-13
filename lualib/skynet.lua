@@ -927,6 +927,20 @@ end
 
 local init_func = {}
 
+function skynet.init(f, name)
+	assert(type(f) == "function")
+	if init_func == nil then
+		f()
+	else
+		tinsert(init_func, f)
+		if name then
+			assert(type(name) == "string")
+			assert(init_func[name] == nil)
+			init_func[name] = f
+		end
+	end
+end
+
 local function init_all()
 	local funcs = init_func
 	if funcs then
@@ -934,20 +948,6 @@ local function init_all()
 			f()
 		end
 		init_func = nil
-	end
-end
-
-function skynet.init(f, name)
-	assert(type(f) == "function")
-	if init_func == nil then
-		init_func = {}
-		skynet.fork(init_all)
-	end
-	tinsert(init_func, f)
-	if name then
-		assert(type(name) == "string")
-		assert(init_func[name] == nil)
-		init_func[name] = f
 	end
 end
 
