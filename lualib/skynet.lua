@@ -530,7 +530,7 @@ function skynet.exit()
 		end
 	end
 	for session, co in pairs(session_id_coroutine) do
-		if type(co) == "thread" then
+		if type(co) == "thread" and co ~= running_thread then
 			coroutine.close(co)
 		end
 	end
@@ -927,27 +927,27 @@ end
 
 local init_func = {}
 
-function skynet.init(f, name)
-	assert(type(f) == "function")
-	if init_func == nil then
-		f()
-	else
-		tinsert(init_func, f)
-		if name then
-			assert(type(name) == "string")
-			assert(init_func[name] == nil)
-			init_func[name] = f
-		end
-	end
-end
-
 local function init_all()
 	local funcs = init_func
-	init_func = nil
 	if funcs then
 		for _,f in ipairs(funcs) do
 			f()
 		end
+		init_func = nil
+	end
+end
+
+function skynet.init(f, name)
+	assert(type(f) == "function")
+	if init_func == nil then
+		init_func = {}
+		skynet.fork(init_all)
+	end
+	tinsert(init_func, f)
+	if name then
+		assert(type(name) == "string")
+		assert(init_func[name] == nil)
+		init_func[name] = f
 	end
 end
 
