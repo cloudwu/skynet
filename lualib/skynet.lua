@@ -1,5 +1,6 @@
 -- read https://github.com/cloudwu/skynet/wiki/FAQ for the module "skynet.core"
 local c = require "skynet.core"
+local skynet_require = require "skynet.require"
 local tostring = tostring
 local coroutine = coroutine
 local assert = assert
@@ -925,49 +926,16 @@ do
 	}
 end
 
-local init_func = {}
-
-function skynet.init(f, name)
-	assert(type(f) == "function")
-	if init_func == nil then
-		f()
-	else
-		tinsert(init_func, f)
-		if name then
-			assert(type(name) == "string")
-			assert(init_func[name] == nil)
-			init_func[name] = f
-		end
-	end
-end
-
-local function init_all()
-	local funcs = init_func
-	init_func = nil
-	if funcs then
-		for _,f in ipairs(funcs) do
-			f()
-		end
-	end
-end
-
-local function ret(f, ...)
-	f()
-	return ...
-end
-
-local function init_template(start, ...)
-	init_all()
-	init_func = {}
-	return ret(init_all, start(...))
-end
-
-function skynet.pcall(start, ...)
-	return xpcall(init_template, traceback, start, ...)
-end
+skynet.init = skynet_require.init
+-- skynet.pcall is deprecated, use pcall directly
+skynet.pcall = pcall
 
 function skynet.init_service(start)
-	local ok, err = skynet.pcall(start)
+	local function main()
+		skynet_require.init_all()
+		start()
+	end
+	local ok, err = xpcall(main, traceback)
 	if not ok then
 		skynet.error("init service failed: " .. tostring(err))
 		skynet.send(".launcher","lua", "ERROR")
