@@ -531,7 +531,7 @@ function skynet.exit()
 		end
 	end
 	for session, co in pairs(session_id_coroutine) do
-		if type(co) == "thread" then
+		if type(co) == "thread" and co ~= running_thread then
 			coroutine.close(co)
 		end
 	end
