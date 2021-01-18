@@ -141,7 +141,7 @@ function gateserver.start(handler)
 		end
 	}
 
-	skynet.start(function()
+	local function init()
 		skynet.dispatch("lua", function (_, address, cmd, ...)
 			local f = CMD[cmd]
 			if f then
@@ -150,7 +150,13 @@ function gateserver.start(handler)
 				skynet.ret(skynet.pack(handler.command(cmd, address, ...)))
 			end
 		end)
-	end)
+	end
+
+	if handler.embed then
+		init()
+	else
+		skynet.start(init)
+	end
 end
 
 return gateserver
