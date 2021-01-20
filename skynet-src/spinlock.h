@@ -25,6 +25,8 @@
 
 #endif
 
+#include <sched.h>
+
 struct spinlock {
 	atomic_flag_ lock;
 };
@@ -37,7 +39,12 @@ spinlock_init(struct spinlock *lock) {
 
 static inline void
 spinlock_lock(struct spinlock *lock) {
-	while (atomic_flag_test_and_set_(&lock->lock)) {}
+	unsigned int counter = 0;
+	while (atomic_flag_test_and_set_(&lock->lock)) {
+		if(++counter>1000){
+			sched_yield();
+		}
+	}
 }
 
 static inline int
