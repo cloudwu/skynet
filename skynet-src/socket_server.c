@@ -29,9 +29,10 @@
 #define SOCKET_TYPE_LISTEN 3
 #define SOCKET_TYPE_CONNECTING 4
 #define SOCKET_TYPE_CONNECTED 5
-#define SOCKET_TYPE_HALFCLOSE 6
-#define SOCKET_TYPE_PACCEPT 7
-#define SOCKET_TYPE_BIND 8
+#define SOCKET_TYPE_HALFCLOSE_READ 6
+#define SOCKET_TYPE_HALFCLOSE_WRITE 7
+#define SOCKET_TYPE_PACCEPT 8
+#define SOCKET_TYPE_BIND 9
 
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
 
@@ -675,6 +676,17 @@ _failed_getaddrinfo:
 }
 
 static int
+close_write(struct socket_server *ss, struct socket *s, struct socket_lock *l, struct socket_message *result) {
+	if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_READ) {
+		force_close(ss,s,l,result);
+		return SOCKET_CLOSE;
+	} else {
+		ATOM_STORE(&s->type, SOCKET_TYPE_HALFCLOSE_WRITE);
+		return -1;
+	}
+}
+
+static int
 send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, struct socket_lock *l, struct socket_message *result) {
 	while (list->head) {
 		struct write_buffer * tmp = list->head;
@@ -687,8 +699,7 @@ send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 				case AGAIN_WOULDBLOCK:
 					return -1;
 				}
-				force_close(ss,s,l,result);
-				return SOCKET_CLOSE;
+				return close_write(ss, s, l, result);
 			}
 			stat_write(ss,s,(int)sz);
 			s->wb_size -= sz;
@@ -827,11 +838,17 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 	if (send_list(ss,s,&s->high,l,result) == SOCKET_CLOSE) {
 		return SOCKET_CLOSE;
 	}
+	if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_WRITE) {
+		return -1;
+	}
 	if (s->high.head == NULL) {
 		// step 2
 		if (s->low.head != NULL) {
 			if (send_list(ss,s,&s->low,l,result) == SOCKET_CLOSE) {
 				return SOCKET_CLOSE;
+			}
+			if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_WRITE) {
+				return -1;
 			}
 			// step 3
 			if (list_uncomplete(&s->low)) {
@@ -844,11 +861,6 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 		// step 4
 		assert(send_buffer_empty(s) && s->wb_size == 0);
 		int err = enable_write(ss, s, false);
-
-		if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE) {
-				force_close(ss, s, l, result);
-				return SOCKET_CLOSE;
-		}
 
 		if (err) {
 			result->opaque = s->opaque;
@@ -970,7 +982,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 	send_object_init(ss, &so, request->buffer, request->sz);
 	uint8_t type = ATOM_LOAD(&s->type);
 	if (type == SOCKET_TYPE_INVALID || s->id != id
-		|| type == SOCKET_TYPE_HALFCLOSE
+		|| type == SOCKET_TYPE_HALFCLOSE_WRITE
 		|| type == SOCKET_TYPE_PACCEPT) {
 		so.free_func((void *)request->buffer);
 		return -1;
@@ -992,7 +1004,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			socklen_t sasz = udp_socket_address(s, udp_address, &sa);
 			if (sasz == 0) {
 				// udp type mismatch, just drop it.
-				skynet_error(NULL, "socket-server: udp socket (%d) type mistach.", id);
+				skynet_error(NULL, "socket-server: udp socket (%d) type mismatch.", id);
 				so.free_func((void *)request->buffer);
 				return -1;
 			}
@@ -1060,7 +1072,8 @@ _failed:
 
 static inline int
 nomore_sending_data(struct socket *s) {
-	return send_buffer_empty(s) && s->dw_buffer == NULL && (ATOM_LOAD(&s->sending) & 0xffff) == 0;
+	return (send_buffer_empty(s) && s->dw_buffer == NULL && (ATOM_LOAD(&s->sending) & 0xffff) == 0)
+		|| (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_WRITE);
 }
 
 static int
@@ -1089,7 +1102,7 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 		result->opaque = request->opaque;
 		return SOCKET_CLOSE;
 	}
-	ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE);
+	ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE_READ);
 	shutdown(s->fd, SHUT_RD);
 
 	return -1;
@@ -1142,7 +1155,7 @@ resume_socket(struct socket_server *ss, struct request_resumepause *request, str
 		result->data = "transfer";
 		return SOCKET_OPEN;
 	}
-	// if s->type == SOCKET_TYPE_HALFCLOSE , SOCKET_CLOSE message will send later
+	// if s->type == SOCKET_TYPE_HALFCLOSE_* , SOCKET_CLOSE message will send later
 	return -1;
 }
 
@@ -1368,15 +1381,14 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		FREE(buffer);
 		if (nomore_sending_data(s)) {
 			force_close(ss,s,l,result); 
-			return SOCKET_CLOSE;
 		} else { 
-			ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE);
+			ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE_READ);
 			shutdown(s->fd, SHUT_RD);
-			return -1; 
 		}
+		return SOCKET_CLOSE;
 	}
 
-	if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE) {
+	if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_READ) {
 		// discard recv data
 		FREE(buffer);
 		return -1;
