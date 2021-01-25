@@ -62,18 +62,23 @@ do
 		context[co] = init_list
 
 		-- We should call modfunc in lua, because modfunc may yield by calling M.require recursive.
-		local m = modfunc(name, filename)
+		local function execute_module()
+			local m = modfunc(name, filename)
 
-		for _, f in ipairs(init_list) do
-			f()
+			for _, f in ipairs(init_list) do
+				f()
+			end
+
+			if m == nil then
+				m = true
+			end
+
+			loaded[name] = m
 		end
+
+		local ok, err = xpcall(execute_module, debug.traceback)
+
 		context[co] = old_init_list
-
-		if m == nil then
-			m = true
-		end
-
-		package.loaded[name] = m
 
 		local waiting = #loading_queue
 		if waiting > 0 then
@@ -84,7 +89,11 @@ do
 		end
 		loading[name] = nil
 
-		return m
+		if ok then
+			return loaded[name]
+		else
+			error(err)
+		end
 	end
 end
 
