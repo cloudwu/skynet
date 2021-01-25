@@ -46,10 +46,8 @@ do
 			-- Module is in the init process (require the same mod at the same time in different coroutines) , waiting.
 			local skynet = require "skynet"
 			loading_queue[#loading_queue+1] = co
-			print ("Waiting " .. name)
 			skynet.wait(co)
 			local m = loaded[name]
-			print ("Waiting OK : " .. tostring(m))
 			if m == nil then
 				error(string.format("require %s failed", name))
 			end
