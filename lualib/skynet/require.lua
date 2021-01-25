@@ -17,20 +17,82 @@ local context = {
 
 do
 	local require = _G.require
-	function M.require(...)
+	local loaded = package.loaded
+	local loading = {}
+
+	function M.require(name)
+		local m = loaded[name]
+		if m ~= nil then
+			return m
+		end
+
 		local co, main = coroutine.running()
 		if main then
-			return require(...)
-		else
-			local old_init_list = context[co]
-			local init_list = {}
-			context[co] = init_list
-			local ret = require(...)
+			return require(name)
+		end
+
+		local filename = package.searchpath(name, package.path)
+		if not filename then
+			return require(name)
+		end
+
+		local modfunc = loadfile(filename)
+		if not modfunc then
+			return require(name)
+		end
+
+		local loading_queue = loading[name]
+		if loading_queue then
+			-- Module is in the init process (require the same mod at the same time in different coroutines) , waiting.
+			local skynet = require "skynet"
+			loading_queue[#loading_queue+1] = co
+			skynet.wait(co)
+			local m = loaded[name]
+			if m == nil then
+				error(string.format("require %s failed", name))
+			end
+			return m
+		end
+
+		loading_queue = {}
+		loading[name] = loading_queue
+
+		local old_init_list = context[co]
+		local init_list = {}
+		context[co] = init_list
+
+		-- We should call modfunc in lua, because modfunc may yield by calling M.require recursive.
+		local function execute_module()
+			local m = modfunc(name, filename)
+
 			for _, f in ipairs(init_list) do
 				f()
 			end
-			context[co] = old_init_list
-			return ret
+
+			if m == nil then
+				m = true
+			end
+
+			loaded[name] = m
+		end
+
+		local ok, err = xpcall(execute_module, debug.traceback)
+
+		context[co] = old_init_list
+
+		local waiting = #loading_queue
+		if waiting > 0 then
+			local skynet = require "skynet"
+			for i = 1, waiting do
+				skynet.wakeup(loading_queue[i])
+			end
+		end
+		loading[name] = nil
+
+		if ok then
+			return loaded[name]
+		else
+			error(err)
 		end
 	end
 end
