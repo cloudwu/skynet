@@ -7,6 +7,10 @@
 #define SOCKET_INFO_UDP 3
 #define SOCKET_INFO_BIND 4
 
+#define SOCKET_INFO_HALFCLOSE_NONE  0
+#define SOCKET_INFO_HALFCLOSE_READ  1
+#define SOCKET_INFO_HALFCLOSE_WRITE 2
+
 #include <stdint.h>
 
 struct socket_info {
@@ -20,6 +24,7 @@ struct socket_info {
 	int64_t wbuffer;
 	uint8_t reading;
 	uint8_t writing;
+	uint8_t halfclose;
 	char name[128];
 	struct socket_info *next;
 };

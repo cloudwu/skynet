@@ -766,6 +766,14 @@ getinfo(lua_State *L, struct socket_info *si) {
 		lua_pushstring(L, si->name);
 		lua_setfield(L, -2, "peer");
 	}
+	uint8_t halfclose = si->halfclose;
+	if(halfclose == SOCKET_INFO_HALFCLOSE_READ) {
+		lua_pushstring(L, "read");
+		lua_setfield(L, -2, "halfclose");
+	} else if(halfclose == SOCKET_INFO_HALFCLOSE_WRITE) {
+		lua_pushstring(L, "write");
+		lua_setfield(L, -2, "halfclose");
+	}
 }
 
 static int

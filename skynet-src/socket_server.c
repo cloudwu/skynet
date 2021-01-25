@@ -2179,33 +2179,52 @@ socket_info_release(struct socket_info *si) {
 	}
 }
 
+static void
+socket_info_forward(struct socket *s, struct socket_info *si) {
+	union sockaddr_all u;
+	socklen_t slen = sizeof(u);
+	if (s->protocol == PROTOCOL_TCP) {
+		si->type = SOCKET_INFO_TCP;
+		if (getpeername(s->fd, &u.s, &slen) == 0) {
+			getname(&u, si->name, sizeof(si->name));
+		}
+	} else {
+		si->type = SOCKET_INFO_UDP;
+		if (udp_socket_address(s, s->p.udp_address, &u)) {
+			getname(&u, si->name, sizeof(si->name));
+		}
+	}
+}
+
+
 static int
 query_info(struct socket *s, struct socket_info *si) {
 	union sockaddr_all u;
 	socklen_t slen = sizeof(u);
 	switch (ATOM_LOAD(&s->type)) {
 	case SOCKET_TYPE_BIND:
+		si->halfclose = SOCKET_INFO_HALFCLOSE_NONE;
 		si->type = SOCKET_INFO_BIND;
 		si->name[0] = '\0';
 		break;
 	case SOCKET_TYPE_LISTEN:
+		si->halfclose = SOCKET_INFO_HALFCLOSE_NONE;
 		si->type = SOCKET_INFO_LISTEN;
 		if (getsockname(s->fd, &u.s, &slen) == 0) {
 			getname(&u, si->name, sizeof(si->name));
 		}
 		break;
+	case SOCKET_TYPE_HALFCLOSE_READ:
+		si->halfclose = SOCKET_INFO_HALFCLOSE_READ;
+		socket_info_forward(s, si);
+		break;
+	case SOCKET_TYPE_HALFCLOSE_WRITE:
+		si->halfclose = SOCKET_INFO_HALFCLOSE_WRITE;
+		socket_info_forward(s, si);
+		break;
 	case SOCKET_TYPE_CONNECTED:
-		if (s->protocol == PROTOCOL_TCP) {
-			si->type = SOCKET_INFO_TCP;
-			if (getpeername(s->fd, &u.s, &slen) == 0) {
-				getname(&u, si->name, sizeof(si->name));
-			}
-		} else {
-			si->type = SOCKET_INFO_UDP;
-			if (udp_socket_address(s, s->p.udp_address, &u)) {
-				getname(&u, si->name, sizeof(si->name));
-			}
-		}
+		si->halfclose = SOCKET_INFO_HALFCLOSE_NONE;
+		socket_info_forward(s, si);
 		break;
 	default:
 		return 0;
