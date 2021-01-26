@@ -742,6 +742,9 @@ getinfo(lua_State *L, struct socket_info *si) {
 	case SOCKET_INFO_BIND:
 		lua_pushstring(L, "BIND");
 		break;
+	case SOCKET_INFO_CLOSING:
+		lua_pushstring(L, "CLOSING");
+		break;
 	default:
 		lua_pushstring(L, "UNKNOWN");
 		lua_setfield(L, -2, "type");

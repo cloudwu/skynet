@@ -6,6 +6,7 @@
 #define SOCKET_INFO_TCP 2
 #define SOCKET_INFO_UDP 3
 #define SOCKET_INFO_BIND 4
+#define SOCKET_INFO_CLOSING 5
 
 #include <stdint.h>
 

@@ -2183,6 +2183,7 @@ static int
 query_info(struct socket *s, struct socket_info *si) {
 	union sockaddr_all u;
 	socklen_t slen = sizeof(u);
+	int closing = 0;
 	switch (ATOM_LOAD(&s->type)) {
 	case SOCKET_TYPE_BIND:
 		si->type = SOCKET_INFO_BIND;
@@ -2194,9 +2195,12 @@ query_info(struct socket *s, struct socket_info *si) {
 			getname(&u, si->name, sizeof(si->name));
 		}
 		break;
+	case SOCKET_TYPE_HALFCLOSE_READ:
+	case SOCKET_TYPE_HALFCLOSE_WRITE:
+		closing = 1;
 	case SOCKET_TYPE_CONNECTED:
 		if (s->protocol == PROTOCOL_TCP) {
-			si->type = SOCKET_INFO_TCP;
+			si->type = closing ? SOCKET_INFO_CLOSING : SOCKET_INFO_TCP;
 			if (getpeername(s->fd, &u.s, &slen) == 0) {
 				getname(&u, si->name, sizeof(si->name));
 			}
