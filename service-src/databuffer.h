@@ -62,7 +62,7 @@ _return_message(struct databuffer *db, struct messagepool *mp) {
 }
 
 static void
-databuffer_read(struct databuffer *db, struct messagepool *mp, void * buffer, int sz) {
+databuffer_read(struct databuffer *db, struct messagepool *mp, char * buffer, int sz) {
 	assert(db->size >= sz);
 	db->size -= sz;
 	for (;;) {
