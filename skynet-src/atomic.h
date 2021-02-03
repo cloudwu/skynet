@@ -3,7 +3,6 @@
 
 #ifdef __STDC_NO_ATOMICS__
 
-#define ATOM_BYTE unsigned char
 #define ATOM_INT int
 #define ATOM_POINTER void *
 #define ATOM_SIZET size_t
@@ -23,7 +22,6 @@
 
 #include <stdatomic.h>
 
-#define ATOM_BYTE atomic_uchar
 #define ATOM_INT atomic_int
 #define ATOM_POINTER atomic_uintptr_t
 #define ATOM_SIZET atomic_size_t
