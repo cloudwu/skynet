@@ -101,14 +101,21 @@ local function compose_message(cmd, msg)
 	local lines = {}
 
 	if t == "table" then
-		lines[1] = count_cache[#msg+1]
+		local n = msg.n or #msg
+		lines[1] = count_cache[n+1]
 		lines[2] = command_cache[cmd]
 		local idx = 3
-		for _,v in ipairs(msg) do
-			v= tostring(v)
-			lines[idx] = header_cache[#v]
-			lines[idx+1] = v
-			idx = idx + 2
+		for i = 1, n do
+			v = msg[i]
+			if v == nil then
+				lines[idx] = "\r\n$-1"
+				idx = idx + 1
+			else
+				v= tostring(v)
+				lines[idx] = header_cache[#v]
+				lines[idx+1] = v
+				idx = idx + 2
+			end
 		end
 		lines[idx] = "\r\n"
 	else
@@ -156,7 +163,7 @@ setmetatable(command, { __index = function(t,k)
 		if type(v) == "table" then
 			return self[1]:request(compose_message(cmd, v), read_response)
 		else
-			return self[1]:request(compose_message(cmd, {v, ...}), read_response)
+			return self[1]:request(compose_message(cmd, table.pack(v, ...)), read_response)
 		end
 	end
 	t[k] = f
@@ -175,7 +182,7 @@ end
 
 function command:sismember(key, value)
 	local fd = self[1]
-	return fd:request(compose_message ("SISMEMBER", {key, value}), read_boolean)
+	return fd:request(compose_message ("SISMEMBER", table.pack(key, value)), read_boolean)
 end
 
 local function compose_table(lines, msg)
