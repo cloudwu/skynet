@@ -1,10 +1,16 @@
-local skynet = require "skynet"
-local socket = require "skynet.socket"
 local socketchannel = require "skynet.socketchannel"
 
+local tostring = tostring
+local tonumber = tonumber
 local table = table
 local string = string
 local assert = assert
+local setmetatable = setmetatable
+local ipairs = ipairs
+local type = type
+local select = select
+local pairs = pairs
+
 
 local redis = {}
 local command = {}
@@ -106,7 +112,7 @@ local function compose_message(cmd, msg)
 		lines[2] = command_cache[cmd]
 		local idx = 3
 		for i = 1, n do
-			v = msg[i]
+			local v = msg[i]
 			if v == nil then
 				lines[idx] = "\r\n$-1"
 				idx = idx + 1
@@ -209,7 +215,7 @@ function command:pipeline(ops,resp)
 
 	if resp then
 		return fd:request(cmds, function (fd)
-			for i=1, #ops do
+			for _=1, #ops do
 				local ok, out = read_response(fd)
 				table.insert(resp, {ok = ok, out = out})
 			end
@@ -218,7 +224,7 @@ function command:pipeline(ops,resp)
 	else
 		return fd:request(cmds, function (fd)
 			local ok, out
-			for i=1, #ops do
+			for _=1, #ops do
 				ok, out = read_response(fd)
 			end
 			-- return last response
@@ -295,18 +301,18 @@ function watch:message()
 	local so = self.__sock
 	while true do
 		local ret = so:response(read_response)
-		local type , channel, data , data2 = ret[1], ret[2], ret[3], ret[4]
-		if type == "message" then
+		local ttype , channel, data , data2 = ret[1], ret[2], ret[3], ret[4]
+		if ttype == "message" then
 			return data, channel
-		elseif type == "pmessage" then
+		elseif ttype == "pmessage" then
 			return data2, data, channel
-		elseif type == "subscribe" then
+		elseif ttype == "subscribe" then
 			self.__subscribe[channel] = true
-		elseif type == "psubscribe" then
+		elseif ttype == "psubscribe" then
 			self.__psubscribe[channel] = true
-		elseif type == "unsubscribe" then
+		elseif ttype == "unsubscribe" then
 			self.__subscribe[channel] = nil
-		elseif type == "punsubscribe" then
+		elseif ttype == "punsubscribe" then
 			self.__psubscribe[channel] = nil
 		end
 	end
