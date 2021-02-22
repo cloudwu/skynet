@@ -1141,6 +1141,8 @@ resume_socket(struct socket_server *ss, struct request_resumepause *request, str
 		result->data = "invalid socket";
 		return SOCKET_ERR;
 	}
+	if (s->closing)
+		return -1;
 	struct socket_lock l;
 	socket_lock_init(s, &l);
 	if (enable_read(ss, s, true)) {
@@ -1385,14 +1387,18 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		FREE(buffer);
 		if (nomore_sending_data(s)) {
 			force_close(ss,s,l,result); 
-		} else { 
+		} else {
 			ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE_READ);
-			shutdown(s->fd, SHUT_RD);
+			if (!s->closing) {
+				shutdown(s->fd, SHUT_RD);
+				s->closing = true;
+			}
+			enable_read(ss, s, false);
 		}
 		return SOCKET_CLOSE;
 	}
 
-	if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_READ) {
+	if (s->closing) {
 		// discard recv data
 		FREE(buffer);
 		return -1;
