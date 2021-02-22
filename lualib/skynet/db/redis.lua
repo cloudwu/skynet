@@ -96,7 +96,17 @@ local count_cache = make_cache(function(t,k)
 		return s
 	end)
 
+local command_np_cache = make_cache(function(t, cmd)
+		local s = "*1" .. command_cache[cmd] .. "\r\n"
+		t[cmd] = s
+		return s
+	end)
+
 local function compose_message(cmd, msg)
+	if msg == nil then
+		return command_np_cache[cmd]
+	end
+
 	local t = type(msg)
 	local lines = {}
 
@@ -160,7 +170,9 @@ end
 setmetatable(command, { __index = function(t,k)
 	local cmd = string.upper(k)
 	local f = function (self, v, ...)
-		if type(v) == "table" then
+		if v == nil then
+			return self[1]:request(compose_message(cmd), read_response)
+		elseif type(v) == "table" then
 			return self[1]:request(compose_message(cmd, v), read_response)
 		else
 			return self[1]:request(compose_message(cmd, table.pack(v, ...)), read_response)
