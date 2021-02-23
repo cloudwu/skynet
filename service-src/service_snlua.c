@@ -195,7 +195,7 @@ timing_resume(lua_State *L, int co_index, int n) {
 		lua_rawset(L, lua_upvalueindex(1));	// set start time
 	}
 
-	int r = auxresume(L, co, lua_gettop(L) - 1);
+	int r = auxresume(L, co, n);
 
 	if (timing_enable(L, co_index, &start_time)) {
 		double total_time = timing_total(L, co_index);
