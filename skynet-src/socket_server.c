@@ -677,12 +677,18 @@ _failed_getaddrinfo:
 	return SOCKET_ERR;
 }
 
-static void
+static int
 close_write(struct socket_server *ss, struct socket *s, struct socket_lock *l, struct socket_message *result) {
 	if (s->closing) {
 		force_close(ss,s,l,result);
+		return SOCKET_CLOSE;
 	} else {
 		ATOM_STORE(&s->type, SOCKET_TYPE_HALFCLOSE_WRITE);
+		result->id = s->id;
+		result->ud = 0;
+		result->opaque = s->opaque;
+		result->data = strerror(errno);
+		return SOCKET_ERR;
 	}
 }
 
@@ -699,8 +705,7 @@ send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 				case AGAIN_WOULDBLOCK:
 					return -1;
 				}
-				close_write(ss, s, l, result);
-				return -1;
+				return close_write(ss, s, l, result);
 			}
 			stat_write(ss,s,(int)sz);
 			s->wb_size -= sz;
@@ -836,19 +841,24 @@ static int
 send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, struct socket_message *result) {
 	assert(!list_uncomplete(&s->low));
 	// step 1
-	if (send_list(ss,s,&s->high,l,result) == SOCKET_CLOSE) {
-		return SOCKET_CLOSE;
-	}
-	if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_WRITE) {
+	int ret = send_list(ss,s,&s->high,l,result);
+	if (ret != -1) {
+		if (ret == SOCKET_ERR) {
+			// HALFCLOSE_WRITE
+			return SOCKET_ERR;
+		}
+		// SOCKET_CLOSE
 		return -1;
 	}
 	if (s->high.head == NULL) {
 		// step 2
 		if (s->low.head != NULL) {
-			if (send_list(ss,s,&s->low,l,result) == SOCKET_CLOSE) {
-				return SOCKET_CLOSE;
-			}
-			if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_WRITE) {
+			int ret = send_list(ss,s,&s->high,l,result);
+			if (ret != -1) {
+				if (ret == SOCKET_ERR) {
+					// HALFCLOSE_WRITE
+					return SOCKET_ERR;
+				}
 				return -1;
 			}
 			// step 3
