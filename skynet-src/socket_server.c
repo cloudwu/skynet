@@ -677,14 +677,12 @@ _failed_getaddrinfo:
 	return SOCKET_ERR;
 }
 
-static int
+static void
 close_write(struct socket_server *ss, struct socket *s, struct socket_lock *l, struct socket_message *result) {
-	if (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_READ) {
+	if (s->closing) {
 		force_close(ss,s,l,result);
-		return SOCKET_CLOSE;
 	} else {
 		ATOM_STORE(&s->type, SOCKET_TYPE_HALFCLOSE_WRITE);
-		return -1;
 	}
 }
 
@@ -701,7 +699,8 @@ send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 				case AGAIN_WOULDBLOCK:
 					return -1;
 				}
-				return close_write(ss, s, l, result);
+				close_write(ss, s, l, result);
+				return -1;
 			}
 			stat_write(ss,s,(int)sz);
 			s->wb_size -= sz;
@@ -865,7 +864,7 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 
 		if (s->closing) {
 			force_close(ss, s, l, result);
-			return SOCKET_CLOSE;
+			return -1;
 		}
 
 		int err = enable_write(ss, s, false);
@@ -1090,26 +1089,22 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 	int id = request->id;
 	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (socket_invalid(s, id)) {
-		result->id = id;
-		result->opaque = request->opaque;
-		result->ud = 0;
-		result->data = NULL;
-		return SOCKET_CLOSE;
+		// The socket is closed, ignore
+		return -1;
 	}
 	struct socket_lock l;
 	socket_lock_init(s, &l);
 
 	if (request->shutdown || nomore_sending_data(s)) {
 		force_close(ss,s,&l,result);
-		return SOCKET_CLOSE;
+	} else {
+		// Don't read socket later
+		ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE_READ);
+		s->closing = true;
+		enable_read(ss,s,false);
+		shutdown(s->fd, SHUT_RD);
 	}
-
-	ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE_READ);
-	s->closing = true;
-	enable_read(ss,s,true);
-	shutdown(s->fd, SHUT_RD);
-
-	return -1;
+	return SOCKET_CLOSE;
 }
 
 static int
@@ -1361,14 +1356,67 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	return -1;
 }
 
+struct stream_buffer {
+	char * buf;
+	int sz;
+};
+
+static char *
+reserve_buffer(struct stream_buffer *buffer, int sz) {
+	if (buffer->buf == NULL) {
+		buffer->buf = (char *)MALLOC(sz);
+		return buffer->buf;
+	} else {
+		char * newbuffer = (char *)MALLOC(sz + buffer->sz);
+		memcpy(newbuffer, buffer->buf, buffer->sz);
+		char * ret = newbuffer + buffer->sz;
+		FREE(buffer->buf);
+		buffer->buf = newbuffer;
+		return ret;
+	}
+}
+
+static int
+read_socket(struct socket *s, struct stream_buffer *buffer) {
+	int sz = s->p.size;
+	buffer->buf = NULL;
+	buffer->sz = 0;
+	for (;;) {
+		char *buf = reserve_buffer(buffer, sz);
+		int n = (int)read(s->fd, buf, sz);
+		if (n <= 0) {
+			if (buffer->sz == 0) {
+				// read nothing
+				FREE(buffer->buf);
+				return n;
+			} else {
+				// ignore the error or hang up, returns buffer
+				// If socket is hang up, SOCKET_CLOSE will be send later.
+				//    (buffer->sz should be 0 next time)
+				break;
+			}
+		}
+		buffer->sz += n;
+		if (n < sz) {
+			break;
+		}
+		// n == sz, read again
+	}
+	int r = buffer->sz;
+	if (r > sz) {
+		s->p.size = sz * 2;
+	} else if (sz > MIN_READ_BUFFER && r*2 < sz) {
+		s->p.size = sz / 2;
+	}
+	return r;
+}
+
 // return -1 (ignore) when error
 static int
 forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lock *l, struct socket_message * result) {
-	int sz = s->p.size;
-	char * buffer = MALLOC(sz);
-	int n = (int)read(s->fd, buffer, sz);
+	struct stream_buffer buf;
+	int n = read_socket(s, &buf);
 	if (n<0) {
-		FREE(buffer);
 		switch(errno) {
 		case EINTR:
 			break;
@@ -1384,38 +1432,28 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		return -1;
 	}
 	if (n==0) {
-		FREE(buffer);
 		if (nomore_sending_data(s)) {
 			force_close(ss,s,l,result); 
-		} else {
-			ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE_READ);
-			if (!s->closing) {
-				shutdown(s->fd, SHUT_RD);
-				s->closing = true;
-			}
-			enable_read(ss, s, false);
+		}
+		if (s->closing) {
+			// Already returned SOCKET_CLOSE
+			return -1;
 		}
 		return SOCKET_CLOSE;
 	}
 
 	if (s->closing) {
 		// discard recv data
-		FREE(buffer);
+		FREE(buf.buf);
 		return -1;
 	}
 
 	stat_read(ss,s,n);
 
-	if (n == sz) {
-		s->p.size *= 2;
-	} else if (sz > MIN_READ_BUFFER && n*2 < sz) {
-		s->p.size /= 2;
-	}
-
 	result->opaque = s->opaque;
 	result->id = s->id;
 	result->ud = n;
-	result->data = buffer;
+	result->data = buf.buf;
 	return SOCKET_DATA;
 }
 
@@ -1695,8 +1733,15 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				return SOCKET_ERR;
 			}
 			if(e->eof) {
+				// For epoll (at least), FIN packets are exchanged both ways.
+				// See: https://stackoverflow.com/questions/52976152/tcp-when-is-epollhup-generated
 				force_close(ss, s, &l, result);
-				return SOCKET_CLOSE;
+				if (s->closing) {
+					// Already returned SOCKET_CLOSE
+					return -1;
+				} else {
+					return SOCKET_CLOSE;
+				}
 			}
 			break;
 		}
