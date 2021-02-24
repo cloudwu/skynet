@@ -1103,6 +1103,10 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 		s->closing = true;
 		enable_read(ss,s,false);
 		shutdown(s->fd, SHUT_RD);
+		result->id = s->id;
+		result->ud = 0;
+		result->data = NULL;
+		result->opaque = s->opaque;
 	}
 	return SOCKET_CLOSE;
 }
@@ -1436,6 +1440,11 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 	if (n==0) {
 		if (nomore_sending_data(s)) {
 			force_close(ss,s,l,result); 
+		} else {
+			result->opaque = s->opaque;
+			result->id = s->id;
+			result->ud = 0;
+			result->data = NULL;
 		}
 		if (s->closing) {
 			// Already returned SOCKET_CLOSE
