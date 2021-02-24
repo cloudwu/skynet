@@ -1381,9 +1381,10 @@ read_socket(struct socket *s, struct stream_buffer *buffer) {
 	int sz = s->p.size;
 	buffer->buf = NULL;
 	buffer->sz = 0;
+	int rsz = sz;
 	for (;;) {
-		char *buf = reserve_buffer(buffer, sz);
-		int n = (int)read(s->fd, buf, sz);
+		char *buf = reserve_buffer(buffer, rsz);
+		int n = (int)read(s->fd, buf, rsz);
 		if (n <= 0) {
 			if (buffer->sz == 0) {
 				// read nothing
@@ -1397,10 +1398,11 @@ read_socket(struct socket *s, struct stream_buffer *buffer) {
 			}
 		}
 		buffer->sz += n;
-		if (n < sz) {
+		if (n < rsz) {
 			break;
 		}
-		// n == sz, read again
+		// n == rsz, read again ( and read more )
+		rsz *= 2;
 	}
 	int r = buffer->sz;
 	if (r > sz) {
