@@ -70,7 +70,7 @@ skynet.start(function()
 	assert(harbor_id == 0)
 
 	skynet.dispatch("lua", function (session,source,command,...)
-		local f = assert(harbor[command])
+		local f = assert(harbor[command],"command: "..tostring(command))
 		f(...)
 	end)
 	skynet.dispatch("text", function(session,source,command)
