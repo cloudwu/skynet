@@ -1094,6 +1094,23 @@ nomore_sending_data(struct socket *s) {
 		|| (ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_WRITE);
 }
 
+static void
+close_read(struct socket_server *ss, struct socket * s, struct socket_message *result) {
+	// Don't read socket later
+	ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE_READ);
+	enable_read(ss,s,false);
+	shutdown(s->fd, SHUT_RD);
+	result->id = s->id;
+	result->ud = 0;
+	result->data = NULL;
+	result->opaque = s->opaque;
+}
+
+static inline int
+halfclose_read(struct socket *s) {
+	return ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_READ;
+}
+
 static int
 close_socket(struct socket_server *ss, struct request_close *request, struct socket_message *result) {
 	int id = request->id;
@@ -1108,15 +1125,8 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 	if (request->shutdown || nomore_sending_data(s)) {
 		force_close(ss,s,&l,result);
 	} else {
-		// Don't read socket later
-		ATOM_STORE(&s->type , SOCKET_TYPE_HALFCLOSE_READ);
 		s->closing = true;
-		enable_read(ss,s,false);
-		shutdown(s->fd, SHUT_RD);
-		result->id = s->id;
-		result->ud = 0;
-		result->data = NULL;
-		result->opaque = s->opaque;
+		close_read(ss, s, result);
 	}
 	return SOCKET_CLOSE;
 }
@@ -1150,7 +1160,7 @@ resume_socket(struct socket_server *ss, struct request_resumepause *request, str
 		result->data = "invalid socket";
 		return SOCKET_ERR;
 	}
-	if (s->closing)
+	if (halfclose_read(s))
 		return -1;
 	struct socket_lock l;
 	socket_lock_init(s, &l);
@@ -1448,22 +1458,20 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		return -1;
 	}
 	if (n==0) {
-		if (nomore_sending_data(s)) {
-			force_close(ss,s,l,result); 
-		} else {
-			result->opaque = s->opaque;
-			result->id = s->id;
-			result->ud = 0;
-			result->data = NULL;
-		}
 		if (s->closing) {
-			// Already returned SOCKET_CLOSE
-			return -1;
+			if (nomore_sending_data(s)) {
+				force_close(ss,s,l,result);
+				return SOCKET_CLOSE;
+			} else {
+				// Already returned SOCKET_CLOSE
+				return -1;
+			}
 		}
+		close_read(ss, s, result);
 		return SOCKET_CLOSE;
 	}
 
-	if (s->closing) {
+	if (halfclose_read(s)) {
 		// discard recv data
 		FREE(buf.buf);
 		return -1;
