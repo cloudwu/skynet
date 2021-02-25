@@ -853,7 +853,7 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 	if (s->high.head == NULL) {
 		// step 2
 		if (s->low.head != NULL) {
-			int ret = send_list(ss,s,&s->high,l,result);
+			int ret = send_list(ss,s,&s->low,l,result);
 			if (ret != -1) {
 				if (ret == SOCKET_ERR) {
 					// HALFCLOSE_WRITE
