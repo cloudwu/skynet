@@ -13,6 +13,7 @@
 #define SOCKET_EXIT 5
 #define SOCKET_UDP 6
 #define SOCKET_WARNING 7
+#define SOCKET_RST 8 // Only for internal use
 
 struct socket_server;
 

@@ -681,9 +681,21 @@ static int
 close_write(struct socket_server *ss, struct socket *s, struct socket_lock *l, struct socket_message *result) {
 	if (s->closing) {
 		force_close(ss,s,l,result);
-		return SOCKET_CLOSE;
+		return SOCKET_RST;
 	} else {
+		int t = ATOM_LOAD(&s->type);
+		if (t == SOCKET_TYPE_HALFCLOSE_READ) {
+			// recv 0 before, ignore the error and close fd
+			force_close(ss,s,l,result);
+			return SOCKET_RST;
+		}
+		if (t == SOCKET_TYPE_HALFCLOSE_WRITE) {
+			// already raise SOCKET_ERR
+			return SOCKET_RST;
+		}
 		ATOM_STORE(&s->type, SOCKET_TYPE_HALFCLOSE_WRITE);
+		shutdown(s->fd, SHUT_WR);
+		enable_write(ss, s, false);
 		result->id = s->id;
 		result->ud = 0;
 		result->opaque = s->opaque;
@@ -847,7 +859,7 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 			// HALFCLOSE_WRITE
 			return SOCKET_ERR;
 		}
-		// SOCKET_CLOSE
+		// SOCKET_RST (ignore)
 		return -1;
 	}
 	if (s->high.head == NULL) {
@@ -859,6 +871,7 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 					// HALFCLOSE_WRITE
 					return SOCKET_ERR;
 				}
+				// SOCKET_RST (ignore)
 				return -1;
 			}
 			// step 3
@@ -873,6 +886,7 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 		assert(send_buffer_empty(s) && s->wb_size == 0);
 
 		if (s->closing) {
+			// finish writing
 			force_close(ss, s, l, result);
 			return -1;
 		}
@@ -1111,6 +1125,11 @@ halfclose_read(struct socket *s) {
 	return ATOM_LOAD(&s->type) == SOCKET_TYPE_HALFCLOSE_READ;
 }
 
+// SOCKET_CLOSE can be raised (only once) in one of two conditions.
+// See https://github.com/cloudwu/skynet/issues/1346 for more discussion.
+// 1. close socket by self, See close_socket()
+// 2. recv 0 or eof event (close socket by remote), See forward_message_tcp()
+// It's able to write data after SOCKET_CLOSE (In condition 2), but if remote is closed, SOCKET_ERR may raised.
 static int
 close_socket(struct socket_server *ss, struct request_close *request, struct socket_message *result) {
 	int id = request->id;
@@ -1122,13 +1141,21 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 	struct socket_lock l;
 	socket_lock_init(s, &l);
 
+	int shutdown_read = halfclose_read(s);
+
 	if (request->shutdown || nomore_sending_data(s)) {
+		// If socket is SOCKET_TYPE_HALFCLOSE_READ, Do not raise SOCKET_CLOSE again.
+		int r = shutdown_read ? -1 : SOCKET_CLOSE;
 		force_close(ss,s,&l,result);
-	} else {
+		return r;
+	} else if (!shutdown_read) {
 		s->closing = true;
+		// don't read socket after socket.close()
 		close_read(ss, s, result);
+		return SOCKET_CLOSE;
 	}
-	return SOCKET_CLOSE;
+	// recv 0 before (socket is SOCKET_TYPE_HALFCLOSE_READ) and waiting for sending data out.
+	return -1;
 }
 
 static int
@@ -1459,20 +1486,28 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 	}
 	if (n==0) {
 		if (s->closing) {
+			// Rare case : if s->closing is true, reading event is disable, and SOCKET_CLOSE is raised.
 			if (nomore_sending_data(s)) {
 				force_close(ss,s,l,result);
-				return SOCKET_CLOSE;
-			} else {
-				// Already returned SOCKET_CLOSE
-				return -1;
 			}
+			return -1;
 		}
-		close_read(ss, s, result);
+		int t = ATOM_LOAD(&s->type);
+		if (t == SOCKET_TYPE_HALFCLOSE_READ) {
+			// Rare case : Already shutdown read.
+			return -1;
+		}
+		if (t == SOCKET_TYPE_HALFCLOSE_WRITE) {
+			// Remote shutdown read (write error) before.
+			force_close(ss,s,l,result);
+		} else {
+			close_read(ss, s, result);
+		}
 		return SOCKET_CLOSE;
 	}
 
 	if (halfclose_read(s)) {
-		// discard recv data
+		// discard recv data (Rare case : if socket is HALFCLOSE_READ, reading event is disable.)
 		FREE(buf.buf);
 		return -1;
 	}
@@ -1765,8 +1800,8 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				// For epoll (at least), FIN packets are exchanged both ways.
 				// See: https://stackoverflow.com/questions/52976152/tcp-when-is-epollhup-generated
 				force_close(ss, s, &l, result);
-				if (s->closing) {
-					// Already returned SOCKET_CLOSE
+				if (halfclose_read(s)) {
+					// Already rasied SOCKET_CLOSE
 					return -1;
 				} else {
 					return SOCKET_CLOSE;
