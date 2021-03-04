@@ -12,14 +12,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#ifdef __APPLE__
-
-#include <sys/time.h>
-#include <mach/task.h>
-#include <mach/mach.h>
-
-#endif
-
 typedef void (*timer_execute_func)(void *ud,void *arg);
 
 #define TIME_NEAR_SHIFT 8
