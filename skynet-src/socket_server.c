@@ -1687,7 +1687,7 @@ clear_closed_event(struct socket_server *ss, struct socket_message * result, int
 			struct event *e = &ss->ev[i];
 			struct socket *s = e->s;
 			if (s) {
-				if (socket_invalid(s, id)) {
+				if (socket_invalid(s, id) && s->id == id) {
 					e->s = NULL;
 					break;
 				}
