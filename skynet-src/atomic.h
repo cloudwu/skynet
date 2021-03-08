@@ -8,8 +8,8 @@
 #define ATOM_SIZET size_t
 #define ATOM_ULONG unsigned long
 #define ATOM_INIT(ptr, v) (*(ptr) = v)
-#define ATOM_LOAD(ptr) (*(ptr))
-#define ATOM_STORE(ptr, v) (*(ptr) = v)
+#define ATOM_LOAD(ptr) __sync_val_compare_and_swap(ptr, *ptr, *ptr) 
+#define ATOM_STORE(ptr, v) __sync_bool_compare_and_swap(ptr, *ptr, v)
 #define ATOM_CAS(ptr, oval, nval) __sync_bool_compare_and_swap(ptr, oval, nval)
 #define ATOM_CAS_POINTER(ptr, oval, nval) __sync_bool_compare_and_swap(ptr, oval, nval)
 #define ATOM_FINC(ptr) __sync_fetch_and_add(ptr, 1)
