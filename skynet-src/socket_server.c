@@ -1024,7 +1024,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		so.free_func((void *)request->buffer);
 		return -1;
 	}
-	if (send_buffer_empty(s) && type == SOCKET_TYPE_CONNECTED) {
+	if (send_buffer_empty(s)) {
 		if (s->protocol == PROTOCOL_TCP) {
 			append_sendbuffer(ss, s, request);	// add to high priority list, even priority == PRIORITY_LOW
 		} else {
@@ -1148,8 +1148,9 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 		int r = shutdown_read ? -1 : SOCKET_CLOSE;
 		force_close(ss,s,&l,result);
 		return r;
-	} else if (!shutdown_read) {
-		s->closing = true;
+	}
+	s->closing = true;
+	if (!shutdown_read) {
 		// don't read socket after socket.close()
 		close_read(ss, s, result);
 		return SOCKET_CLOSE;

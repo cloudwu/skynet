@@ -269,8 +269,8 @@ function socket.close(id)
 	if s == nil then
 		return
 	end
+	driver.close(id)
 	if s.connected then
-		driver.close(id)
 		if s.co then
 			-- reading this socket on another coroutine, so don't shutdown (clear the buffer) immediately
 			-- wait reading coroutine read the buffer.
