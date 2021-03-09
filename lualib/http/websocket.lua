@@ -24,6 +24,14 @@ local function _isws_closed(id)
     return not ws_pool[id]
 end
 
+local function _try_close(ws_obj)
+    local id = ws_obj.id
+    if not _isws_closed(id) then
+        _close_websocket(ws_obj)
+        return true
+    end
+    return false
+end
 
 local function write_handshake(self, host, url, header)
     local key = crypt.base64encode(crypt.randomkey()..crypt.randomkey())
@@ -43,7 +51,7 @@ local function write_handshake(self, host, url, header)
     local recvheader = {}
     local code, body = internal.request(self, "GET", host, url, recvheader, request_header)
     if code ~= 101 then
-        error(string.format("websocket handshake error: code[%s] info:%s", code, body))    
+        error(string.format("websocket handshake error: code[%s] info:%s", code, body))
     end
 
     if not recvheader["upgrade"] or recvheader["upgrade"]:lower() ~= "websocket" then
@@ -173,7 +181,7 @@ local op_code = {
     [0x0A]     = "pong",
 }
 
-local function write_frame(self, op, payload_data, masking_key)
+local function _write_frame(self, op, payload_data, masking_key)
     payload_data = payload_data or ""
     local payload_len = #payload_data
     local op_v = assert(op_code[op])
@@ -202,6 +210,21 @@ local function write_frame(self, op, payload_data, masking_key)
     end
 end
 
+local function write_frame(self, ...)
+    local ok, err = pcall(_write_frame, self, ...)
+    if not ok then
+        local opened = _try_close(self)
+        if err == socket_error then
+            if opened then
+                try_handle(self, "error")
+            else
+                try_handle(self, "close")
+            end
+        else
+            return false, err
+        end
+    end
+end
 
 local function read_close(payload_data)
     local code, reason
@@ -261,6 +284,7 @@ local function resolve_accept(self, options)
     try_handle(self, "handshake", header, url)
     local recv_count = 0
     local recv_buf = {}
+    local first_op
     while true do
         if _isws_closed(self.id) then
             try_handle(self, "close")
@@ -286,11 +310,13 @@ local function resolve_accept(self, options)
                 if recv_count > MAX_FRAME_SIZE then
                     error("payload_len is too large")
                 end
+                first_op = first_op or op
                 if fin then
                     local s = table.concat(recv_buf)
-                    try_handle(self, "message", s, op)
+                    try_handle(self, "message", s, first_op)
                     recv_buf = {}  -- clear recv_buf
                     recv_count = 0
+                    first_op = nil
                 end
             end
         end
@@ -323,7 +349,7 @@ local function _new_client_ws(socket_id, protocol)
             websocket = true,
             close = function ()
                 socket.close(socket_id)
-                tls.closefunc(tls_ctx)() 
+                tls.closefunc(tls_ctx)()
             end,
             read = tls.readfunc(socket_id, tls_ctx),
             write = tls.writefunc(socket_id, tls_ctx),
@@ -369,7 +395,7 @@ local function _new_server_ws(socket_id, handle, protocol)
         obj = {
             close = function ()
                 socket.close(socket_id)
-                tls.closefunc(tls_ctx)() 
+                tls.closefunc(tls_ctx)()
             end,
             read = tls.readfunc(socket_id, tls_ctx),
             write = tls.writefunc(socket_id, tls_ctx),
@@ -404,17 +430,14 @@ function M.accept(socket_id, handle, protocol, addr, options)
         end)
     end
 
-    local ok, err = xpcall(resolve_accept, debug.traceback, ws_obj, options)
-    local closed = _isws_closed(socket_id)
-    if not closed then
-        _close_websocket(ws_obj)
-    end
+    local ok, err = pcall(resolve_accept, ws_obj, options)
+    local opened = _try_close(ws_obj)
     if not ok then
         if err == socket_error then
-            if closed then
-                try_handle(ws_obj, "close")
-            else
+            if opened then
                 try_handle(ws_obj, "error")
+            else
+                try_handle(ws_obj, "close")
             end
         else
             -- error(err)
@@ -430,7 +453,7 @@ function M.connect(url, header, timeout)
     if protocol ~= "wss" and protocol ~= "ws" then
         error(string.format("invalid protocol: %s", protocol))
     end
-    
+
     assert(host)
     local host_name, host_port = string.match(host, "^([^:]+):?(%d*)$")
     assert(host_name and host_port)
@@ -470,7 +493,6 @@ function M.read(id)
             end
         end
     end
-    assert(false)
 end
 
 
