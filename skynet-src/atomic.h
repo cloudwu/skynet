@@ -3,10 +3,12 @@
 
 #ifdef __STDC_NO_ATOMICS__
 
-#define ATOM_INT int
-#define ATOM_POINTER void *
-#define ATOM_SIZET size_t
-#define ATOM_ULONG unsigned long
+#include <stddef.h>
+
+#define ATOM_INT volatile int
+#define ATOM_POINTER volatile uintptr_t
+#define ATOM_SIZET volatile size_t
+#define ATOM_ULONG volatile unsigned long
 #define ATOM_INIT(ptr, v) (*(ptr) = v)
 #define ATOM_LOAD(ptr) (*(ptr))
 #define ATOM_STORE(ptr, v) (*(ptr) = v)
