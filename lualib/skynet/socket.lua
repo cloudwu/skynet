@@ -118,6 +118,7 @@ end
 socket_message[3] = function(id)
 	local s = socket_pool[id]
 	if s == nil then
+		driver.close(id)
 		return
 	end
 	s.connected = false
@@ -138,6 +139,7 @@ end
 socket_message[5] = function(id, _, err)
 	local s = socket_pool[id]
 	if s == nil then
+		driver.shutdown(id)
 		skynet.error("socket: error on unknown", id, err)
 		return
 	end
