@@ -43,7 +43,7 @@ local function write_handshake(self, host, url, header)
     local recvheader = {}
     local code, body = internal.request(self, "GET", host, url, recvheader, request_header)
     if code ~= 101 then
-        error(string.format("websocket handshake error: code[%s] info:%s", code, body))    
+        error(string.format("websocket handshake error: code[%s] info:%s", code, body))
     end
 
     if not recvheader["upgrade"] or recvheader["upgrade"]:lower() ~= "websocket" then
@@ -261,6 +261,7 @@ local function resolve_accept(self, options)
     try_handle(self, "handshake", header, url)
     local recv_count = 0
     local recv_buf = {}
+    local first_op
     while true do
         if _isws_closed(self.id) then
             try_handle(self, "close")
@@ -286,11 +287,13 @@ local function resolve_accept(self, options)
                 if recv_count > MAX_FRAME_SIZE then
                     error("payload_len is too large")
                 end
+                first_op = first_op or op
                 if fin then
                     local s = table.concat(recv_buf)
-                    try_handle(self, "message", s, op)
+                    try_handle(self, "message", s, first_op)
                     recv_buf = {}  -- clear recv_buf
                     recv_count = 0
+                    first_op = nil
                 end
             end
         end
@@ -323,7 +326,7 @@ local function _new_client_ws(socket_id, protocol)
             websocket = true,
             close = function ()
                 socket.close(socket_id)
-                tls.closefunc(tls_ctx)() 
+                tls.closefunc(tls_ctx)()
             end,
             read = tls.readfunc(socket_id, tls_ctx),
             write = tls.writefunc(socket_id, tls_ctx),
@@ -369,7 +372,7 @@ local function _new_server_ws(socket_id, handle, protocol)
         obj = {
             close = function ()
                 socket.close(socket_id)
-                tls.closefunc(tls_ctx)() 
+                tls.closefunc(tls_ctx)()
             end,
             read = tls.readfunc(socket_id, tls_ctx),
             write = tls.writefunc(socket_id, tls_ctx),
@@ -430,7 +433,7 @@ function M.connect(url, header, timeout)
     if protocol ~= "wss" and protocol ~= "ws" then
         error(string.format("invalid protocol: %s", protocol))
     end
-    
+
     assert(host)
     local host_name, host_port = string.match(host, "^([^:]+):?(%d*)$")
     assert(host_name and host_port)
@@ -470,7 +473,6 @@ function M.read(id)
             end
         end
     end
-    assert(false)
 end
 
 
