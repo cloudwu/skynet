@@ -156,6 +156,18 @@ typedef struct stringtable {
 
 /*
 ** Information about a call.
+** About union 'u':
+** - field 'l' is used only for Lua functions;
+** - field 'c' is used only for C functions.
+** About union 'u2':
+** - field 'funcidx' is used only by C functions while doing a
+** protected call;
+** - field 'nyield' is used only while a function is "doing" an
+** yield (from the yield until the next resume);
+** - field 'nres' is used only while closing tbc variables when
+** returning from a C function;
+** - field 'transferinfo' is used only during call/returnhooks,
+** before the function starts or after it ends.
 */
 typedef struct CallInfo {
   StkId func;  /* function index in the stack */
@@ -176,6 +188,7 @@ typedef struct CallInfo {
   union {
     int funcidx;  /* called-function index */
     int nyield;  /* number of values yielded */
+    int nres;  /* number of values returned */
     struct {  /* info about transferred values (for call/return hooks) */
       unsigned short ftransfer;  /* offset of first value transferred */
       unsigned short ntransfer;  /* number of values transferred */
@@ -191,16 +204,33 @@ typedef struct CallInfo {
 */
 #define CIST_OAH	(1<<0)	/* original value of 'allowhook' */
 #define CIST_C		(1<<1)	/* call is running a C function */
-#define CIST_FRESH	(1<<2)  /* call is on a fresh "luaV_execute" frame */
+#define CIST_FRESH	(1<<2)	/* call is on a fresh "luaV_execute" frame */
 #define CIST_HOOKED	(1<<3)	/* call is running a debug hook */
-#define CIST_YPCALL	(1<<4)	/* call is a yieldable protected call */
+#define CIST_YPCALL	(1<<4)	/* doing a yieldable protected call */
 #define CIST_TAIL	(1<<5)	/* call was tail called */
 #define CIST_HOOKYIELD	(1<<6)	/* last hook called yielded */
-#define CIST_FIN	(1<<7)  /* call is running a finalizer */
+#define CIST_FIN	(1<<7)	/* call is running a finalizer */
 #define CIST_TRAN	(1<<8)	/* 'ci' has transfer information */
+#define CIST_CLSRET	(1<<9)  /* function is closing tbc variables */
+/* Bits 10-12 are used for CIST_RECST (see below) */
+#define CIST_RECST	10
 #if defined(LUA_COMPAT_LT_LE)
-#define CIST_LEQ	(1<<9)  /* using __lt for __le */
+#define CIST_LEQ	(1<<13)  /* using __lt for __le */
 #endif
+
+
+/*
+** Field CIST_RECST stores the "recover status", used to keep the error
+** status while closing to-be-closed variables in coroutines, so that
+** Lua can correctly resume after an yield from a __close method called
+** because of an error.  (Three bits are enough for error status.)
+*/
+#define getcistrecst(ci)     (((ci)->callstatus >> CIST_RECST) & 7)
+#define setcistrecst(ci,st)  \
+  check_exp(((st) & 7) == (st),   /* status must fit in three bits */  \
+            ((ci)->callstatus = ((ci)->callstatus & ~(7 << CIST_RECST))  \
+                                                  | ((st) << CIST_RECST)))
+
 
 /* active function is a Lua function */
 #define isLua(ci)	(!((ci)->callstatus & CIST_C))
@@ -229,6 +259,7 @@ typedef struct global_State {
   lu_byte currentwhite;
   lu_byte gcstate;  /* state of garbage collector */
   lu_byte gckind;  /* kind of GC running */
+  lu_byte gcstopem;  /* stops emergency collections */
   lu_byte genminormul;  /* control for minor generational collections */
   lu_byte genmajormul;  /* control for major generational collections */
   lu_byte gcrunning;  /* true if GC is running */
@@ -280,6 +311,7 @@ struct lua_State {
   StkId stack_last;  /* end of stack (last element + 1) */
   StkId stack;  /* stack base */
   UpVal *openupval;  /* list of open upvalues in this stack */
+  StkId tbclist;  /* list of to-be-closed variables */
   GCObject *gclist;
   struct lua_State *twups;  /* list of threads with open upvalues */
   struct lua_longjmp *errorJmp;  /* current error recover point */
@@ -295,6 +327,12 @@ struct lua_State {
 
 
 #define G(L)	(L->l_G)
+
+/*
+** 'g->nilvalue' being a nil value flags that the state was completely
+** build.
+*/
+#define completestate(g)	ttisnil(&g->nilvalue)
 
 
 /*
@@ -358,6 +396,7 @@ LUAI_FUNC void luaE_checkcstack (lua_State *L);
 LUAI_FUNC void luaE_incCstack (lua_State *L);
 LUAI_FUNC void luaE_warning (lua_State *L, const char *msg, int tocont);
 LUAI_FUNC void luaE_warnerror (lua_State *L, const char *where);
+LUAI_FUNC int luaE_resetthread (lua_State *L, int status);
 
 
 #endif

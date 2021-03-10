@@ -42,6 +42,8 @@
 
 #define hastocloseCfunc(n)	((n) < LUA_MULTRET)
 
+/* Map [-1, inf) (range of 'nresults') into (-inf, -2] */
 #define codeNresults(n)		(-(n) - 3)
+#define decodeNresults(n)	(-(n) - 3)
 
 #endif

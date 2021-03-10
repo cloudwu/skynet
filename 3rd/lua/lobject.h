@@ -136,10 +136,18 @@ typedef struct TValue {
 
 
 /*
-** Entries in the Lua stack
+** Entries in a Lua stack. Field 'tbclist' forms a list of all
+** to-be-closed variables active in this stack. Dummy entries are
+** used when the distance between two tbc variables does not fit
+** in an unsigned short.
 */
 typedef union StackValue {
   TValue val;
+  struct {
+    TValuefields;
+    lu_byte isdummy;
+    unsigned short delta;
+  } tbclist;
 } StackValue;
 
 
@@ -571,10 +579,11 @@ typedef struct Proto {
 #define LUA_VCCL	makevariant(LUA_TFUNCTION, 2)  /* C closure */
 
 #define ttisfunction(o)		checktype(o, LUA_TFUNCTION)
-#define ttisclosure(o)		((rawtt(o) & 0x1F) == LUA_VLCL)
 #define ttisLclosure(o)		checktag((o), ctb(LUA_VLCL))
 #define ttislcf(o)		checktag((o), LUA_VLCF)
 #define ttisCclosure(o)		checktag((o), ctb(LUA_VCCL))
+#define ttisclosure(o)         (ttisLclosure(o) || ttisCclosure(o))
+
 
 #define isLfunction(o)	ttisLclosure(o)
 

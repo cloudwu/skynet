@@ -26,11 +26,22 @@
 */
 #define ABSLINEINFO	(-0x80)
 
+
+/*
+** MAXimum number of successive Instructions WiTHout ABSolute line
+** information. (A power of two allows fast divisions.)
+*/
+#if !defined(MAXIWTHABS)
+#define MAXIWTHABS	128
+#endif
+
+
 LUAI_FUNC int luaG_getfuncline (const Proto *f, int pc);
 LUAI_FUNC const char *luaG_findlocal (lua_State *L, CallInfo *ci, int n,
                                                     StkId *pos);
 LUAI_FUNC l_noret luaG_typeerror (lua_State *L, const TValue *o,
                                                 const char *opname);
+LUAI_FUNC l_noret luaG_callerror (lua_State *L, const TValue *o);
 LUAI_FUNC l_noret luaG_forerror (lua_State *L, const TValue *o,
                                                const char *what);
 LUAI_FUNC l_noret luaG_concaterror (lua_State *L, const TValue *p1,

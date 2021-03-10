@@ -42,15 +42,9 @@
 #define MAXMISS		10
 
 
-/*
-** Special "status" for 'luaF_close'
-*/
 
-/* close upvalues without running their closing methods */
-#define NOCLOSINGMETH	(-1)
-
-/* close upvalues running all closing methods in protected mode */
-#define CLOSEPROTECT	(-2)
+/* special status to close upvalues preserving the top of the stack */
+#define CLOSEKTOP	(-1)
 
 
 LUAI_FUNC Proto *luaF_newproto (lua_State *L);
@@ -59,7 +53,8 @@ LUAI_FUNC LClosure *luaF_newLclosure (lua_State *L, int nupvals);
 LUAI_FUNC void luaF_initupvals (lua_State *L, LClosure *cl);
 LUAI_FUNC UpVal *luaF_findupval (lua_State *L, StkId level);
 LUAI_FUNC void luaF_newtbcupval (lua_State *L, StkId level);
-LUAI_FUNC int luaF_close (lua_State *L, StkId level, int status);
+LUAI_FUNC void luaF_closeupval (lua_State *L, StkId level);
+LUAI_FUNC void luaF_close (lua_State *L, StkId level, int status, int yy);
 LUAI_FUNC void luaF_unlinkupval (UpVal *uv);
 LUAI_FUNC void luaF_freeproto (lua_State *L, Proto *f);
 LUAI_FUNC const char *luaF_getlocalname (const Proto *func, int local_number,
