@@ -24,14 +24,6 @@ local function _isws_closed(id)
     return not ws_pool[id]
 end
 
-local function _try_close(ws_obj)
-    local id = ws_obj.id
-    if not _isws_closed(id) then
-        _close_websocket(ws_obj)
-        return true
-    end
-    return false
-end
 
 local function write_handshake(self, host, url, header)
     local key = crypt.base64encode(crypt.randomkey()..crypt.randomkey())
@@ -181,7 +173,7 @@ local op_code = {
     [0x0A]     = "pong",
 }
 
-local function _write_frame(self, op, payload_data, masking_key)
+local function write_frame(self, op, payload_data, masking_key)
     payload_data = payload_data or ""
     local payload_len = #payload_data
     local op_v = assert(op_code[op])
@@ -210,21 +202,6 @@ local function _write_frame(self, op, payload_data, masking_key)
     end
 end
 
-local function write_frame(self, ...)
-    local ok, err = pcall(_write_frame, self, ...)
-    if not ok then
-        local opened = _try_close(self)
-        if err == socket_error then
-            if opened then
-                try_handle(self, "error")
-            else
-                try_handle(self, "close")
-            end
-        else
-            return false, err
-        end
-    end
-end
 
 local function read_close(payload_data)
     local code, reason
@@ -430,14 +407,17 @@ function M.accept(socket_id, handle, protocol, addr, options)
         end)
     end
 
-    local ok, err = pcall(resolve_accept, ws_obj, options)
-    local opened = _try_close(ws_obj)
+    local ok, err = xpcall(resolve_accept, debug.traceback, ws_obj, options)
+    local closed = _isws_closed(socket_id)
+    if not closed then
+        _close_websocket(ws_obj)
+    end
     if not ok then
         if err == socket_error then
-            if opened then
-                try_handle(ws_obj, "error")
-            else
+            if closed then
                 try_handle(ws_obj, "close")
+            else
+                try_handle(ws_obj, "error")
             end
         else
             -- error(err)
