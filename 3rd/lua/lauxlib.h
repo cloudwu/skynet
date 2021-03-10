@@ -125,7 +125,7 @@ LUALIB_API void (luaL_requiref) (lua_State *L, const char *modname,
 */
 
 #if !defined(l_likely)
-#define l_likely(x)	x
+#define l_likely(x)	(x)
 #endif
 
 
