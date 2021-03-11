@@ -12,6 +12,9 @@ local CMD = setmetatable({}, { __gc = function() netpack.clear(queue) end })
 local nodelay = false
 
 local connection = {}
+-- true : connected
+-- nil : closed
+-- false : close read
 
 function gateserver.openclient(fd)
 	if connection[fd] then
@@ -21,8 +24,8 @@ end
 
 function gateserver.closeclient(fd)
 	local c = connection[fd]
-	if c then
-		connection[fd] = false
+	if c ~= nil then
+		connection[fd] = nil
 		socketdriver.close(fd)
 	end
 end
@@ -80,7 +83,7 @@ function gateserver.start(handler)
 
 	function MSG.open(fd, msg)
 		if client_number >= maxclient then
-			socketdriver.close(fd)
+			socketdriver.shutdown(fd)
 			return
 		end
 		if nodelay then
@@ -91,20 +94,17 @@ function gateserver.start(handler)
 		handler.connect(fd, msg)
 	end
 
-	local function close_fd(fd)
-		local c = connection[fd]
-		if c ~= nil then
-			connection[fd] = nil
-			client_number = client_number - 1
-		end
-	end
-
 	function MSG.close(fd)
 		if fd ~= socket then
+			client_number = client_number - 1
+			if connection[fd] then
+				connection[fd] = false	-- close read
+			end
 			if handler.disconnect then
 				handler.disconnect(fd)
+			else
+				socketdriver.close(fd)
 			end
-			close_fd(fd)
 		else
 			socket = nil
 		end
@@ -114,10 +114,10 @@ function gateserver.start(handler)
 		if fd == socket then
 			skynet.error("gateserver accpet error:",msg)
 		else
+			socketdriver.shutdown(fd)
 			if handler.error then
 				handler.error(fd, msg)
 			end
-			close_fd(fd)
 		end
 	end
 
