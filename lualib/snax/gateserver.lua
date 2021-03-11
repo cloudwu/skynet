@@ -102,8 +102,6 @@ function gateserver.start(handler)
 			end
 			if handler.disconnect then
 				handler.disconnect(fd)
-			else
-				socketdriver.close(fd)
 			end
 		else
 			socket = nil
