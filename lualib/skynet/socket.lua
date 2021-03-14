@@ -123,6 +123,9 @@ socket_message[3] = function(id)
 	end
 	s.connected = false
 	wakeup(s)
+	if s.on_close then
+		s.on_close(id)
+	end
 end
 
 -- SKYNET_SOCKET_TYPE_ACCEPT = 4
@@ -483,6 +486,12 @@ function socket.warning(id, callback)
 	local obj = socket_pool[id]
 	assert(obj)
 	obj.on_warning = callback
+end
+
+function socket.onclose(id, callback)
+	local obj = socket_pool[id]
+	assert(obj)
+	obj.on_close = callback
 end
 
 return socket
