@@ -1418,9 +1418,7 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		FREE(buffer);
 		switch(errno) {
 		case EINTR:
-			break;
 		case AGAIN_WOULDBLOCK:
-			skynet_error(NULL, "socket-server: EAGAIN capture.");
 			break;
 		default:
 			// close when error
