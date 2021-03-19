@@ -128,6 +128,16 @@ local function pop_response(self)
 	end
 end
 
+-- on close callback
+local function autoclose_cb(self, fd)
+	local sock = self.__sock
+	if self.__wait_response and sock and sock[1] == fd then
+		-- closed by peer
+		skynet.error("socket closed by peer : ", self.__host, self.__port)
+		close_channel_socket(self)
+	end
+end
+
 local function push_response(self, response, co)
 	if self.__response then
 		-- response is session
@@ -170,7 +180,15 @@ local function dispatch_by_order(self)
 			wakeup_all(self, "channel_closed")
 			break
 		end
-		local ok, result_ok, result_data = pcall(get_response, func, self.__sock)
+		local sock = self.__sock
+		if not sock then
+			-- closed by peer
+			self.__result[co] = socket_error
+			skynet.wakeup(co)
+			wakeup_all(self)
+			break
+		end
+		local ok, result_ok, result_data = pcall(get_response, func, sock)
 		if ok then
 			self.__result[co] = result_ok
 			if result_ok and self.__result_data[co] then
@@ -197,6 +215,9 @@ local function dispatch_function(self)
 	if self.__response then
 		return dispatch_by_session
 	else
+		socket.onclose(self.__sock[1], function(fd)
+			autoclose_cb(self, fd)
+		end)
 		return dispatch_by_order
 	end
 end
