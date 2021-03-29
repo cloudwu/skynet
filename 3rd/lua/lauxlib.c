@@ -1135,7 +1135,7 @@ luaL_initcodecache(void) {
 }
 
 static const void *
-load(const char *key) {
+load_proto(const char *key) {
   if (CC.L == NULL)
     return NULL;
   SPIN_LOCK(&CC)
@@ -1150,7 +1150,7 @@ load(const char *key) {
 }
 
 static const void *
-save(const char *key, const void * proto) {
+save_proto(const char *key, const void * proto) {
   lua_State *L;
   const void * result = NULL;
 
@@ -1223,7 +1223,7 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   if (level == CACHE_OFF) {
     return luaL_loadfilex_(L, filename, mode);
   }
-  const void * proto = load(filename);
+  const void * proto = load_proto(filename);
   if (proto) {
     lua_clonefunction(L, proto);
     return LUA_OK;
@@ -1246,7 +1246,7 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   }
   lua_sharefunction(eL, -1);
   proto = lua_topointer(eL, -1);
-  const void * oldv = save(filename, proto);
+  const void * oldv = save_proto(filename, proto);
   if (oldv) {
     lua_close(eL);
     lua_clonefunction(L, oldv);
