@@ -15,7 +15,7 @@ end
 
 function command.QUERY(key, ...)
 	local d = database[key]
-	if d then
+	if d ~= nil then
 		return query(d, ...)
 	end
 end
@@ -59,7 +59,7 @@ end
 
 function command.UPDATE(...)
 	local ret, value = update(database, ...)
-	if ret or value == nil then
+	if ret ~= nil or value == nil then
 		return ret
 	end
 	local q = wakeup(wait_queue, ...)
@@ -97,7 +97,7 @@ skynet.start(function()
 	skynet.dispatch("lua", function (_, _, cmd, ...)
 		if cmd == "WAIT" then
 			local ret = command.QUERY(...)
-			if ret then
+			if ret ~= nil then
 				skynet.ret(skynet.pack(ret))
 			else
 				waitfor(wait_queue, ...)
