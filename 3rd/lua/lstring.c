@@ -23,7 +23,7 @@
 #include "atomic.h"
 
 static unsigned int STRSEED;
-static ATOM_SIZET STRID = 0;
+static size_t STRID = 0;
 
 /*
 ** Maximum size for string table.

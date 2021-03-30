@@ -68,18 +68,23 @@
 #define MAXHSIZE	luaM_limitN(1u << MAXHBITS, Node)
 
 
+/*
+** When the original hash value is good, hashing by a power of 2
+** avoids the cost of '%'.
+*/
 #define hashpow2(t,n)		(gnode(t, lmod((n), sizenode(t))))
+
+/*
+** for other types, it is better to avoid modulo by power of 2, as
+** they can have many 2 factors.
+*/
+#define hashmod(t,n)	(gnode(t, ((n) % ((sizenode(t)-1)|1))))
+
 
 #define hashstr(t,str)		hashpow2(t, (str)->hash)
 #define hashboolean(t,p)	hashpow2(t, p)
+
 #define hashint(t,i)		hashpow2(t, i)
-
-
-/*
-** for some types, it is better to avoid modulus by power of 2, as
-** they tend to have many 2 factors.
-*/
-#define hashmod(t,n)	(gnode(t, ((n) % ((sizenode(t)-1)|1))))
 
 
 #define hashpointer(t,p)	hashmod(t, point2uint(p))
@@ -135,24 +140,38 @@ static int l_hashfloat (lua_Number n) {
 */
 static Node *mainposition (const Table *t, int ktt, const Value *kvl) {
   switch (withvariant(ktt)) {
-    case LUA_VNUMINT:
-      return hashint(t, ivalueraw(*kvl));
-    case LUA_VNUMFLT:
-      return hashmod(t, l_hashfloat(fltvalueraw(*kvl)));
-    case LUA_VSHRSTR:
-      return hashstr(t, tsvalueraw(*kvl));
-    case LUA_VLNGSTR:
-      return hashpow2(t, luaS_hashlongstr(tsvalueraw(*kvl)));
+    case LUA_VNUMINT: {
+      lua_Integer key = ivalueraw(*kvl);
+      return hashint(t, key);
+    }
+    case LUA_VNUMFLT: {
+      lua_Number n = fltvalueraw(*kvl);
+      return hashmod(t, l_hashfloat(n));
+    }
+    case LUA_VSHRSTR: {
+      TString *ts = tsvalueraw(*kvl);
+      return hashstr(t, ts);
+    }
+    case LUA_VLNGSTR: {
+      TString *ts = tsvalueraw(*kvl);
+      return hashpow2(t, luaS_hashlongstr(ts));
+    }
     case LUA_VFALSE:
       return hashboolean(t, 0);
     case LUA_VTRUE:
       return hashboolean(t, 1);
-    case LUA_VLIGHTUSERDATA:
-      return hashpointer(t, pvalueraw(*kvl));
-    case LUA_VLCF:
-      return hashpointer(t, fvalueraw(*kvl));
-    default:
-      return hashpointer(t, gcvalueraw(*kvl));
+    case LUA_VLIGHTUSERDATA: {
+      void *p = pvalueraw(*kvl);
+      return hashpointer(t, p);
+    }
+    case LUA_VLCF: {
+      lua_CFunction f = fvalueraw(*kvl);
+      return hashpointer(t, f);
+    }
+    default: {
+      GCObject *o = gcvalueraw(*kvl);
+      return hashpointer(t, o);
+    }
   }
 }
 

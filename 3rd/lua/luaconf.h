@@ -663,19 +663,27 @@
 
 /*
 ** macros to improve jump prediction, used mostly for error handling
-** and debug facilities.
+** and debug facilities. (Some macros in the Lua API use these macros.
+** Define LUA_NOBUILTIN if you do not want '__builtin_expect' in your
+** code.)
 */
-#if (defined(LUA_CORE) || defined(LUA_LIB)) && !defined(l_likely)
+#if !defined(luai_likely)
 
-#include <stdio.h>
-#if defined(__GNUC__)
-#define l_likely(x)	(__builtin_expect(((x) != 0), 1))
-#define l_unlikely(x)	(__builtin_expect(((x) != 0), 0))
+#if defined(__GNUC__) && !defined(LUA_NOBUILTIN)
+#define luai_likely(x)		(__builtin_expect(((x) != 0), 1))
+#define luai_unlikely(x)	(__builtin_expect(((x) != 0), 0))
 #else
-#define l_likely(x)	(x)
-#define l_unlikely(x)	(x)
+#define luai_likely(x)		(x)
+#define luai_unlikely(x)	(x)
 #endif
 
+#endif
+
+
+#if defined(LUA_CORE) || defined(LUA_LIB)
+/* shorter names for Lua's own use */
+#define l_likely(x)	luai_likely(x)
+#define l_unlikely(x)	luai_unlikely(x)
 #endif
 
 

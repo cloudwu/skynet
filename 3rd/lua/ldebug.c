@@ -50,6 +50,8 @@ static int currentpc (CallInfo *ci) {
 ** an integer division gets the right place. When the source file has
 ** large sequences of empty/comment lines, it may need extra entries,
 ** so the original estimate needs a correction.
+** If the original estimate is -1, the initial 'if' ensures that the
+** 'while' will run at least once.
 ** The assertion that the estimate is a lower bound for the correct base
 ** is valid as long as the debug info has been generated with the same
 ** value for MAXIWTHABS or smaller. (Previous releases use a little
@@ -63,7 +65,8 @@ static int getbaseline (const Proto *f, int pc, int *basepc) {
   else {
     int i = cast_uint(pc) / MAXIWTHABS - 1;  /* get an estimate */
     /* estimate must be a lower bond of the correct base */
-    lua_assert(i < f->sizeabslineinfo && f->abslineinfo[i].pc <= pc);
+    lua_assert(i < 0 ||
+              (i < f->sizeabslineinfo && f->abslineinfo[i].pc <= pc));
     while (i + 1 < f->sizeabslineinfo && pc >= f->abslineinfo[i + 1].pc)
       i++;  /* low estimate; adjust it */
     *basepc = f->abslineinfo[i].pc;
