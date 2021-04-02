@@ -450,7 +450,6 @@ function skynet.killthread(thread)
 	if co == nil then
 		return
 	end
-	watching_session[session] = nil
 	local addr = session_coroutine_address[co]
 	if addr then
 		session_coroutine_address[co] = nil
