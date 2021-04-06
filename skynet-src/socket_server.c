@@ -1672,10 +1672,11 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			ss->event_index = 0;
 			if (ss->event_n <= 0) {
 				ss->event_n = 0;
-				if (errno == EINTR) {
-					continue;
+				int err = errno;
+				if (err != EINTR) {
+					skynet_error(NULL, "socket-server: %s", strerror(err));
 				}
-				return -1;
+				continue;
 			}
 		}
 		struct event *e = &ss->ev[ss->event_index++];
@@ -1752,9 +1753,11 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			if (e->eof) {
 				// For epoll (at least), FIN packets are exchanged both ways.
 				// See: https://stackoverflow.com/questions/52976152/tcp-when-is-epollhup-generated
-				int r = halfclose_read(s) ? -1 : SOCKET_CLOSE;
+				int halfclose = halfclose_read(s);
 				force_close(ss, s, &l, result);
-				return r;
+				if (!halfclose) {
+					return SOCKET_CLOSE;
+				}
 			}
 			break;
 		}
