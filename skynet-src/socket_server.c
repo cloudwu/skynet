@@ -1421,8 +1421,6 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		case AGAIN_WOULDBLOCK:
 			break;
 		default:
-			// close when error
-			force_close(ss, s, l, result);
 			result->data = strerror(errno);
 			return SOCKET_ERR;
 		}
@@ -1737,7 +1735,6 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				return type;
 			}
 			if (e->error) {
-				// close when error
 				int error;
 				socklen_t len = sizeof(error);  
 				int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);  
@@ -1749,7 +1746,6 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				} else {
 					err = "Unknown error";
 				}
-				force_close(ss, s, &l, result);
 				result->data = (char *)err;
 				return SOCKET_ERR;
 			}
