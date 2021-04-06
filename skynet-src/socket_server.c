@@ -1749,16 +1749,12 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				result->data = (char *)err;
 				return SOCKET_ERR;
 			}
-			if(e->eof) {
+			if (e->eof) {
 				// For epoll (at least), FIN packets are exchanged both ways.
 				// See: https://stackoverflow.com/questions/52976152/tcp-when-is-epollhup-generated
+				int r = halfclose_read(s) ? -1 : SOCKET_CLOSE;
 				force_close(ss, s, &l, result);
-				if (halfclose_read(s)) {
-					// Already rasied SOCKET_CLOSE
-					return -1;
-				} else {
-					return SOCKET_CLOSE;
-				}
+				return r;
 			}
 			break;
 		}
