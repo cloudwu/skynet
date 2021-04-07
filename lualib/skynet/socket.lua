@@ -16,6 +16,7 @@ local socket_pool = setmetatable( -- store all socket object
 	}
 )
 
+local socket_onclose = {}
 local socket_message = {}
 
 local function wakeup(s)
@@ -117,14 +118,16 @@ end
 -- SKYNET_SOCKET_TYPE_CLOSE = 3
 socket_message[3] = function(id)
 	local s = socket_pool[id]
-	if s == nil then
-		driver.close(id)
-		return
+	if s then
+		s.connected = false
+		wakeup(s)
+	else
+		driver.shutdown(id)
 	end
-	s.connected = false
-	wakeup(s)
-	if s.on_close then
-		s.on_close(id)
+	local cb = socket_onclose[id]
+	if cb then
+		cb(id)
+		socket_onclose[id] = nil
 	end
 end
 
@@ -216,6 +219,7 @@ local function connect(id, func)
 		callback = func,
 		protocol = "TCP",
 	}
+	assert(not socket_onclose[id], "socket has onclose callback")
 	assert(not socket_pool[id], "socket is not closed")
 	socket_pool[id] = s
 	suspend(s)
@@ -409,6 +413,7 @@ function socket.abandon(id)
 	if s then
 		s.connected = false
 		wakeup(s)
+		socket_onclose[id] = nil
 		socket_pool[id] = nil
 	end
 end
@@ -460,9 +465,7 @@ function socket.warning(id, callback)
 end
 
 function socket.onclose(id, callback)
-	local obj = socket_pool[id]
-	assert(obj)
-	obj.on_close = callback
+	socket_onclose[id] = callback
 end
 
 return socket
