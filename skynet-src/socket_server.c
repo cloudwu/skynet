@@ -1188,8 +1188,11 @@ resume_socket(struct socket_server *ss, struct request_resumepause *request, str
 		result->data = "invalid socket";
 		return SOCKET_ERR;
 	}
-	if (halfclose_read(s))
-		return -1;
+	if (halfclose_read(s)) {
+		// The closing socket may be in transit, so raise an error. See https://github.com/cloudwu/skynet/issues/1374
+		result->data = "socket closed";
+		return SOCKET_ERR;
+	}
 	struct socket_lock l;
 	socket_lock_init(s, &l);
 	if (enable_read(ss, s, true)) {
@@ -1208,7 +1211,7 @@ resume_socket(struct socket_server *ss, struct request_resumepause *request, str
 		result->data = "transfer";
 		return SOCKET_OPEN;
 	}
-	// if s->type == SOCKET_TYPE_HALFCLOSE_* , SOCKET_CLOSE message will send later
+	// if s->type == SOCKET_TYPE_HALFCLOSE_WRITE , SOCKET_CLOSE message will send later
 	return -1;
 }
 
