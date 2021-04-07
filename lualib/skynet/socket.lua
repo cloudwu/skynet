@@ -287,7 +287,6 @@ function socket.close(id)
 		end
 		s.connected = false
 	end
-	assert(s.lock == nil or next(s.lock) == nil)
 	socket_pool[id] = nil
 end
 
@@ -401,34 +400,6 @@ function socket.listen(host, port, backlog)
 		port = tonumber(port)
 	end
 	return driver.listen(host, port, backlog)
-end
-
-function socket.lock(id)
-	local s = socket_pool[id]
-	assert(s)
-	local lock_set = s.lock
-	if not lock_set then
-		lock_set = {}
-		s.lock = lock_set
-	end
-	if #lock_set == 0 then
-		lock_set[1] = true
-	else
-		local co = coroutine.running()
-		table.insert(lock_set, co)
-		skynet.wait(co)
-	end
-end
-
-function socket.unlock(id)
-	local s = socket_pool[id]
-	assert(s)
-	local lock_set = assert(s.lock)
-	table.remove(lock_set,1)
-	local co = lock_set[1]
-	if co then
-		skynet.wakeup(co)
-	end
 end
 
 -- abandon use to forward socket id to other service
