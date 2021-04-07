@@ -235,7 +235,17 @@ bootstrap(struct skynet_context * logger, const char * cmdline) {
 	int sz = strlen(cmdline);
 	char name[sz+1];
 	char args[sz+1];
-	sscanf(cmdline, "%s %s", name, args);
+	int arg_pos;
+	sscanf(cmdline, "%s", name);  
+	arg_pos = strlen(name);
+	if (arg_pos < sz) {
+		while(cmdline[arg_pos] == ' ') {
+			arg_pos++;
+		}
+		strncpy(args, cmdline + arg_pos, sz);
+	} else {
+		args[0] = '\0';
+	}
 	struct skynet_context *ctx = skynet_context_new(name, args);
 	if (ctx == NULL) {
 		skynet_error(NULL, "Bootstrap error : %s\n", cmdline);
