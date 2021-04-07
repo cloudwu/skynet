@@ -678,6 +678,15 @@ _failed_getaddrinfo:
 }
 
 static int
+report_error(struct socket *s, struct socket_message *result, const char *err) {
+	result->id = s->id;
+	result->ud = 0;
+	result->opaque = s->opaque;
+	result->data = (char *)err;
+	return SOCKET_ERR;
+}
+
+static int
 close_write(struct socket_server *ss, struct socket *s, struct socket_lock *l, struct socket_message *result) {
 	if (s->closing) {
 		force_close(ss,s,l,result);
@@ -696,11 +705,7 @@ close_write(struct socket_server *ss, struct socket *s, struct socket_lock *l, s
 		ATOM_STORE(&s->type, SOCKET_TYPE_HALFCLOSE_WRITE);
 		shutdown(s->fd, SHUT_WR);
 		enable_write(ss, s, false);
-		result->id = s->id;
-		result->ud = 0;
-		result->opaque = s->opaque;
-		result->data = strerror(errno);
-		return SOCKET_ERR;
+		return report_error(s, result, strerror(errno));
 	}
 }
 
@@ -894,11 +899,7 @@ send_buffer_(struct socket_server *ss, struct socket *s, struct socket_lock *l, 
 		int err = enable_write(ss, s, false);
 
 		if (err) {
-			result->opaque = s->opaque;
-			result->id = s->id;
-			result->ud = 0;
-			result->data = "disable write failed";
-			return SOCKET_ERR;
+			return report_error(s, result, "disable write failed");
 		}
 
 		if(s->warn_size > 0){
@@ -989,11 +990,7 @@ trigger_write(struct socket_server *ss, struct request_send * request, struct so
 	if (socket_invalid(s, id))
 		return -1;
 	if (enable_write(ss, s, true)) {
-		result->opaque = s->opaque;
-		result->id = s->id;
-		result->ud = 0;
-		result->data = "enable write failed";
-		return SOCKET_ERR;
+		return report_error(s, result, "enable write failed");
 	}
 	return -1;
 }
@@ -1050,11 +1047,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			}
 		}
 		if (enable_write(ss, s, true)) {
-			result->opaque = s->opaque;
-			result->id = s->id;
-			result->ud = 0;
-			result->data = "enable write failed";
-			return SOCKET_ERR;
+			return report_error(s, result, "enable write failed");
 		}
 	} else {
 		if (s->protocol == PROTOCOL_TCP) {
@@ -1223,11 +1216,7 @@ pause_socket(struct socket_server *ss, struct request_resumepause *request, stru
 		return -1;
 	}
 	if (enable_read(ss, s, false)) {
-		result->id = id;
-		result->opaque = request->opaque;
-		result->ud = 0;
-		result->data = "enable read failed";
-		return SOCKET_ERR;
+		return report_error(s, result, "enable read failed");
 	}
 	return -1;
 }
@@ -1302,12 +1291,7 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 	int type = request->address[0];
 	if (type != s->protocol) {
 		// protocol mismatch
-		result->opaque = s->opaque;
-		result->id = s->id;
-		result->ud = 0;
-		result->data = "protocol mismatch";
-
-		return SOCKET_ERR;
+		return report_error(s, result, "protocol mismatch");
 	}
 	if (type == PROTOCOL_UDP) {
 		memcpy(s->p.udp_address, request->address, 1+2+4);	// 1 type, 2 port, 4 ipv4
@@ -1424,8 +1408,7 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_lo
 		case AGAIN_WOULDBLOCK:
 			break;
 		default:
-			result->data = strerror(errno);
-			return SOCKET_ERR;
+			return report_error(s, result, strerror(errno));
 		}
 		return -1;
 	}
@@ -1750,8 +1733,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				} else {
 					err = "Unknown error";
 				}
-				result->data = (char *)err;
-				return SOCKET_ERR;
+				return report_error(s, result, err);
 			}
 			if (e->eof) {
 				// For epoll (at least), FIN packets are exchanged both ways.
