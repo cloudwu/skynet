@@ -122,7 +122,7 @@ socket_message[3] = function(id)
 		s.connected = false
 		wakeup(s)
 	else
-		driver.shutdown(id)
+		driver.close(id)
 	end
 	local cb = socket_onclose[id]
 	if cb then
