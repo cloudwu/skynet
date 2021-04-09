@@ -146,9 +146,16 @@ local function compose_message(cmd, msg)
 	return lines
 end
 
-local function redis_login(auth, db)
+local function redis_login(conf)
+	local auth = conf.auth
+	local db = conf.db
 	if auth == nil and db == nil then
 		return
+	end
+	if auth then
+		if conf.username then
+			auth = { conf.username, auth }
+		end
 	end
 	return function(so)
 		if auth then
@@ -164,7 +171,7 @@ function redis.connect(db_conf)
 	local channel = socketchannel.channel {
 		host = db_conf.host,
 		port = db_conf.port or 6379,
-		auth = redis_login(db_conf.auth, db_conf.db),
+		auth = redis_login(db_conf),
 		nodelay = true,
 		overload = db_conf.overload,
 	}
@@ -256,10 +263,11 @@ local watchmeta = {
 	end,
 }
 
-local function watch_login(obj, auth)
+local function watch_login(conf, obj)
+	local login_auth = redis_login(conf)
 	return function(so)
-		if auth then
-			so:request(compose_message("AUTH", auth), read_response)
+		if login_auth then
+			login_auth(so)
 		end
 		for k in pairs(obj.__psubscribe) do
 			so:request(compose_message ("PSUBSCRIBE", k))
@@ -278,7 +286,7 @@ function redis.watch(db_conf)
 	local channel = socketchannel.channel {
 		host = db_conf.host,
 		port = db_conf.port or 6379,
-		auth = watch_login(obj, db_conf.auth),
+		auth = watch_login(db_conf, obj),
 		nodelay = true,
 	}
 	obj.__sock = channel
