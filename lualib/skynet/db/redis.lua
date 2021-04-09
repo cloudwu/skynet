@@ -267,7 +267,7 @@ local function watch_login(conf, obj)
 	local login_auth = redis_login(conf)
 	return function(so)
 		if login_auth then
-			login_auth()
+			login_auth(so)
 		end
 		for k in pairs(obj.__psubscribe) do
 			so:request(compose_message ("PSUBSCRIBE", k))
