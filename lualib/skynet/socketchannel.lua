@@ -432,12 +432,12 @@ local function block_connect(self, once)
 	else
 		self.__connecting[1] = true
 		err = try_connect(self, once)
-		self.__connecting[1] = nil
 		for i=2, #self.__connecting do
 			local co = self.__connecting[i]
 			self.__connecting[i] = nil
 			skynet.wakeup(co)
 		end
+		self.__connecting[1] = nil
 	end
 
 	r = check_connection(self)
