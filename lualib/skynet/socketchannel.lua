@@ -125,6 +125,17 @@ local function pop_response(self)
 		end
 		self.__wait_response = coroutine.running()
 		skynet.wait(self.__wait_response)
+		if not self.__sock then
+			-- disconnected before request, terminate dispatch_by_order
+			return
+		end
+	end
+end
+
+local function wakeup_response(self)
+	if self.__wait_response then
+		skynet.wakeup(self.__wait_response)
+		self.__wait_response = nil
 	end
 end
 
@@ -135,6 +146,7 @@ local function autoclose_cb(self, fd)
 		-- closed by peer
 		skynet.error("socket closed by peer : ", self.__host, self.__port)
 		close_channel_socket(self)
+		wakeup_response(self)
 	end
 end
 
@@ -146,10 +158,7 @@ local function push_response(self, response, co)
 		-- response is a function, push it to __request
 		table.insert(self.__request, response)
 		table.insert(self.__thread, co)
-		if self.__wait_response then
-			skynet.wakeup(self.__wait_response)
-			self.__wait_response = nil
-		end
+		wakeup_response(self)
 	end
 end
 
@@ -423,12 +432,12 @@ local function block_connect(self, once)
 	else
 		self.__connecting[1] = true
 		err = try_connect(self, once)
-		self.__connecting[1] = nil
 		for i=2, #self.__connecting do
 			local co = self.__connecting[i]
 			self.__connecting[i] = nil
 			skynet.wakeup(co)
 		end
+		self.__connecting[1] = nil
 	end
 
 	r = check_connection(self)
