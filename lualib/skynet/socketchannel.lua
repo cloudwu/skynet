@@ -184,10 +184,6 @@ end
 local function dispatch_by_order(self)
 	while self.__sock do
 		local func, co = pop_response(self)
-		if func == nil then
-			-- disconnected before request, terminate this thread
-			break
-		end
 		if not co then
 			-- close signal
 			wakeup_all(self, "channel_closed")
