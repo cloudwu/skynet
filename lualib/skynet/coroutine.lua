@@ -6,6 +6,7 @@ local coroutine_resume = coroutine.resume
 local coroutine_yield = coroutine.yield
 local coroutine_status = coroutine.status
 local coroutine_running = coroutine.running
+local coroutine_close = coroutine.close
 
 local select = select
 local skynetco = {}
@@ -15,6 +16,9 @@ skynetco.running = coroutine.running
 skynetco.status = coroutine.status
 
 local skynet_coroutines = setmetatable({}, { __mode = "kv" })
+-- true : skynet coroutine
+-- false : skynet suspend
+-- nil : exit
 
 function skynetco.create(f)
 	local co = coroutine.create(f)
@@ -84,7 +88,7 @@ do -- begin skynetco.resume
 end -- end of skynetco.resume
 
 function skynetco.status(co)
-	local status = coroutine.status(co)
+	local status = coroutine_status(co)
 	if status == "suspended" then
 		if skynet_coroutines[co] == false then
 			return "blocked"
@@ -120,5 +124,10 @@ function skynetco.wrap(f)
 end
 
 end	-- end of skynetco.wrap
+
+function skynetco.close(co)
+	skynet_coroutines[co] = nil
+	return coroutine_close(co)
+end
 
 return skynetco
