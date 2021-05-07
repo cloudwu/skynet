@@ -246,25 +246,25 @@ function gateserver.start(handler)
 		end
 	end
 
-	-- skynet.register_protocol {
-	-- 	name = "socket",
-	-- 	id = skynet.PTYPE_SOCKET,	-- PTYPE_SOCKET = 6
-	-- 	unpack = function ( msg, sz )
- --            local _, fd = socketdriver.unpack(msg, sz)
-	-- 		if (connection[fd] == nil ) then
-	-- 				return netpack.filter( queue, msg, sz, 1)
-	-- 		elseif connection[fd].isconnect then
-	-- 				return netpack.filter( queue, msg, sz, connection[fd].iswebsocket_handeshake)
-	-- 		end
-	-- 		return netpack.filter( queue, msg, sz, 1)
-	-- 	end,
-	-- 	dispatch = function (_, _, q, type, ...)
-	-- 		queue = q
-	-- 		if type then
-	-- 			MSG[type](...)
-	-- 		end
-	-- 	end
-	-- }
+	skynet.register_protocol {
+		name = "socket",
+		id = skynet.PTYPE_SOCKET,	-- PTYPE_SOCKET = 6
+		unpack = function ( msg, sz )
+            local _, fd = socketdriver.unpack(msg, sz)
+			if (connection[fd] == nil ) then
+					return netpack.filter( queue, msg, sz, 1)
+			elseif connection[fd].isconnect then
+					return netpack.filter( queue, msg, sz, connection[fd].iswebsocket_handeshake)
+			end
+			return netpack.filter( queue, msg, sz, 1)
+		end,
+		dispatch = function (_, _, q, type, ...)
+			queue = q
+			if type then
+				MSG[type](...)
+			end
+		end
+	}
 
      skynet.start(function()
      skynet.dispatch("lua", function (_, address, cmd, ...)
