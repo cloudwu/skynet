@@ -1,3 +1,8 @@
+这个版本和官方的版本完全一致，并且会一直合并最新的修改；由于skynet极其精简的内核，所以实现这个调试器并没有修改框架的代码，只是增加了几个额外的模块：
+
+cjson 用于进行json格式的数据交换。
+
+
 ## ![skynet logo](https://github.com/cloudwu/skynet/wiki/image/skynet_metro.jpg)
 
 Skynet is a lightweight online game framework which can be used in many other fields.
