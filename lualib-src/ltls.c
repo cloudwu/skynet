@@ -177,6 +177,7 @@ _ltls_context_handshake(lua_State* L) {
 
     // first handshake; initiated by client
     if(!SSL_is_init_finished(tls_p->ssl)) {
+        ERR_clear_error();
         int ret = SSL_do_handshake(tls_p->ssl);
         if(ret == 1) {
             return 0;
@@ -215,6 +216,7 @@ _ltls_context_read(lua_State* L) {
     luaL_Buffer b;
     luaL_buffinit(L, &b);
 
+    ERR_clear_error();
     do {
         read = SSL_read(tls_p->ssl, outbuff, sizeof(outbuff));
         if(read <= 0) {
@@ -240,6 +242,7 @@ _ltls_context_write(lua_State* L) {
     size_t slen = 0;
     char* unencrypted_data = (char*)lua_tolstring(L, 2, &slen);
 
+    ERR_clear_error();
     while(slen > 0) {
         int written = SSL_write(tls_p->ssl, unencrypted_data,  slen);
         if(written <= 0) {
