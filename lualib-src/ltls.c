@@ -182,6 +182,7 @@ _ltls_context_handshake(lua_State* L) {
             return 0;
         } else if (ret < 0) {
             int err = SSL_get_error(tls_p->ssl, ret);
+            ERR_clear_error();
             if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
                 int all_read = _bio_read(L, tls_p);
                 if(all_read>0) {
@@ -192,6 +193,7 @@ _ltls_context_handshake(lua_State* L) {
             }
         } else {
             int err = SSL_get_error(tls_p->ssl, ret);
+            ERR_clear_error();
             luaL_error(L, "SSL_do_handshake error:%d ret:%d", err, ret);
         }
     }
@@ -219,6 +221,7 @@ _ltls_context_read(lua_State* L) {
         read = SSL_read(tls_p->ssl, outbuff, sizeof(outbuff));
         if(read <= 0) {
             int err = SSL_get_error(tls_p->ssl, read);
+            ERR_clear_error();
             if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
                 break;
             }
@@ -244,6 +247,7 @@ _ltls_context_write(lua_State* L) {
         int written = SSL_write(tls_p->ssl, unencrypted_data,  slen);
         if(written <= 0) {
             int err = SSL_get_error(tls_p->ssl, written);
+            ERR_clear_error();
             luaL_error(L, "SSL_write error:%d", err);
         }else if(written <= slen) {
             unencrypted_data += written;
