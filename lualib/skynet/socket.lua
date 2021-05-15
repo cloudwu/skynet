@@ -203,6 +203,16 @@ skynet.register_protocol {
 	end
 }
 
+-- see https://en.wikipedia.org/wiki/IPv6#Addressing for ipv6
+local function split_host_port(addr)
+	local host, port = addr:match("(%[.*%]):([^:]+)$")
+	if not host then
+		host, port = addr:match("([^:]+):(.+)$")
+	end
+	port = tonumber(port)
+	return host, port
+end
+
 local function connect(id, func)
 	local newbuffer
 	if func == nil then
@@ -233,9 +243,29 @@ local function connect(id, func)
 	end
 end
 
+local function connect_until_success(ips, port)
+	for _, ip in ipairs(ips) do
+		local id = driver.connect(ip, port)
+		if connect(id) then
+			return id
+		end
+	end
+	return nil
+end
+
 function socket.open(addr, port)
-	local id = driver.connect(addr,port)
-	return connect(id)
+	if port == nil then
+		addr, port = split_host_port(addr)
+	end
+	local skynet_dns = require "skynet.dns" -- dns require also socket
+	local id, ips
+	_, ips = skynet_dns.resolve(addr) -- first try ipv4
+	id = connect_until_success(ips, port)
+	if not id then
+		_, ips = skynet_dns.resolve(addr, true) -- then try ipv6
+		id = connect_until_success(ips, port)
+	end
+	return id
 end
 
 function socket.bind(os_fd)
@@ -400,8 +430,7 @@ end
 
 function socket.listen(host, port, backlog)
 	if port == nil then
-		host, port = string.match(host, "([^:]+):(.+)$")
-		port = tonumber(port)
+		host, port = split_host_port(host)
 	end
 	return driver.listen(host, port, backlog)
 end

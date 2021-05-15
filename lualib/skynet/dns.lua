@@ -497,14 +497,16 @@ local function remote_resolve(name, ipv6)
 	return suspend(question_header.tid, name, qtype)
 end
 
+local single_ip = {}
 function dns.resolve(name, ipv6)
 	local name = name:lower()
 	local ntype = guess_name_type(name)
 	if ntype ~= "hostname" then
-		if (ipv6 and name == "ipv4") or (not ipv6 and name == "ipv6") then
+		if (ipv6 and ntype == "ipv4") or (not ipv6 and ntype == "ipv6") then
 			return nil, "illegal ip address"
 		end
-		return name
+		single_ip[1] = name
+		return name, single_ip
 	end
 
 	if not verify_domain_name(name) then
