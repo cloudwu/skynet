@@ -11,8 +11,10 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #include "skynet.h"
 #include "skynet_socket.h"
@@ -786,6 +788,34 @@ linfo(lua_State *L) {
 	return 1;
 }
 
+static int
+lresolve(lua_State *L) {
+	const char * host = luaL_checkstring(L, 1);
+	int status;
+	struct addrinfo ai_hints;
+	struct addrinfo *ai_list = NULL;
+	struct addrinfo *ai_ptr = NULL;
+	memset( &ai_hints, 0, sizeof( ai_hints ) );
+	status = getaddrinfo( host, NULL, &ai_hints, &ai_list);
+	if ( status != 0 ) {
+		return luaL_error(L, gai_strerror(status));
+	}
+	lua_newtable(L);
+	int idx = 1;
+	char tmp[128];
+	for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next ) {
+		struct sockaddr * addr = ai_ptr->ai_addr;
+		void * sin_addr = (ai_ptr->ai_family == AF_INET) ? (void*)&((struct sockaddr_in *)addr)->sin_addr : (void*)&((struct sockaddr_in6 *)addr)->sin6_addr;
+		if (inet_ntop(ai_ptr->ai_family, sin_addr, tmp, sizeof(tmp))) {
+			lua_pushstring(L, tmp);
+			lua_rawseti(L, -2, idx++);
+		}
+	}
+
+	freeaddrinfo(ai_list);
+	return 1;
+}
+
 LUAMOD_API int
 luaopen_skynet_socketdriver(lua_State *L) {
 	luaL_checkversion(L);
@@ -820,6 +850,7 @@ luaopen_skynet_socketdriver(lua_State *L) {
 		{ "udp_connect", ludp_connect },
 		{ "udp_send", ludp_send },
 		{ "udp_address", ludp_address },
+		{ "resolve", lresolve },
 		{ NULL, NULL },
 	};
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
