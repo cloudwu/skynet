@@ -28,7 +28,7 @@ local function wakeup(s)
 end
 
 local function pause_socket(s, size)
-	if s.pause then
+	if s.pause ~= nil then
 		return
 	end
 	if size then
@@ -254,7 +254,7 @@ end
 
 function socket.pause(id)
 	local s = socket_pool[id]
-	if s == nil or s.pause then
+	if s == nil then
 		return
 	end
 	pause_socket(s)
@@ -280,6 +280,7 @@ function socket.close(id)
 	end
 	driver.close(id)
 	if s.connected then
+		s.pause = false -- Do not resume this fd if it paused.
 		if s.co then
 			-- reading this socket on another coroutine, so don't shutdown (clear the buffer) immediately
 			-- wait reading coroutine read the buffer.
