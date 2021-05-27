@@ -4,7 +4,6 @@
 #include "socket_poll.h"
 #include "atomic.h"
 #include "spinlock.h"
-#include "skynet.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -307,13 +306,13 @@ static inline void
 send_object_init_from_sendbuffer(struct socket_server *ss, struct send_object *so, struct socket_sendbuffer *buf) {
 	switch (buf->type) {
 	case SOCKET_BUFFER_MEMORY:
-		send_object_init(ss, so, (void *)buf->buffer, buf->sz);
+		send_object_init(ss, so, buf->buffer, buf->sz);
 		break;
 	case SOCKET_BUFFER_OBJECT:
-		send_object_init(ss, so, (void *)buf->buffer, USEROBJECT);
+		send_object_init(ss, so, buf->buffer, USEROBJECT);
 		break;
 	case SOCKET_BUFFER_RAWPOINTER:
-		so->buffer = (void *)buf->buffer;
+		so->buffer = buf->buffer;
 		so->sz = buf->sz;
 		so->free_func = dummy_free;
 		break;
@@ -445,7 +444,7 @@ free_buffer(struct socket_server *ss, struct socket_sendbuffer *buf) {
 	void *buffer = (void *)buf->buffer;
 	switch (buf->type) {
 	case SOCKET_BUFFER_MEMORY:
-		FREE((void *)buffer);
+		FREE(buffer);
 		break;
 	case SOCKET_BUFFER_OBJECT:
 		ss->soi.free(buffer);
@@ -1485,14 +1484,13 @@ forward_message_udp(struct socket_server *ss, struct socket *s, struct socket_lo
 		switch(errno) {
 		case EINTR:
 		case AGAIN_WOULDBLOCK:
-			break;
-		default:
-			// close when error
-			force_close(ss, s, l, result);
-			result->data = strerror(errno);
-			return SOCKET_ERR;
+			return -1;
 		}
-		return -1;
+		int error = errno;
+		// close when error
+		force_close(ss, s, l, result);
+		result->data = strerror(error);
+		return SOCKET_ERR;
 	}
 	stat_read(ss,s,n);
 
@@ -1524,11 +1522,9 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_lock *l
 	socklen_t len = sizeof(error);  
 	int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);  
 	if (code < 0 || error) {  
-		force_close(ss,s,l, result);
-		if (code >= 0)
-			result->data = strerror(error);
-		else
-			result->data = strerror(errno);
+		error = code < 0 ? errno : error;
+		force_close(ss, s, l, result);
+		result->data = strerror(error);
 		return SOCKET_ERR;
 	} else {
 		ATOM_STORE(&s->type , SOCKET_TYPE_CONNECTED);
@@ -1560,8 +1556,8 @@ static int
 getname(union sockaddr_all *u, char *buffer, size_t sz) {
 	char tmp[INET6_ADDRSTRLEN];
 	void * sin_addr = (u->s.sa_family == AF_INET) ? (void*)&u->v4.sin_addr : (void *)&u->v6.sin6_addr;
-	int sin_port = ntohs((u->s.sa_family == AF_INET) ? u->v4.sin_port : u->v6.sin6_port);
 	if (inet_ntop(u->s.sa_family, sin_addr, tmp, sizeof(tmp))) {
+		int sin_port = ntohs((u->s.sa_family == AF_INET) ? u->v4.sin_port : u->v6.sin6_port);
 		snprintf(buffer, sz, "%s:%d", tmp, sin_port);
 		return 1;
 	} else {
