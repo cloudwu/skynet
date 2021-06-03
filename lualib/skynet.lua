@@ -968,7 +968,9 @@ function skynet.task(ret)
 	if ret == nil then
 		local t = 0
 		for session,co in pairs(session_id_coroutine) do
-			t = t + 1
+			if co ~= "BREAK" then
+				t = t + 1
+			end
 		end
 		return t
 	end
@@ -983,7 +985,9 @@ function skynet.task(ret)
 	if tt == "table" then
 		for session,co in pairs(session_id_coroutine) do
 			local key = string.format("%s session: %d", tostring(co), session)
-			if timeout_traceback and timeout_traceback[co] then
+			if co == "BREAK" then
+				ret[key] = "BREAK"
+			elseif timeout_traceback and timeout_traceback[co] then
 				ret[key] = timeout_traceback[co]
 			else
 				ret[key] = traceback(co)
@@ -993,7 +997,11 @@ function skynet.task(ret)
 	elseif tt == "number" then
 		local co = session_id_coroutine[ret]
 		if co then
-			return traceback(co)
+			if co == "BREAK" then
+				return "BREAK"
+			else
+				return traceback(co)
+			end
 		else
 			return "No session"
 		end
