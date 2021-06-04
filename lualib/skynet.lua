@@ -413,7 +413,7 @@ end
 function skynet.wait(token)
 	local session = c.genid()
 	token = token or coroutine.running()
-	local ret, msg = suspend_sleep(session, token)
+	suspend_sleep(session, token)
 	sleep_session[token] = nil
 	session_id_coroutine[session] = nil
 end
