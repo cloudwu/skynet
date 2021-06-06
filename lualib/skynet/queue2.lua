@@ -19,7 +19,7 @@ function skynet.queue2()
 		end
 	end})
 
-	return function(f, ...)
+	return function()
 		local thread = coroutine.running()
 		if current_thread and current_thread ~= thread then
 			table.insert(thread_queue, thread)
