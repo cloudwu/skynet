@@ -79,8 +79,8 @@ spinlock_lock(struct spinlock *lock) {
 
 static inline int
 spinlock_trylock(struct spinlock *lock) {
-    return !atomic_load_relaxed_(&lock->lock) &&
-           !atomic_test_and_set_(&lock->lock);
+	return !atomic_load_relaxed_(&lock->lock) &&
+		!atomic_test_and_set_(&lock->lock);
 }
 
 static inline void
