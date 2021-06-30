@@ -15,16 +15,6 @@
 #define atomic_flag_test_and_set_(ptr) __sync_lock_test_and_set(ptr, 1)
 #define atomic_flag_clear_(ptr) __sync_lock_release(ptr)
 
-#else
-
-#include <stdatomic.h>
-#define atomic_flag_ atomic_flag
-#define ATOMIC_FLAG_INIT_ ATOMIC_FLAG_INIT
-#define atomic_flag_test_and_set_ atomic_flag_test_and_set
-#define atomic_flag_clear_ atomic_flag_clear
-
-#endif
-
 struct spinlock {
 	atomic_flag_ lock;
 };
@@ -54,6 +44,56 @@ static inline void
 spinlock_destroy(struct spinlock *lock) {
 	(void) lock;
 }
+
+#else  // __STDC_NO_ATOMICS__
+
+#include <stdatomic.h>
+#define atomic_test_and_set_(ptr) atomic_exchange_explicit(ptr, 1, memory_order_acquire)
+#define atomic_clear_(ptr) atomic_store_explicit(ptr, 0, memory_order_release);
+#define atomic_load_relaxed_(ptr) atomic_load_explicit(ptr, memory_order_relaxed)
+
+#if defined(__x86_64__)
+#define atomic_pause_() __builtin_ia32_pause()
+#else
+#define atomic_pause_() ((void)0)
+#endif
+
+struct spinlock {
+	atomic_int lock;
+};
+
+static inline void
+spinlock_init(struct spinlock *lock) {
+	atomic_init(&lock->lock, 0);
+}
+
+static inline void
+spinlock_lock(struct spinlock *lock) {
+	for (;;) {
+	  if (!atomic_test_and_set_(&lock->lock))
+		return;
+	  while (atomic_load_relaxed_(&lock->lock))
+		atomic_pause_();
+	}
+}
+
+static inline int
+spinlock_trylock(struct spinlock *lock) {
+	return !atomic_load_relaxed_(&lock->lock) &&
+		!atomic_test_and_set_(&lock->lock);
+}
+
+static inline void
+spinlock_unlock(struct spinlock *lock) {
+	atomic_clear_(&lock->lock);
+}
+
+static inline void
+spinlock_destroy(struct spinlock *lock) {
+	(void) lock;
+}
+
+#endif  // __STDC_NO_ATOMICS__
 
 #else
 
