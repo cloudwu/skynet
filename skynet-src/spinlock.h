@@ -53,7 +53,8 @@ spinlock_destroy(struct spinlock *lock) {
 #define atomic_load_relaxed_(ptr) atomic_load_explicit(ptr, memory_order_relaxed)
 
 #if defined(__x86_64__)
-#define atomic_pause_() __builtin_ia32_pause()
+#include <immintrin.h> // For _mm_pause
+#define atomic_pause_() _mm_pause()
 #else
 #define atomic_pause_() ((void)0)
 #endif
@@ -70,10 +71,10 @@ spinlock_init(struct spinlock *lock) {
 static inline void
 spinlock_lock(struct spinlock *lock) {
 	for (;;) {
-	  if (!atomic_test_and_set_(&lock->lock))
-		return;
-	  while (atomic_load_relaxed_(&lock->lock))
-		atomic_pause_();
+		if (!atomic_test_and_set_(&lock->lock))
+			return;
+		while (atomic_load_relaxed_(&lock->lock))
+			atomic_pause_();
 	}
 }
 
