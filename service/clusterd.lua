@@ -15,9 +15,15 @@ local function open_channel(t, key)
 	local ct = connecting[key]
 	if ct then
 		local co = coroutine.running()
-		table.insert(ct, co)
-		skynet.wait(co)
-		return assert(ct.channel)
+		local channel
+		while ct do
+			table.insert(ct, co)
+			skynet.wait(co)
+			channel = ct.channel
+			ct = connecting[key]
+			-- reload again if ct ~= nil
+		end
+		return assert(node_address[key] and channel)
 	end
 	ct = {}
 	connecting[key] = ct
@@ -53,8 +59,17 @@ local function open_channel(t, key)
 		else
 			err = string.format("changenode [%s] (%s:%s) failed", key, host, port)
 		end
+	elseif address == false then
+		c = node_sender[key]
+		if c == nil then
+			-- no sender, always succ
+			succ = true
+		else
+			-- trun off the sender
+			succ, err = pcall(skynet.call, c, "lua", "changenode", false)
+		end
 	else
-		err = string.format("cluster node [%s] is %s.", key,  address == false and "down" or "absent")
+		err = string.format("cluster node [%s] is absent.", key)
 	end
 	connecting[key] = nil
 	for _, co in ipairs(ct) do

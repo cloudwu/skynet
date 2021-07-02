@@ -59,8 +59,13 @@ local function read_response(sock)
 end
 
 function command.changenode(host, port)
-	channel:changehost(host, tonumber(port))
-	channel:connect(true)
+	if not host then
+		skynet.error(string.format("Close cluster sender %s:%d", channel.__host, channel.__port))
+		channel:close()
+	else
+		channel:changehost(host, tonumber(port))
+		channel:connect(true)
+	end
 	skynet.ret(skynet.pack(nil))
 end
 
