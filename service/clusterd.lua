@@ -31,11 +31,15 @@ local function open_channel(t, key)
 		address = node_address[key]
 	end
 	local succ, err, c
-	if address then
-		local host, port = string.match(address, "([^:]+):(.*)$")
+	if address ~= nil then
 		c = node_sender[key]
 		if c == nil then
-			c = skynet.newservice("clustersender", key, nodename, host, port)
+			if not address then 
+				succ=true 
+				goto finish 
+			end
+			local host, port = string.match(address, "([^:]+):(.*)$")
+			c = skynet.newservice("clustersender", key, nodename,host,port)
 			if node_sender[key] then
 				-- double check
 				skynet.kill(c)
@@ -45,17 +49,18 @@ local function open_channel(t, key)
 			end
 		end
 
-		succ = pcall(skynet.call, c, "lua", "changenode", host, port)
+		succ = pcall(skynet.call, c, "lua", "changenode",address)
 
 		if succ then
 			t[key] = c
 			ct.channel = c
 		else
-			err = string.format("changenode [%s] (%s:%s) failed", key, host, port)
+			err = string.format("changenode [%s] (%s) failed", key,address)
 		end
 	else
 		err = string.format("cluster node [%s] is %s.", key,  address == false and "down" or "absent")
 	end
+	::finish::
 	connecting[key] = nil
 	for _, co in ipairs(ct) do
 		skynet.wakeup(co)
@@ -133,7 +138,8 @@ function command.listen(source, addr, port)
 end
 
 function command.sender(source, node)
-	skynet.ret(skynet.pack(node_channel[node]))
+	local sender=assert(node_channel[node],string.format("cluster node [%s] is down",node))
+	skynet.ret(skynet.pack(sender))
 end
 
 function command.senders(source)

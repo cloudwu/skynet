@@ -10,6 +10,9 @@ local node, nodename, init_host, init_port = ...
 local command = {}
 
 local function send_request(addr, msg, sz)
+	if channel.__closed then
+		error(string.format("cluster node [%s] is down",node))
+	end
 	-- msg is a local pointer, cluster.packrequest will free it
 	local current_session = session
 	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
@@ -44,6 +47,9 @@ function command.req(...)
 end
 
 function command.push(addr, msg, sz)
+	if channel.__closed then
+		error(string.format("cluster node [%s] is down",node))
+	end
 	local request, new_session, padding = cluster.packpush(addr, session, msg, sz)
 	if padding then	-- is multi push
 		session = new_session
@@ -58,9 +64,14 @@ local function read_response(sock)
 	return cluster.unpackresponse(msg)	-- session, ok, data, padding
 end
 
-function command.changenode(host, port)
-	channel:changehost(host, tonumber(port))
-	channel:connect(true)
+function command.changenode(address)
+	if address then
+		local host, port = string.match(address, "([^:]+):(.*)$")
+		channel:changehost(host, tonumber(port))
+		channel:connect(true)
+	else
+		channel:close()
+	end
 	skynet.ret(skynet.pack(nil))
 end
 
