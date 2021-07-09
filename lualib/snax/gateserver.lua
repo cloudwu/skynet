@@ -110,7 +110,7 @@ function gateserver.start(handler)
 
 	function MSG.error(fd, msg)
 		if fd == socket then
-			skynet.error("gateserver accpet error:",msg)
+			skynet.error("gateserver accept error:",msg)
 		else
 			socketdriver.shutdown(fd)
 			if handler.error then
