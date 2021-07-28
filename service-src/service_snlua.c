@@ -186,6 +186,7 @@ timing_resume(lua_State *L, int co_index, int n) {
 	lua_State *co = lua_tothread(L, co_index);
 	lua_Number start_time = 0;
 	if (timing_enable(L, co_index, &start_time)) {
+		
 #ifdef DEBUG_LOG
 		double ti = diff_time(start_time);
 		fprintf(stderr, "PROFILE [%p] resume %lf\n", co, ti);
