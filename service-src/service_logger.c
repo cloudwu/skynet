@@ -40,7 +40,7 @@ timestring(struct logger *inst, char tmp[SIZETIMEFMT]) {
 	time_t ti = now/100 + inst->starttime;
 	struct tm info;
 	(void)localtime_r(&ti,&info);
-	strftime(tmp, SIZETIMEFMT, "%D %T", &info);
+	strftime(tmp, SIZETIMEFMT, "%d/%m/%y %H:%M:%S", &info);
 	return now % 100;
 }
 
