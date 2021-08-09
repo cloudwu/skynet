@@ -1,6 +1,5 @@
 local table = table
 local type = type
-local sockethelper = require "http.sockethelper"
 
 local M = {}
 
@@ -171,7 +170,7 @@ function M.request(interface, method, host, url, recvheader, header, content)
 	local tmpline = {}
 	local body = M.recvheader(read, tmpline, "")
 	if not body then
-		error(sockethelper.socket_error)
+		error("Recv header failed")
 	end
 
 	local statusline = tmpline[1]
