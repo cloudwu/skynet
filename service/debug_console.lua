@@ -59,6 +59,11 @@ end
 local function docmd(cmdline, print, fd)
 	local split = split_cmdline(cmdline)
 	local command = split[1]
+	if command == "quit" then
+		print("Bye!")
+		sockethelper.close(fd)
+		return
+	end
 	local cmd = COMMAND[command]
 	local ok, list
 	if cmd then
@@ -166,6 +171,7 @@ function COMMAND.help()
 		dumpheap = "dumpheap : dump heap profilling",
 		killtask = "killtask address threadname : threadname listed by task",
 		dbgcmd = "run address debug command",
+		quit = "quit skynet console",
 	}
 end
 
