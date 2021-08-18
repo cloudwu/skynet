@@ -201,7 +201,7 @@ skynet.start(function()
 	test_runcommand()
 	print("Test expire index")
 	test_expire_index()
-	print("test safe batch insert finish.")
+	print("test safe batch insert")
 	test_safe_batch_insert()
 	print("mongodb test finish.");
 end)
