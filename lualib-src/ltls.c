@@ -51,7 +51,6 @@ _init_bio(lua_State* L, struct tls_context* tls_p, struct ssl_ctx* ctx_p) {
     BIO_set_mem_eof_return(tls_p->out_bio, -1); /* see: https://www.openssl.org/docs/crypto/BIO_s_mem.html */
 
     SSL_set_bio(tls_p->ssl, tls_p->in_bio, tls_p->out_bio);
-
 }
 
 
