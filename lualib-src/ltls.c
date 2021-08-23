@@ -358,6 +358,10 @@ lnew_tls(lua_State* L) {
 
     if(strcmp(method, "client") == 0) {
         _init_client_context(L, tls_p, ctx_p);
+        if (!lua_isnoneornil(L, 3)) {
+            const char* hostname = luaL_checkstring(L, 3);
+            SSL_set_tlsext_host_name(tls_p->ssl, hostname);
+        }
     }else if(strcmp(method, "server") == 0) {
         _init_server_context(L, tls_p, ctx_p);
     } else {
