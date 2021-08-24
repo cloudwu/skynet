@@ -102,6 +102,9 @@ function httpc.request(method, host, url, recvheader, header, content)
 		interface.init()
 	end
 	local ok , statuscode, body = pcall(internal.request, interface, method, host, url, recvheader, header, content)
+	if ok then
+		ok, body = pcall(internal.response, interface, statuscode, body, recvheader)
+	end
 	finish = true
 	socket.close(fd)
 	if interface.close then

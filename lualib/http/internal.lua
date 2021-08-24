@@ -141,9 +141,32 @@ function M.recvchunkedbody(readbytes, bodylimit, header, body)
 	return result, header
 end
 
+function M.recvbody(interface, code, header, body)
+	local length = header["content-length"]
+	if length then
+		length = tonumber(length)
+	end
+	if length then
+		if #body >= length then
+			body = body:sub(1,length)
+		else
+			local padding = interface.read(length - #body)
+			body = body .. padding
+		end
+	elseif code == 204 or code == 304 or code < 200 then
+		body = ""
+		-- See https://stackoverflow.com/questions/15991173/is-the-content-length-header-required-for-a-http-1-0-response
+	elseif interface.is_ws and code == 101 then
+		-- if websocket handshake success
+			return body
+	else
+		-- no content-length, read all
+		body = body .. interface.readall()
+	end
+	return body
+end
 
 function M.request(interface, method, host, url, recvheader, header, content)
-	local is_ws = interface.websocket
 	local read = interface.read
 	local write = interface.write
 	local header_content = ""
@@ -181,11 +204,10 @@ function M.request(interface, method, host, url, recvheader, header, content)
 	if not header then
 		error("Invalid HTTP response header")
 	end
+	return code, body, header
+end
 
-	local length = header["content-length"]
-	if length then
-		length = tonumber(length)
-	end
+function M.response(interface, code, body, header)
 	local mode = header["transfer-encoding"]
 	if mode then
 		if mode ~= "identity" and mode ~= "chunked" then
@@ -194,32 +216,16 @@ function M.request(interface, method, host, url, recvheader, header, content)
 	end
 
 	if mode == "chunked" then
-		body, header = M.recvchunkedbody(read, nil, header, body)
+		body, header = M.recvchunkedbody(interface.read, nil, header, body)
 		if not body then
 			error("Invalid response body")
 		end
 	else
 		-- identity mode
-		if length then
-			if #body >= length then
-				body = body:sub(1,length)
-			else
-				local padding = read(length - #body)
-				body = body .. padding
-			end
-		elseif code == 204 or code == 304 or code < 200 then
-			body = ""
-			-- See https://stackoverflow.com/questions/15991173/is-the-content-length-header-required-for-a-http-1-0-response
-		elseif is_ws and code == 101 then
-			-- if websocket handshake success
-				return code, body
-		else
-			-- no content-length, read all
-			body = body .. interface.readall()
-		end
+		body = M.recvbody(interface, code, header, body)
 	end
 
-	return code, body
+	return body
 end
 
 return M
