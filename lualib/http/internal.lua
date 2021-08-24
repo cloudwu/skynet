@@ -141,11 +141,10 @@ function M.recvchunkedbody(readbytes, bodylimit, header, body)
 	return result, header
 end
 
-
-function M.request(interface, method, host, url, recvheader, header, content)
-	local is_ws = interface.websocket
+local function _request(interface, method, host, url, recvheader, header, content)
 	local read = interface.read
 	local write = interface.write
+
 	local header_content = ""
 	if header then
 		if not header.host then
@@ -182,6 +181,15 @@ function M.request(interface, method, host, url, recvheader, header, content)
 		error("Invalid HTTP response header")
 	end
 
+	return code, header, body
+end
+
+
+function M.request(interface, method, host, url, recvheader, header, content)
+	local is_ws = interface.websocket
+	local read = interface.read
+	
+	local code, header, body = _request(interface, method, host, url, recvheader, header, content)
 	local length = header["content-length"]
 	if length then
 		length = tonumber(length)
@@ -223,68 +231,32 @@ function M.request(interface, method, host, url, recvheader, header, content)
 end
 
 
-function M.request_stream(fd, interface, method, host, url, recvheader, header, content)
-	local is_ws = interface.websocket
+
+function M.request_stream(close, fd, interface, method, host, url, recvheader, header, content)
 	local read = interface.read
-	local write = interface.write
-	local header_content = ""
-	if header then
-		if not header.host then
-			header.host = host
-		end
-		for k, v in pairs(header) do
-			header_content = string.format("%s%s:%s\r\n", header_content, k, v)
-		end
-	else
-		header_content = string.format("host:%s\r\n", host)
-	end
 
-	if content then
-		local data = string.format("%s %s HTTP/1.1\r\n%sContent-length:%d\r\n\r\n", method, url, header_content, #content)
-		write(data)
-		write(content)
-	else
-		local request_header = string.format("%s %s HTTP/1.1\r\n%sContent-length:0\r\n\r\n", method, url, header_content)
-		write(request_header)
-	end
-
-	local tmpline = {}
-	local body = M.recvheader(read, tmpline, "")
-	if not body then
-		error("Recv header failed")
-	end
-
-	local statusline = tmpline[1]
-	local code, info = statusline:match("HTTP/[%d%.]+%s+([%d]+)%s+(.*)$")
-	code = assert(tonumber(code))
-
-	local header = M.parseheader(tmpline, 2, recvheader or {})
-	if not header then
-		error("Invalid HTTP response header")
-	end
-
-	local streamObj = {
-		body = body,
-		header = header,
-		fd = fd,
-		close = interface.close
-	}
-	local function chunked_body_reader(bodylimit)
+	local code, header, body = _request(interface, method, host, url, recvheader, header, content)
+	local stream_meta = {}
+	local function chunked_body_reader(self, bodylimit)
 		local sz
-		sz, streamObj.body = chunksize(read, streamObj.body)
+		sz, self.body = chunksize(read, self.body)
 		if not sz then
+			self.connected = false
+			self.status = "Exception"
 			return nil
 		end
 
 		if sz == 0 then
 			local tmpline = {}
-			streamObj.body = M.recvheader(read, tmpline, streamObj.body)
-			if not streamObj.body then
+			self.body = M.recvheader(read, tmpline, self.body)
+			if not self.body then
 				return
 			end
 
-			streamObj.header = M.parseheader(tmpline, 1, streamObj.header)
-			return true
+			self.header = M.parseheader(tmpline, 1, self.header)
+			self.connected = nil
+			self.status = "Close"
+			return nil
 		end
 
 		if bodylimit and sz > bodylimit then
@@ -292,21 +264,49 @@ function M.request_stream(fd, interface, method, host, url, recvheader, header, 
 		end
 
 		local result
-		if #streamObj.body >= sz then
-			result = streamObj.body:sub(1, sz)
-			streamObj.body = streamObj.body:sub(sz+1)
+		if #self.body >= sz then
+			result = self.body:sub(1, sz)
+			self.body = self.body:sub(sz+1)
 		else
-			result = streamObj.body .. read(sz - #streamObj.body)
-			streamObj.body = ""
+			result = self.body .. read(sz - #self.body)
+			self.body = ""
 		end
 
-		streamObj.body = readcrln(read, streamObj.body)
+		self.body = readcrln(read, self.body)
 		
 		return result
 	end
-	streamObj.body_reader = chunked_body_reader
+	stream_meta.__call = chunked_body_reader
+
+	local _close = function(self)
+		close(self.fd)
+
+		if interface.close then
+			interface.close()
+		end
+	end
 	
-	return code, streamObj
+	stream_meta.__close = function(self)
+		_close(self)
+	end
+
+	local stream = setmetatable({
+		header = header,
+		-- connected: 
+			-- true, fd isconnected
+			-- false, fd is disconnected(response is incomplete)
+			-- nil, fd is closed(response is complete).
+		connected = true,
+		status = "OK",
+		body = body,
+		fd = fd
+	}, stream_meta)
+
+	function stream.close(self)
+		_close(self)
+	end
+
+	return code, stream
 end
 
 return M
