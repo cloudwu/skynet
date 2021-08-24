@@ -132,4 +132,95 @@ function httpc.post(host, url, form, recvheader)
 	return httpc.request("POST", host, url, recvheader, header, table.concat(body , "&"))
 end
 
+
+function httpc.request_stream(method, host, url, recvheader, header, content)
+	local protocol
+	local timeout = httpc.timeout	-- get httpc.timeout before any blocked api
+	protocol, host = check_protocol(host)
+	local hostname, port = host:match"([^:]+):?(%d*)$"
+	if port == "" then
+		port = protocol=="http" and 80 or protocol=="https" and 443
+	else
+		port = tonumber(port)
+	end
+
+	if async_dns and not hostname:match(".*%d+$") then
+		hostname = dns.resolve(hostname)
+	end
+
+	local fd = socket.connect(hostname, port, timeout)
+	if not fd then
+		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostname, port, timeout))
+		return
+	end
+
+	local interface = gen_interface(protocol, fd)
+	local finish
+	if timeout then
+		skynet.timeout(timeout, function()
+			if not finish then
+				socket.shutdown(fd)	-- shutdown the socket fd, need close later.
+				if interface.close then
+					interface.close()
+				end
+			end
+		end)
+	end
+	if interface.init then
+		interface.init()
+	end
+
+	local ok, code, res = pcall(internal.request_stream, fd, interface, method, host, url, recvheader, header, content, content)
+	finish = true
+	if not ok then
+		socket.close(fd)
+		if interface.close then
+			interface.close()
+		end
+
+		error(code)
+	end
+
+	local mode = res.header["transfer-encoding"]
+	if mode then
+		if mode ~= "identity" and mode ~= "chunked" then
+			error("Unsupport transfer-encoding")
+		end
+	end
+
+	-- you need to exec socket.close(res.fd) and res.close() if res.close is not nil.
+	if mode == "chunked" then
+		return code, res
+	end
+	
+	-- identity mode
+	local body = ""
+	local length = res.header["content-length"]
+	if length then
+		length = tonumber(length)
+		if #res.body >= length then
+			body = res.body:sub(1, length)
+		else
+			local padding = interface.read(length-#res.body)
+			body = res.body..padding
+		end
+	elseif code == 204 or code == 304 or code < 200 then
+		body = ""
+		-- See https://stackoverflow.com/questions/15991173/is-the-content-length-header-required-for-a-http-1-0-response
+	elseif is_ws and code == 101 then
+		-- if websocket handshake success
+		body = res.body
+	else
+		-- no content-length, read all
+		body = res.body .. interface.readall()
+	end
+
+	socket.close(fd)
+	if interface.close then
+		interface.close()
+	end
+
+	return code, body
+end
+
 return httpc

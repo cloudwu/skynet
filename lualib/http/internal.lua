@@ -222,4 +222,84 @@ function M.request(interface, method, host, url, recvheader, header, content)
 	return code, body
 end
 
+
+function M.request_stream(fd, interface, method, host, url, recvheader, header, content)
+	local is_ws = interface.websocket
+	local read = interface.read
+	local write = interface.write
+	local header_content = ""
+	if header then
+		if not header.host then
+			header.host = host
+		end
+		for k, v in pairs(header) do
+			header_content = string.format("%s%s:%s\r\n", header_content, k, v)
+		end
+	else
+		header_content = string.format("host:%s\r\n", host)
+	end
+
+	if content then
+		local data = string.format("%s %s HTTP/1.1\r\n%sContent-length:%d\r\n\r\n", method, url, header_content, #content)
+		write(data)
+		write(content)
+	else
+		local request_header = string.format("%s %s HTTP/1.1\r\n%sContent-length:0\r\n\r\n", method, url, header_content)
+		write(request_header)
+	end
+
+	local tmpline = {}
+	local body = M.recvheader(read, tmpline, "")
+	if not body then
+		error("Recv header failed")
+	end
+
+	local statusline = tmpline[1]
+	local code, info = statusline:match("HTTP/[%d%.]+%s+([%d]+)%s+(.*)$")
+	code = assert(tonumber(code))
+
+	local header = M.parseheader(tmpline, 2, recvheader or {})
+	if not header then
+		error("Invalid HTTP response header")
+	end
+
+	local streamObj = {
+		body = body,
+		header = header,
+		fd = fd,
+		close = interface.close
+	}
+	local function chunked_body_reader(bodylimit)
+		local sz
+		sz, streamObj.body = chunksize(read, streamObj.body)
+		if not sz then
+			return nil
+		end
+
+		if sz == 0 then
+			return true
+		end
+
+		if bodylimit and sz > bodylimit then
+			return
+		end
+
+		local result
+		if #body >= sz then
+			result = body:sub(1, sz)
+			streamObj.body = streamObj.body:sub(sz+1)
+		else
+			result = streamObj.body .. read(sz - #streamObj.body)
+			streamObj.body = ""
+		end
+
+		streamObj.body = readcrln(read, streamObj.body)
+
+		return result
+	end
+	streamObj.body_reader = chunked_body_reader
+	
+	return code, streamObj
+end
+
 return M
