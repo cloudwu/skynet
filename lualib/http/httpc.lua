@@ -67,80 +67,6 @@ function httpc.request(method, host, url, recvheader, header, content)
 	local protocol
 	local timeout = httpc.timeout	-- get httpc.timeout before any blocked api
 	protocol, host = check_protocol(host)
-	local hostaddr, port = host:match"([^:]+):?(%d*)$"
-	if port == "" then
-		port = protocol=="http" and 80 or protocol=="https" and 443
-	else
-		port = tonumber(port)
-	end
-	local hostname
-	if not hostaddr:match(".*%d+$") then
-		hostname = hostaddr
-		if async_dns then
-			hostaddr = dns.resolve(hostname)
-		end
-	end
-	local fd = socket.connect(hostaddr, port, timeout)
-	if not fd then
-		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostaddr, port, timeout))
-		return
-	end
-	-- print("protocol hostname port", protocol, hostname, port)
-	local interface = gen_interface(protocol, fd, hostname)
-	local finish
-	if timeout then
-		skynet.timeout(timeout, function()
-			if not finish then
-				socket.shutdown(fd)	-- shutdown the socket fd, need close later.
-				if interface.close then
-					interface.close()
-				end
-			end
-		end)
-	end
-	if interface.init then
-		interface.init()
-	end
-	local ok , statuscode, body = pcall(internal.request, interface, method, host, url, recvheader, header, content)
-	finish = true
-	socket.close(fd)
-	if interface.close then
-		interface.close()
-	end
-	if ok then
-		return statuscode, body
-	else
-		error(statuscode)
-	end
-end
-
-function httpc.get(...)
-	return httpc.request("GET", ...)
-end
-
-local function escape(s)
-	return (string.gsub(s, "([^A-Za-z0-9_])", function(c)
-		return string.format("%%%02X", string.byte(c))
-	end))
-end
-
-function httpc.post(host, url, form, recvheader)
-	local header = {
-		["content-type"] = "application/x-www-form-urlencoded"
-	}
-	local body = {}
-	for k,v in pairs(form) do
-		table.insert(body, string.format("%s=%s",escape(k),escape(v)))
-	end
-
-	return httpc.request("POST", host, url, recvheader, header, table.concat(body , "&"))
-end
-
-
-function httpc.request_stream(method, host, url, recvheader, header, content)
-	local protocol
-	local timeout = httpc.timeout	-- get httpc.timeout before any blocked api
-	protocol, host = check_protocol(host)
 	local hostname, port = host:match"([^:]+):?(%d*)$"
 	if port == "" then
 		port = protocol=="http" and 80 or protocol=="https" and 443
@@ -174,7 +100,7 @@ function httpc.request_stream(method, host, url, recvheader, header, content)
 		interface.init()
 	end
 
-	local ok, code, res = pcall(internal.request_stream, fd, interface, method, host, url, recvheader, header, content, content)
+	local ok, code, stream = pcall(internal.request_stream, socket.close, fd, interface, method, host, url, recvheader, header, content, content)
 	finish = true
 	if not ok then
 		socket.close(fd)
@@ -185,54 +111,68 @@ function httpc.request_stream(method, host, url, recvheader, header, content)
 		error(code)
 	end
 
-	local mode = res.header["transfer-encoding"]
+	local mode = stream.header["transfer-encoding"]
 	if mode then
 		if mode ~= "identity" and mode ~= "chunked" then
 			error("Unsupport transfer-encoding")
 		end
 	end
 
-	-- you need to exec socket.close(res.fd) and res.close() if res.close is not nil.
+	-- you need to exec stream:close() when end in chunked mode.
 	if mode == "chunked" then
-		return code, res
+		return code, stream
 	end
 	
 	-- identity mode
+	local is_ws = interface.websocket
 	local body = ""
-	local length = res.header["content-length"]
+	local length = stream.header["content-length"]
 	if length then
 		length = tonumber(length)
-		if #res.body >= length then
-			body = res.body:sub(1, length)
+		if #stream.body >= length then
+			body = stream.body:sub(1, length)
 		else
-			local padding = interface.read(length-#res.body)
-			body = res.body..padding
+			local padding = interface.read(length-#stream.body)
+			body = stream.body..padding
 		end
 	elseif code == 204 or code == 304 or code < 200 then
 		body = ""
-		-- See https://stackoverflow.com/questions/15991173/is-the-content-length-header-required-for-a-http-1-0-response
+		-- See https://stackoverflow.com/questions/15991173/is-the-content-length-header-required-for-a-http-1-0-streamponse
 	elseif is_ws and code == 101 then
 		-- if websocket handshake success
-		body = res.body
+		body = stream.body
 	else
 		-- no content-length, read all
-		body = res.body .. interface.readall()
+		body = stream.body .. interface.readall()
 	end
 
-	socket.close(fd)
-	if interface.close then
-		interface.close()
-	end
+	stream:close()
 
 	return code, body
 end
 
 
-function httpc.close(streamObj)
-	socket.close(streamObj.fd)
-	if streamObj.close then
-		streamObj.close()
-	end
+function httpc.get(...)
+	return httpc.request("GET", ...)
 end
+
+local function escape(s)
+	return (string.gsub(s, "([^A-Za-z0-9_])", function(c)
+		return string.format("%%%02X", string.byte(c))
+	end))
+end
+
+function httpc.post(host, url, form, recvheader)
+	local header = {
+		["content-type"] = "application/x-www-form-urlencoded"
+	}
+	local body = {}
+	for k,v in pairs(form) do
+		table.insert(body, string.format("%s=%s",escape(k),escape(v)))
+	end
+
+	return httpc.request("POST", host, url, recvheader, header, table.concat(body , "&"))
+end
+
 
 return httpc
