@@ -89,8 +89,8 @@ function tlshelper.newctx()
     return c.newctx()
 end
 
-function tlshelper.newtls(method, ssl_ctx)
-    return c.newtls(method, ssl_ctx)
+function tlshelper.newtls(method, ssl_ctx, hostname)
+    return c.newtls(method, ssl_ctx, hostname)
 end
 
 return tlshelper

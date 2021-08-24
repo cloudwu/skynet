@@ -35,7 +35,7 @@ local function check_protocol(host)
 end
 
 local SSLCTX_CLIENT = nil
-local function gen_interface(protocol, fd)
+local function gen_interface(protocol, fd, hostname)
 	if protocol == "http" then
 		return {
 			init = nil,
@@ -49,7 +49,7 @@ local function gen_interface(protocol, fd)
 	elseif protocol == "https" then
 		local tls = require "http.tlshelper"
 		SSLCTX_CLIENT = SSLCTX_CLIENT or tls.newctx()
-		local tls_ctx = tls.newtls("client", SSLCTX_CLIENT)
+		local tls_ctx = tls.newtls("client", SSLCTX_CLIENT, hostname)
 		return {
 			init = tls.init_requestfunc(fd, tls_ctx),
 			close = tls.closefunc(tls_ctx),
@@ -67,22 +67,26 @@ function httpc.request(method, host, url, recvheader, header, content)
 	local protocol
 	local timeout = httpc.timeout	-- get httpc.timeout before any blocked api
 	protocol, host = check_protocol(host)
-	local hostname, port = host:match"([^:]+):?(%d*)$"
+	local hostaddr, port = host:match"([^:]+):?(%d*)$"
 	if port == "" then
 		port = protocol=="http" and 80 or protocol=="https" and 443
 	else
 		port = tonumber(port)
 	end
-	if async_dns and not hostname:match(".*%d+$") then
-		hostname = dns.resolve(hostname)
+	local hostname
+	if not hostaddr:match(".*%d+$") then
+		hostname = hostaddr
+		if async_dns then
+			hostaddr = dns.resolve(hostname)
+		end
 	end
-	local fd = socket.connect(hostname, port, timeout)
+	local fd = socket.connect(hostaddr, port, timeout)
 	if not fd then
-		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostname, port, timeout))
+		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostaddr, port, timeout))
 		return
 	end
 	-- print("protocol hostname port", protocol, hostname, port)
-	local interface = gen_interface(protocol, fd)
+	local interface = gen_interface(protocol, fd, hostname)
 	local finish
 	if timeout then
 		skynet.timeout(timeout, function()

@@ -302,7 +302,7 @@ end
 
 
 local SSLCTX_CLIENT = nil
-local function _new_client_ws(socket_id, protocol)
+local function _new_client_ws(socket_id, protocol, hostname)
     local obj
     if protocol == "ws" then
         obj = {
@@ -319,7 +319,7 @@ local function _new_client_ws(socket_id, protocol)
     elseif protocol == "wss" then
         local tls = require "http.tlshelper"
         SSLCTX_CLIENT = SSLCTX_CLIENT or tls.newctx()
-        local tls_ctx = tls.newtls("client", SSLCTX_CLIENT)
+        local tls_ctx = tls.newtls("client", SSLCTX_CLIENT, hostname)
         local init = tls.init_requestfunc(socket_id, tls_ctx)
         init()
         obj = {
@@ -435,17 +435,21 @@ function M.connect(url, header, timeout)
     end
 
     assert(host)
-    local host_name, host_port = string.match(host, "^([^:]+):?(%d*)$")
-    assert(host_name and host_port)
+    local host_addr, host_port = string.match(host, "^([^:]+):?(%d*)$")
+    assert(host_addr and host_port)
     if host_port == "" then
         host_port = protocol == "ws" and 80 or 443
     end
+    local hostname
+    if not host_addr:match(".*%d+$") then
+        hostname = host_addr
+    end
 
     uri = uri == "" and "/" or uri
-    local socket_id = sockethelper.connect(host_name, host_port, timeout)
-    local ws_obj = _new_client_ws(socket_id, protocol)
+    local socket_id = sockethelper.connect(host_addr, host_port, timeout)
+    local ws_obj = _new_client_ws(socket_id, protocol, hostname)
     ws_obj.addr = host
-    write_handshake(ws_obj, host_name, uri, header)
+    write_handshake(ws_obj, host_addr, uri, header)
     return socket_id
 end
 

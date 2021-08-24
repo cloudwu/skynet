@@ -168,6 +168,24 @@ function test_expire_index()
 	assert(false, "test expire index failed");
 end
 
+local function test_safe_batch_insert()
+	local ok, err, ret
+	local c = _create_client()
+	local db = c[db_name]
+
+	db.testcoll:drop()
+	
+	local docs, length = {}, 10
+	for i = 1, length do
+		table.insert(docs, {test_key = i})
+	end
+	
+	db.testcoll:safe_batch_insert(docs)
+
+	local ret = db.testcoll:find()
+	assert(length == ret:count(), "test safe batch insert failed")
+end
+
 skynet.start(function()
 	if username then
 		print("Test auth")
@@ -183,5 +201,7 @@ skynet.start(function()
 	test_runcommand()
 	print("Test expire index")
 	test_expire_index()
+	print("test safe batch insert")
+	test_safe_batch_insert()
 	print("mongodb test finish.");
 end)
