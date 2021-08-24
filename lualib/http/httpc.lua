@@ -223,4 +223,12 @@ function httpc.request_stream(method, host, url, recvheader, header, content)
 	return code, body
 end
 
+
+function httpc.close(streamObj)
+	socket.close(streamObj.fd)
+	if streamObj.close then
+		streamObj.close()
+	end
+end
+
 return httpc
