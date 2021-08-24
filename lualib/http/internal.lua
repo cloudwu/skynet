@@ -277,6 +277,13 @@ function M.request_stream(fd, interface, method, host, url, recvheader, header, 
 		end
 
 		if sz == 0 then
+			local tmpline = {}
+			body = M.recvheader(read, tmpline, streamObj.body)
+			if not body then
+				return
+			end
+
+			streamObj.header = M.parseheader(tmpline, 1, streamObj.header)
 			return true
 		end
 
@@ -294,7 +301,7 @@ function M.request_stream(fd, interface, method, host, url, recvheader, header, 
 		end
 
 		streamObj.body = readcrln(read, streamObj.body)
-
+		
 		return result
 	end
 	streamObj.body_reader = chunked_body_reader
