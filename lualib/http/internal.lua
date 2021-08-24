@@ -278,8 +278,8 @@ function M.request_stream(fd, interface, method, host, url, recvheader, header, 
 
 		if sz == 0 then
 			local tmpline = {}
-			body = M.recvheader(read, tmpline, streamObj.body)
-			if not body then
+			streamObj.body = M.recvheader(read, tmpline, streamObj.body)
+			if not streamObj.body then
 				return
 			end
 
@@ -292,8 +292,8 @@ function M.request_stream(fd, interface, method, host, url, recvheader, header, 
 		end
 
 		local result
-		if #body >= sz then
-			result = body:sub(1, sz)
+		if #streamObj.body >= sz then
+			result = streamObj.body:sub(1, sz)
 			streamObj.body = streamObj.body:sub(sz+1)
 		else
 			result = streamObj.body .. read(sz - #streamObj.body)
