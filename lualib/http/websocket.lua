@@ -45,6 +45,7 @@ local function write_handshake(self, host, url, header)
     if code ~= 101 then
         error(string.format("websocket handshake error: code[%s] info:%s", code, body))
     end
+	assert(body == "")	-- todo: M.read may need handle it
 
     if not recvheader["upgrade"] or recvheader["upgrade"]:lower() ~= "websocket" then
         error("websocket handshake upgrade must websocket")
@@ -306,7 +307,6 @@ local function _new_client_ws(socket_id, protocol, hostname)
     local obj
     if protocol == "ws" then
         obj = {
-            websocket = true,
             close = function ()
                 socket.close(socket_id)
             end,
@@ -323,7 +323,6 @@ local function _new_client_ws(socket_id, protocol, hostname)
         local init = tls.init_requestfunc(socket_id, tls_ctx)
         init()
         obj = {
-            websocket = true,
             close = function ()
                 socket.close(socket_id)
                 tls.closefunc(tls_ctx)()
