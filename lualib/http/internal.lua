@@ -297,7 +297,7 @@ local function stream_all(stream)
 end
 
 local function stream_chunked(stream)
-	local read = interface.read
+	local read = stream._interface.read
 	local sz, body = chunksize(read, stream._body)
 	if not sz then
 		stream.connected = false
