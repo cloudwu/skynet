@@ -277,7 +277,7 @@ local function stream_length(length)
 end
 
 local function stream_read(stream)
-	local ret, padding = interface.read()
+	local ret, padding = stream._interface.read()
 	if ret == "" or not ret then
 		stream.connected = nil
 		stream:close()
