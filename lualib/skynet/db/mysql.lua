@@ -98,9 +98,9 @@ converters[0x09] = tonumber -- int24
 converters[0x0d] = tonumber -- year
 converters[0xf6] = tonumber -- newdecimal
 
-local function _get_byte1(data, i)
-    return strbyte(data, i), i + 1
-end
+-- local function _get_byte1(data, i)
+--     return strbyte(data, i), i + 1
+-- end
 
 local function _get_int1(data, i, is_signed)
     if not is_signed then
@@ -165,25 +165,25 @@ local function _set_byte2(n)
     return strpack("<I2", n)
 end
 
-local function _set_byte3(n)
-    return strpack("<I3", n)
-end
+-- local function _set_byte3(n)
+--     return strpack("<I3", n)
+-- end
 
-local function _set_byte4(n)
-    return strpack("<I4", n)
-end
+-- local function _set_byte4(n)
+--     return strpack("<I4", n)
+-- end
 
-local function _set_byte8(n)
-    return strpack("<I8", n)
-end
+-- local function _set_byte8(n)
+--     return strpack("<I8", n)
+-- end
 
 local function _set_int8(n)
     return strpack("<i8", n)
 end
 
-local function _set_float(n)
-    return strpack("<f", n)
-end
+-- local function _set_float(n)
+--     return strpack("<f", n)
+-- end
 
 local function _set_double(n)
     return strpack("<d", n)
@@ -193,12 +193,12 @@ local function _from_cstring(data, i)
     return strunpack("z", data, i)
 end
 
-local function _dumphex(bytes)
-    return strgsub(bytes, ".",
-        function(x)
-            return strformat("%02x ", strbyte(x))
-        end)
-end
+-- local function _dumphex(bytes)
+--     return strgsub(bytes, ".",
+--         function(x)
+--             return strformat("%02x ", strbyte(x))
+--         end)
+-- end
 
 local function _compute_token(password, scramble)
     if password == "" then
@@ -639,7 +639,7 @@ local function read_result(self, sock)
 
     -- typ == 'DATA'
 
-    local field_count, extra = _parse_result_set_header_packet(packet)
+    local field_count = _parse_result_set_header_packet(packet)
     local cols = {}
     for i = 1, field_count do
         local col, err, errno, sqlstate = _recv_field_packet(self, sock)
@@ -946,7 +946,7 @@ local function read_execute_result(self, sock)
 
     -- typ == 'DATA'
 
-    local field_count, extra = _parse_result_set_header_packet(packet)
+    -- local field_count, extra = _parse_result_set_header_packet(packet)
 
     local cols = {}
     local col

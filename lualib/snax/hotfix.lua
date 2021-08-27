@@ -3,7 +3,7 @@ local si = require "snax.interface"
 local function envid(f)
 	local i = 1
 	while true do
-		local name, value = debug.getupvalue(f, i)
+		local name = debug.getupvalue(f, i)
 		if name == nil then
 			return
 		end

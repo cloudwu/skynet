@@ -165,7 +165,7 @@ do ---- request/select
 	function request_meta:close()
 		if self._request > 0 then
 			local resp = self._resp
-			for session, req in pairs(self._sessions) do
+			for session in pairs(self._sessions) do
 				if not resp[session] then
 					session_id_coroutine[session] = "BREAK"
 					watching_session[session] = nil
@@ -623,7 +623,7 @@ function skynet.tracecall(tag, addr, typename, msg, sz)
 	c.send(addr, skynet.PTYPE_TRACE, 0, tag)
 	local p = proto[typename]
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
-	local msg, sz = yield_call(addr, session)
+	msg, sz = yield_call(addr, session)
 	c.trace(tag, "tracecall end")
 	return msg, sz
 end

@@ -1,6 +1,5 @@
 local stm = require "skynet.stm"
 local sprotoloader = require "sprotoloader"
-local sproto = require "sproto"
 local setmetatable = setmetatable
 
 local sharemap = {}

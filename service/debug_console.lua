@@ -101,7 +101,7 @@ local function console_main_loop(stdin, print, addr)
 			if cmdline:sub(1,4) == "GET " then
 				-- http
 				local code, url = httpd.read_request(sockethelper.readfunc(stdin, cmdline.. "\n"), 8192)
-				local cmdline = url:sub(2):gsub("/"," ")
+				cmdline = url:sub(2):gsub("/"," ")
 				docmd(cmdline, print, stdin)
 				break
 			end

@@ -8,7 +8,7 @@ local socket = {}	-- api
 local socket_pool = setmetatable( -- store all socket object
 	{},
 	{ __gc = function(p)
-		for id,v in pairs(p) do
+		for id in pairs(p) do
 			driver.close(id)
 			p[id] = nil
 		end

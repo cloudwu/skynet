@@ -1,5 +1,4 @@
 local bson = require "bson"
-local socket = require "skynet.socket"
 local socketchannel	= require "skynet.socketchannel"
 local skynet = require "skynet"
 local driver = require "skynet.mongo.driver"
@@ -192,14 +191,14 @@ function mongo_client:runCommand(...)
 end
 
 function auth_method:auth_mongodb_cr(user,password)
-	local password = md5.sumhexa(string.format("%s:mongo:%s",user,password))
+	password = md5.sumhexa(string.format("%s:mongo:%s",user,password))
 	local result= self:runCommand "getnonce"
 	if result.ok ~=1 then
 		return false
 	end
 
 	local key =	md5.sumhexa(string.format("%s%s%s",result.nonce,user,password))
-	local result= self:runCommand ("authenticate",1,"user",user,"nonce",result.nonce,"key",key)
+	result= self:runCommand ("authenticate",1,"user",user,"nonce",result.nonce,"key",key)
 	return result.ok ==	1
 end
 
@@ -613,7 +612,7 @@ function mongo_cursor:hasNext()
 
 		if ok then
 			if doc then
-				local doc = result.result
+				doc = result.result
 				self.__document	= doc
 				self.__data	= result.data
 				self.__ptr = 1

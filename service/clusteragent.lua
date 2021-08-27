@@ -1,5 +1,4 @@
 local skynet = require "skynet"
-local sc = require "skynet.socketchannel"
 local socket = require "skynet.socket"
 local cluster = require "skynet.cluster.core"
 local ignoreret = skynet.ignoreret
@@ -78,7 +77,7 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 	if addr == 0 then
 		local name = skynet.unpack(msg, sz)
 		skynet.trash(msg, sz)
-		local addr = register_name["@" .. name]
+		addr = register_name["@" .. name]
 		if addr then
 			ok = true
 			msg = skynet.packstring(addr)

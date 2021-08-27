@@ -68,9 +68,9 @@ end
 
 
 local function read_handshake(self, upgrade_ops)
-    local header, method, url
+    local header, url
     if upgrade_ops then
-        header, method, url = upgrade_ops.header, upgrade_ops.method, upgrade_ops.url
+        header, url = upgrade_ops.header, upgrade_ops.url
     else
         local tmpline = {}
         local header_body = internal.recvheader(self.read, tmpline, "")
@@ -79,7 +79,7 @@ local function read_handshake(self, upgrade_ops)
         end
 
         local request = assert(tmpline[1])
-        local httpver
+        local method, httpver
         method, url, httpver = request:match "^(%a+)%s+(.-)%s+HTTP/([%d%.]+)$"
         assert(method and url and httpver)
         if method ~= "GET" then
@@ -269,7 +269,8 @@ local function resolve_accept(self, options)
         end
         local fin, op, payload_data = read_frame(self)
         if op == "close" then
-            local code, reason = read_close(payload_data)
+            local reason
+            code, reason = read_close(payload_data)
             write_frame(self, "close")
             try_handle(self, "close", code, reason)
             break

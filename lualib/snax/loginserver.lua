@@ -47,7 +47,7 @@ local function write(service, fd, text)
 end
 
 local function launch_slave(auth_handler)
-	local function auth(fd, addr)
+	local function auth(fd)
 		-- set socket buffer limit (8K)
 		-- If the attacker send large package, close the socket
 		socket.limit(fd, 8192)
@@ -96,7 +96,7 @@ local function launch_slave(auth_handler)
 	local function auth_fd(fd, addr)
 		skynet.error(string.format("connect from %s (fd = %d)", addr, fd))
 		socket.start(fd)	-- may raise error here
-		local msg, len = ret_pack(pcall(auth, fd, addr))
+		local msg, len = ret_pack(pcall(auth, fd))
 		socket.abandon(fd)	-- never raise error here
 		return msg, len
 	end
@@ -134,7 +134,8 @@ local function accept(conf, s, fd, addr)
 		user_login[uid] = true
 	end
 
-	local ok, err = pcall(conf.login_handler, server, uid, secret)
+	local err
+	ok, err = pcall(conf.login_handler, server, uid, secret)
 	-- unlock login
 	user_login[uid] = nil
 

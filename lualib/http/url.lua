@@ -5,7 +5,7 @@ local function decode_func(c)
 end
 
 local function decode(str)
-	local str = str:gsub('+', ' ')
+	str = str:gsub('+', ' ')
 	return str:gsub("%%(..)", decode_func)
 end
 

@@ -120,10 +120,10 @@ function convert.protocol(all, obj)
 	return result
 end
 
-local map_keytypes = {
-	integer = true,
-	string = true,
-}
+-- local map_keytypes = {
+-- 	integer = true,
+-- 	string = true,
+-- }
 
 function convert.type(all, obj)
 	local result = {}

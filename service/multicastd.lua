@@ -70,7 +70,7 @@ local function publish(c , source, pack, size)
 	if remote then
 		-- remote publish should unpack the pack, because we should not publish the pointer out.
 		local _, msg, sz = mc.unpack(pack, size)
-		local msg = skynet.tostring(msg,sz)
+		msg = skynet.tostring(msg,sz)
 		for node in pairs(remote) do
 			remote_publish(node, c, source, msg)
 		end
@@ -79,7 +79,7 @@ local function publish(c , source, pack, size)
 	local group = channel[c]
 	if group == nil or next(group) == nil then
 		-- dead channel, delete the pack. mc.bind returns the pointer in pack and free the pack (struct mc_package **)
-		local pack = mc.bind(pack, 1)
+		pack = mc.bind(pack, 1)
 		mc.close(pack)
 		return
 	end

@@ -27,7 +27,7 @@ local function wrap_locals(co, source, level, ext_funcs)
 	local local_id = {}
 
 	if ext_funcs then
-		for k,v in pairs(ext_funcs) do
+		for k in pairs(ext_funcs) do
 			table.insert(uv, k)
 		end
 	end

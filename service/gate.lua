@@ -3,7 +3,7 @@ local gateserver = require "snax.gateserver"
 
 local watchdog
 local connection = {}	-- fd -> connection : { fd , client, agent , ip, mode }
-local forwarding = {}	-- agent -> connection
+-- local forwarding = {}	-- agent -> connection
 
 skynet.register_protocol {
 	name = "client",
@@ -41,7 +41,7 @@ end
 
 local function unforward(c)
 	if c.agent then
-		forwarding[c.agent] = nil
+		-- forwarding[c.agent] = nil
 		c.agent = nil
 		c.client = nil
 	end
@@ -76,7 +76,7 @@ function CMD.forward(source, fd, client, address)
 	unforward(c)
 	c.client = client or 0
 	c.agent = address or source
-	forwarding[c.agent] = c
+	-- forwarding[c.agent] = c
 	gateserver.openclient(fd)
 end
 

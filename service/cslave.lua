@@ -254,7 +254,7 @@ skynet.start(function()
 			socketdriver.nodelay(fd)
 			if pcall(accept_slave,fd) then
 				local s = 0
-				for k,v in pairs(slaves) do
+				for k in pairs(slaves) do
 					s = s + 1
 				end
 				if s >= n then

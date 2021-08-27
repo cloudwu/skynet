@@ -85,7 +85,7 @@ local function dispatch_slave(fd)
 		end
 	elseif t == 'Q' then
 		-- query name
-		local address = global_name[name]
+		address = global_name[name]
 		if address then
 			socket.write(fd, pack_package("N", name, address))
 		end

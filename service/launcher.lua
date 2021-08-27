@@ -8,9 +8,9 @@ local command = {}
 local instance = {} -- for confirm (function command.LAUNCH / command.ERROR / command.LAUNCHOK)
 local launch_session = {} -- for command.QUERY, service_address -> session
 
-local function handle_to_address(handle)
-	return tonumber("0x" .. string.sub(handle , 2))
-end
+-- local function handle_to_address(handle)
+-- 	return tonumber("0x" .. string.sub(handle , 2))
+-- end
 
 local NORET = {}
 
@@ -70,7 +70,7 @@ function command.MEM(addr, ti)
 end
 
 function command.GC(addr, ti)
-	for k,v in pairs(services) do
+	for k in pairs(services) do
 		skynet.send(k,"debug","GC")
 	end
 	return command.MEM(addr, ti)

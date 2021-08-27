@@ -1,5 +1,4 @@
 local skynet = require "skynet"
-local harbor = require "skynet.harbor"
 local service = require "skynet.service"
 require "skynet.manager"	-- import skynet.launch, ...
 

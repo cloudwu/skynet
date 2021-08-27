@@ -174,10 +174,10 @@ function M.request(interface, method, host, url, recvheader, header, content)
 	end
 
 	local statusline = tmpline[1]
-	local code, info = statusline:match "HTTP/[%d%.]+%s+([%d]+)%s+(.*)$"
+	local code = statusline:match "HTTP/[%d%.]+%s+([%d]+)%s+.*$"
 	code = assert(tonumber(code))
 
-	local header = M.parseheader(tmpline,2,recvheader or {})
+	header = M.parseheader(tmpline,2,recvheader or {})
 	if not header then
 		error("Invalid HTTP response header")
 	end
@@ -194,7 +194,7 @@ function M.request(interface, method, host, url, recvheader, header, content)
 	end
 
 	if mode == "chunked" then
-		body, header = M.recvchunkedbody(read, nil, header, body)
+		body = M.recvchunkedbody(read, nil, header, body)
 		if not body then
 			error("Invalid response body")
 		end

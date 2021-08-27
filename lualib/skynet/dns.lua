@@ -69,7 +69,7 @@ local socket = require "skynet.socket"
 
 local MAX_DOMAIN_LEN = 1024
 local MAX_LABEL_LEN = 63
-local MAX_PACKET_LEN = 2048
+-- local MAX_PACKET_LEN = 2048
 local DNS_HEADER_LEN = 12
 local TIMEOUT = 30 * 100	-- 30 seconds
 
