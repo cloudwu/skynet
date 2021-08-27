@@ -200,7 +200,10 @@ function M.request(interface, method, host, url, recvheader, header, content)
 		end
 	else
 		-- identity mode
-		if length then
+		if method:upper() == "HEAD" then
+			-- See https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Methods/HEAD
+			return code, body
+		elseif length then
 			if #body >= length then
 				body = body:sub(1,length)
 			else
@@ -212,7 +215,7 @@ function M.request(interface, method, host, url, recvheader, header, content)
 			-- See https://stackoverflow.com/questions/15991173/is-the-content-length-header-required-for-a-http-1-0-response
 		elseif is_ws and code == 101 then
 			-- if websocket handshake success
-				return code, body
+			return code, body
 		else
 			-- no content-length, read all
 			body = body .. interface.readall()
