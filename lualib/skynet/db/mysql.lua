@@ -335,8 +335,8 @@ local function _parse_ok_packet(packet)
 end
 
 local function _parse_eof_packet(packet)
-    local pos = 2
-    local warning_count, pos = _get_byte2(packet, pos)
+    local pos, warning_count = 2
+    warning_count, pos = _get_byte2(packet, pos)
     local status_flags = _get_byte2(packet, pos)
     return warning_count, status_flags
 end
@@ -376,7 +376,7 @@ local function _parse_field_packet(data)
     length, pos = _get_byte4(data, pos)
     col.type = strbyte(data, pos)
     pos = pos + 1
-    local flags, pos = _get_byte2(data, pos)
+    local flags = _get_byte2(data, pos)
     if flags & 0x20 == 0 then -- https://mariadb.com/kb/en/resultset/
         col.is_signed = true
     end
@@ -473,7 +473,8 @@ local function _mysql_login(self, user, password, charset, database, on_connect)
 
         self._server_ver = server_ver
 
-        local thread_id, pos = _get_byte4(packet, pos)
+        local thread_id
+        thread_id, pos = _get_byte4(packet, pos)
         local scramble1 = sub(packet, pos, pos + 8 - 1)
         if not scramble1 then
             error "1st part of scramble not found"
@@ -642,7 +643,8 @@ local function read_result(self, sock)
     local field_count = _parse_result_set_header_packet(packet)
     local cols = {}
     for i = 1, field_count do
-        local col, err, errno, sqlstate = _recv_field_packet(self, sock)
+        local col, errno, sqlstate
+        col, err, errno, sqlstate = _recv_field_packet(self, sock)
         if not col then
             return nil, err, errno, sqlstate
             --error( strformat("errno:%d, msg:%s,sqlstate:%s",errno,msg,sqlstate))
@@ -650,7 +652,7 @@ local function read_result(self, sock)
         cols[i] = col
     end
 
-    local packet, typ, err = _recv_packet(self, sock)
+    packet, typ, err = _recv_packet(self, sock)
     if not packet then
         --error( err)
         return nil, err
@@ -741,7 +743,7 @@ function _M.connect(opts)
     local user = opts.user or ""
     local password = opts.password or ""
     local charset = CHARSET_MAP[opts.charset or "_default"]
-    local channel = 
+    local channel =
         socketchannel.channel {
         host = opts.host,
         port = opts.port or 3306,
@@ -951,9 +953,9 @@ local function read_execute_result(self, sock)
     local cols = {}
     local col
     while true do
-        packet, typ, err = _recv_packet(self, sock)
+        packet, typ = _recv_packet(self, sock)
         if typ == "EOF" then
-            local warning_count, status_flags = _parse_eof_packet(packet)
+            _parse_eof_packet(packet)
             break
         end
         col = _parse_field_packet(packet)
@@ -973,7 +975,7 @@ local function read_execute_result(self, sock)
     local rows = {}
     local row
     while true do
-        packet, typ, err = _recv_packet(self, sock)
+        packet, typ = _recv_packet(self, sock)
         if typ == "EOF" then
             local warning_count, status_flags = _parse_eof_packet(packet)
             if status_flags & SERVER_MORE_RESULTS_EXISTS ~= 0 then

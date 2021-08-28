@@ -142,7 +142,6 @@ local function parse_hosts()
 			end
 			table.insert(rt[family], ip)
 		end
-		
 		::continue::
 	end
 	return rts
@@ -267,8 +266,9 @@ local function unpack_name(chunk, left)
 end
 
 local function unpack_question(chunk, left)
-	local name, left = unpack_name(chunk, left)
-	local atype, class, left = string.unpack(">HH", chunk, left)
+	local name, atype, class
+	name, left = unpack_name(chunk, left)
+	atype, class, left = string.unpack(">HH", chunk, left)
 	return {
 		name = name,
 		atype = atype,
@@ -277,8 +277,9 @@ local function unpack_question(chunk, left)
 end
 
 local function unpack_answer(chunk, left)
-	local name, left = unpack_name(chunk, left)
-	local atype, class, ttl, rdata, left = string.unpack(">HHI4s2", chunk, left)
+	local name, atype, class, ttl, rdata
+	name, left = unpack_name(chunk, left)
+	atype, class, ttl, rdata, left = string.unpack(">HHI4s2", chunk, left)
 	return {
 		name = name,
 		atype = atype,
@@ -317,7 +318,8 @@ local function resolve(content)
 	-- verify answer
 	assert(answer_header.qdcount == 1, "malformed packet")
 
-	local question,left = unpack_question(content, left)
+	local question
+	question,left = unpack_question(content, left)
 
 	local ttl
 	local answer
@@ -438,7 +440,7 @@ local function suspend(tid, name, qtype)
 	request_pool[tid] = req
 	skynet.fork(function()
 		skynet.sleep(TIMEOUT)
-		local req = request_pool[tid]
+		req = request_pool[tid]
 		if req then
 			-- cancel tid
 			skynet.error(string.format("DNS query %s timeout", name))
@@ -498,7 +500,7 @@ local function remote_resolve(name, ipv6)
 end
 
 function dns.resolve(name, ipv6)
-	local name = name:lower()
+	name = name:lower()
 	local ntype = guess_name_type(name)
 	if ntype ~= "hostname" then
 		if (ipv6 and name == "ipv4") or (not ipv6 and name == "ipv6") then

@@ -81,7 +81,7 @@ function rediscluster:get_redis_link(node)
 	}
 	return redis.connect(conf)
 end
- 
+
 -- Given a node (that is just a Ruby hash) give it a name just
 -- concatenating the host and port. We use the node name as a key
 -- to cache connections to that node.
@@ -111,7 +111,7 @@ function rediscluster:initialize_slots_cache()
 				}
 				self:set_node_name(master_node)
 				for i=4,#result do
-					local ip,port = table.unpack(result[i])
+					ip,port = table.unpack(result[i])
 					assert(ip)
 					port = assert(tonumber(port))
 					local slave_node = {
@@ -204,7 +204,7 @@ end
 -- we cache a new connection in the @connections hash.
 function rediscluster:close_existing_connection()
 	local length = 0
-	for name,conn in pairs(self.connections) do
+	for name in pairs(self.connections) do
 		length = length + 1
 	end
 	if length >= self.max_connections then
@@ -296,8 +296,8 @@ function rediscluster:get_connection_by_slot(slot)
 	if not ok then
 		if self.opt.read_slave and node.slaves and #node.slaves > 0 then
 			local slave_node = node.slaves[math.random(1,#node.slaves)]
-			local ok2,conn = pcall(self.get_connection,self,slave_node)
-			if ok2 then
+			ok,conn = pcall(self.get_connection,self,slave_node)
+			if ok then
 				conn:readonly()		-- allow this connection read-slave
 				return conn
 			end

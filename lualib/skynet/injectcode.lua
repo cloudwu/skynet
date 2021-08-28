@@ -44,7 +44,7 @@ local function wrap_locals(co, source, level, ext_funcs)
 		end
 		i = i + 1
 	end
-	local i = 1
+	i = 1
 	while true do
 		local name = debug.getupvalue(f, i)
 		if name == nil then
@@ -64,7 +64,7 @@ local function wrap_locals(co, source, level, ext_funcs)
 	end
 	local func, update = loader()
 	-- join func's upvalues
-	local i = 1
+	i = 1
 	while true do
 		local name = debug.getupvalue(func, i)
 		if name == nil then
@@ -90,9 +90,9 @@ local function wrap_locals(co, source, level, ext_funcs)
 	local vararg, v = debug.getlocal(co, level, -1)
 	if vararg then
 		local vargs = { v }
-		local i = 2
+		i = 2
 		while true do
-			local vararg,v = debug.getlocal(co, level, -i)
+			vararg,v = debug.getlocal(co, level, -i)
 			if vararg then
 				vargs[i] = v
 			else

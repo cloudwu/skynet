@@ -403,7 +403,6 @@ local function packproto(name, p, alltypes)
 		if request == nil then
 			error(string.format("Protocol %s request type %s not found", name, p.request))
 		end
-		request = request.id
 	end
 	local tmp = {
 		"\4\0",	-- 4 fields

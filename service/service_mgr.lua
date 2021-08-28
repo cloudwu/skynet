@@ -169,7 +169,7 @@ local function register_global()
 end
 
 local function register_local()
-	local function waitfor_remote(cmd, name, ...)
+	local function waitfor_remote(name, ...)
 		local global_name = "@" .. name
 		local local_name
 		if name == "snaxd" then
@@ -181,11 +181,11 @@ local function register_local()
 	end
 
 	function cmd.GLAUNCH(...)
-		return waitfor_remote("LAUNCH", ...)
+		return waitfor_remote(...)
 	end
 
 	function cmd.GQUERY(...)
-		return waitfor_remote("QUERY", ...)
+		return waitfor_remote(...)
 	end
 
 	function cmd.LIST()

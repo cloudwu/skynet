@@ -36,7 +36,8 @@ local function message_dispatch(f)
 			local msg = table.remove(message_queue,1)
 			local session = msg.session
 			if session == 0 then
-				local ok, msg = do_func(f, msg)
+				local ok
+				ok, msg = do_func(f, msg)
 				if ok then
 					if msg then
 						skynet.fork(message_dispatch,f)

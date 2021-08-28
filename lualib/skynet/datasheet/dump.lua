@@ -202,7 +202,7 @@ function ctd.diff(last, current)
 	local stringtbl, n = string.unpack("<I4I4",current)
 	local _, lastn = string.unpack("<I4I4",last)
 	local existn = 0
-	for k,v in pairs(map) do
+	for k in pairs(map) do
 		existn = existn + 1
 	end
 	local newn = lastn

@@ -157,7 +157,7 @@ local function find_node(cobj, key, ...)
 	if key == nil then
 		return cobj
 	end
-	local cobj = index(cobj, key)
+	cobj = index(cobj, key)
 	if cobj == nil then
 		return nil
 	end

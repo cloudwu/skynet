@@ -31,7 +31,7 @@ function snax.interface(name)
 	}
 
 	for _,v in ipairs(si) do
-		local id, group, name, f = table.unpack(v)
+		local id, group, name = table.unpack(v)
 		ret[group][name] = id
 	end
 
