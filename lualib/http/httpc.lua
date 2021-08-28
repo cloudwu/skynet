@@ -105,7 +105,7 @@ function httpc.request(method, hostname, url, recvheader, header, content)
 		end)
 	end
 	local ok , statuscode, body , header = pcall(internal.request, interface, method, host, url, recvheader, header, content)
-	if ok then
+	if ok and method:upper() ~= "HEAD" then
 		ok, body = pcall(internal.response, interface, statuscode, body, header)
 	end
 	finish = true
