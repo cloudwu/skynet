@@ -267,7 +267,7 @@ local function stream_length(length)
 			return (body:sub(1,length))
 		else
 			length = length - n
-			stream.body = nil
+			stream._body = nil
 			if not stream.connected then
 				stream._reading = stream.close
 			end

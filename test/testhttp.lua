@@ -35,10 +35,20 @@ local function http_stream_test()
 	end
 end
 
+local function http_head_test()
+	httpc.timeout = 100
+	local respheader = {}
+	local status = httpc.head("http://baidu.com", "/", respheader)
+	for k,v in pairs(respheader) do
+		print("HEAD", k, v)
+	end
+end
+
 local function main()
 	dns.server()
 
 	http_stream_test()
+	http_head_test()
 
 	http_test("http")
 	if not pcall(require,"ltls.c") then
@@ -52,3 +62,4 @@ skynet.start(function()
 	print(pcall(main))
 	skynet.exit()
 end)
+ 
