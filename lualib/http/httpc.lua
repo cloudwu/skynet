@@ -62,10 +62,8 @@ local function gen_interface(protocol, fd, hostname)
 	end
 end
 
-
-function httpc.request(method, host, url, recvheader, header, content)
+local function connect(host, timeout)
 	local protocol
-	local timeout = httpc.timeout	-- get httpc.timeout before any blocked api
 	protocol, host = check_protocol(host)
 	local hostaddr, port = host:match"([^:]+):?(%d*)$"
 	if port == "" then
@@ -83,35 +81,71 @@ function httpc.request(method, host, url, recvheader, header, content)
 	local fd = socket.connect(hostaddr, port, timeout)
 	if not fd then
 		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostaddr, port, timeout))
-		return
 	end
 	-- print("protocol hostname port", protocol, hostname, port)
 	local interface = gen_interface(protocol, fd, hostname)
-	local finish
-	if timeout then
-		skynet.timeout(timeout, function()
-			if not finish then
-				socket.shutdown(fd)	-- shutdown the socket fd, need close later.
-				if interface.close then
-					interface.close()
-				end
-			end
-		end)
-	end
 	if interface.init then
 		interface.init()
 	end
-	local ok , statuscode, body = pcall(internal.request, interface, method, host, url, recvheader, header, content)
-	finish = true
+	if timeout then
+		skynet.timeout(timeout, function()
+			if not interface.finish then
+				socket.shutdown(fd)	-- shutdown the socket fd, need close later.
+			end
+		end)
+	end
+	return fd, interface, host
+end
+
+local function close_interface(interface, fd)
+	interface.finish = true
 	socket.close(fd)
 	if interface.close then
 		interface.close()
+		interface.close = nil
 	end
+end
+
+function httpc.request(method, hostname, url, recvheader, header, content)
+	local fd, interface, host = connect(hostname, httpc.timeout)
+	local ok , statuscode, body , header = pcall(internal.request, interface, method, host, url, recvheader, header, content)
+	if ok then
+		ok, body = pcall(internal.response, interface, statuscode, body, header)
+	end
+	close_interface(interface, fd)
 	if ok then
 		return statuscode, body
 	else
 		error(statuscode)
 	end
+end
+
+function httpc.head(hostname, url, recvheader, header, content)
+	local fd, interface, host = connect(hostname, httpc.timeout)
+	local ok , statuscode = pcall(internal.request, interface, "HEAD", host, url, recvheader, header, content)
+	close_interface(interface, fd)
+	if ok then
+		return statuscode
+	else
+		error(statuscode)
+	end
+end
+
+function httpc.request_stream(method, hostname, url, header, content)
+	local fd, interface, host = connect(hostname, httpc.timeout)
+	local ok , statuscode, body , header = pcall(internal.request, interface, method, host, url, recvheader, header, content)
+	interface.finish = true -- don't shutdown fd in timeout
+	local function close_fd()
+		close_interface(interface, fd)
+	end
+	if not ok then
+		close_fd()
+		error(statuscode)
+	end
+	-- todo: stream support timeout
+	local stream = internal.response_stream(interface, statuscode, body, header)
+	stream._onclose = close_fd
+	return stream
 end
 
 function httpc.get(...)
