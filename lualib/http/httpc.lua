@@ -1,6 +1,5 @@
 local skynet = require "skynet"
 local socket = require "http.sockethelper"
-local url = require "http.url"
 local internal = require "http.internal"
 local dns = require "skynet.dns"
 local string = string
@@ -131,7 +130,7 @@ function httpc.head(hostname, url, recvheader, header, content)
 	end
 end
 
-function httpc.request_stream(method, hostname, url, header, content)
+function httpc.request_stream(method, hostname, url, recvheader, header, content)
 	local fd, interface, host = connect(hostname, httpc.timeout)
 	local ok , statuscode, body , header = pcall(internal.request, interface, method, host, url, recvheader, header, content)
 	interface.finish = true -- don't shutdown fd in timeout

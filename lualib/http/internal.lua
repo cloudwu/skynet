@@ -247,7 +247,7 @@ local function stream_nobody(stream)
 	return ""
 end
 
-local function stream_length(length)
+local function stream_length(interface, length)
 	return function(stream)
 		local body = stream._body
 		if body == nil then
@@ -353,7 +353,7 @@ function M.response_stream(interface, code, body, header)
 	local read_func
 
 	if mode == "chunked" then
-		readfunc = stream_chunked
+		read_func = stream_chunked
 	else
 		-- identity mode
 		local length = header["content-length"]
@@ -361,11 +361,11 @@ function M.response_stream(interface, code, body, header)
 			length = tonumber(length)
 		end
 		if length then
-			readfunc = stream_length(length)
+			read_func = stream_length(interface, length)
 		elseif code == 204 or code == 304 or code < 200 then
-			readfunc = stream_nobody
+			read_func = stream_nobody
 		else
-			readfunc = stream_all
+			read_func = stream_all
 		end
 	end
 
@@ -375,7 +375,7 @@ function M.response_stream(interface, code, body, header)
 		status = code,
 		_body = body,
 		_interface = interface,
-		_reading = readfunc,
+		_reading = read_func,
 		header = header,
 		connected = true,
 	}, stream)
