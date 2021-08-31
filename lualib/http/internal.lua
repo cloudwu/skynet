@@ -247,11 +247,11 @@ local function stream_nobody(stream)
 	return ""
 end
 
-local function stream_length(interface, length)
+local function stream_length(length)
 	return function(stream)
 		local body = stream._body
 		if body == nil then
-			local ret, padding = interface.read()
+			local ret, padding = stream._interface.read()
 			if not ret then
 				-- disconnected
 				body = padding
@@ -361,7 +361,7 @@ function M.response_stream(interface, code, body, header)
 			length = tonumber(length)
 		end
 		if length then
-			read_func = stream_length(interface, length)
+			read_func = stream_length(length)
 		elseif code == 204 or code == 304 or code < 200 then
 			read_func = stream_nobody
 		else
