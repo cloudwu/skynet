@@ -188,7 +188,7 @@ static int iscleared (global_State *g, const GCObject *o) {
     markobject(g, o);  /* strings are 'values', so are never weak */
     return 0;
   }
-  else return iswhite(o);
+  else return iswhite(o) && !isshared(o);
 }
 
 
@@ -482,7 +482,7 @@ static int traverseephemeron (global_State *g, Table *h, int inv) {
   unsigned int nsize = sizenode(h);
   /* traverse array part */
   for (i = 0; i < asize; i++) {
-    if (valiswhite(&h->array[i])) {
+    if (valiswhite(&h->array[i]) && !isshared(gcvalue(&h->array[i]))) {
       marked = 1;
       reallymarkobject(g, gcvalue(&h->array[i]));
     }
@@ -495,10 +495,10 @@ static int traverseephemeron (global_State *g, Table *h, int inv) {
       clearkey(n);  /* clear its key */
     else if (iscleared(g, gckeyN(n))) {  /* key is not marked (yet)? */
       hasclears = 1;  /* table must be cleared */
-      if (valiswhite(gval(n)))  /* value not marked yet? */
+      if (valiswhite(gval(n)) && !isshared(gcvalue(gval(n))))  /* value not marked yet? */
         hasww = 1;  /* white-white entry */
     }
-    else if (valiswhite(gval(n))) {  /* value not marked yet? */
+    else if (valiswhite(gval(n)) && !isshared(gcvalue(gval(n)))) {  /* value not marked yet? */
       marked = 1;
       reallymarkobject(g, gcvalue(gval(n)));  /* mark it now */
     }
