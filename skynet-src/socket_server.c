@@ -1846,8 +1846,6 @@ socket_server_send(struct socket_server *ss, struct socket_sendbuffer *buf) {
 
 			socket_unlock(&l);
 
-			inc_sending_ref(s, id);
-
 			struct request_package request;
 			request.u.send.id = id;
 			request.u.send.sz = 0;
