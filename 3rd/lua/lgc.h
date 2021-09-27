@@ -120,6 +120,7 @@
 
 #define isshared(x)     (getage(x) == G_SHARED)
 #define makeshared(x)   setage(x, G_SHARED)
+#define ispurewhite(x)  (iswhite(x) && !isshared(x))
 
 #define changeage(o,f,t)  \
 	check_exp(getage(o) == (f), (o)->marked ^= ((f)^(t)))
@@ -167,15 +168,15 @@
 
 
 #define luaC_barrier(L,p,v) (  \
-	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v)) && !isshared(gcvalue(v))) ?  \
+	(iscollectable(v) && isblack(p) && ispurewhite(gcvalue(v))) ?  \
 	luaC_barrier_(L,obj2gco(p),gcvalue(v)) : cast_void(0))
 
 #define luaC_barrierback(L,p,v) (  \
-	(iscollectable(v) && isblack(p) && iswhite(gcvalue(v)) && !isshared(gcvalue(v))) ? \
+	(iscollectable(v) && isblack(p) && ispurewhite(gcvalue(v))) ? \
 	luaC_barrierback_(L,p) : cast_void(0))
 
 #define luaC_objbarrier(L,p,o) (  \
-	(isblack(p) && iswhite(o) && !isshared(o)) ? \
+	(isblack(p) && ispurewhite(o)) ? \
 	luaC_barrier_(L,obj2gco(p),obj2gco(o)) : cast_void(0))
 
 LUAI_FUNC void luaC_fix (lua_State *L, GCObject *o);

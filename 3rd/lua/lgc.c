@@ -80,9 +80,9 @@
   (x->marked = cast_byte((x->marked & ~WHITEBITS) | bitmask(BLACKBIT)))
 
 
-#define valiswhite(x)   (iscollectable(x) && iswhite(gcvalue(x)))
+#define valiswhite(x)   (iscollectable(x) && ispurewhite(gcvalue(x)))
 
-#define keyiswhite(n)   (keyiscollectable(n) && iswhite(gckey(n)))
+#define keyiswhite(n)   (keyiscollectable(n) && ispurewhite(gckey(n)))
 
 
 /*
@@ -96,7 +96,7 @@
 
 #define markkey(g, n)	{ if keyiswhite(n) reallymarkobject(g,gckey(n)); }
 
-#define markobject(g,t)	{ if (iswhite(t)) reallymarkobject(g, obj2gco(t)); }
+#define markobject(g,t)	{ if (ispurewhite(t)) reallymarkobject(g, obj2gco(t)); }
 
 /*
 ** mark an object that can be NULL (either because it is really optional,
@@ -188,7 +188,7 @@ static int iscleared (global_State *g, const GCObject *o) {
     markobject(g, o);  /* strings are 'values', so are never weak */
     return 0;
   }
-  else return iswhite(o);
+  else return ispurewhite(o);
 }
 
 
@@ -289,8 +289,6 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
 ** (only closures can), and a userdata's metatable must be a table.
 */
 static void reallymarkobject (global_State *g, GCObject *o) {
-  if (isshared(o))
-    return;
   switch (o->tt) {
     case LUA_VSHRSTR:
     case LUA_VLNGSTR: {
