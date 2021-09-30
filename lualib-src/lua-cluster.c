@@ -366,6 +366,8 @@ lunpackrequest(lua_State *L) {
 		msg = luaL_checklstring(L,1,&ssz);
 		sz = (int)ssz;
 	}
+	if (sz == 0)
+		return luaL_error(L, "Invalid req package. size == 0");
 	switch (msg[0]) {
 	case 0:
 		return unpackreq_number(L, (const uint8_t *)msg, sz);
