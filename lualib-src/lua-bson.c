@@ -518,7 +518,7 @@ is_rawarray(lua_State *L) {
 		// empty table
 		return false;
 	}
-	lua_Integer firstkey = (lua_type(L, -2) == LUA_TNUMBER) ? lua_tointeger(L, -2) : 0;
+	lua_Integer firstkey = lua_isinteger(L, -2) ? lua_tointeger(L, -2) : 0;
 	lua_pop(L, 2);
 	if (firstkey != 1)
 		return false;
