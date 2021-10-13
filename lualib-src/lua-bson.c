@@ -512,16 +512,25 @@ pack_meta_dict(lua_State *L, struct bson *b, int depth) {
 
 static bool
 is_rawarray(lua_State *L) {
-	size_t len = lua_rawlen(L, -1);
-	if (len > 0) {
-		lua_pushinteger(L, len);
-		if (lua_next(L,-2) == 0) {
-			return true;
-		} else {
-			lua_pop(L,2);
-		}
+	// test first key, hash part first in Lua 5.4
+	lua_pushnil(L);
+	if (lua_next(L, -2) == 0) {
+		// empty table
+		return false;
 	}
-	return false;
+	lua_Integer firstkey = lua_tointeger(L, -2);
+	lua_pop(L, 2);
+	if (firstkey != 1)
+		return false;
+
+	size_t len = lua_rawlen(L, -1);
+	lua_pushinteger(L, len);
+	if (lua_next(L,-2) == 0) {
+		return true;
+	} else {
+		lua_pop(L,2);
+		return false;
+	}
 }
 
 static void
