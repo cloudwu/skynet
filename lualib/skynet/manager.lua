@@ -27,7 +27,7 @@ local function globalname(name, handle)
 		return false
 	end
 
-	assert(#name <= 16)	-- GLOBALNAME_LENGTH is 16, defined in skynet_harbor.h
+	assert(#name < 16)	-- GLOBALNAME_LENGTH is 16, defined in skynet_harbor.h
 	assert(tonumber(name) == nil)	-- global name can't be number
 
 	local harbor = require "skynet.harbor"
