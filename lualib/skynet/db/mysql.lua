@@ -862,6 +862,7 @@ local _binary_parser = {
     [0x0c] = _get_datetime,
     [0x0f] = _from_length_coded_str,
     [0x10] = _from_length_coded_str,
+    [0xf5] = _from_length_coded_str,
     [0xf9] = _from_length_coded_str,
     [0xfa] = _from_length_coded_str,
     [0xfb] = _from_length_coded_str,
