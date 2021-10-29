@@ -43,14 +43,16 @@ function tlshelper.closefunc(tls_ctx)
 end
 
 function tlshelper.readfunc(fd, tls_ctx)
-    local readfunc = socket.readfunc(fd)
-    local read_buff = false
+    local function readfunc()
+        readfunc = socket.readfunc(fd)
+        return ""
+    end
+    local read_buff = ""
     return function (sz)
-        read_buff = read_buff or tls_ctx:read()
         if not sz then
             local s = ""
             if #read_buff == 0 then
-                local ds = readfunc(sz)
+                local ds = readfunc()
                 s = tls_ctx:read(ds)
             end
             s = read_buff .. s
