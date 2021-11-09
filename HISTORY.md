@@ -1,4 +1,4 @@
-v1.5.0 (2020-11-9)
+v1.5.0 (2021-11-9)
 -----------
 * Update Lua to 5.4.3
 * Fix socket half close issues
