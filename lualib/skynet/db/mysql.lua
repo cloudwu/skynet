@@ -565,7 +565,7 @@ store_types["nil"] = function(v)
 end
 
 local function _compose_stmt_execute(self, stmt, cursor_type, args)
-    local arg_num = #args
+    local arg_num = args.n
     if arg_num ~= stmt.param_count then
         error("require stmt.param_count " .. stmt.param_count .. " get arg_num " .. arg_num)
     end
@@ -1034,7 +1034,7 @@ end
         err
 ]]
 function _M.execute(self, stmt, ...)
-    local querypacket, er = _compose_stmt_execute(self, stmt, CURSOR_TYPE_NO_CURSOR, {...})
+    local querypacket, er = _compose_stmt_execute(self, stmt, CURSOR_TYPE_NO_CURSOR, table.pack(...))
     if not querypacket then
         return {
             badresult = true,
