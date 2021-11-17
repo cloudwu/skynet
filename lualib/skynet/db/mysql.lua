@@ -599,7 +599,7 @@ local function _compose_stmt_execute(self, stmt, cursor_type, args)
             local v = args[i]
             f = store_types[type(v)]
             if not f then
-                error("invalid parameter type", type(v))
+                error("invalid parameter type " .. type(v))
             end
             ts, vs = f(v)
             types_buf = types_buf .. ts
@@ -741,7 +741,7 @@ function _M.connect(opts)
     local user = opts.user or ""
     local password = opts.password or ""
     local charset = CHARSET_MAP[opts.charset or "_default"]
-    local channel = 
+    local channel =
         socketchannel.channel {
         host = opts.host,
         port = opts.port or 3306,
