@@ -64,7 +64,7 @@ static int getbaseline (const Proto *f, int pc, int *basepc) {
   }
   else {
     int i = cast_uint(pc) / MAXIWTHABS - 1;  /* get an estimate */
-    /* estimate must be a lower bond of the correct base */
+    /* estimate must be a lower bound of the correct base */
     lua_assert(i < 0 ||
               (i < f->sizeabslineinfo && f->abslineinfo[i].pc <= pc));
     while (i + 1 < f->sizeabslineinfo && pc >= f->abslineinfo[i + 1].pc)
@@ -301,7 +301,14 @@ static void collectvalidlines (lua_State *L, Closure *f) {
     sethvalue2s(L, L->top, t);  /* push it on stack */
     api_incr_top(L);
     setbtvalue(&v);  /* boolean 'true' to be the value of all indices */
-    for (i = 0; i < p->sizelineinfo; i++) {  /* for all instructions */
+    if (!p->is_vararg)  /* regular function? */
+      i = 0;  /* consider all instructions */
+    else {  /* vararg function */
+      lua_assert(p->code[0] == OP_VARARGPREP);
+      currentline = nextline(p, currentline, 0);
+      i = 1;  /* skip first instruction (OP_VARARGPREP) */
+    }
+    for (; i < p->sizelineinfo; i++) {  /* for each instruction */
       currentline = nextline(p, currentline, i);  /* get its line */
       luaH_setint(L, t, currentline, &v);  /* table[line] = true */
     }
@@ -675,9 +682,21 @@ static const char *getupvalname (CallInfo *ci, const TValue *o,
 }
 
 
+static const char *formatvarinfo (lua_State *L, const char *kind,
+                                                const char *name) {
+  if (kind == NULL)
+    return "";  /* no information */
+  else
+    return luaO_pushfstring(L, " (%s '%s')", kind, name);
+}
+
+/*
+** Build a string with a "description" for the value 'o', such as
+** "variable 'x'" or "upvalue 'y'".
+*/
 static const char *varinfo (lua_State *L, const TValue *o) {
-  const char *name = NULL;  /* to avoid warnings */
   CallInfo *ci = L->ci;
+  const char *name = NULL;  /* to avoid warnings */
   const char *kind = NULL;
   if (isLua(ci)) {
     kind = getupvalname(ci, o, &name);  /* check whether 'o' is an upvalue */
@@ -685,26 +704,40 @@ static const char *varinfo (lua_State *L, const TValue *o) {
       kind = getobjname(ci_func(ci)->p, currentpc(ci),
                         cast_int(cast(StkId, o) - (ci->func + 1)), &name);
   }
-  return (kind) ? luaO_pushfstring(L, " (%s '%s')", kind, name) : "";
+  return formatvarinfo(L, kind, name);
 }
 
 
-l_noret luaG_typeerror (lua_State *L, const TValue *o, const char *op) {
+/*
+** Raise a type error
+*/
+static l_noret typeerror (lua_State *L, const TValue *o, const char *op,
+                          const char *extra) {
   const char *t = luaT_objtypename(L, o);
-  luaG_runerror(L, "attempt to %s a %s value%s", op, t, varinfo(L, o));
+  luaG_runerror(L, "attempt to %s a %s value%s", op, t, extra);
 }
 
 
+/*
+** Raise a type error with "standard" information about the faulty
+** object 'o' (using 'varinfo').
+*/
+l_noret luaG_typeerror (lua_State *L, const TValue *o, const char *op) {
+  typeerror(L, o, op, varinfo(L, o));
+}
+
+
+/*
+** Raise an error for calling a non-callable object. Try to find
+** a name for the object based on the code that made the call
+** ('funcnamefromcode'); if it cannot get a name there, try 'varinfo'.
+*/
 l_noret luaG_callerror (lua_State *L, const TValue *o) {
   CallInfo *ci = L->ci;
   const char *name = NULL;  /* to avoid warnings */
-  const char *what = (isLua(ci)) ? funcnamefromcode(L, ci, &name) : NULL;
-  if (what != NULL) {
-    const char *t = luaT_objtypename(L, o);
-    luaG_runerror(L, "%s '%s' is not callable (a %s value)", what, name, t);
-  }
-  else
-    luaG_typeerror(L, o, "call");
+  const char *kind = (isLua(ci)) ? funcnamefromcode(L, ci, &name) : NULL;
+  const char *extra = kind ? formatvarinfo(L, kind, name) : varinfo(L, o);
+  typeerror(L, o, "call", extra);
 }
 
 

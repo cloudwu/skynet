@@ -165,7 +165,7 @@ typedef struct stringtable {
 ** - field 'nyield' is used only while a function is "doing" an
 ** yield (from the yield until the next resume);
 ** - field 'nres' is used only while closing tbc variables when
-** returning from a C function;
+** returning from a function;
 ** - field 'transferinfo' is used only during call/returnhooks,
 ** before the function starts or after it ends.
 */

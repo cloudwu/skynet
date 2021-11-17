@@ -166,6 +166,20 @@ typedef LUAI_UACINT l_uacInt;
 
 
 /*
+** Inline functions
+*/
+#if !defined(LUA_USE_C89)
+#define l_inline	inline
+#elif defined(__GNUC__)
+#define l_inline	__inline__
+#else
+#define l_inline	/* empty */
+#endif
+
+#define l_sinline	static l_inline
+
+
+/*
 ** type for virtual-machine instructions;
 ** must be an unsigned with (at least) 4 bytes (see details in lopcodes.h)
 */

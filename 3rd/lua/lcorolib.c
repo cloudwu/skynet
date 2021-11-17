@@ -78,7 +78,7 @@ static int luaB_auxwrap (lua_State *L) {
     if (stat != LUA_OK && stat != LUA_YIELD) {  /* error in the coroutine? */
       stat = lua_resetthread(co);  /* close its tbc variables */
       lua_assert(stat != LUA_OK);
-      lua_xmove(co, L, 1);  /* copy error message */
+      lua_xmove(co, L, 1);  /* move error message to the caller */
     }
     if (stat != LUA_ERRMEM &&  /* not a memory error and ... */
         lua_type(L, -1) == LUA_TSTRING) {  /* ... error object is a string? */
@@ -179,7 +179,7 @@ static int luaB_close (lua_State *L) {
       }
       else {
         lua_pushboolean(L, 0);
-        lua_xmove(co, L, 1);  /* copy error message */
+        lua_xmove(co, L, 1);  /* move error message */
         return 2;
       }
     }
