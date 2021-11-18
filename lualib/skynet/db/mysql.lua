@@ -165,25 +165,25 @@ local function _set_byte2(n)
     return strpack("<I2", n)
 end
 
-local function _set_byte3(n)
-    return strpack("<I3", n)
-end
+-- local function _set_byte3(n)
+--     return strpack("<I3", n)
+-- end
 
-local function _set_byte4(n)
-    return strpack("<I4", n)
-end
+-- local function _set_byte4(n)
+--     return strpack("<I4", n)
+-- end
 
-local function _set_byte8(n)
-    return strpack("<I8", n)
-end
+-- local function _set_byte8(n)
+--     return strpack("<I8", n)
+-- end
 
 local function _set_int8(n)
     return strpack("<i8", n)
 end
 
-local function _set_float(n)
-    return strpack("<f", n)
-end
+-- local function _set_float(n)
+--     return strpack("<f", n)
+-- end
 
 local function _set_double(n)
     return strpack("<d", n)
@@ -193,12 +193,12 @@ local function _from_cstring(data, i)
     return strunpack("z", data, i)
 end
 
-local function _dumphex(bytes)
-    return strgsub(bytes, ".",
-        function(x)
-            return strformat("%02x ", strbyte(x))
-        end)
-end
+-- local function _dumphex(bytes)
+--     return strgsub(bytes, ".",
+--         function(x)
+--             return strformat("%02x ", strbyte(x))
+--         end)
+-- end
 
 local function _compute_token(password, scramble)
     if password == "" then
@@ -947,7 +947,7 @@ local function read_execute_result(self, sock)
 
     -- typ == 'DATA'
 
-    local field_count, extra = _parse_result_set_header_packet(packet)
+    -- local field_count, extra = _parse_result_set_header_packet(packet)
 
     local cols = {}
     local col
