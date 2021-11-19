@@ -233,6 +233,7 @@ close_harbor(struct harbor *h, int id) {
 	s->status = STATUS_DOWN;
 	if (s->fd) {
 		skynet_socket_close(h->ctx, s->fd);
+		s->fd = 0;
 	}
 	if (s->queue) {
 		release_queue(s->queue);
@@ -256,17 +257,20 @@ harbor_create(void) {
 	return h;
 }
 
-void
-harbor_release(struct harbor *h) {
+
+static void
+close_all_remotes(struct harbor *h) {
 	int i;
 	for (i=1;i<REMOTE_MAX;i++) {
-		struct slave *s = &h->s[i];
-		if (s->fd && s->status != STATUS_DOWN) {
-			close_harbor(h,i);
-			// don't call report_harbor_down.
-			// never call skynet_send during module exit, because of dead lock
-		}
+		close_harbor(h,i);
+		// don't call report_harbor_down.
+		// never call skynet_send during module exit, because of dead lock
 	}
+}
+
+void
+harbor_release(struct harbor *h) {
+	close_all_remotes(h);
 	hash_delete(h->map);
 	skynet_free(h);
 }
@@ -534,7 +538,7 @@ remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int 
 		if (s->status == STATUS_DOWN) {
 			// throw an error return to source
 			// report the destination is dead
-			skynet_send(context, destination, source, PTYPE_ERROR, 0 , NULL, 0);
+			skynet_send(context, destination, source, PTYPE_ERROR, session, NULL, 0);
 			skynet_error(context, "Drop message to harbor %d from %x to %x (session = %d, msgsz = %d)",harbor_id, source, destination,session,(int)sz);
 		} else {
 			if (s->queue == NULL) {
@@ -735,6 +739,9 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 	}
 	h->id = harbor_id;
 	h->slave = slave;
+	if (harbor_id == 0) {
+		close_all_remotes(h);
+	}
 	skynet_callback(ctx, h, mainloop);
 	skynet_harbor_start(ctx);
 
