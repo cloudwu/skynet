@@ -418,6 +418,12 @@ local function block_connect(self, once)
 	if #self.__connecting > 0 then
 		-- connecting in other coroutine
 		local co = coroutine.running()
+		for _, v in ipairs(self.__connecting) do
+			if v == co then
+				-- socket closed during auth (connecting) , See Issue #1513
+				error(socket_error)
+			end
+		end
 		table.insert(self.__connecting, co)
 		skynet.wait(co)
 	else
