@@ -908,18 +908,18 @@ static void GCTM (lua_State *L) {
   if (!notm(tm)) {  /* is there a finalizer? */
     int status;
     lu_byte oldah = L->allowhook;
-    int running  = g->gcrunning;
+    int oldgcstp  = g->gcstp;
+    g->gcstp = GCSTPGC;  /* avoid GC steps */
     L->allowhook = 0;  /* stop debug hooks during GC metamethod */
-    g->gcrunning = 0;  /* avoid GC steps */
     setobj2s(L, L->top++, tm);  /* push finalizer... */
     setobj2s(L, L->top++, &v);  /* ... and its argument */
     L->ci->callstatus |= CIST_FIN;  /* will run a finalizer */
     status = luaD_pcall(L, dothecall, NULL, savestack(L, L->top - 2), 0);
     L->ci->callstatus &= ~CIST_FIN;  /* not running a finalizer anymore */
     L->allowhook = oldah;  /* restore hooks */
-    g->gcrunning = running;  /* restore state */
+    g->gcstp = oldgcstp;  /* restore state */
     if (l_unlikely(status != LUA_OK)) {  /* error while running __gc? */
-      luaE_warnerror(L, "__gc metamethod");
+      luaE_warnerror(L, "__gc");
       L->top--;  /* pops error object */
     }
   }
@@ -1508,9 +1508,11 @@ static void deletelist (lua_State *L, GCObject *p, GCObject *limit) {
 */
 void luaC_freeallobjects (lua_State *L) {
   global_State *g = G(L);
+  g->gcstp = GCSTPGC;
   luaC_changemode(L, KGC_INC);
   separatetobefnz(g, 1);  /* separate all objects with finalizers */
   lua_assert(g->finobj == NULL);
+  g->gcstp = 0;
   callallpendingfinalizers(L);
   deletelist(L, g->allgc, obj2gco(g->mainthread));
   deletelist(L, g->finobj, NULL);
@@ -1653,6 +1655,7 @@ void luaC_runtilstate (lua_State *L, int statesmask) {
 }
 
 
+
 /*
 ** Performs a basic incremental step. The debt and step size are
 ** converted from bytes to "units of work"; then the function loops
@@ -1684,7 +1687,7 @@ static void incstep (lua_State *L, global_State *g) {
 void luaC_step (lua_State *L) {
   global_State *g = G(L);
   lua_assert(!g->gcemergency);
-  if (g->gcrunning) {  /* running? */
+  if (gcrunning(g)) {  /* running? */
     if(isdecGCmodegen(g))
       genstep(L, g);
     else

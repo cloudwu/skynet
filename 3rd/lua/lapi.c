@@ -1180,18 +1180,19 @@ LUA_API int lua_status (lua_State *L) {
 LUA_API int lua_gc (lua_State *L, int what, ...) {
   va_list argp;
   int res = 0;
-  global_State *g;
+  global_State *g = G(L);
+  if (g->gcstp & GCSTPGC)  /* internal stop? */
+    return -1;  /* all options are invalid when stopped */
   lua_lock(L);
-  g = G(L);
   va_start(argp, what);
   switch (what) {
     case LUA_GCSTOP: {
-      g->gcrunning = 0;
+      g->gcstp = GCSTPUSR;  /* stopped by the user */
       break;
     }
     case LUA_GCRESTART: {
       luaE_setdebt(g, 0);
-      g->gcrunning = 1;
+      g->gcstp = 0;  /* (GCSTPGC must be already zero here) */
       break;
     }
     case LUA_GCCOLLECT: {
@@ -1210,8 +1211,8 @@ LUA_API int lua_gc (lua_State *L, int what, ...) {
     case LUA_GCSTEP: {
       int data = va_arg(argp, int);
       l_mem debt = 1;  /* =1 to signal that it did an actual step */
-      lu_byte oldrunning = g->gcrunning;
-      g->gcrunning = 1;  /* allow GC to run */
+      lu_byte oldstp = g->gcstp;
+      g->gcstp = 0;  /* allow GC to run (GCSTPGC must be zero here) */
       if (data == 0) {
         luaE_setdebt(g, 0);  /* do a basic step */
         luaC_step(L);
@@ -1221,7 +1222,7 @@ LUA_API int lua_gc (lua_State *L, int what, ...) {
         luaE_setdebt(g, debt);
         luaC_checkGC(L);
       }
-      g->gcrunning = oldrunning;  /* restore previous state */
+      g->gcstp = oldstp;  /* restore previous state */
       if (debt > 0 && g->gcstate == GCSpause)  /* end of cycle? */
         res = 1;  /* signal it */
       break;
@@ -1239,7 +1240,7 @@ LUA_API int lua_gc (lua_State *L, int what, ...) {
       break;
     }
     case LUA_GCISRUNNING: {
-      res = g->gcrunning;
+      res = gcrunning(g);
       break;
     }
     case LUA_GCGEN: {
