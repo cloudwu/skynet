@@ -159,6 +159,7 @@
 */
 #define GCSTPUSR	1  /* bit true when GC stopped by user */
 #define GCSTPGC		2  /* bit true when GC stopped by itself */
+#define GCSTPCLS	4  /* bit true when closing Lua state */
 #define gcrunning(g)	((g)->gcstp == 0)
 
 

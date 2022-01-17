@@ -607,7 +607,7 @@ static int luaK_numberK (FuncState *fs, lua_Number r) {
     return addk(fs, &o, &o);  /* use number itself as key */
   else {  /* must build an alternative key */
     const int nbm = l_floatatt(MANT_DIG);
-    const lua_Number q = l_mathop(ldexp)(1.0, -nbm + 1);
+    const lua_Number q = l_mathop(ldexp)(l_mathop(1.0), -nbm + 1);
     const lua_Number k = (ik == 0) ? q : r + r*q;  /* new key */
     TValue kv;
     setfltvalue(&kv, k);

@@ -909,7 +909,7 @@ static void GCTM (lua_State *L) {
     int status;
     lu_byte oldah = L->allowhook;
     int oldgcstp  = g->gcstp;
-    g->gcstp = GCSTPGC;  /* avoid GC steps */
+    g->gcstp |= GCSTPGC;  /* avoid GC steps */
     L->allowhook = 0;  /* stop debug hooks during GC metamethod */
     setobj2s(L, L->top++, tm);  /* push finalizer... */
     setobj2s(L, L->top++, &v);  /* ... and its argument */
@@ -1013,7 +1013,8 @@ static void correctpointers (global_State *g, GCObject *o) {
 void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt) {
   global_State *g = G(L);
   if (tofinalize(o) ||                 /* obj. is already marked... */
-      gfasttm(g, mt, TM_GC) == NULL)   /* or has no finalizer? */
+      gfasttm(g, mt, TM_GC) == NULL ||    /* or has no finalizer... */
+      (g->gcstp & GCSTPCLS))                   /* or closing state? */
     return;  /* nothing to be done */
   else {  /* move 'o' to 'finobj' list */
     GCObject **p;
@@ -1508,14 +1509,13 @@ static void deletelist (lua_State *L, GCObject *p, GCObject *limit) {
 */
 void luaC_freeallobjects (lua_State *L) {
   global_State *g = G(L);
-  g->gcstp = GCSTPGC;
+  g->gcstp = GCSTPCLS;  /* no extra finalizers after here */
   luaC_changemode(L, KGC_INC);
   separatetobefnz(g, 1);  /* separate all objects with finalizers */
   lua_assert(g->finobj == NULL);
-  g->gcstp = 0;
   callallpendingfinalizers(L);
   deletelist(L, g->allgc, obj2gco(g->mainthread));
-  deletelist(L, g->finobj, NULL);
+  lua_assert(g->finobj == NULL);  /* no new finalizers */
   deletelist(L, g->fixedgc, NULL);  /* collect fixed objects */
   lua_assert(g->strt.nuse == 0);
 }
