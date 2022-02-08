@@ -1221,7 +1221,7 @@ static int cache_mode(lua_State *L) {
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
   int level = cache_level(L);
-  if (level == CACHE_OFF) {
+  if (level == CACHE_OFF || filename == NULL) {
     return luaL_loadfilex_(L, filename, mode);
   }
   const void * proto = load_proto(filename);
