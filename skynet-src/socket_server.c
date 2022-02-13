@@ -646,7 +646,6 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 
 	ns = new_fd(ss, id, sock, PROTOCOL_TCP, request->opaque, true);
 	if (ns == NULL) {
-		close(sock);
 		result->data = "reach skynet socket number limit";
 		goto _failed;
 	}
@@ -661,19 +660,21 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		freeaddrinfo( ai_list );
 		return SOCKET_OPEN;
 	} else {
-		ATOM_STORE(&ns->type , SOCKET_TYPE_CONNECTING);
 		if (enable_write(ss, ns, true)) {
 			result->data = "enable write failed";
 			goto _failed;
 		}
+		ATOM_STORE(&ns->type , SOCKET_TYPE_CONNECTING);
 	}
 
 	freeaddrinfo( ai_list );
 	return -1;
 _failed:
+	if (sock >= 0)
+		close(sock);
 	freeaddrinfo( ai_list );
 _failed_getaddrinfo:
-	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
+	ATOM_STORE(&ss->slot[HASH_ID(id)].type, SOCKET_TYPE_INVALID);
 	return SOCKET_ERR;
 }
 
