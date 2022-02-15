@@ -92,6 +92,16 @@ local function sharetable_service()
 		skynet.ret(skynet.pack(ptr))
 	end
 
+    function sharetable.queryall(source, filenamelist)
+        local ptrList = {}
+        for _, filename in ipairs(filenamelist) do
+            if files[filename] then
+                ptrList[filename] = query_file(source, filename)
+            end
+        end
+        skynet.ret(skynet.pack(ptrList))
+    end
+
 	function sharetable.close(source)
 		local list = clients[source]
 		if list then
@@ -208,6 +218,21 @@ function sharetable.query(filename)
 	end
 end
 
+function sharetable.queryall(filenamelist)
+    local list, t, map = {}
+    local ptrList = skynet.call(sharetable.address, "lua", "queryall", filenamelist)
+    for filename, ptr in pairs(ptrList) do
+        t = core.clone(ptr)
+        map = RECORD[filename]
+        if not map then
+            map = {}
+            RECORD[filename] = map
+        end
+        map[t] = true
+        list[filename] = t
+    end
+    return list
+end
 
 local pairs = pairs
 local type = type
