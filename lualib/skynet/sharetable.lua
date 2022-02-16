@@ -92,13 +92,27 @@ local function sharetable_service()
 		skynet.ret(skynet.pack(ptr))
 	end
 
-    function sharetable.queryall(source, filenamelist)
-        local ptrList = {}
+	local function querylist(source, filenamelist)
+		local ptrList = {}
         for _, filename in ipairs(filenamelist) do
             if files[filename] then
                 ptrList[filename] = query_file(source, filename)
             end
         end
+		return ptrList
+	end
+
+	local function queryall(source)
+		local ptrList = {}
+		for filename in pairs(files) do
+			ptrList[filename] = query_file(source, filename)
+		end
+		return ptrList
+	end
+
+    function sharetable.queryall(source, filenamelist)
+		local queryFunc = filenamelist and querylist or queryall
+		local ptrList = queryFunc(source, filenamelist)
         skynet.ret(skynet.pack(ptrList))
     end
 
