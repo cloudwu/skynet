@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define GLOBALNAME_LENGTH 16
+#define GLOBALNAME_LENGTH 32
 #define REMOTE_MAX 256
 
 struct remote_name {
