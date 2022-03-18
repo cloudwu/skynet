@@ -31,8 +31,7 @@ rwlock_rlock(struct rwlock *lock) {
 
 static inline void
 rwlock_wlock(struct rwlock *lock) {
-	int clear = 0;
-	while (!ATOM_CAS(&lock->write,clear,1)) {}
+	while (!ATOM_CAS(&lock->write,0,1)) {}
 	while(ATOM_LOAD(&lock->read)) {}
 }
 

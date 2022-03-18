@@ -595,8 +595,7 @@ cmd_logon(struct skynet_context * context, const char * param) {
 	if (lastf == NULL) {
 		f = skynet_log_open(context, handle);
 		if (f) {
-			uintptr_t exp = 0;
-			if (!ATOM_CAS_POINTER(&ctx->logfile, exp, (uintptr_t)f)) {
+			if (!ATOM_CAS_POINTER(&ctx->logfile, 0, (uintptr_t)f)) {
 				// logfile opens in other thread, close this one.
 				fclose(f);
 			}
@@ -617,8 +616,7 @@ cmd_logoff(struct skynet_context * context, const char * param) {
 	FILE * f = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (f) {
 		// logfile may close in other thread
-		uintptr_t fptr = (uintptr_t)f;
-		if (ATOM_CAS_POINTER(&ctx->logfile, fptr, (uintptr_t)NULL)) {
+		if (ATOM_CAS_POINTER(&ctx->logfile, (uintptr_t)f, (uintptr_t)NULL)) {
 			skynet_log_close(context, f, handle);
 		}
 	}

@@ -1316,7 +1316,7 @@ inc_sending_ref(struct socket *s, int id) {
 				continue;
 			}
 			// inc sending only matching the same socket id
-			if (ATOM_CAS(&s->sending, sending, sending + 1))
+			if (ATOM_CAS_ULONG(&s->sending, sending, sending + 1))
 				return;
 			// atom inc failed, retry
 		} else {
