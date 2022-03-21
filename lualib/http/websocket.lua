@@ -184,7 +184,7 @@ local function write_frame(self, op, payload_data, masking_key)
     -- mask set to 0
     if payload_len < 126 then
         s = string.pack("I1I1", v1, mask | payload_len)
-    elseif payload_len < 0xffff then
+    elseif payload_len <= 0xffff then
         s = string.pack("I1I1>I2", v1, mask | 126, payload_len)
     else
         s = string.pack("I1I1>I8", v1, mask | 127, payload_len)
