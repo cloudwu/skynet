@@ -545,6 +545,7 @@ function skynet.exit()
 	for address in pairs(tmp) do
 		c.send(address, skynet.PTYPE_ERROR, 0, "")
 	end
+	c.callback(function() end)
 	c.command("EXIT")
 	-- quit service
 	coroutine_yield "QUIT"
