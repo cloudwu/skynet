@@ -1,4 +1,4 @@
--- $Id: re.lua,v 1.44 2013/03/26 20:11:40 roberto Exp $
+-- $Id: re.lua $
 
 -- imported functions and modules
 local tonumber, type, print, error = tonumber, type, print, error
@@ -71,13 +71,6 @@ updatelocale()
 local I = m.P(function (s,i) print(i, s:sub(1, i-1)); return i end)
 
 
-local function getdef (id, defs)
-  local c = defs and defs[id]
-  if not c then error("undefined name: " .. id) end
-  return c
-end
-
-
 local function patt_error (s, i)
   local msg = (#s < i + 20) and s:sub(i)
                              or s:sub(i,i+20) .. "..."
@@ -116,6 +109,20 @@ name = m.C(name)
 -- a defined name only have meaning in a given environment
 local Def = name * m.Carg(1)
 
+
+local function getdef (id, defs)
+  local c = defs and defs[id]
+  if not c then error("undefined name: " .. id) end
+  return c
+end
+
+-- match a name and return a group of its corresponding definition
+-- and 'f' (to be folded in 'Suffix')
+local function defwithfunc (f)
+  return m.Cg(Def / getdef * m.Cc(f))
+end
+
+
 local num = m.C(m.R"09"^1) * S / tonumber
 
 local String = "'" * m.C((any - "'")^0) * "'" +
@@ -130,7 +137,7 @@ end
 
 local Range = m.Cs(any * (m.P"-"/"") * (any - "]")) / mm.R
 
-local item = defined + Range + m.C(any)
+local item = (defined + Range + m.C(any)) / m.P
 
 local Class =
     "["
@@ -176,9 +183,10 @@ local exp = m.P{ "Exp",
                     )
             + "->" * S * ( m.Cg((String + num) * m.Cc(mt.__div))
                          + m.P"{}" * m.Cc(nil, m.Ct)
-                         + m.Cg(Def / getdef * m.Cc(mt.__div))
+                         + defwithfunc(mt.__div)
                          )
-            + "=>" * S * m.Cg(Def / getdef * m.Cc(m.Cmt))
+            + "=>" * S * defwithfunc(m.Cmt)
+            + "~>" * S * defwithfunc(m.Cf)
             ) * S
           )^0, function (a,b,f) return f(a,b) end );
   Primary = "(" * m.V"Exp" * ")"
