@@ -11,6 +11,31 @@ local function hmac_sha1(key, text)
 	return crypt.hexencode(c)
 end
 
+local function sha256(text)
+	local c = crypt.sha256(text)
+	return crypt.hexencode(c)
+end
+
+local function hmac_sha256(key, text)
+	local c = crypt.hmac_sha256(key, text)
+	return crypt.hexencode(c)
+end
+
+-- test To improve compatibility, test MTM0MjM=
+print(crypt.base64decode("MTM0MjM"))
+print(crypt.base64decode("MTIz"))
+print(crypt.base64decode("MTIzMg=="))
+print(crypt.base64decode("MTIzMjM="))
+print(crypt.base64decode("MTIzMg"))
+print(crypt.base64decode("MTIzMjM"))
+
+-- test sha256 
+print(sha256("Hello World!"))
+
+-- test hamc_sha256 
+print(assert("4b393abced1c497f8048860ba1ede46a23f1ff5209b18e9c428bddfbb690aad8" == hmac_sha256("super-secret-key","Hello World!")))
+
+
 -- test case from http://regex.info/code/sha1.lua
 
 print(1) assert(sha1 "http://regex.info/blog/"                                  == "7f103bf600de51dfe91062300c14738b32725db5", 1)
