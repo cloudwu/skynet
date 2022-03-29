@@ -961,10 +961,12 @@ lb64decode(lua_State *L) {
 		int padding = 0;
 		int c[4];
 		for (j=0;j<4;) {
-			if (i>=sz) {
-				return luaL_error(L, "Invalid base64 text");
+			if (i>=sz && 4>j){
+				/*To improve compatibility, there may not be enough equal signs */ 
+				c[j] = -2;   
+			}else{
+				c[j] = b64index(text[i]);
 			}
-			c[j] = b64index(text[i]);
 			if (c[j] == -1) {
 				++i;
 				continue;
@@ -1032,6 +1034,9 @@ lxor_str(lua_State *L) {
 int lsha1(lua_State *L);
 int lhmac_sha1(lua_State *L);
 
+// defined in hmac_sha256.c
+int lsha256(lua_State *L);
+int lhmac_sha256(lua_State *L);
 
 LUAMOD_API int
 luaopen_skynet_crypt(lua_State *L) {
@@ -1059,6 +1064,8 @@ luaopen_skynet_crypt(lua_State *L) {
 		{ "hmac_sha1", lhmac_sha1 },
 		{ "hmac_hash", lhmac_hash },
 		{ "xor_str", lxor_str },
+		{ "sha256", lsha256 },
+		{ "hmac_sha256", lhmac_sha256 },
 		{ "padding", NULL },
 		{ NULL, NULL },
 	};

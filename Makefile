@@ -63,7 +63,7 @@ LUA_CLIB_SKYNET = \
   lua-memory.c \
   lua-multicast.c \
   lua-cluster.c \
-  lua-crypt.c lsha1.c \
+  lua-crypt.c lsha1.c hmac_sha256.c sha256.c\
   lua-sharedata.c \
   lua-stm.c \
   lua-debugchannel.c \
@@ -106,7 +106,7 @@ $(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
 $(LUA_CLIB_PATH)/md5.so : 3rd/lua-md5/md5.c 3rd/lua-md5/md5lib.c 3rd/lua-md5/compat-5.2.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -I3rd/lua-md5 $^ -o $@ 
 
-$(LUA_CLIB_PATH)/client.so : lualib-src/lua-clientsocket.c lualib-src/lua-crypt.c lualib-src/lsha1.c | $(LUA_CLIB_PATH)
+$(LUA_CLIB_PATH)/client.so : lualib-src/lua-clientsocket.c lualib-src/lua-crypt.c lualib-src/lsha1.c lualib-src/hmac_sha256.c lualib-src/sha256.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -lpthread
 
 $(LUA_CLIB_PATH)/sproto.so : lualib-src/sproto/sproto.c lualib-src/sproto/lsproto.c | $(LUA_CLIB_PATH)
