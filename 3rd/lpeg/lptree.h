@@ -1,5 +1,5 @@
 /*  
-** $Id: lptree.h,v 1.3 2016/09/13 18:07:51 roberto Exp $
+** $Id: lptree.h $
 */
 
 #if !defined(lptree_h)

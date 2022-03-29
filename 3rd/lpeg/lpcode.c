@@ -1,5 +1,5 @@
 /*
-** $Id: lpcode.c,v 1.24 2016/09/15 17:46:13 roberto Exp $
+** $Id: lpcode.c $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
