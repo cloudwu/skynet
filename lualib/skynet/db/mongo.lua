@@ -333,14 +333,16 @@ function mongo_collection:insert(doc)
 end
 
 local function werror(r)
-	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError)
+	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError and not r.errmsg)
 
 	local err
 	if not ok then
 		if r.writeErrors then
 			err = r.writeErrors[1].errmsg
-		else
+		elseif r.writeConcernError then
 			err = r.writeConcernError.errmsg
+		else
+			err = r.errmsg
 		end
 	end
 	return ok, err, r
@@ -361,6 +363,18 @@ function mongo_collection:batch_insert(docs)
 	local sock = self.connection.__sock
 	local pack = driver.insert(0, self.full_name, docs)
 	sock:request(pack)
+end
+
+function mongo_collection:safe_batch_insert(docs)
+	for i = 1, #docs do
+		if docs[i]._id == nil then
+			docs[i]._id = bson.objectid()
+		end
+		docs[i] = bson_encode(docs[i])
+	end
+
+	local r = self.database:runCommand("insert", self.name, "documents", docs)
+	return werror(r)
 end
 
 function mongo_collection:update(selector,update,upsert,multi)

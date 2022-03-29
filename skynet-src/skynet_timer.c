@@ -12,13 +12,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#if defined(__APPLE__)
-#include <AvailabilityMacros.h>
-#include <sys/time.h>
-#include <mach/task.h>
-#include <mach/mach.h>
-#endif
-
 typedef void (*timer_execute_func)(void *ud,void *arg);
 
 #define TIME_NEAR_SHIFT 8
@@ -233,33 +226,19 @@ skynet_timeout(uint32_t handle, int time, int session) {
 // centisecond: 1/100 second
 static void
 systime(uint32_t *sec, uint32_t *cs) {
-#if !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_REALTIME, &ti);
 	*sec = (uint32_t)ti.tv_sec;
 	*cs = (uint32_t)(ti.tv_nsec / 10000000);
-#else
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	*sec = tv.tv_sec;
-	*cs = tv.tv_usec / 10000;
-#endif
 }
 
 static uint64_t
 gettime() {
 	uint64_t t;
-#if !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_MONOTONIC, &ti);
 	t = (uint64_t)ti.tv_sec * 100;
 	t += ti.tv_nsec / 10000000;
-#else
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	t = (uint64_t)tv.tv_sec * 100;
-	t += tv.tv_usec / 10000;
-#endif
 	return t;
 }
 
@@ -306,18 +285,8 @@ skynet_timer_init(void) {
 
 uint64_t
 skynet_thread_time(void) {
-#if  !defined(__APPLE__) || defined(AVAILABLE_MAC_OS_X_VERSION_10_12_AND_LATER)
 	struct timespec ti;
 	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ti);
 
 	return (uint64_t)ti.tv_sec * MICROSEC + (uint64_t)ti.tv_nsec / (NANOSEC / MICROSEC);
-#else
-	struct task_thread_times_info aTaskInfo;
-	mach_msg_type_number_t aTaskInfoCount = TASK_THREAD_TIMES_INFO_COUNT;
-	if (KERN_SUCCESS != task_info(mach_task_self(), TASK_THREAD_TIMES_INFO, (task_info_t )&aTaskInfo, &aTaskInfoCount)) {
-		return 0;
-	}
-
-	return (uint64_t)(aTaskInfo.user_time.seconds) + (uint64_t)aTaskInfo.user_time.microseconds;
-#endif
 }

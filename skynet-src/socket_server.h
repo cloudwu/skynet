@@ -14,6 +14,10 @@
 #define SOCKET_UDP 6
 #define SOCKET_WARNING 7
 
+// Only for internal use
+#define SOCKET_RST 8
+#define SOCKET_MORE 9
+
 struct socket_server;
 
 struct socket_message {

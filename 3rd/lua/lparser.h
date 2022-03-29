@@ -23,7 +23,7 @@
 
 /* kinds of variables/expressions */
 typedef enum {
-  VVOID,  /* when 'expdesc' describes the last expression a list,
+  VVOID,  /* when 'expdesc' describes the last expression of a list,
              this kind means an empty list (so, no expression) */
   VNIL,  /* constant nil */
   VTRUE,  /* constant true */
@@ -35,10 +35,11 @@ typedef enum {
              (string is fixed by the lexer) */
   VNONRELOC,  /* expression has its value in a fixed register;
                  info = result register */
-  VLOCAL,  /* local variable; var.sidx = stack index (local register);
+  VLOCAL,  /* local variable; var.ridx = register index;
               var.vidx = relative index in 'actvar.arr'  */
   VUPVAL,  /* upvalue variable; info = index of upvalue in 'upvalues' */
-  VCONST,  /* compile-time constant; info = absolute index in 'actvar.arr'  */
+  VCONST,  /* compile-time <const> variable;
+              info = absolute index in 'actvar.arr'  */
   VINDEXED,  /* indexed variable;
                 ind.t = table register;
                 ind.idx = key's R index */
@@ -76,7 +77,7 @@ typedef struct expdesc {
       lu_byte t;  /* table (register or upvalue) */
     } ind;
     struct {  /* for local variables */
-      lu_byte sidx;  /* index in the stack */
+      lu_byte ridx;  /* register holding the variable */
       unsigned short vidx;  /* compiler index (in 'actvar.arr')  */
     } var;
   } u;
@@ -96,7 +97,7 @@ typedef union Vardesc {
   struct {
     TValuefields;  /* constant value (if it is a compile-time constant) */
     lu_byte kind;
-    lu_byte sidx;  /* index of the variable in the stack */
+    lu_byte ridx;  /* register holding the variable */
     short pidx;  /* index of the variable in the Proto's 'locvars' array */
     TString *name;  /* variable name */
   } vd;

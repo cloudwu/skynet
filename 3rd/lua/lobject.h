@@ -68,7 +68,7 @@ typedef struct TValue {
 
 
 #define val_(o)		((o)->value_)
-#define valraw(o)	(&val_(o))
+#define valraw(o)	(val_(o))
 
 
 /* raw type tag of a TValue */
@@ -112,7 +112,7 @@ typedef struct TValue {
 #define settt_(o,t)	((o)->tt_=(t))
 
 
-/* main macro to copy values (from 'obj1' to 'obj2') */
+/* main macro to copy values (from 'obj2' to 'obj1') */
 #define setobj(L,obj1,obj2) \
 	{ TValue *io1=(obj1); const TValue *io2=(obj2); \
           io1->value_ = io2->value_; settt_(io1, io2->tt_); \
@@ -136,10 +136,19 @@ typedef struct TValue {
 
 
 /*
-** Entries in the Lua stack
+** Entries in a Lua stack. Field 'tbclist' forms a list of all
+** to-be-closed variables active in this stack. Dummy entries are
+** used when the distance between two tbc variables does not fit
+** in an unsigned short. They are represented by delta==0, and
+** their real delta is always the maximum value that fits in
+** that field.
 */
 typedef union StackValue {
   TValue val;
+  struct {
+    TValuefields;
+    unsigned short delta;
+  } tbclist;
 } StackValue;
 
 
@@ -571,10 +580,11 @@ typedef struct Proto {
 #define LUA_VCCL	makevariant(LUA_TFUNCTION, 2)  /* C closure */
 
 #define ttisfunction(o)		checktype(o, LUA_TFUNCTION)
-#define ttisclosure(o)		((rawtt(o) & 0x1F) == LUA_VLCL)
 #define ttisLclosure(o)		checktag((o), ctb(LUA_VLCL))
 #define ttislcf(o)		checktag((o), LUA_VLCF)
 #define ttisCclosure(o)		checktag((o), ctb(LUA_VCCL))
+#define ttisclosure(o)         (ttisLclosure(o) || ttisCclosure(o))
+
 
 #define isLfunction(o)	ttisLclosure(o)
 

@@ -190,7 +190,8 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 
 
 /*
-** grep "ORDER OP" if you change these enums
+** Grep "ORDER OP" if you change these enums. Opcodes marked with a (*)
+** has extra descriptions in the notes after the enumeration.
 */
 
 typedef enum {
@@ -203,7 +204,7 @@ OP_LOADF,/*	A sBx	R[A] := (lua_Number)sBx				*/
 OP_LOADK,/*	A Bx	R[A] := K[Bx]					*/
 OP_LOADKX,/*	A	R[A] := K[extra arg]				*/
 OP_LOADFALSE,/*	A	R[A] := false					*/
-OP_LFALSESKIP,/*A	R[A] := false; pc++				*/
+OP_LFALSESKIP,/*A	R[A] := false; pc++	(*)			*/
 OP_LOADTRUE,/*	A	R[A] := true					*/
 OP_LOADNIL,/*	A B	R[A], R[A+1], ..., R[A+B] := nil		*/
 OP_GETUPVAL,/*	A B	R[A] := UpValue[B]				*/
@@ -225,13 +226,13 @@ OP_SELF,/*	A B C	R[A+1] := R[B]; R[A] := R[B][RK(C):string]	*/
 
 OP_ADDI,/*	A B sC	R[A] := R[B] + sC				*/
 
-OP_ADDK,/*	A B C	R[A] := R[B] + K[C]				*/
-OP_SUBK,/*	A B C	R[A] := R[B] - K[C]				*/
-OP_MULK,/*	A B C	R[A] := R[B] * K[C]				*/
-OP_MODK,/*	A B C	R[A] := R[B] % K[C]				*/
-OP_POWK,/*	A B C	R[A] := R[B] ^ K[C]				*/
-OP_DIVK,/*	A B C	R[A] := R[B] / K[C]				*/
-OP_IDIVK,/*	A B C	R[A] := R[B] // K[C]				*/
+OP_ADDK,/*	A B C	R[A] := R[B] + K[C]:number			*/
+OP_SUBK,/*	A B C	R[A] := R[B] - K[C]:number			*/
+OP_MULK,/*	A B C	R[A] := R[B] * K[C]:number			*/
+OP_MODK,/*	A B C	R[A] := R[B] % K[C]:number			*/
+OP_POWK,/*	A B C	R[A] := R[B] ^ K[C]:number			*/
+OP_DIVK,/*	A B C	R[A] := R[B] / K[C]:number			*/
+OP_IDIVK,/*	A B C	R[A] := R[B] // K[C]:number			*/
 
 OP_BANDK,/*	A B C	R[A] := R[B] & K[C]:integer			*/
 OP_BORK,/*	A B C	R[A] := R[B] | K[C]:integer			*/
@@ -254,7 +255,7 @@ OP_BXOR,/*	A B C	R[A] := R[B] ~ R[C]				*/
 OP_SHL,/*	A B C	R[A] := R[B] << R[C]				*/
 OP_SHR,/*	A B C	R[A] := R[B] >> R[C]				*/
 
-OP_MMBIN,/*	A B C	call C metamethod over R[A] and R[B]		*/
+OP_MMBIN,/*	A B C	call C metamethod over R[A] and R[B]	(*)	*/
 OP_MMBINI,/*	A sB C k	call C metamethod over R[A] and sB	*/
 OP_MMBINK,/*	A B C k		call C metamethod over R[A] and K[B]	*/
 
@@ -280,7 +281,7 @@ OP_GTI,/*	A sB k	if ((R[A] > sB) ~= k) then pc++			*/
 OP_GEI,/*	A sB k	if ((R[A] >= sB) ~= k) then pc++		*/
 
 OP_TEST,/*	A k	if (not R[A] == k) then pc++			*/
-OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B]	*/
+OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) */
 
 OP_CALL,/*	A B C	R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1]) */
 OP_TAILCALL,/*	A B C k	return R[A](R[A+1], ... ,R[A+B-1])		*/
@@ -315,6 +316,18 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
 
 /*===========================================================================
   Notes:
+
+  (*) Opcode OP_LFALSESKIP is used to convert a condition to a boolean
+  value, in a code equivalent to (not cond ? false : true).  (It
+  produces false and skips the next instruction producing true.)
+
+  (*) Opcodes OP_MMBIN and variants follow each arithmetic and
+  bitwise opcode. If the operation succeeds, it skips this next
+  opcode. Otherwise, this opcode calls the corresponding metamethod.
+
+  (*) Opcode OP_TESTSET is used in short-circuit expressions that need
+  both to jump and to produce a value, such as (a = b or c).
+
   (*) In OP_CALL, if (B == 0) then B = top - A. If (C == 0), then
   'top' is set to last_result+1, so next open instruction (OP_CALL,
   OP_RETURN*, OP_SETLIST) may use 'top'.

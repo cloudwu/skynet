@@ -25,11 +25,32 @@ local function http_test(protocol)
 	print(status)
 end
 
+local function http_stream_test()
+	for resp, stream in httpc.request_stream("GET", "http://baidu.com", "/") do
+		print("STATUS", stream.status)
+		for k,v in pairs(stream.header) do
+			print("HEADER",k,v)
+		end
+		print("BODY", resp)
+	end
+end
+
+local function http_head_test()
+	httpc.timeout = 100
+	local respheader = {}
+	local status = httpc.head("http://baidu.com", "/", respheader)
+	for k,v in pairs(respheader) do
+		print("HEAD", k, v)
+	end
+end
 
 local function main()
 	dns.server()
-	http_test("http")
 
+	http_stream_test()
+	http_head_test()
+
+	http_test("http")
 	if not pcall(require,"ltls.c") then
 		print "No ltls module, https is not supported"
 	else
@@ -41,3 +62,4 @@ skynet.start(function()
 	print(pcall(main))
 	skynet.exit()
 end)
+ 

@@ -1,4 +1,5 @@
 #include "skynet.h"
+#include "atomic.h"
 
 #include <lua.h>
 #include <lualib.h>
@@ -29,7 +30,7 @@ struct snlua {
 	size_t mem_report;
 	size_t mem_limit;
 	lua_State * activeL;
-	volatile int trap;
+	ATOM_INT trap;
 };
 
 // LUA_CACHELIB may defined in patched lua for shared proto
@@ -66,8 +67,8 @@ signal_hook(lua_State *L, lua_Debug *ar) {
 	struct snlua *l = (struct snlua *)ud;
 
 	lua_sethook (L, NULL, 0, 0);
-	if (l->trap) {
-		l->trap = 0;
+	if (ATOM_LOAD(&l->trap)) {
+		ATOM_STORE(&l->trap , 0);
 		luaL_error(L, "signal 0");
 	}
 }
@@ -75,7 +76,7 @@ signal_hook(lua_State *L, lua_Debug *ar) {
 static void
 switchL(lua_State *L, struct snlua *l) {
 	l->activeL = L;
-	if (l->trap) {
+	if (ATOM_LOAD(&l->trap)) {
 		lua_sethook(L, signal_hook, LUA_MASKCOUNT, 1);
 	}
 }
@@ -87,6 +88,10 @@ lua_resumeX(lua_State *L, lua_State *from, int nargs, int *nresults) {
 	struct snlua *l = (struct snlua *)ud;
 	switchL(L, l);
 	int err = lua_resume(L, from, nargs, nresults);
+	if (ATOM_LOAD(&l->trap)) {
+		// wait for lua_sethook. (l->trap == -1)
+		while (ATOM_LOAD(&l->trap) >= 0) ;
+	}
 	switchL(from, l);
 	return err;
 }
@@ -190,7 +195,7 @@ timing_resume(lua_State *L, int co_index, int n) {
 		lua_rawset(L, lua_upvalueindex(1));	// set start time
 	}
 
-	int r = auxresume(L, co, lua_gettop(L) - 1);
+	int r = auxresume(L, co, n);
 
 	if (timing_enable(L, co_index, &start_time)) {
 		double total_time = timing_total(L, co_index);
@@ -501,7 +506,7 @@ snlua_create(void) {
 	l->mem_limit = 0;
 	l->L = lua_newstate(lalloc, l);
 	l->activeL = NULL;
-	l->trap = 0;
+	ATOM_INIT(&l->trap , 0);
 	return l;
 }
 
@@ -515,9 +520,13 @@ void
 snlua_signal(struct snlua *l, int signal) {
 	skynet_error(l->ctx, "recv a signal %d", signal);
 	if (signal == 0) {
-		if (l->trap == 0) {
-			l->trap = 1;
+		if (ATOM_LOAD(&l->trap) == 0) {
+			// only one thread can set trap ( l->trap 0->1 )
+			if (!ATOM_CAS(&l->trap, 0, 1))
+				return;
 			lua_sethook (l->activeL, signal_hook, LUA_MASKCOUNT, 1);
+			// finish set ( l->trap 1 -> -1 )
+			ATOM_CAS(&l->trap, 1, -1);
 		}
 	} else if (signal == 1) {
 		skynet_error(l->ctx, "Current Memory %.3fK", (float)l->mem / 1024);

@@ -39,7 +39,7 @@ const char lua_ident[] =
 
 
 /*
-** Test for a valid index.
+** Test for a valid index (one that is not the 'nilvalue').
 ** '!ttisnil(o)' implies 'o != &G(L)->nilvalue', so it is not needed.
 ** However, it covers the most common cases in a faster way.
 */
@@ -53,6 +53,10 @@ const char lua_ident[] =
 #define isupvalue(i)		((i) < LUA_REGISTRYINDEX)
 
 
+/*
+** Convert an acceptable index to a pointer to its respective value.
+** Non-valid indices return the special nil value 'G(L)->nilvalue'.
+*/
 static TValue *index2value (lua_State *L, int idx) {
   CallInfo *ci = L->ci;
   if (idx > 0) {
@@ -70,21 +74,28 @@ static TValue *index2value (lua_State *L, int idx) {
   else {  /* upvalues */
     idx = LUA_REGISTRYINDEX - idx;
     api_check(L, idx <= MAXUPVAL + 1, "upvalue index too large");
-    if (ttislcf(s2v(ci->func)))  /* light C function? */
-      return &G(L)->nilvalue;  /* it has no upvalues */
-    else {
+    if (ttisCclosure(s2v(ci->func))) {  /* C closure? */
       CClosure *func = clCvalue(s2v(ci->func));
-      return (idx <= func->nupvalues) ? &func->upvalue[idx-1] : &G(L)->nilvalue;
+      return (idx <= func->nupvalues) ? &func->upvalue[idx-1]
+                                      : &G(L)->nilvalue;
+    }
+    else {  /* light C function or Lua function (through a hook)?) */
+      api_check(L, ttislcf(s2v(ci->func)), "caller not a C function");
+      return &G(L)->nilvalue;  /* no upvalues */
     }
   }
 }
 
 
-static StkId index2stack (lua_State *L, int idx) {
+
+/*
+** Convert a valid actual index (not a pseudo-index) to its address.
+*/
+l_sinline StkId index2stack (lua_State *L, int idx) {
   CallInfo *ci = L->ci;
   if (idx > 0) {
     StkId o = ci->func + idx;
-    api_check(L, o < L->top, "unacceptable index");
+    api_check(L, o < L->top, "invalid index");
     return o;
   }
   else {    /* non-positive index */
@@ -172,7 +183,7 @@ LUA_API int lua_gettop (lua_State *L) {
 
 LUA_API void lua_settop (lua_State *L, int idx) {
   CallInfo *ci;
-  StkId func;
+  StkId func, newtop;
   ptrdiff_t diff;  /* difference for new top */
   lua_lock(L);
   ci = L->ci;
@@ -187,9 +198,26 @@ LUA_API void lua_settop (lua_State *L, int idx) {
     api_check(L, -(idx+1) <= (L->top - (func + 1)), "invalid new top");
     diff = idx + 1;  /* will "subtract" index (as it is negative) */
   }
-  if (diff < 0 && hastocloseCfunc(ci->nresults))
-    luaF_close(L, L->top + diff, LUA_OK);
-  L->top += diff;  /* correct top only after closing any upvalue */
+  api_check(L, L->tbclist < L->top, "previous pop of an unclosed slot");
+  newtop = L->top + diff;
+  if (diff < 0 && L->tbclist >= newtop) {
+    lua_assert(hastocloseCfunc(ci->nresults));
+    luaF_close(L, newtop, CLOSEKTOP, 0);
+  }
+  L->top = newtop;  /* correct top only after closing any upvalue */
+  lua_unlock(L);
+}
+
+
+LUA_API void lua_closeslot (lua_State *L, int idx) {
+  StkId level;
+  lua_lock(L);
+  level = index2stack(L, idx);
+  api_check(L, hastocloseCfunc(L->ci->nresults) && L->tbclist == level,
+     "no variable to close at given level");
+  luaF_close(L, level, CLOSEKTOP, 0);
+  level = index2stack(L, idx);  /* stack may be moved */
+  setnilvalue(s2v(level));
   lua_unlock(L);
 }
 
@@ -200,7 +228,7 @@ LUA_API void lua_settop (lua_State *L, int idx) {
 ** Note that we move(copy) only the value inside the stack.
 ** (We do not move additional fields that may exist.)
 */
-static void reverse (lua_State *L, StkId from, StkId to) {
+l_sinline void reverse (lua_State *L, StkId from, StkId to) {
   for (; from < to; from++, to--) {
     TValue temp;
     setobj(L, &temp, s2v(from));
@@ -420,7 +448,7 @@ LUA_API lua_CFunction lua_tocfunction (lua_State *L, int idx) {
 }
 
 
-static void *touserdata (const TValue *o) {
+l_sinline void *touserdata (const TValue *o) {
   switch (ttype(o)) {
     case LUA_TUSERDATA: return getudatamem(uvalue(o));
     case LUA_TLIGHTUSERDATA: return pvalue(o);
@@ -612,7 +640,7 @@ LUA_API int lua_pushthread (lua_State *L) {
 */
 
 
-static int auxgetstr (lua_State *L, const TValue *t, const char *k) {
+l_sinline int auxgetstr (lua_State *L, const TValue *t, const char *k) {
   const TValue *slot;
   TString *str = luaS_new(L, k);
   if (luaV_fastget(L, t, str, slot, luaH_getstr)) {
@@ -629,11 +657,21 @@ static int auxgetstr (lua_State *L, const TValue *t, const char *k) {
 }
 
 
+/*
+** Get the global table in the registry. Since all predefined
+** indices in the registry were inserted right when the registry
+** was created and never removed, they must always be in the array
+** part of the registry.
+*/
+#define getGtable(L)  \
+	(&hvalue(&G(L)->l_registry)->array[LUA_RIDX_GLOBALS - 1])
+
+
 LUA_API int lua_getglobal (lua_State *L, const char *name) {
-  Table *reg;
+  const TValue *G;
   lua_lock(L);
-  reg = hvalue(&G(L)->l_registry);
-  return auxgetstr(L, luaH_getint(reg, LUA_RIDX_GLOBALS), name);
+  G = getGtable(L);
+  return auxgetstr(L, G, name);
 }
 
 
@@ -677,7 +715,7 @@ LUA_API int lua_geti (lua_State *L, int idx, lua_Integer n) {
 }
 
 
-static int finishrawget (lua_State *L, const TValue *val) {
+l_sinline int finishrawget (lua_State *L, const TValue *val) {
   if (isempty(val))  /* avoid copying empty items to the stack */
     setnilvalue(s2v(L->top));
   else
@@ -811,10 +849,10 @@ static void auxsetstr (lua_State *L, const TValue *t, const char *k) {
 
 
 LUA_API void lua_setglobal (lua_State *L, const char *name) {
-  Table *reg;
+  const TValue *G;
   lua_lock(L);  /* unlock done in 'auxsetstr' */
-  reg = hvalue(&G(L)->l_registry);
-  auxsetstr(L, luaH_getint(reg, LUA_RIDX_GLOBALS), name);
+  G = getGtable(L);
+  auxsetstr(L, G, name);
 }
 
 
@@ -861,12 +899,10 @@ LUA_API void lua_seti (lua_State *L, int idx, lua_Integer n) {
 
 static void aux_rawset (lua_State *L, int idx, TValue *key, int n) {
   Table *t;
-  TValue *slot;
   lua_lock(L);
   api_checknelems(L, n);
   t = gettable(L, idx);
-  slot = luaH_set(L, t, key);
-  setobj2t(L, slot, s2v(L->top - 1));
+  luaH_set(L, t, key, s2v(L->top - 1));
   invalidateTMcache(t);
   luaC_barrierback(L, obj2gco(t), s2v(L->top - 1));
   L->top -= n;
@@ -912,7 +948,7 @@ LUA_API int lua_setmetatable (lua_State *L, int objindex) {
   }
   switch (ttype(obj)) {
     case LUA_TTABLE: {
-      if (isshared(hvalue(obj)))
+      if (l_unlikely(isshared(hvalue(obj))))
         luaG_runerror(L, "can't setmetatable to shared table");
       hvalue(obj)->metatable = mt;
       if (mt) {
@@ -1055,8 +1091,7 @@ LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
 static void set_env (lua_State *L, LClosure *f) {
   if (f->nupvalues >= 1) {  /* does it have an upvalue? */
     /* get global table from registry */
-    Table *reg = hvalue(&G(L)->l_registry);
-    const TValue *gt = luaH_getint(reg, LUA_RIDX_GLOBALS);
+    const TValue *gt = getGtable(L);
     /* set global table as 1st upvalue of 'f' (may be LUA_ENV) */
     setobj(L, f->upvals[0]->v, gt);
     luaC_barrier(L, f->upvals[0], gt);
@@ -1110,7 +1145,7 @@ LUA_API void lua_sharestring (lua_State *L, int index) {
 LUA_API void lua_clonetable(lua_State *L, const void * tp) {
   Table *t = cast(Table *, tp);
 
-  if (!isshared(t))
+  if (l_unlikely(!isshared(t)))
     luaG_runerror(L, "Not a shared table");
 
   lua_lock(L);
@@ -1145,18 +1180,19 @@ LUA_API int lua_status (lua_State *L) {
 LUA_API int lua_gc (lua_State *L, int what, ...) {
   va_list argp;
   int res = 0;
-  global_State *g;
+  global_State *g = G(L);
+  if (g->gcstp & GCSTPGC)  /* internal stop? */
+    return -1;  /* all options are invalid when stopped */
   lua_lock(L);
-  g = G(L);
   va_start(argp, what);
   switch (what) {
     case LUA_GCSTOP: {
-      g->gcrunning = 0;
+      g->gcstp = GCSTPUSR;  /* stopped by the user */
       break;
     }
     case LUA_GCRESTART: {
       luaE_setdebt(g, 0);
-      g->gcrunning = 1;
+      g->gcstp = 0;  /* (GCSTPGC must be already zero here) */
       break;
     }
     case LUA_GCCOLLECT: {
@@ -1175,8 +1211,8 @@ LUA_API int lua_gc (lua_State *L, int what, ...) {
     case LUA_GCSTEP: {
       int data = va_arg(argp, int);
       l_mem debt = 1;  /* =1 to signal that it did an actual step */
-      lu_byte oldrunning = g->gcrunning;
-      g->gcrunning = 1;  /* allow GC to run */
+      lu_byte oldstp = g->gcstp;
+      g->gcstp = 0;  /* allow GC to run (GCSTPGC must be zero here) */
       if (data == 0) {
         luaE_setdebt(g, 0);  /* do a basic step */
         luaC_step(L);
@@ -1186,7 +1222,7 @@ LUA_API int lua_gc (lua_State *L, int what, ...) {
         luaE_setdebt(g, debt);
         luaC_checkGC(L);
       }
-      g->gcrunning = oldrunning;  /* restore previous state */
+      g->gcstp = oldstp;  /* restore previous state */
       if (debt > 0 && g->gcstate == GCSpause)  /* end of cycle? */
         res = 1;  /* signal it */
       break;
@@ -1204,7 +1240,7 @@ LUA_API int lua_gc (lua_State *L, int what, ...) {
       break;
     }
     case LUA_GCISRUNNING: {
-      res = g->gcrunning;
+      res = gcrunning(g);
       break;
     }
     case LUA_GCGEN: {
@@ -1284,8 +1320,7 @@ LUA_API void lua_toclose (lua_State *L, int idx) {
   lua_lock(L);
   o = index2stack(L, idx);
   nresults = L->ci->nresults;
-  api_check(L, L->openupval == NULL || uplevel(L->openupval) <= o,
-               "marked index below or equal new one");
+  api_check(L, L->tbclist < o, "given index below or equal a marked one");
   luaF_newtbcupval(L, o);  /* create new to-be-closed upvalue */
   if (!hastocloseCfunc(nresults))  /* function not marked yet? */
     L->ci->nresults = codeNresults(nresults);  /* mark it */

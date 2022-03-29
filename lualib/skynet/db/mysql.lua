@@ -165,25 +165,25 @@ local function _set_byte2(n)
     return strpack("<I2", n)
 end
 
-local function _set_byte3(n)
-    return strpack("<I3", n)
-end
+-- local function _set_byte3(n)
+--     return strpack("<I3", n)
+-- end
 
-local function _set_byte4(n)
-    return strpack("<I4", n)
-end
+-- local function _set_byte4(n)
+--     return strpack("<I4", n)
+-- end
 
-local function _set_byte8(n)
-    return strpack("<I8", n)
-end
+-- local function _set_byte8(n)
+--     return strpack("<I8", n)
+-- end
 
 local function _set_int8(n)
     return strpack("<i8", n)
 end
 
-local function _set_float(n)
-    return strpack("<f", n)
-end
+-- local function _set_float(n)
+--     return strpack("<f", n)
+-- end
 
 local function _set_double(n)
     return strpack("<d", n)
@@ -193,12 +193,12 @@ local function _from_cstring(data, i)
     return strunpack("z", data, i)
 end
 
-local function _dumphex(bytes)
-    return strgsub(bytes, ".",
-        function(x)
-            return strformat("%02x ", strbyte(x))
-        end)
-end
+-- local function _dumphex(bytes)
+--     return strgsub(bytes, ".",
+--         function(x)
+--             return strformat("%02x ", strbyte(x))
+--         end)
+-- end
 
 local function _compute_token(password, scramble)
     if password == "" then
@@ -565,7 +565,7 @@ store_types["nil"] = function(v)
 end
 
 local function _compose_stmt_execute(self, stmt, cursor_type, args)
-    local arg_num = #args
+    local arg_num = args.n
     if arg_num ~= stmt.param_count then
         error("require stmt.param_count " .. stmt.param_count .. " get arg_num " .. arg_num)
     end
@@ -599,7 +599,7 @@ local function _compose_stmt_execute(self, stmt, cursor_type, args)
             local v = args[i]
             f = store_types[type(v)]
             if not f then
-                error("invalid parameter type", type(v))
+                error("invalid parameter type " .. type(v))
             end
             ts, vs = f(v)
             types_buf = types_buf .. ts
@@ -741,7 +741,7 @@ function _M.connect(opts)
     local user = opts.user or ""
     local password = opts.password or ""
     local charset = CHARSET_MAP[opts.charset or "_default"]
-    local channel = 
+    local channel =
         socketchannel.channel {
         host = opts.host,
         port = opts.port or 3306,
@@ -862,6 +862,7 @@ local _binary_parser = {
     [0x0c] = _get_datetime,
     [0x0f] = _from_length_coded_str,
     [0x10] = _from_length_coded_str,
+    [0xf5] = _from_length_coded_str,
     [0xf9] = _from_length_coded_str,
     [0xfa] = _from_length_coded_str,
     [0xfb] = _from_length_coded_str,
@@ -946,7 +947,7 @@ local function read_execute_result(self, sock)
 
     -- typ == 'DATA'
 
-    local field_count, extra = _parse_result_set_header_packet(packet)
+    -- local field_count, extra = _parse_result_set_header_packet(packet)
 
     local cols = {}
     local col
@@ -1033,7 +1034,7 @@ end
         err
 ]]
 function _M.execute(self, stmt, ...)
-    local querypacket, er = _compose_stmt_execute(self, stmt, CURSOR_TYPE_NO_CURSOR, {...})
+    local querypacket, er = _compose_stmt_execute(self, stmt, CURSOR_TYPE_NO_CURSOR, table.pack(...))
     if not querypacket then
         return {
             badresult = true,

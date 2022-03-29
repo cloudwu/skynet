@@ -1386,7 +1386,7 @@ sproto_unpack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 		++src;
 		if (header == 0xff) {
 			int n;
-			if (srcsz < 0) {
+			if (srcsz <= 0) {
 				return -1;
 			}
 			n = (src[0] + 1) * 8;
@@ -1406,7 +1406,7 @@ sproto_unpack(const void * srcv, int srcsz, void * bufferv, int bufsz) {
 			for (i=0;i<8;i++) {
 				int nz = (header >> i) & 1;
 				if (nz) {
-					if (srcsz < 0)
+					if (srcsz <= 0)
 						return -1;
 					if (bufsz > 0) {
 						*buffer = *src;

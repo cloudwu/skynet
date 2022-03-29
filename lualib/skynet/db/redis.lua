@@ -1,10 +1,16 @@
-local skynet = require "skynet"
-local socket = require "skynet.socket"
 local socketchannel = require "skynet.socketchannel"
 
+local tostring = tostring
+local tonumber = tonumber
 local table = table
 local string = string
 local assert = assert
+local setmetatable = setmetatable
+local ipairs = ipairs
+local type = type
+local select = select
+local pairs = pairs
+
 
 local redis = {}
 local command = {}
@@ -96,19 +102,36 @@ local count_cache = make_cache(function(t,k)
 		return s
 	end)
 
+local command_np_cache = make_cache(function(t, cmd)
+		local s = "*1" .. command_cache[cmd] .. "\r\n"
+		t[cmd] = s
+		return s
+	end)
+
 local function compose_message(cmd, msg)
+	if msg == nil then
+		return command_np_cache[cmd]
+	end
+
 	local t = type(msg)
 	local lines = {}
 
 	if t == "table" then
-		lines[1] = count_cache[#msg+1]
+		local n = msg.n or #msg
+		lines[1] = count_cache[n+1]
 		lines[2] = command_cache[cmd]
 		local idx = 3
-		for _,v in ipairs(msg) do
-			v= tostring(v)
-			lines[idx] = header_cache[#v]
-			lines[idx+1] = v
-			idx = idx + 2
+		for i = 1, n do
+			local v = msg[i]
+			if v == nil then
+				lines[idx] = "\r\n$-1"
+				idx = idx + 1
+			else
+				v= tostring(v)
+				lines[idx] = header_cache[#v]
+				lines[idx+1] = v
+				idx = idx + 2
+			end
 		end
 		lines[idx] = "\r\n"
 	else
@@ -123,9 +146,16 @@ local function compose_message(cmd, msg)
 	return lines
 end
 
-local function redis_login(auth, db)
+local function redis_login(conf)
+	local auth = conf.auth
+	local db = conf.db
 	if auth == nil and db == nil then
 		return
+	end
+	if auth then
+		if conf.username then
+			auth = { conf.username, auth }
+		end
 	end
 	return function(so)
 		if auth then
@@ -141,7 +171,7 @@ function redis.connect(db_conf)
 	local channel = socketchannel.channel {
 		host = db_conf.host,
 		port = db_conf.port or 6379,
-		auth = redis_login(db_conf.auth, db_conf.db),
+		auth = redis_login(db_conf),
 		nodelay = true,
 		overload = db_conf.overload,
 	}
@@ -153,10 +183,12 @@ end
 setmetatable(command, { __index = function(t,k)
 	local cmd = string.upper(k)
 	local f = function (self, v, ...)
-		if type(v) == "table" then
+		if v == nil then
+			return self[1]:request(compose_message(cmd), read_response)
+		elseif type(v) == "table" then
 			return self[1]:request(compose_message(cmd, v), read_response)
 		else
-			return self[1]:request(compose_message(cmd, {v, ...}), read_response)
+			return self[1]:request(compose_message(cmd, table.pack(v, ...)), read_response)
 		end
 	end
 	t[k] = f
@@ -175,7 +207,7 @@ end
 
 function command:sismember(key, value)
 	local fd = self[1]
-	return fd:request(compose_message ("SISMEMBER", {key, value}), read_boolean)
+	return fd:request(compose_message ("SISMEMBER", table.pack(key, value)), read_boolean)
 end
 
 local function compose_table(lines, msg)
@@ -202,7 +234,7 @@ function command:pipeline(ops,resp)
 
 	if resp then
 		return fd:request(cmds, function (fd)
-			for i=1, #ops do
+			for _=1, #ops do
 				local ok, out = read_response(fd)
 				table.insert(resp, {ok = ok, out = out})
 			end
@@ -211,7 +243,7 @@ function command:pipeline(ops,resp)
 	else
 		return fd:request(cmds, function (fd)
 			local ok, out
-			for i=1, #ops do
+			for _=1, #ops do
 				ok, out = read_response(fd)
 			end
 			-- return last response
@@ -231,10 +263,11 @@ local watchmeta = {
 	end,
 }
 
-local function watch_login(obj, auth)
+local function watch_login(conf, obj)
+	local login_auth = redis_login(conf)
 	return function(so)
-		if auth then
-			so:request(compose_message("AUTH", auth), read_response)
+		if login_auth then
+			login_auth(so)
 		end
 		for k in pairs(obj.__psubscribe) do
 			so:request(compose_message ("PSUBSCRIBE", k))
@@ -253,7 +286,7 @@ function redis.watch(db_conf)
 	local channel = socketchannel.channel {
 		host = db_conf.host,
 		port = db_conf.port or 6379,
-		auth = watch_login(obj, db_conf.auth),
+		auth = watch_login(db_conf, obj),
 		nodelay = true,
 	}
 	obj.__sock = channel
@@ -288,18 +321,18 @@ function watch:message()
 	local so = self.__sock
 	while true do
 		local ret = so:response(read_response)
-		local type , channel, data , data2 = ret[1], ret[2], ret[3], ret[4]
-		if type == "message" then
+		local ttype , channel, data , data2 = ret[1], ret[2], ret[3], ret[4]
+		if ttype == "message" then
 			return data, channel
-		elseif type == "pmessage" then
+		elseif ttype == "pmessage" then
 			return data2, data, channel
-		elseif type == "subscribe" then
+		elseif ttype == "subscribe" then
 			self.__subscribe[channel] = true
-		elseif type == "psubscribe" then
+		elseif ttype == "psubscribe" then
 			self.__psubscribe[channel] = true
-		elseif type == "unsubscribe" then
+		elseif ttype == "unsubscribe" then
 			self.__subscribe[channel] = nil
-		elseif type == "punsubscribe" then
+		elseif ttype == "punsubscribe" then
 			self.__psubscribe[channel] = nil
 		end
 	end

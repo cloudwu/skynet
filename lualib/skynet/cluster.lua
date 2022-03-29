@@ -5,6 +5,10 @@ local cluster = {}
 local sender = {}
 local task_queue = {}
 
+local function repack(address, ...)
+	return address, skynet.pack(...)
+end
+
 local function request_sender(q, node)
 	local ok, c = pcall(skynet.call, clusterd, "lua", "sender", node)
 	if not ok then
@@ -16,9 +20,9 @@ local function request_sender(q, node)
 	q.confirm = confirm
 	q.sender = c
 	for _, task in ipairs(q) do
-		if type(task) == "table" then
+		if type(task) == "string" then
 			if c then
-				skynet.send(c, "lua", "push", task[1], skynet.pack(table.unpack(task,2,task.n)))
+				skynet.send(c, "lua", "push", repack(skynet.unpack(task)))
 			end
 		else
 			skynet.wakeup(task)
@@ -53,14 +57,19 @@ end
 
 function cluster.call(node, address, ...)
 	-- skynet.pack(...) will free by cluster.core.packrequest
-	return skynet.call(get_sender(node), "lua", "req",  address, skynet.pack(...))
+	local s = sender[node]
+	if not s then
+		local task = skynet.packstring(address, ...)
+		return skynet.call(get_sender(node), "lua", "req", repack(skynet.unpack(task)))
+	end
+	return skynet.call(s, "lua", "req", address, skynet.pack(...))
 end
 
 function cluster.send(node, address, ...)
 	-- push is the same with req, but no response
 	local s = sender[node]
 	if not s then
-		table.insert(task_queue[node], table.pack(address, ...))
+		table.insert(task_queue[node], skynet.packstring(address, ...))
 	else
 		skynet.send(sender[node], "lua", "push", address, skynet.pack(...))
 	end

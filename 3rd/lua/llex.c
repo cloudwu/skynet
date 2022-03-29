@@ -122,26 +122,29 @@ l_noret luaX_syntaxerror (LexState *ls, const char *msg) {
 
 
 /*
-** creates a new string and anchors it in scanner's table so that
-** it will not be collected until the end of the compilation
-** (by that time it should be anchored somewhere)
+** Creates a new string and anchors it in scanner's table so that it
+** will not be collected until the end of the compilation; by that time
+** it should be anchored somewhere. It also internalizes long strings,
+** ensuring there is only one copy of each unique string.  The table
+** here is used as a set: the string enters as the key, while its value
+** is irrelevant. We use the string itself as the value only because it
+** is a TValue readly available. Later, the code generation can change
+** this value.
 */
 TString *luaX_newstring (LexState *ls, const char *str, size_t l) {
   lua_State *L = ls->L;
-  TValue *o;  /* entry for 'str' */
   TString *ts = luaS_newlstr(L, str, l);  /* create new string */
-  setsvalue2s(L, L->top++, ts);  /* temporarily anchor it in stack */
-  o = luaH_set(L, ls->h, s2v(L->top - 1));
-  if (isempty(o)) {  /* not in use yet? */
-    /* boolean value does not need GC barrier;
-       table is not a metatable, so it does not need to invalidate cache */
-    setbtvalue(o);  /* t[string] = true */
+  const TValue *o = luaH_getstr(ls->h, ts);
+  if (!ttisnil(o))  /* string already present? */
+    ts = keystrval(nodefromval(o));  /* get saved copy */
+  else {  /* not in use yet */
+    TValue *stv = s2v(L->top++);  /* reserve stack space for string */
+    setsvalue(L, stv, ts);  /* temporarily anchor the string */
+    luaH_finishset(L, ls->h, stv, o, stv);  /* t[string] = string */
+    /* table is not a metatable, so it does not need to invalidate cache */
     luaC_checkGC(L);
+    L->top--;  /* remove string from stack */
   }
-  else {  /* string already present */
-    ts = keystrval(nodefromval(o));  /* re-use value previously stored */
-  }
-  L->top--;  /* remove string from stack */
   return ts;
 }
 
@@ -254,9 +257,10 @@ static int read_numeral (LexState *ls, SemInfo *seminfo) {
 
 
 /*
-** reads a sequence '[=*[' or ']=*]', leaving the last bracket.
-** If sequence is well formed, return its number of '='s + 2; otherwise,
-** return 1 if there is no '='s or 0 otherwise (an unfinished '[==...').
+** read a sequence '[=*[' or ']=*]', leaving the last bracket. If
+** sequence is well formed, return its number of '='s + 2; otherwise,
+** return 1 if it is a single bracket (no '='s and no 2nd bracket);
+** otherwise (an unfinished '[==...') return 0.
 */
 static size_t skip_sep (LexState *ls) {
   size_t count = 0;
@@ -481,34 +485,34 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       }
       case '=': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_EQ;
+        if (check_next1(ls, '=')) return TK_EQ;  /* '==' */
         else return '=';
       }
       case '<': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_LE;
-        else if (check_next1(ls, '<')) return TK_SHL;
+        if (check_next1(ls, '=')) return TK_LE;  /* '<=' */
+        else if (check_next1(ls, '<')) return TK_SHL;  /* '<<' */
         else return '<';
       }
       case '>': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_GE;
-        else if (check_next1(ls, '>')) return TK_SHR;
+        if (check_next1(ls, '=')) return TK_GE;  /* '>=' */
+        else if (check_next1(ls, '>')) return TK_SHR;  /* '>>' */
         else return '>';
       }
       case '/': {
         next(ls);
-        if (check_next1(ls, '/')) return TK_IDIV;
+        if (check_next1(ls, '/')) return TK_IDIV;  /* '//' */
         else return '/';
       }
       case '~': {
         next(ls);
-        if (check_next1(ls, '=')) return TK_NE;
+        if (check_next1(ls, '=')) return TK_NE;  /* '~=' */
         else return '~';
       }
       case ':': {
         next(ls);
-        if (check_next1(ls, ':')) return TK_DBCOLON;
+        if (check_next1(ls, ':')) return TK_DBCOLON;  /* '::' */
         else return ':';
       }
       case '"': case '\'': {  /* short literal strings */
@@ -547,7 +551,7 @@ static int llex (LexState *ls, SemInfo *seminfo) {
             return TK_NAME;
           }
         }
-        else {  /* single-char tokens (+ - / ...) */
+        else {  /* single-char tokens ('+', '*', '%', '{', '}', ...) */
           int c = ls->current;
           next(ls);
           return c;

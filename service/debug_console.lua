@@ -165,6 +165,7 @@ function COMMAND.help()
 		profactive = "profactive [on|off] : active/deactive jemalloc heap profilling",
 		dumpheap = "dumpheap : dump heap profilling",
 		killtask = "killtask address threadname : threadname listed by task",
+		dbgcmd = "run address debug command",
 	}
 end
 
@@ -273,24 +274,25 @@ function COMMAND.inject(address, filename, ...)
 	return output
 end
 
-function COMMAND.task(address)
+function COMMAND.dbgcmd(address, cmd, ...)
 	address = adjust_address(address)
-	return skynet.call(address,"debug","TASK")
+	return skynet.call(address, "debug", cmd, ...)
+end
+
+function COMMAND.task(address)
+	return COMMAND.dbgcmd(address, "TASK")
 end
 
 function COMMAND.killtask(address, threadname)
-	address = adjust_address(address)
-	return skynet.call(address, "debug", "KILLTASK", threadname)
+	return COMMAND.dbgcmd(address, "KILLTASK", threadname)
 end
 
 function COMMAND.uniqtask(address)
-	address = adjust_address(address)
-	return skynet.call(address,"debug","UNIQTASK")
+	return COMMAND.dbgcmd(address, "UNIQTASK")
 end
 
 function COMMAND.info(address, ...)
-	address = adjust_address(address)
-	return skynet.call(address,"debug","INFO", ...)
+	return COMMAND.dbgcmd(address, "INFO", ...)
 end
 
 function COMMANDX.debug(cmd)

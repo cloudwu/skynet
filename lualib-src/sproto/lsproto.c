@@ -81,6 +81,55 @@ lua_seti(lua_State *L, int index, lua_Integer n) {
 
 #endif
 
+#if defined(SPROTO_WEAK_TYPE)
+static int64_t
+tointegerx (lua_State *L, int idx, int *isnum) {
+	int64_t v;
+	if (lua_isnumber(L, idx)) {
+		v = (int64_t)(round(lua_tonumber(L, idx)));
+		if (isnum) *isnum = 1;
+		return v;
+	} else {
+		return lua_tointegerx(L, idx, isnum);
+	}
+}
+
+static int
+tobooleanx (lua_State *L, int idx, int *isbool) {
+	if (isbool) *isbool = 1;
+	return lua_toboolean(L, idx);
+}
+
+static const char *
+tolstringx (lua_State *L, int idx, size_t *len, int *isstring) {
+	const char * str = luaL_tolstring(L, idx, len); // call metamethod, '__tostring' must return a string
+	if (isstring) {
+		*isstring = 1;
+	}
+	lua_pop(L, 1);
+	return str;
+}
+
+#else
+#define tointegerx(L, idx, isnum) lua_tointegerx((L), (idx), (isnum))
+
+static int
+tobooleanx (lua_State *L, int idx, int *isbool) {
+	if (isbool) *isbool = lua_isboolean(L, idx);
+	return lua_toboolean(L, idx);
+}
+
+static const char *
+tolstringx (lua_State *L, int idx, size_t *len, int *isstring) {
+	if (isstring) {
+		*isstring = (lua_type(L, idx) == LUA_TSTRING);
+	}
+	const char * str = lua_tolstring(L, idx, len);
+	return str;
+}
+
+#endif
+
 static int
 lnewproto(lua_State *L) {
 	struct sproto * sp;
@@ -243,7 +292,7 @@ encode_one(const struct sproto_arg *args, struct encode_ud *self) {
 			// use 64bit integer for 32bit architecture.
 			v = (int64_t)(round(vn * args->extra));
 		} else {
-			v = lua_tointegerx(L, -1, &isnum);
+			v = tointegerx(L, -1, &isnum);
 			if(!isnum) {
 				return luaL_error(L, ".%s[%d] is not an integer (Is a %s)", 
 					args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
@@ -267,8 +316,9 @@ encode_one(const struct sproto_arg *args, struct encode_ud *self) {
 		return 8;
 	}
 	case SPROTO_TBOOLEAN: {
-		int v = lua_toboolean(L, -1);
-		if (!lua_isboolean(L,-1)) {
+		int isbool;
+		int v = tobooleanx(L, -1, &isbool);
+		if (!isbool) {
 			return luaL_error(L, ".%s[%d] is not a boolean (Is a %s)",
 				args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
 		}
@@ -278,12 +328,12 @@ encode_one(const struct sproto_arg *args, struct encode_ud *self) {
 	}
 	case SPROTO_TSTRING: {
 		size_t sz = 0;
-		const char * str;
-		if (!lua_isstring(L, -1)) {
+		int isstring;
+		int type = lua_type(L, -1); // get the type firstly, lua_tolstring may convert value on stack to string
+		const char * str = tolstringx(L, -1, &sz, &isstring);
+		if (!isstring) {
 			return luaL_error(L, ".%s[%d] is not a string (Is a %s)", 
-				args->tagname, args->index, lua_typename(L, lua_type(L, -1)));
-		} else {
-			str = lua_tolstring(L, -1, &sz);
+				args->tagname, args->index, lua_typename(L, type));
 		}
 		if (sz > args->length)
 			return SPROTO_CB_ERROR;

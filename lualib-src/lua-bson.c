@@ -512,16 +512,14 @@ pack_meta_dict(lua_State *L, struct bson *b, int depth) {
 
 static bool
 is_rawarray(lua_State *L) {
-	size_t len = lua_rawlen(L, -1);
-	if (len > 0) {
-		lua_pushinteger(L, len);
-		if (lua_next(L,-2) == 0) {
-			return true;
-		} else {
-			lua_pop(L,2);
-		}
+	lua_pushnil(L);
+	if (lua_next(L, -2) == 0) {
+		// empty table
+		return false;
 	}
-	return false;
+	lua_Integer firstkey = lua_isinteger(L, -2) ? lua_tointeger(L, -2) : 0;
+	lua_pop(L, 2);
+	return firstkey > 0;
 }
 
 static void
@@ -1086,6 +1084,7 @@ lbinary(lua_State *L) {
 	luaL_addchar(&b, 0);
 	luaL_addchar(&b, BSON_BINARY);
 	luaL_addchar(&b, 0);	// sub type
+	lua_pushvalue(L,1);
 	luaL_addvalue(&b);
 	luaL_pushresult(&b);
 
@@ -1245,11 +1244,11 @@ typeclosure(lua_State *L) {
 }
 
 static uint8_t oid_header[5];
-static uint32_t oid_counter;
+static ATOM_ULONG oid_counter;
 
 static void
 init_oid_header() {
-	if (oid_counter) {
+	if (ATOM_LOAD(&oid_counter)) {
 		// already init
 		return;
 	}
@@ -1269,11 +1268,11 @@ init_oid_header() {
 	oid_header[3] = pid & 0xff;
 	oid_header[4] = (pid >> 8) & 0xff;
 	
-	uint32_t c = h ^ time(NULL) ^ (uintptr_t)&h;
+	unsigned long c = h ^ time(NULL) ^ (uintptr_t)&h;
 	if (c == 0) {
 		c = 1;
 	}
-	oid_counter = c;
+	ATOM_STORE(&oid_counter, c);
 }
 
 static inline int

@@ -150,22 +150,6 @@ typedef LUAI_UACINT l_uacInt;
 
 
 /*
-** macros to improve jump prediction (used mainly for error handling)
-*/
-#if !defined(likely)
-
-#if defined(__GNUC__)
-#define likely(x)	(__builtin_expect(((x) != 0), 1))
-#define unlikely(x)	(__builtin_expect(((x) != 0), 0))
-#else
-#define likely(x)	(x)
-#define unlikely(x)	(x)
-#endif
-
-#endif
-
-
-/*
 ** non-return type
 */
 #if !defined(l_noret)
@@ -179,6 +163,20 @@ typedef LUAI_UACINT l_uacInt;
 #endif
 
 #endif
+
+
+/*
+** Inline functions
+*/
+#if !defined(LUA_USE_C89)
+#define l_inline	inline
+#elif defined(__GNUC__)
+#define l_inline	__inline__
+#else
+#define l_inline	/* empty */
+#endif
+
+#define l_sinline	static l_inline
 
 
 /*
@@ -326,7 +324,8 @@ typedef l_uint32 Instruction;
 
 /* exponentiation */
 #if !defined(luai_numpow)
-#define luai_numpow(L,a,b)      ((void)L, l_mathop(pow)(a,b))
+#define luai_numpow(L,a,b)  \
+  ((void)L, (b == 2) ? (a)*(a) : l_mathop(pow)(a,b))
 #endif
 
 /* the others are quite standard operations */
@@ -355,14 +354,14 @@ typedef l_uint32 Instruction;
 #else
 /* realloc stack keeping its size */
 #define condmovestack(L,pre,pos)  \
-  { int sz_ = (L)->stacksize; pre; luaD_reallocstack((L), sz_, 0); pos; }
+  { int sz_ = stacksize(L); pre; luaD_reallocstack((L), sz_, 0); pos; }
 #endif
 
 #if !defined(HARDMEMTESTS)
 #define condchangemem(L,pre,pos)	((void)0)
 #else
 #define condchangemem(L,pre,pos)  \
-	{ if (G(L)->gcrunning) { pre; luaC_fullgc(L, 0); pos; } }
+	{ if (gcrunning(G(L))) { pre; luaC_fullgc(L, 0); pos; } }
 #endif
 
 #endif

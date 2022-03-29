@@ -175,13 +175,13 @@ _forward(struct gate *g, struct connection * c, int size) {
 	}
 	if (g->broker) {
 		void * temp = skynet_malloc(size);
-		databuffer_read(&c->buffer,&g->mp,temp, size);
+		databuffer_read(&c->buffer,&g->mp,(char *)temp, size);
 		skynet_send(ctx, 0, g->broker, g->client_tag | PTYPE_TAG_DONTCOPY, fd, temp, size);
 		return;
 	}
 	if (c->agent) {
 		void * temp = skynet_malloc(size);
-		databuffer_read(&c->buffer,&g->mp,temp, size);
+		databuffer_read(&c->buffer,&g->mp,(char *)temp, size);
 		skynet_send(ctx, c->client, c->agent, g->client_tag | PTYPE_TAG_DONTCOPY, fd , temp, size);
 	} else if (g->watchdog) {
 		char * tmp = skynet_malloc(size + 32);

@@ -128,6 +128,16 @@ local function pop_response(self)
 	end
 end
 
+-- on close callback
+local function autoclose_cb(self, fd)
+	local sock = self.__sock
+	if self.__wait_response and sock and sock[1] == fd then
+		-- closed by peer
+		skynet.error("socket closed by peer : ", self.__host, self.__port)
+		close_channel_socket(self)
+	end
+end
+
 local function push_response(self, response, co)
 	if self.__response then
 		-- response is session
@@ -170,7 +180,15 @@ local function dispatch_by_order(self)
 			wakeup_all(self, "channel_closed")
 			break
 		end
-		local ok, result_ok, result_data = pcall(get_response, func, self.__sock)
+		local sock = self.__sock
+		if not sock then
+			-- closed by peer
+			self.__result[co] = socket_error
+			skynet.wakeup(co)
+			wakeup_all(self)
+			break
+		end
+		local ok, result_ok, result_data = pcall(get_response, func, sock)
 		if ok then
 			self.__result[co] = result_ok
 			if result_ok and self.__result_data[co] then
@@ -197,6 +215,9 @@ local function dispatch_function(self)
 	if self.__response then
 		return dispatch_by_session
 	else
+		socket.onclose(self.__sock[1], function(fd)
+			autoclose_cb(self, fd)
+		end)
 		return dispatch_by_order
 	end
 end
@@ -300,7 +321,10 @@ local function connect_once(self)
 
 		self.__sock = setmetatable( {fd} , channel_socket_meta )
 		self.__dispatch_thread = skynet.fork(function()
-			pcall(dispatch_function(self), self)
+			if self.__sock then
+				-- self.__sock can be false (socket closed) if error during connecting, See #1513
+				pcall(dispatch_function(self), self)
+			end
 			-- clear dispatch_thread
 			self.__dispatch_thread = nil
 		end)
@@ -367,13 +391,17 @@ end
 
 local function check_connection(self)
 	if self.__sock then
+		local authco = self.__authcoroutine
 		if socket.disconnected(self.__sock[1]) then
 			-- closed by peer
 			skynet.error("socket: disconnect detected ", self.__host, self.__port)
 			close_channel_socket(self)
+			if authco and authco == coroutine.running() then
+				-- disconnected during auth, See #1513
+				return false
+			end
 			return
 		end
-		local authco = self.__authcoroutine
 		if not authco then
 			return true
 		end
@@ -402,12 +430,12 @@ local function block_connect(self, once)
 	else
 		self.__connecting[1] = true
 		err = try_connect(self, once)
-		self.__connecting[1] = nil
 		for i=2, #self.__connecting do
 			local co = self.__connecting[i]
 			self.__connecting[i] = nil
 			skynet.wakeup(co)
 		end
+		self.__connecting[1] = nil
 	end
 
 	r = check_connection(self)

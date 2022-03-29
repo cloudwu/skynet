@@ -41,6 +41,7 @@ mark_shared(lua_State *L) {
 				} else if (!lua_iscfunction(L, idx)) {
 					LClosure *f = (LClosure *)lua_topointer(L, idx);
 					makeshared(f);
+					lua_sharefunction(L, idx);
 				}
 				break;
 			case LUA_TSTRING:

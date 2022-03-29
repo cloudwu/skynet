@@ -73,7 +73,7 @@ static int math_atan (lua_State *L) {
 static int math_toint (lua_State *L) {
   int valid;
   lua_Integer n = lua_tointegerx(L, 1, &valid);
-  if (valid)
+  if (l_likely(valid))
     lua_pushinteger(L, n);
   else {
     luaL_checkany(L, 1);
@@ -175,7 +175,8 @@ static int math_log (lua_State *L) {
     lua_Number base = luaL_checknumber(L, 2);
 #if !defined(LUA_USE_C89)
     if (base == l_mathop(2.0))
-      res = l_mathop(log2)(x); else
+      res = l_mathop(log2)(x);
+    else
 #endif
     if (base == l_mathop(10.0))
       res = l_mathop(log10)(x);
@@ -474,7 +475,7 @@ static lua_Number I2d (Rand64 x) {
 
 /* 2^(-FIGS) = 1.0 / 2^30 / 2^3 / 2^(FIGS-33) */
 #define scaleFIG  \
-	((lua_Number)1.0 / (UONE << 30) / 8.0 / (UONE << (FIGS - 33)))
+    (l_mathop(1.0) / (UONE << 30) / l_mathop(8.0) / (UONE << (FIGS - 33)))
 
 /*
 ** use FIGS - 32 bits from lower half, throwing out the other
@@ -485,7 +486,7 @@ static lua_Number I2d (Rand64 x) {
 /*
 ** higher 32 bits go after those (FIGS - 32) bits: shiftHI = 2^(FIGS - 32)
 */
-#define shiftHI		((lua_Number)(UONE << (FIGS - 33)) * 2.0)
+#define shiftHI		((lua_Number)(UONE << (FIGS - 33)) * l_mathop(2.0))
 
 
 static lua_Number I2d (Rand64 x) {
