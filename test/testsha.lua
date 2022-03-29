@@ -23,6 +23,11 @@ end
 
 -- test To improve compatibility, test MTM0MjM=
 print(crypt.base64decode("MTM0MjM"))
+print(crypt.base64decode("MTIz"))
+print(crypt.base64decode("MTIzMg=="))
+print(crypt.base64decode("MTIzMjM="))
+print(crypt.base64decode("MTIzMg"))
+print(crypt.base64decode("MTIzMjM"))
 
 -- test sha256 
 print(sha256("Hello World!"))

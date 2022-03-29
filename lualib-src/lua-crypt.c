@@ -961,7 +961,7 @@ lb64decode(lua_State *L) {
 		int padding = 0;
 		int c[4];
 		for (j=0;j<4;) {
-			if (i>=sz && 4>j){
+			if (i>=sz){
 				/*To improve compatibility, there may not be enough equal signs */ 
 				c[j] = -2;   
 			}else{
