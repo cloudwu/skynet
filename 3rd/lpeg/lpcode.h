@@ -1,5 +1,5 @@
 /*
-** $Id: lpcode.h,v 1.8 2016/09/15 17:46:13 roberto Exp $
+** $Id: lpcode.h $
 */
 
 #if !defined(lpcode_h)

@@ -10,7 +10,7 @@
 </head>
 <body>
 
-<!-- $Id: re.html,v 1.24 2016/09/20 17:41:27 roberto Exp $ -->
+<!-- $Id: re.html $ -->
 
 <div id="container">
 	
@@ -93,6 +93,8 @@ Constructions are listed in order of decreasing precedence.
 equivalent to <code>p / defs[name]</code></td></tr>
 <tr><td><code>p =&gt; name</code></td> <td>match-time capture
 equivalent to <code>lpeg.Cmt(p, defs[name])</code></td></tr>
+<tr><td><code>p ~&gt; name</code></td> <td>fold capture
+equivalent to <code>lpeg.Cf(p, defs[name])</code></td></tr>
 <tr><td><code>& p</code></td> <td>and predicate</td></tr>
 <tr><td><code>! p</code></td> <td>not predicate</td></tr>
 <tr><td><code>p1 p2</code></td> <td>concatenation</td></tr>
@@ -485,12 +487,6 @@ THE SOFTWARE.
 </div> <!-- id="content" -->
 
 </div> <!-- id="main" -->
-
-<div id="about">
-<p><small>
-$Id: re.html,v 1.24 2016/09/20 17:41:27 roberto Exp $
-</small></p>
-</div> <!-- id="about" -->
 
 </div> <!-- id="container" -->
 
