@@ -961,10 +961,12 @@ lb64decode(lua_State *L) {
 		int padding = 0;
 		int c[4];
 		for (j=0;j<4;) {
-			if (i>=sz) {
-				return luaL_error(L, "Invalid base64 text");
+			if (i>=sz && 4>j){
+				/*To improve compatibility, there may not be enough equal signs */ 
+				c[j] = -2;   
+			}else{
+				c[j] = b64index(text[i]);
 			}
-			c[j] = b64index(text[i]);
 			if (c[j] == -1) {
 				++i;
 				continue;
