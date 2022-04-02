@@ -204,6 +204,18 @@ function command.register(source, name, addr)
 	skynet.error(string.format("Register [%s] :%08x", name, addr))
 end
 
+function command.unregister(_, name)
+	if not register_name[name] then
+		return skynet.ret(nil)
+	end
+	local addr = register_name[name]
+	register_name[addr] = nil
+	register_name[name] = nil
+	clearnamecache()
+	skynet.ret(nil)
+	skynet.error(string.format("Unregister [%s] :%08x", name, addr))
+end
+
 function command.queryname(source, name)
 	skynet.ret(skynet.pack(register_name[name]))
 end
