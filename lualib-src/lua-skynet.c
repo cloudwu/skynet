@@ -35,12 +35,6 @@ get_time() {
 #endif
 }
 
-struct snlua {
-	lua_State * L;
-	struct skynet_context * ctx;
-	const char * preload;
-};
-
 static int
 traceback (lua_State *L) {
 	const char *msg = lua_tostring(L, 1);
