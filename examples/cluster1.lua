@@ -12,6 +12,8 @@ skynet.start(function()
 	-- register name "sdb" for simpledb, you can use cluster.query() later.
 	-- See cluster2.lua
 	cluster.register("sdb", sdb)
+	cluster.unregister("sdb")
+	cluster.register("sdb", sdb)
 
 	print(skynet.call(sdb, "lua", "SET", "a", "foobar"))
 	print(skynet.call(sdb, "lua", "SET", "b", "foobar2"))
