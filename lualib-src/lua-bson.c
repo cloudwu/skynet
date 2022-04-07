@@ -666,7 +666,7 @@ unpack_dict(lua_State *L, struct bson_reader *br, bool array) {
 		case BSON_MINKEY:
 		case BSON_MAXKEY:
 		case BSON_NULL: {
-			char key[] = { 0, bt };
+			char key[] = { 0, (char)bt };
 			lua_pushlstring(L, key, sizeof(key));
 			break;
 		}
@@ -1106,7 +1106,7 @@ lsubtype(lua_State *L, int subtype, const uint8_t * buf, size_t sz) {
 		char oid[24];
 		int i;
 		const uint8_t * id = buf;
-		static char *hex = "0123456789abcdef";
+		static const char *hex = "0123456789abcdef";
 		for (i=0;i<12;i++) {
 			oid[i*2] = hex[id[i] >> 4];
 			oid[i*2+1] = hex[id[i] & 0xf];

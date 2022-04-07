@@ -27,9 +27,11 @@
 #if defined (__cplusplus)
 #include <atomic>
 #define STD_ std::
+#define atomic_value_type_(p, v) decltype((p)->load())(v) 
 #else
 #include <stdatomic.h>
 #define STD_
+#define atomic_value_type_(p, v) v
 #endif
 
 #define ATOM_INT  STD_ atomic_int
@@ -60,11 +62,11 @@ ATOM_CAS_POINTER(STD_ atomic_uintptr_t *ptr, uintptr_t oval, uintptr_t nval) {
 	return STD_ atomic_compare_exchange_weak(ptr, &(oval), nval);
 }
 
-#define ATOM_FINC(ptr) STD_ atomic_fetch_add(ptr, 1)
-#define ATOM_FDEC(ptr) STD_ atomic_fetch_sub(ptr, 1)
-#define ATOM_FADD(ptr,n) STD_ atomic_fetch_add(ptr, n)
-#define ATOM_FSUB(ptr,n) STD_ atomic_fetch_sub(ptr, n)
-#define ATOM_FAND(ptr,n) STD_ atomic_fetch_and(ptr, n)
+#define ATOM_FINC(ptr) STD_ atomic_fetch_add(ptr, atomic_value_type_(ptr,1))
+#define ATOM_FDEC(ptr) STD_ atomic_fetch_sub(ptr, atomic_value_type_(ptr, 1))
+#define ATOM_FADD(ptr,n) STD_ atomic_fetch_add(ptr, atomic_value_type_(ptr, n))
+#define ATOM_FSUB(ptr,n) STD_ atomic_fetch_sub(ptr, atomic_value_type_(ptr, n))
+#define ATOM_FAND(ptr,n) STD_ atomic_fetch_and(ptr, atomic_value_type_(ptr, n))
 
 #endif
 
