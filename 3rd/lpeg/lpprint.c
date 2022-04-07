@@ -1,5 +1,5 @@
 /*
-** $Id: lpprint.c,v 1.10 2016/09/13 16:06:03 roberto Exp $
+** $Id: lpprint.c $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 

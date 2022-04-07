@@ -321,7 +321,10 @@ local function connect_once(self)
 
 		self.__sock = setmetatable( {fd} , channel_socket_meta )
 		self.__dispatch_thread = skynet.fork(function()
-			pcall(dispatch_function(self), self)
+			if self.__sock then
+				-- self.__sock can be false (socket closed) if error during connecting, See #1513
+				pcall(dispatch_function(self), self)
+			end
 			-- clear dispatch_thread
 			self.__dispatch_thread = nil
 		end)
@@ -388,13 +391,17 @@ end
 
 local function check_connection(self)
 	if self.__sock then
+		local authco = self.__authcoroutine
 		if socket.disconnected(self.__sock[1]) then
 			-- closed by peer
 			skynet.error("socket: disconnect detected ", self.__host, self.__port)
 			close_channel_socket(self)
+			if authco and authco == coroutine.running() then
+				-- disconnected during auth, See #1513
+				return false
+			end
 			return
 		end
-		local authco = self.__authcoroutine
 		if not authco then
 			return true
 		end

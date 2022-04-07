@@ -512,16 +512,14 @@ pack_meta_dict(lua_State *L, struct bson *b, int depth) {
 
 static bool
 is_rawarray(lua_State *L) {
-	size_t len = lua_rawlen(L, -1);
-	if (len > 0) {
-		lua_pushinteger(L, len);
-		if (lua_next(L,-2) == 0) {
-			return true;
-		} else {
-			lua_pop(L,2);
-		}
+	lua_pushnil(L);
+	if (lua_next(L, -2) == 0) {
+		// empty table
+		return false;
 	}
-	return false;
+	lua_Integer firstkey = lua_isinteger(L, -2) ? lua_tointeger(L, -2) : 0;
+	lua_pop(L, 2);
+	return firstkey > 0;
 }
 
 static void

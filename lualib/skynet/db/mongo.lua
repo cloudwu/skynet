@@ -365,6 +365,18 @@ function mongo_collection:batch_insert(docs)
 	sock:request(pack)
 end
 
+function mongo_collection:safe_batch_insert(docs)
+	for i = 1, #docs do
+		if docs[i]._id == nil then
+			docs[i]._id = bson.objectid()
+		end
+		docs[i] = bson_encode(docs[i])
+	end
+
+	local r = self.database:runCommand("insert", self.name, "documents", docs)
+	return werror(r)
+end
+
 function mongo_collection:update(selector,update,upsert,multi)
 	local flags	= (upsert and 1	or 0) +	(multi and 2 or	0)
 	local sock = self.connection.__sock

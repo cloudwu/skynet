@@ -1,8 +1,8 @@
 LIBNAME = lpeg
 LUADIR = ../lua/
 
-COPT = -O2
-# COPT = -DLPEG_DEBUG -g
+COPT = -O2 -DNDEBUG
+# COPT = -g
 
 CWARNS = -Wall -Wextra -pedantic \
 	-Waggregate-return \
@@ -29,11 +29,11 @@ FILES = lpvm.o lpcap.o lptree.o lpcode.o lpprint.o
 
 # For Linux
 linux:
-	make lpeg.so "DLLFLAGS = -shared -fPIC"
+	$(MAKE) lpeg.so "DLLFLAGS = -shared -fPIC"
 
 # For Mac OS
 macosx:
-	make lpeg.so "DLLFLAGS = -bundle -undefined dynamic_lookup"
+	$(MAKE) lpeg.so "DLLFLAGS = -bundle -undefined dynamic_lookup"
 
 lpeg.so: $(FILES)
 	env $(CC) $(DLLFLAGS) $(FILES) -o lpeg.so

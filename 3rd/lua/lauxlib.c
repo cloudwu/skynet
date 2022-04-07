@@ -881,6 +881,7 @@ LUALIB_API lua_Integer luaL_len (lua_State *L, int idx) {
 
 
 LUALIB_API const char *luaL_tolstring (lua_State *L, int idx, size_t *len) {
+  idx = lua_absindex(L,idx);
   if (luaL_callmeta(L, idx, "__tostring")) {  /* metafield? */
     if (!lua_isstring(L, -1))
       luaL_error(L, "'__tostring' must return a string");
@@ -1220,7 +1221,7 @@ static int cache_mode(lua_State *L) {
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
   int level = cache_level(L);
-  if (level == CACHE_OFF) {
+  if (level == CACHE_OFF || filename == NULL) {
     return luaL_loadfilex_(L, filename, mode);
   }
   const void * proto = load_proto(filename);

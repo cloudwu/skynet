@@ -19,8 +19,8 @@ static ATOM_SIZET _used_memory = 0;
 static ATOM_SIZET _memory_block = 0;
 
 struct mem_data {
-	uint32_t handle;
-	ssize_t allocated;
+	ATOM_ULONG handle;
+	ATOM_SIZET allocated;
 };
 
 struct mem_cookie {
@@ -44,19 +44,19 @@ static struct mem_data mem_stats[SLOT_SIZE];
 #define raw_realloc je_realloc
 #define raw_free je_free
 
-static ssize_t*
+static ATOM_SIZET *
 get_allocated_field(uint32_t handle) {
 	int h = (int)(handle & (SLOT_SIZE - 1));
 	struct mem_data *data = &mem_stats[h];
 	uint32_t old_handle = data->handle;
-	ssize_t old_alloc = data->allocated;
+	ssize_t old_alloc = (ssize_t)data->allocated;
 	if(old_handle == 0 || old_alloc <= 0) {
 		// data->allocated may less than zero, because it may not count at start.
-		if(!ATOM_CAS(&data->handle, old_handle, handle)) {
+		if(!ATOM_CAS_ULONG(&data->handle, old_handle, handle)) {
 			return 0;
 		}
 		if (old_alloc < 0) {
-			ATOM_CAS(&data->allocated, old_alloc, 0);
+			ATOM_CAS_SIZET(&data->allocated, (size_t)old_alloc, 0);
 		}
 	}
 	if(data->handle != handle) {
@@ -69,7 +69,7 @@ inline static void
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
 	ATOM_FADD(&_used_memory, __n);
 	ATOM_FINC(&_memory_block);
-	ssize_t* allocated = get_allocated_field(handle);
+	ATOM_SIZET * allocated = get_allocated_field(handle);
 	if(allocated) {
 		ATOM_FADD(allocated, __n);
 	}
@@ -79,7 +79,7 @@ inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
 	ATOM_FSUB(&_used_memory, __n);
 	ATOM_FDEC(&_memory_block);
-	ssize_t* allocated = get_allocated_field(handle);
+	ATOM_SIZET * allocated = get_allocated_field(handle);
 	if(allocated) {
 		ATOM_FSUB(allocated, __n);
 	}

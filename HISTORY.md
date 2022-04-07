@@ -1,3 +1,14 @@
+v1.5.0 (2021-11-9)
+-----------
+* Update Lua to 5.4.3
+* Fix socket half close issues
+* Fix TLS issues
+* Improve websocket support
+* Improve redis support
+* Rework skynet.init/skynet.require
+* Add socket.onclose
+* Add httpc.request_stream
+
 v1.4.0 (2020-11-16)
 -----------
 * Update Lua to 5.4.2
