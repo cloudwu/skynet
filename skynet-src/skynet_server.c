@@ -10,7 +10,6 @@
 #include "skynet_monitor.h"
 #include "skynet_imp.h"
 #include "skynet_log.h"
-#include "skynet_timer.h"
 #include "spinlock.h"
 #include "atomic.h"
 
