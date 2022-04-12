@@ -100,19 +100,11 @@ lcallback(lua_State *L) {
 	int forward = lua_toboolean(L, 2);
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);
-	struct callback_context *cb_ctx;
-	if (lua_getfield(L, LUA_REGISTRYINDEX, "callback_context") != LUA_TUSERDATA) {
-		lua_pop(L, 1);
-		cb_ctx = (struct callback_context *)lua_newuserdata(L, sizeof(*cb_ctx));
-		cb_ctx->L = lua_newthread(L);
-		lua_pushcfunction(cb_ctx->L, traceback);
-		lua_setuservalue(L, -2);
-		lua_setfield(L, LUA_REGISTRYINDEX, "callback_context");
-	} else {
-		cb_ctx = (struct callback_context *)lua_touserdata(L, -1);
-		lua_pop(L, 1);
-	}
-	lua_settop(cb_ctx->L, 1);
+	struct callback_context *cb_ctx = (struct callback_context *)lua_newuserdata(L, sizeof(*cb_ctx));
+	cb_ctx->L = lua_newthread(L);
+	lua_pushcfunction(cb_ctx->L, traceback);
+	lua_setuservalue(L, -2);
+	lua_setfield(L, LUA_REGISTRYINDEX, "callback_context");
 	lua_xmove(L, cb_ctx->L, 1);
 
 	if (forward) {
