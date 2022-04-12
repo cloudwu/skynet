@@ -106,6 +106,8 @@ lcallback(lua_State *L) {
 
 	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
 	lua_State *gL = lua_tothread(L,-1);
+	// reload callback function, See _cb()
+	lua_settop(gL, 0);
 
 	if (forward) {
 		skynet_callback(context, gL, forward_cb);
