@@ -1,0 +1,10 @@
+include "config.path"
+
+thread = 8
+logger = "skynet.log"
+logpath = "."
+harbor = 0
+start = "testhandle"	-- main script
+bootstrap = "snlua bootstrap"	-- The service for bootstrap
+cpath = root.."cservice/?.so"
+--daemon = "./skynet.pid"

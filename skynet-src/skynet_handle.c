@@ -60,9 +60,11 @@ skynet_handle_register(struct skynet_context *ctx) {
 		struct skynet_context ** new_slot = skynet_malloc(s->slot_size * 2 * sizeof(struct skynet_context *));
 		memset(new_slot, 0, s->slot_size * 2 * sizeof(struct skynet_context *));
 		for (i=0;i<s->slot_size;i++) {
-			int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
-			assert(new_slot[hash] == NULL);
-			new_slot[hash] = s->slot[i];
+			if (s->slot[i]) {
+				int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
+				assert(new_slot[hash] == NULL);
+				new_slot[hash] = s->slot[i];
+			}
 		}
 		skynet_free(s->slot);
 		s->slot = new_slot;
