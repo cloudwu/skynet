@@ -394,6 +394,21 @@ function mongo_collection:safe_update(selector, update, upsert, multi)
 	return werror(r)
 end
 
+function mongo_collection:safe_batch_update(updates)
+	local updates_tb = {}
+	for i = 1, #updates do
+		updates_tb[i] = bson_encode({
+			q = updates[i].query,
+			u = updates[i].update,
+			upsert = updates[i].upsert,
+			multi = updates[i].multi,
+		})
+	end
+
+	local r = self.database:runCommand("update", self.name, "updates", updates_tb)
+	return werror(r)
+end
+
 function mongo_collection:delete(selector, single)
 	local sock = self.connection.__sock
 	local pack = driver.delete(self.full_name, single, bson_encode(selector))
