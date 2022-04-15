@@ -423,6 +423,18 @@ function mongo_collection:safe_delete(selector, single)
 	return werror(r)
 end
 
+function mongo_collection:safe_batch_delete(selectors, single)
+	local delete_tb = {}
+	for i = 1, #selectors do
+		delete_tb[i] = bson_encode({
+			q = selectors[i],
+			limit = single and 1 or 0,
+		})
+	end
+	local r = self.database:runCommand("delete", self.name, "deletes", delete_tb)
+	return werror(r)
+end
+
 function mongo_collection:findOne(query, selector)
 	local conn = self.connection
 	local request_id = conn:genId()
