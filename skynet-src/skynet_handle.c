@@ -121,13 +121,13 @@ skynet_handle_retireall() {
 			rwlock_rlock(&s->lock);
 			struct skynet_context * ctx = s->slot[i];
 			uint32_t handle = 0;
-			if (ctx)
+			if (ctx) {
 				handle = skynet_context_handle(ctx);
+				++n;
+			}
 			rwlock_runlock(&s->lock);
 			if (handle != 0) {
-				if (skynet_handle_retire(handle)) {
-					++n;
-				}
+				skynet_handle_retire(handle);
 			}
 		}
 		if (n==0)
