@@ -4,6 +4,7 @@
 #ifdef __STDC_NO_ATOMICS__
 
 #include <stddef.h>
+#include <stdint.h>
 
 #define ATOM_INT volatile int
 #define ATOM_POINTER volatile uintptr_t
