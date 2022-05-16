@@ -1,5 +1,5 @@
 /*
-** $Id: lpvm.c,v 1.6 2015/09/28 17:01:25 roberto Exp $
+** $Id: lpvm.c $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -45,16 +45,29 @@ typedef struct Stack {
 
 
 /*
-** Double the size of the array of captures
+** Ensures the size of array 'capture' (with size '*capsize' and
+** 'captop' elements being used) is enough to accomodate 'n' extra
+** elements plus one.  (Because several opcodes add stuff to the capture
+** array, it is simpler to ensure the array always has at least one free
+** slot upfront and check its size later.)
 */
-static Capture *doublecap (lua_State *L, Capture *cap, int captop, int ptop) {
-  Capture *newc;
-  if (captop >= INT_MAX/((int)sizeof(Capture) * 2))
-    luaL_error(L, "too many captures");
-  newc = (Capture *)lua_newuserdata(L, captop * 2 * sizeof(Capture));
-  memcpy(newc, cap, captop * sizeof(Capture));
-  lua_replace(L, caplistidx(ptop));
-  return newc;
+static Capture *growcap (lua_State *L, Capture *capture, int *capsize,
+                                       int captop, int n, int ptop) {
+  if (*capsize - captop > n)
+    return capture;  /* no need to grow array */
+  else {  /* must grow */
+    Capture *newc;
+    int newsize = captop + n + 1;  /* minimum size needed */
+    if (newsize < INT_MAX/((int)sizeof(Capture) * 2))
+      newsize *= 2;  /* twice that size, if not too big */
+    else if (newsize >= INT_MAX/((int)sizeof(Capture)))
+      luaL_error(L, "too many captures");
+    newc = (Capture *)lua_newuserdata(L, newsize * sizeof(Capture));
+    memcpy(newc, capture, captop * sizeof(Capture));
+    *capsize = newsize;
+    lua_replace(L, caplistidx(ptop));
+    return newc;
+  }
 }
 
 
@@ -107,24 +120,24 @@ static int resdyncaptures (lua_State *L, int fr, int curr, int limit) {
 
 
 /*
-** Add capture values returned by a dynamic capture to the capture list
-** 'base', nested inside a group capture. 'fd' indexes the first capture
-** value, 'n' is the number of values (at least 1).
+** Add capture values returned by a dynamic capture to the list
+** 'capture', nested inside a group. 'fd' indexes the first capture
+** value, 'n' is the number of values (at least 1). The open group
+** capture is already in 'capture', before the place for the new entries.
 */
-static void adddyncaptures (const char *s, Capture *base, int n, int fd) {
+static void adddyncaptures (const char *s, Capture *capture, int n, int fd) {
   int i;
-  /* Cgroup capture is already there */
-  assert(base[0].kind == Cgroup && base[0].siz == 0);
-  base[0].idx = 0;  /* make it an anonymous group */
-  for (i = 1; i <= n; i++) {  /* add runtime captures */
-    base[i].kind = Cruntime;
-    base[i].siz = 1;  /* mark it as closed */
-    base[i].idx = fd + i - 1;  /* stack index of capture value */
-    base[i].s = s;
+  assert(capture[-1].kind == Cgroup && capture[-1].siz == 0);
+  capture[-1].idx = 0;  /* make group capture an anonymous group */
+  for (i = 0; i < n; i++) {  /* add runtime captures */
+    capture[i].kind = Cruntime;
+    capture[i].siz = 1;  /* mark it as closed */
+    capture[i].idx = fd + i;  /* stack index of capture value */
+    capture[i].s = s;
   }
-  base[i].kind = Cclose;  /* close group */
-  base[i].siz = 1;
-  base[i].s = s;
+  capture[n].kind = Cclose;  /* close group */
+  capture[n].siz = 1;
+  capture[n].s = s;
 }
 
 
@@ -157,10 +170,11 @@ const char *match (lua_State *L, const char *o, const char *s, const char *e,
   lua_pushlightuserdata(L, stackbase);
   for (;;) {
 #if defined(DEBUG)
-      printf("s: |%s| stck:%d, dyncaps:%d, caps:%d  ",
-             s, stack - getstackbase(L, ptop), ndyncap, captop);
-      printinst(op, p);
+      printf("-------------------------------------\n");
       printcaplist(capture, capture + captop);
+      printf("s: |%s| stck:%d, dyncaps:%d, caps:%d  ",
+             s, (int)(stack - getstackbase(L, ptop)), ndyncap, captop);
+      printinst(op, p);
 #endif
     assert(stackidx(ptop) + ndyncap == lua_gettop(L) && ndyncap <= captop);
     switch ((Opcode)p->i.code) {
@@ -284,29 +298,36 @@ const char *match (lua_State *L, const char *o, const char *s, const char *e,
           ndyncap -= removedyncap(L, capture, stack->caplevel, captop);
         captop = stack->caplevel;
         p = stack->p;
+#if defined(DEBUG)
+        printf("**FAIL**\n");
+#endif
         continue;
       }
       case ICloseRunTime: {
         CapState cs;
         int rem, res, n;
         int fr = lua_gettop(L) + 1;  /* stack index of first result */
-        cs.s = o; cs.L = L; cs.ocap = capture; cs.ptop = ptop;
+        cs.reclevel = 0; cs.L = L;
+        cs.s = o; cs.ocap = capture; cs.ptop = ptop;
         n = runtimecap(&cs, capture + captop, s, &rem);  /* call function */
         captop -= n;  /* remove nested captures */
+        ndyncap -= rem;  /* update number of dynamic captures */
         fr -= rem;  /* 'rem' items were popped from Lua stack */
         res = resdyncaptures(L, fr, s - o, e - o);  /* get result */
         if (res == -1)  /* fail? */
           goto fail;
         s = o + res;  /* else update current position */
         n = lua_gettop(L) - fr + 1;  /* number of new captures */
-        ndyncap += n - rem;  /* update number of dynamic captures */
-        if (n > 0) {  /* any new capture? */
-          if ((captop += n + 2) >= capsize) {
-            capture = doublecap(L, capture, captop, ptop);
-            capsize = 2 * captop;
-          }
-          /* add new captures to 'capture' list */
-          adddyncaptures(s, capture + captop - n - 2, n, fr); 
+        ndyncap += n;  /* update number of dynamic captures */
+        if (n == 0)  /* no new captures? */
+          captop--;  /* remove open group */
+        else {  /* new captures; keep original open group */
+          if (fr + n >= SHRT_MAX)
+            luaL_error(L, "too many results in match-time capture");
+          /* add new captures + close group to 'capture' list */
+          capture = growcap(L, capture, &capsize, captop, n + 1, ptop);
+          adddyncaptures(s, capture + captop, n, fr);
+          captop += n + 1;  /* new captures + close group */
         }
         p++;
         continue;
@@ -338,10 +359,8 @@ const char *match (lua_State *L, const char *o, const char *s, const char *e,
       pushcapture: {
         capture[captop].idx = p->i.key;
         capture[captop].kind = getkind(p);
-        if (++captop >= capsize) {
-          capture = doublecap(L, capture, captop, ptop);
-          capsize = 2 * captop;
-        }
+        captop++;
+        capture = growcap(L, capture, &capsize, captop, 0, ptop);
         p++;
         continue;
       }

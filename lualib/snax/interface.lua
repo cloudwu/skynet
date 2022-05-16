@@ -1,8 +1,23 @@
 local skynet = require "skynet"
 
+local function dft_loader(path, name, G)
+	local errlist = {}
+
+	for pat in string.gmatch(path,"[^;]+") do
+		local filename = string.gsub(pat, "?", name)
+		local f , err = loadfile(filename, "bt", G)
+		if f then
+			return f, pat
+		else
+			table.insert(errlist, err)
+		end
+	end
+
+	error(table.concat(errlist, "\n"))
+end
+
 return function (name , G, loader)
-	loader = loader or loadfile
-	local mainfunc
+	loader = loader or dft_loader
 
 	local function func_id(id, group)
 		local tmp = {}
@@ -26,7 +41,6 @@ return function (name , G, loader)
 		assert(getmetatable(G) == nil)
 		assert(G.init == nil)
 		assert(G.exit == nil)
-
 		assert(G.accept == nil)
 		assert(G.response == nil)
 	end
@@ -35,7 +49,7 @@ return function (name , G, loader)
 	local env = setmetatable({} , { __index = temp_global })
 	local func = {}
 
-	local system = { "init", "exit", "hotfix" }
+	local system = { "init", "exit", "hotfix", "profile"}
 
 	do
 		for k, v in ipairs(system) do
@@ -59,32 +73,11 @@ return function (name , G, loader)
 		end
 	end
 
-	local pattern
-
-	do
-		local path = assert(skynet.getenv "snax" , "please set snax in config file")
-
-		local errlist = {}
-
-		for pat in string.gmatch(path,"[^;]+") do
-			local filename = string.gsub(pat, "?", name)
-			local f , err = loader(filename, "bt", G)
-			if f then
-				pattern = pat
-				mainfunc = f
-				break
-			else
-				table.insert(errlist, err)
-			end
-		end
-
-		if mainfunc == nil then
-			error(table.concat(errlist, "\n"))
-		end
-	end
+	local path = assert(skynet.getenv "snax" , "please set snax in config file")
+	local mainfunc, pattern = loader(path, name, G)
 
 	setmetatable(G,	{ __index = env , __newindex = init_system })
-	local ok, err = pcall(mainfunc)
+	local ok, err = xpcall(mainfunc, debug.traceback)
 	setmetatable(G, nil)
 	assert(ok,err)
 

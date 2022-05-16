@@ -15,7 +15,7 @@ static struct socket_server * SOCKET_SERVER = NULL;
 
 void 
 skynet_socket_init() {
-	SOCKET_SERVER = socket_server_create();
+	SOCKET_SERVER = socket_server_create(skynet_now());
 }
 
 void
@@ -27,6 +27,11 @@ void
 skynet_socket_free() {
 	socket_server_release(SOCKET_SERVER);
 	SOCKET_SERVER = NULL;
+}
+
+void
+skynet_socket_updatetime() {
+	socket_server_updatetime(SOCKET_SERVER, skynet_now());
 }
 
 // mainloop thread
@@ -89,7 +94,7 @@ skynet_socket_poll() {
 	case SOCKET_OPEN:
 		forward_message(SKYNET_SOCKET_TYPE_CONNECT, true, &result);
 		break;
-	case SOCKET_ERROR:
+	case SOCKET_ERR:
 		forward_message(SKYNET_SOCKET_TYPE_ERROR, true, &result);
 		break;
 	case SOCKET_ACCEPT:
@@ -97,6 +102,9 @@ skynet_socket_poll() {
 		break;
 	case SOCKET_UDP:
 		forward_message(SKYNET_SOCKET_TYPE_UDP, false, &result);
+		break;
+	case SOCKET_WARNING:
+		forward_message(SKYNET_SOCKET_TYPE_WARNING, false, &result);
 		break;
 	default:
 		skynet_error(NULL, "Unknown socket message type %d.",type);
@@ -108,31 +116,14 @@ skynet_socket_poll() {
 	return 1;
 }
 
-static int
-check_wsz(struct skynet_context *ctx, int id, void *buffer, int64_t wsz) {
-	if (wsz < 0) {
-		return -1;
-	} else if (wsz > 1024 * 1024) {
-		struct skynet_socket_message tmp;
-		tmp.type = SKYNET_SOCKET_TYPE_WARNING;
-		tmp.id = id;
-		tmp.ud = (int)(wsz / 1024);
-		tmp.buffer = NULL;
-		skynet_send(ctx, 0, skynet_context_handle(ctx), PTYPE_SOCKET, 0 , &tmp, sizeof(tmp));
-//		skynet_error(ctx, "%d Mb bytes on socket %d need to send out", (int)(wsz / (1024 * 1024)), id);
-	}
-	return 0;
+int
+skynet_socket_sendbuffer(struct skynet_context *ctx, struct socket_sendbuffer *buffer) {
+	return socket_server_send(SOCKET_SERVER, buffer);
 }
 
 int
-skynet_socket_send(struct skynet_context *ctx, int id, void *buffer, int sz) {
-	int64_t wsz = socket_server_send(SOCKET_SERVER, id, buffer, sz);
-	return check_wsz(ctx, id, buffer, wsz);
-}
-
-void
-skynet_socket_send_lowpriority(struct skynet_context *ctx, int id, void *buffer, int sz) {
-	socket_server_send_lowpriority(SOCKET_SERVER, id, buffer, sz);
+skynet_socket_sendbuffer_lowpriority(struct skynet_context *ctx, struct socket_sendbuffer *buffer) {
+	return socket_server_send_lowpriority(SOCKET_SERVER, buffer);
 }
 
 int 
@@ -172,6 +163,13 @@ skynet_socket_start(struct skynet_context *ctx, int id) {
 }
 
 void
+skynet_socket_pause(struct skynet_context *ctx, int id) {
+	uint32_t source = skynet_context_handle(ctx);
+	socket_server_pause(SOCKET_SERVER, source, id);
+}
+
+
+void
 skynet_socket_nodelay(struct skynet_context *ctx, int id) {
 	socket_server_nodelay(SOCKET_SERVER, id);
 }
@@ -188,9 +186,8 @@ skynet_socket_udp_connect(struct skynet_context *ctx, int id, const char * addr,
 }
 
 int 
-skynet_socket_udp_send(struct skynet_context *ctx, int id, const char * address, const void *buffer, int sz) {
-	int64_t wsz = socket_server_udp_send(SOCKET_SERVER, id, (const struct socket_udp_address *)address, buffer, sz);
-	return check_wsz(ctx, id, (void *)buffer, wsz);
+skynet_socket_udp_sendbuffer(struct skynet_context *ctx, const char * address, struct socket_sendbuffer *buffer) {
+	return socket_server_udp_send(SOCKET_SERVER, (const struct socket_udp_address *)address, buffer);
 }
 
 const char *
@@ -204,4 +201,9 @@ skynet_socket_udp_address(struct skynet_socket_message *msg, int *addrsz) {
 	sm.ud = msg->ud;
 	sm.data = msg->buffer;
 	return (const char *)socket_server_udp_address(SOCKET_SERVER, &sm, addrsz);
+}
+
+struct socket_info *
+skynet_socket_info() {
+	return socket_server_info(SOCKET_SERVER);
 }

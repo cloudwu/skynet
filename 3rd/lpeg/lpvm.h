@@ -1,5 +1,5 @@
 /*
-** $Id: lpvm.h,v 1.3 2014/02/21 13:06:41 roberto Exp $
+** $Id: lpvm.h $
 */
 
 #if !defined(lpvm_h)

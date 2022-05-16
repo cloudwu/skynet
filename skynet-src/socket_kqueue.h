@@ -38,30 +38,36 @@ static int
 sp_add(int kfd, int sock, void *ud) {
 	struct kevent ke;
 	EV_SET(&ke, sock, EVFILT_READ, EV_ADD, 0, 0, ud);
-	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1) {
+	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1 ||	ke.flags & EV_ERROR) {
 		return 1;
 	}
 	EV_SET(&ke, sock, EVFILT_WRITE, EV_ADD, 0, 0, ud);
-	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1) {
+	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1 ||	ke.flags & EV_ERROR) {
 		EV_SET(&ke, sock, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 		kevent(kfd, &ke, 1, NULL, 0, NULL);
 		return 1;
 	}
 	EV_SET(&ke, sock, EVFILT_WRITE, EV_DISABLE, 0, 0, ud);
-	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1) {
+	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1 ||	ke.flags & EV_ERROR) {
 		sp_del(kfd, sock);
 		return 1;
 	}
 	return 0;
 }
 
-static void 
-sp_write(int kfd, int sock, void *ud, bool enable) {
+static int
+sp_enable(int kfd, int sock, void *ud, bool read_enable, bool write_enable) {
+	int ret = 0;
 	struct kevent ke;
-	EV_SET(&ke, sock, EVFILT_WRITE, enable ? EV_ENABLE : EV_DISABLE, 0, 0, ud);
-	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1) {
-		// todo: check error
+	EV_SET(&ke, sock, EVFILT_READ, read_enable ? EV_ENABLE : EV_DISABLE, 0, 0, ud);
+	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1 || ke.flags & EV_ERROR) {
+		ret |= 1;
 	}
+	EV_SET(&ke, sock, EVFILT_WRITE, write_enable ? EV_ENABLE : EV_DISABLE, 0, 0, ud);
+	if (kevent(kfd, &ke, 1, NULL, 0, NULL) == -1 || ke.flags & EV_ERROR) {
+		ret |= 1;
+	}
+	return ret;
 }
 
 static int 
@@ -73,8 +79,11 @@ sp_wait(int kfd, struct event *e, int max) {
 	for (i=0;i<n;i++) {
 		e[i].s = ev[i].udata;
 		unsigned filter = ev[i].filter;
-		e[i].write = (filter == EVFILT_WRITE);
+		bool eof = (ev[i].flags & EV_EOF) != 0;
+		e[i].write = (filter == EVFILT_WRITE) && (!eof);
 		e[i].read = (filter == EVFILT_READ);
+		e[i].error = (ev[i].flags & EV_ERROR) != 0;
+		e[i].eof = eof;
 	}
 
 	return n;

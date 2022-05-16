@@ -1,7 +1,7 @@
 local skynet = require "skynet"
 -- You should use skynet.coroutine instead of origin coroutine in skynet
 local coroutine = require "skynet.coroutine"
-local profile = require "profile"
+local profile = require "skynet.profile"
 
 local function status(co)
 	repeat
@@ -50,4 +50,5 @@ skynet.start(function()
 	print("main step", f())
 	print("main step", f())
 --	print("main thread time:", profile.stop())
+	print("close", coroutine.close(coroutine.create(main)))
 end)

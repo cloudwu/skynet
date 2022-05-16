@@ -1,3 +1,7 @@
+## ![skynet logo](https://github.com/cloudwu/skynet/wiki/image/skynet_metro.jpg)
+
+Skynet is a lightweight online game framework which can be used in many other fields.
+
 ## Build
 
 For Linux, install autoconf first for jemalloc:
@@ -8,7 +12,7 @@ cd skynet
 make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd now
 ```
 
-Or you can:
+Or:
 
 ```
 export PLAT=linux
@@ -26,15 +30,13 @@ Run these in different consoles:
 ./3rd/lua/lua examples/client.lua 	# Launch a client, and try to input hello.
 ```
 
-## About Lua
+## About Lua version
 
-Skynet now uses a modified version of lua 5.3.2 ( http://www.lua.org/ftp/lua-5.3.2.tar.gz ) .
+Skynet now uses a modified version of lua 5.4.4 ( https://github.com/ejoy/lua/tree/skynet54 ) for multiple lua states.
 
-For details: http://lua-users.org/lists/lua-l/2014-03/msg00489.html
+Official Lua versions can also be used as long as the Makefile is edited.
 
-You can also use other official Lua versions, just edit the Makefile by yourself.
+## How To Use
 
-## How To Use (Sorry, Only in Chinese now)
-
-* Read Wiki https://github.com/cloudwu/skynet/wiki
+* Read Wiki for documents https://github.com/cloudwu/skynet/wiki
 * The FAQ in wiki https://github.com/cloudwu/skynet/wiki/FAQ

@@ -1,5 +1,5 @@
 /*
-** $Id: lptree.c,v 1.21 2015/09/28 17:01:25 roberto Exp $
+** $Id: lptree.c $
 ** Copyright 2013, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -64,7 +64,7 @@ static void fixonecall (lua_State *L, int postable, TTree *g, TTree *t) {
   t->tag = TCall;
   t->u.ps = n - (t - g);  /* position relative to node */
   assert(sib2(t)->tag == TRule);
-  sib2(t)->key = t->key;
+  sib2(t)->key = t->key;  /* fix rule's key */
 }
 
 
@@ -716,6 +716,7 @@ static int capture_aux (lua_State *L, int cap, int labelidx) {
 
 /*
 ** Fill a tree with an empty capture, using an empty (TTrue) sibling.
+** (The 'key' field must be filled by the caller to finish the tree.)
 */
 static TTree *auxemptycap (TTree *tree, int cap) {
   tree->tag = TCapture;
@@ -726,15 +727,17 @@ static TTree *auxemptycap (TTree *tree, int cap) {
 
 
 /*
-** Create a tree for an empty capture
+** Create a tree for an empty capture.
 */
-static TTree *newemptycap (lua_State *L, int cap) {
-  return auxemptycap(newtree(L, 2), cap);
+static TTree *newemptycap (lua_State *L, int cap, int key) {
+  TTree *tree = auxemptycap(newtree(L, 2), cap);
+  tree->key = key;
+  return tree;
 }
 
 
 /*
-** Create a tree for an empty capture with an associated Lua value
+** Create a tree for an empty capture with an associated Lua value.
 */
 static TTree *newemptycapkey (lua_State *L, int cap, int idx) {
   TTree *tree = auxemptycap(newtree(L, 2), cap);
@@ -795,16 +798,15 @@ static int lp_simplecapture (lua_State *L) {
 
 
 static int lp_poscapture (lua_State *L) {
-  newemptycap(L, Cposition);
+  newemptycap(L, Cposition, 0);
   return 1;
 }
 
 
 static int lp_argcapture (lua_State *L) {
   int n = (int)luaL_checkinteger(L, 1);
-  TTree *tree = newemptycap(L, Carg);
-  tree->key = n;
   luaL_argcheck(L, 0 < n && n <= SHRT_MAX, 1, "invalid argument index");
+  newemptycap(L, Carg, n);
   return 1;
 }
 
@@ -935,7 +937,7 @@ static void buildgrammar (lua_State *L, TTree *grammar, int frule, int n) {
     int rulesize;
     TTree *rn = gettree(L, ridx, &rulesize);
     nd->tag = TRule;
-    nd->key = 0;
+    nd->key = 0;  /* will be fixed when rule is used */
     nd->cap = i;  /* rule number */
     nd->u.ps = rulesize + 1;  /* point to next rule */
     memcpy(sib1(nd), rn, rulesize * sizeof(TTree));  /* copy rule */
@@ -969,6 +971,11 @@ static int checkloops (TTree *tree) {
 }
 
 
+/*
+** Give appropriate error message for 'verifyrule'. If a rule appears
+** twice in 'passed', there is path from it back to itself without
+** advancing the subject.
+*/
 static int verifyerror (lua_State *L, int *passed, int npassed) {
   int i, j;
   for (i = npassed - 1; i >= 0; i--) {  /* search for a repetition */
@@ -990,6 +997,8 @@ static int verifyerror (lua_State *L, int *passed, int npassed) {
 ** is only relevant if the first is nullable.
 ** Parameter 'nb' works as an accumulator, to allow tail calls in
 ** choices. ('nb' true makes function returns true.)
+** Parameter 'passed' is a list of already visited rules, 'npassed'
+** counts the elements in 'passed'.
 ** Assume ktable at the top of the stack.
 */
 static int verifyrule (lua_State *L, TTree *tree, int *passed, int npassed,

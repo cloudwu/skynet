@@ -82,6 +82,8 @@ A million repetitions of "a"
   34AA973C D4C4DAA4	F61EEB2B DBAD2731 6534016F
 */
 
+#define LUA_LIB
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -261,15 +263,15 @@ lsha1(lua_State *L) {
 #define BLOCKSIZE 64
 
 static inline void
-xor_key(uint8_t key[BLOCKSIZE], uint32_t xor) {
+xor_key(uint8_t key[BLOCKSIZE], uint32_t xor_) {
 	int i;
 	for (i=0;i<BLOCKSIZE;i+=sizeof(uint32_t)) {
 		uint32_t * k = (uint32_t *)&key[i];
-		*k ^= xor;
+		*k ^= xor_;
 	}
 }
 
-int
+LUAMOD_API int
 lhmac_sha1(lua_State *L) {
 	size_t key_sz = 0;
 	const uint8_t * key = (const uint8_t *)luaL_checklstring(L, 1, &key_sz);

@@ -1,11 +1,11 @@
 package.cpath = "luaclib/?.so"
 package.path = "lualib/?.lua;examples/?.lua"
 
-if _VERSION ~= "Lua 5.3" then
-	error "Use lua 5.3"
+if _VERSION ~= "Lua 5.4" then
+	error "Use lua 5.4"
 end
 
-local socket = require "clientsocket"
+local socket = require "client.socket"
 local proto = require "proto"
 local sproto = require "sproto"
 

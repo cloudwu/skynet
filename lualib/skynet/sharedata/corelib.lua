@@ -1,0 +1,181 @@
+local core = require "skynet.sharedata.core"
+local type = type
+local rawset = rawset
+
+local conf = {}
+
+conf.host = {
+	new = core.new,
+	delete = core.delete,
+	getref = core.getref,
+	markdirty = core.markdirty,
+	incref = core.incref,
+	decref = core.decref,
+}
+
+local meta = {}
+
+local isdirty = core.isdirty
+local index = core.index
+local needupdate = core.needupdate
+local len = core.len
+local core_nextkey = core.nextkey
+
+local function findroot(self)
+	while self.__parent do
+		self = self.__parent
+	end
+	return self
+end
+
+local function update(root, cobj, gcobj)
+	root.__obj = cobj
+	root.__gcobj = gcobj
+	local children = root.__cache
+	if children then
+		for k,v in pairs(children) do
+			local pointer = index(cobj, k)
+			if type(pointer) == "userdata" then
+				update(v, pointer, gcobj)
+			else
+				children[k] = nil
+			end
+		end
+	end
+end
+
+local function genkey(self)
+	local key = tostring(self.__key)
+	while self.__parent do
+		self = self.__parent
+		key = self.__key .. "." .. key
+	end
+	return key
+end
+
+local function getcobj(self)
+	local obj = self.__obj
+	if isdirty(obj) then
+		local newobj, newtbl = needupdate(self.__gcobj)
+		if newobj then
+			local newgcobj = newtbl.__gcobj
+			local root = findroot(self)
+			update(root, newobj, newgcobj)
+			if obj == self.__obj then
+				error ("The key [" .. genkey(self) .. "] doesn't exist after update")
+			end
+			obj = self.__obj
+		end
+	end
+	return obj
+end
+
+function meta:__newindex(key, value)
+	error ("Error newindex, the key [" .. genkey(self) .. "]")
+end
+
+function meta:__index(key)
+	local obj = getcobj(self)
+	local v = index(obj, key)
+	if type(v) == "userdata" then
+		local children = self.__cache
+		if children == nil then
+			children = {}
+			rawset(self, "__cache", children)
+		end
+		local r = children[key]
+		if r then
+			return r
+		end
+		r = setmetatable({
+			__obj = v,
+			__gcobj = self.__gcobj,
+			__parent = self,
+			__key = key,
+		}, meta)
+		children[key] = r
+		return r
+	else
+		return v
+	end
+end
+
+function meta:__len()
+	return len(getcobj(self))
+end
+
+function meta:__pairs()
+	return conf.next, self, nil
+end
+
+function conf.next(obj, key)
+	local cobj = getcobj(obj)
+	local nextkey = core_nextkey(cobj, key)
+	if nextkey then
+		return nextkey, obj[nextkey]
+	end
+end
+
+function conf.box(obj)
+	local gcobj = core.box(obj)
+	return setmetatable({
+		__parent = false,
+		__obj = obj,
+		__gcobj = gcobj,
+		__key = "",
+	} , meta)
+end
+
+function conf.update(self, pointer)
+	local cobj = self.__obj
+	assert(isdirty(cobj), "Only dirty object can be update")
+	core.update(self.__gcobj, pointer, { __gcobj = core.box(pointer) })
+end
+
+function conf.flush(obj)
+	getcobj(obj)
+end
+
+local function clone_table(cobj)
+	local obj = {}
+	local key
+	while true do
+		key = core_nextkey(cobj, key)
+		if key == nil then
+			break
+		end
+		local v = index(cobj, key)
+		if type(v) == "userdata" then
+			v = clone_table(v)
+		end
+		obj[key] = v
+	end
+	return obj
+end
+
+local function find_node(cobj, key, ...)
+	if key == nil then
+		return cobj
+	end
+	local cobj = index(cobj, key)
+	if cobj == nil then
+		return nil
+	end
+	if type(cobj) == "userdata" then
+		return find_node(cobj, ...)
+	end
+	return cobj
+end
+
+function conf.copy(cobj, ...)
+	cobj = find_node(cobj, ...)
+	if cobj then
+		if type(cobj) == "userdata" then
+			return clone_table(cobj)
+		else
+			return cobj
+		end
+	end
+end
+
+return conf

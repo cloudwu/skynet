@@ -3,7 +3,6 @@
 #include "skynet_imp.h"
 #include "skynet_env.h"
 #include "skynet_server.h"
-#include "luashrtbl.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,7 +25,6 @@ optint(const char *key, int opt) {
 	return strtol(str, NULL, 10);
 }
 
-/*
 static int
 optboolean(const char *key, int opt) {
 	const char * str = skynet_getenv(key);
@@ -36,7 +34,6 @@ optboolean(const char *key, int opt) {
 	}
 	return strcmp(str,"true")==0;
 }
-*/
 
 static const char *
 optstring(const char *key,const char * opt) {
@@ -80,20 +77,41 @@ _init_env(lua_State *L) {
 int sigign() {
 	struct sigaction sa;
 	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = 0;
+	sigemptyset(&sa.sa_mask);
 	sigaction(SIGPIPE, &sa, 0);
 	return 0;
 }
 
 static const char * load_config = "\
-	local config_name = ...\
-	local f = assert(io.open(config_name))\
-	local code = assert(f:read \'*a\')\
-	local function getenv(name) return assert(os.getenv(name), \'os.getenv() failed: \' .. name) end\
-	code = string.gsub(code, \'%$([%w_%d]+)\', getenv)\
-	f:close()\
-	local result = {}\
-	assert(load(code,\'=(load)\',\'t\',result))()\
-	return result\
+	local result = {}\n\
+	local function getenv(name) return assert(os.getenv(name), [[os.getenv() failed: ]] .. name) end\n\
+	local sep = package.config:sub(1,1)\n\
+	local current_path = [[.]]..sep\n\
+	local function include(filename)\n\
+		local last_path = current_path\n\
+		local path, name = filename:match([[(.*]]..sep..[[)(.*)$]])\n\
+		if path then\n\
+			if path:sub(1,1) == sep then	-- root\n\
+				current_path = path\n\
+			else\n\
+				current_path = current_path .. path\n\
+			end\n\
+		else\n\
+			name = filename\n\
+		end\n\
+		local f = assert(io.open(current_path .. name))\n\
+		local code = assert(f:read [[*a]])\n\
+		code = string.gsub(code, [[%$([%w_%d]+)]], getenv)\n\
+		f:close()\n\
+		assert(load(code,[[@]]..filename,[[t]],result))()\n\
+		current_path = last_path\n\
+	end\n\
+	setmetatable(result, { __index = { include = include } })\n\
+	local config_name = ...\n\
+	include(config_name)\n\
+	setmetatable(result, nil)\n\
+	return result\n\
 ";
 
 int
@@ -107,7 +125,6 @@ main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	luaS_initshr();
 	skynet_globalinit();
 	skynet_env_init();
 
@@ -115,10 +132,15 @@ main(int argc, char *argv[]) {
 
 	struct skynet_config config;
 
+#ifdef LUA_CACHELIB
+	// init the lock of code cache
+	luaL_initcodecache();
+#endif
+
 	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);	// link lua lib
 
-	int err = luaL_loadstring(L, load_config);
+	int err =  luaL_loadbufferx(L, load_config, strlen(load_config), "=[skynet config]", "t");
 	assert(err == LUA_OK);
 	lua_pushstring(L, config_file);
 
@@ -137,12 +159,12 @@ main(int argc, char *argv[]) {
 	config.daemon = optstring("daemon", NULL);
 	config.logger = optstring("logger", NULL);
 	config.logservice = optstring("logservice", "logger");
+	config.profile = optboolean("profile", 1);
 
 	lua_close(L);
 
 	skynet_start(&config);
 	skynet_globalexit();
-	luaS_exitshr();
 
 	return 0;
 }

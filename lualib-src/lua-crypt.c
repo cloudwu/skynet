@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include <lua.h>
 #include <lauxlib.h>
 
@@ -5,6 +7,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+#define PADDING_MODE_ISO7816_4 0
+#define PADDING_MODE_PKCS7 1
+#define PADDING_MODE_COUNT 2
 
 #define SMALL_CHUNK 256
 
@@ -351,13 +358,104 @@ lrandomkey(lua_State *L) {
 }
 
 static void
+padding_mode_table(lua_State *L) {
+	// see macros PADDING_MODE_ISO7816_4, etc.
+	const char * mode[] = {
+		"iso7816_4",
+		"pkcs7",
+	};
+	int n = sizeof(mode) / sizeof(mode[0]);
+	int i;
+	lua_createtable(L,0,n);
+	for (i=0;i<n;i++) {
+		lua_pushinteger(L, i);
+		lua_setfield(L, -2, mode[i]);
+	}
+}
+
+typedef void (*padding_add)(uint8_t buf[8], int offset);
+typedef int (*padding_remove)(const uint8_t *last);
+
+static void
+padding_add_iso7816_4(uint8_t buf[8], int offset) {
+	buf[offset] = 0x80;
+	memset(buf+offset+1, 0, 7-offset);
+}
+
+static int
+padding_remove_iso7816_4(const uint8_t *last) {
+	int padding = 1;
+	int i;
+	for (i=0;i<8;i++,last--) {
+		if (*last == 0) {
+			padding++;
+		} else if (*last == 0x80) {
+			return padding;
+		} else {
+			break;
+		}
+	}
+	// invalid
+	return 0;
+}
+
+static void
+padding_add_pkcs7(uint8_t buf[8], int offset) {
+	uint8_t x = 8-offset;
+	memset(buf+offset, x, 8-offset);
+}
+
+static int
+padding_remove_pkcs7(const uint8_t *last) {
+	int padding = *last;
+	int i;
+	for (i=1;i<padding;i++) {
+		--last;
+		if (*last != padding)
+			return 0;	// invalid
+	}
+	return padding;
+}
+
+static padding_add padding_add_func[] = {
+	padding_add_iso7816_4,
+	padding_add_pkcs7,
+};
+
+static padding_remove padding_remove_func[] = {
+	padding_remove_iso7816_4,
+	padding_remove_pkcs7,
+};
+
+static inline void
+check_padding_mode(lua_State *L, int mode) {
+	if (mode < 0 || mode >= PADDING_MODE_COUNT)
+		luaL_error(L, "Invalid padding mode %d", mode);
+}
+
+static void
+add_padding(lua_State *L, uint8_t buf[8], const uint8_t *src, int offset, int mode) {
+	check_padding_mode(L, mode);
+	if (offset >= 8)
+		luaL_error(L, "Invalid padding");
+	memcpy(buf, src, offset);
+	padding_add_func[mode](buf, offset);
+}
+
+static int
+remove_padding(lua_State *L, const uint8_t *last, int mode) {
+	check_padding_mode(L, mode);
+	return padding_remove_func[mode](last);
+}
+
+static void
 des_key(lua_State *L, uint32_t SK[32]) {
 	size_t keysz = 0;
 	const void * key = luaL_checklstring(L, 1, &keysz);
 	if (keysz != 8) {
 		luaL_error(L, "Invalid key size %d, need 8 bytes", (int)keysz);
 	}
-	des_main_ks(SK, key);
+	des_main_ks(SK, (const uint8_t*)key);
 }
 
 static int
@@ -368,27 +466,18 @@ ldesencode(lua_State *L) {
 	size_t textsz = 0;
 	const uint8_t * text = (const uint8_t *)luaL_checklstring(L, 2, &textsz);
 	size_t chunksz = (textsz + 8) & ~7;
+	int padding_mode = luaL_optinteger(L, 3, PADDING_MODE_ISO7816_4);
 	uint8_t tmp[SMALL_CHUNK];
 	uint8_t *buffer = tmp;
 	if (chunksz > SMALL_CHUNK) {
-		buffer = lua_newuserdata(L, chunksz);
+		buffer = (uint8_t*)lua_newuserdatauv(L, chunksz, 0);
 	}
 	int i;
 	for (i=0;i<(int)textsz-7;i+=8) {
 		des_crypt(SK, text+i, buffer+i);
 	}
-	int bytes = textsz - i;
 	uint8_t tail[8];
-	int j;
-	for (j=0;j<8;j++) {
-		if (j < bytes) {
-			tail[j] = text[i+j];
-		} else if (j==bytes) {
-			tail[j] = 0x80;
-		} else {
-			tail[j] = 0;
-		}
-	}
+	add_padding(L, tail, text+i, textsz - i, padding_mode);
 	des_crypt(SK, tail, buffer+i);
 	lua_pushlstring(L, (const char *)buffer, chunksz);
 
@@ -410,25 +499,17 @@ ldesdecode(lua_State *L) {
 	if ((textsz & 7) || textsz == 0) {
 		return luaL_error(L, "Invalid des crypt text length %d", (int)textsz);
 	}
+	int padding_mode = luaL_optinteger(L, 3, PADDING_MODE_ISO7816_4);
 	uint8_t tmp[SMALL_CHUNK];
 	uint8_t *buffer = tmp;
 	if (textsz > SMALL_CHUNK) {
-		buffer = lua_newuserdata(L, textsz);
+		buffer = (uint8_t*)lua_newuserdatauv(L, textsz, 0);
 	}
 	for (i=0;i<textsz;i+=8) {
 		des_crypt(SK, text+i, buffer+i);
 	}
-	int padding = 1;
-	for (i=textsz-1;i>=textsz-8;i--) {
-		if (buffer[i] == 0) {
-			padding++;
-		} else if (buffer[i] == 0x80) {
-			break;
-		} else {
-			return luaL_error(L, "Invalid des crypt text");
-		}
-	}
-	if (padding > 8) {
+	int padding = remove_padding(L, buffer + textsz - 1, padding_mode);
+	if (padding <= 0 || padding > 8) {
 		return luaL_error(L, "Invalid des crypt text");
 	}
 	lua_pushlstring(L, (const char *)buffer, textsz - padding);
@@ -477,7 +558,7 @@ ltohex(lua_State *L) {
 	char tmp[SMALL_CHUNK];
 	char *buffer = tmp;
 	if (sz > SMALL_CHUNK/2) {
-		buffer = lua_newuserdata(L, sz * 2);
+		buffer = (char*)lua_newuserdatauv(L, sz * 2, 0);
 	}
 	int i;
 	for (i=0;i<sz;i++) {
@@ -494,13 +575,13 @@ static int
 lfromhex(lua_State *L) {
 	size_t sz = 0;
 	const char * text = luaL_checklstring(L, 1, &sz);
-	if (sz & 2) {
+	if (sz & 1) {
 		return luaL_error(L, "Invalid hex text size %d", (int)sz);
 	}
 	char tmp[SMALL_CHUNK];
 	char *buffer = tmp;
 	if (sz > SMALL_CHUNK*2) {
-		buffer = lua_newuserdata(L, sz / 2);
+		buffer = (char*)lua_newuserdatauv(L, sz / 2, 0);
 	}
 	int i;
 	for (i=0;i<sz;i+=2) {
@@ -517,7 +598,7 @@ lfromhex(lua_State *L) {
 }
 
 // Constants are the integer part of the sines of integers (in radians) * 2^32.
-const uint32_t k[64] = {
+static const uint32_t k[64] = {
 0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee ,
 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501 ,
 0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be ,
@@ -536,17 +617,16 @@ const uint32_t k[64] = {
 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391 };
  
 // r specifies the per-round shift amounts
-const uint32_t r[] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+static const uint32_t r[] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
 					  5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
 					  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
 					  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21};
  
 // leftrotate function definition
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
- 
+
 static void
-hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
-	uint32_t w[16];
+digest_md5(uint32_t w[16], uint32_t result[4]) {
 	uint32_t a, b, c, d, f, g, temp;
 	int i;
  
@@ -554,13 +634,6 @@ hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
 	b = 0xefcdab89u;
 	c = 0x98badcfeu;
 	d = 0x10325476u;
-
-	for (i=0;i<16;i+=4) {
-		w[i] = x[1];
-		w[i+1] = x[0];
-		w[i+2] = y[1];
-		w[i+3] = y[0];
-	}
 
 	for(i = 0; i<64; i++) {
 		if (i < 16) {
@@ -582,11 +655,54 @@ hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
 		c = b;
 		b = b + LEFTROTATE((a + f + k[i] + w[g]), r[i]);
 		a = temp;
-
 	}
 
-	result[0] = c^d;
-	result[1] = a^b;
+	result[0] = a;
+	result[1] = b;
+	result[2] = c;
+	result[3] = d;
+}
+
+// hmac64 use md5 algorithm without padding, and the result is (c^d .. a^b)
+static void
+hmac(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
+	uint32_t w[16];
+	uint32_t r[4];
+	int i;
+	for (i=0;i<16;i+=4) {
+		w[i] = x[1];
+		w[i+1] = x[0];
+		w[i+2] = y[1];
+		w[i+3] = y[0];
+	}
+
+	digest_md5(w,r);
+
+	result[0] = r[2]^r[3];
+	result[1] = r[0]^r[1];
+}
+
+static void
+hmac_md5(uint32_t x[2], uint32_t y[2], uint32_t result[2]) {
+	uint32_t w[16];
+	uint32_t r[4];
+	int i;
+	for (i=0;i<12;i+=4) {
+		w[i] = x[0];
+		w[i+1] = x[1];
+		w[i+2] = y[0];
+		w[i+3] = y[1];
+	}
+
+	w[12] = 0x80;
+	w[13] = 0;
+	w[14] = 384;
+	w[15] = 0;
+
+	digest_md5(w,r);
+
+	result[0] = (r[0] + 0x67452301u) ^ (r[2] + 0x98badcfeu);
+	result[1] = (r[1] + 0xefcdab89u) ^ (r[3] + 0x10325476u);
 }
 
 static void
@@ -628,6 +744,21 @@ lhmac64(lua_State *L) {
 	read64(L, x, y);
 	uint32_t result[2];
 	hmac(x,y,result);
+	return pushqword(L, result);
+}
+
+/*
+  h1 = crypt.hmac64_md5(a,b)
+  m = md5.sum((a..b):rep(3))
+  h2 = crypt.xor_str(m:sub(1,8), m:sub(9,16))
+  assert(h1 == h2)
+ */
+static int
+lhmac64_md5(lua_State *L) {
+	uint32_t x[2], y[2];
+	read64(L, x, y);
+	uint32_t result[2];
+	hmac_md5(x,y,result);
 	return pushqword(L, result);
 }
 
@@ -751,7 +882,7 @@ ldhexchange(lua_State *L) {
 	if (x64 == 0)
 		return luaL_error(L, "Can't be 0");
 
-	uint64_t r = powmodp(5,	x64);
+	uint64_t r = powmodp(G,	x64);
 	push64(L, r);
 	return 1;
 }
@@ -767,7 +898,7 @@ lb64encode(lua_State *L) {
 	char tmp[SMALL_CHUNK];
 	char *buffer = tmp;
 	if (encode_sz > SMALL_CHUNK) {
-		buffer = lua_newuserdata(L, encode_sz);
+		buffer = (char*)lua_newuserdatauv(L, encode_sz, 0);
 	}
 	int i,j;
 	j=0;
@@ -822,7 +953,7 @@ lb64decode(lua_State *L) {
 	char tmp[SMALL_CHUNK];
 	char *buffer = tmp;
 	if (decode_sz > SMALL_CHUNK) {
-		buffer = lua_newuserdata(L, decode_sz);
+		buffer = (char*)lua_newuserdatauv(L, decode_sz, 0);
 	}
 	int i,j;
 	int output = 0;
@@ -830,10 +961,12 @@ lb64decode(lua_State *L) {
 		int padding = 0;
 		int c[4];
 		for (j=0;j<4;) {
-			if (i>=sz) {
-				return luaL_error(L, "Invalid base64 text");
+			if (i>=sz && 4>j){
+				/*To improve compatibility, there may not be enough equal signs */ 
+				c[j] = -2;   
+			}else{
+				c[j] = b64index(text[i]);
 			}
-			c[j] = b64index(text[i]);
 			if (c[j] == -1) {
 				++i;
 				continue;
@@ -878,18 +1011,38 @@ lb64decode(lua_State *L) {
 	return 1;
 }
 
+static int
+lxor_str(lua_State *L) {
+	size_t len1,len2;
+	const char *s1 = luaL_checklstring(L,1,&len1);
+	const char *s2 = luaL_checklstring(L,2,&len2);
+	if (len2 == 0) {
+		return luaL_error(L, "Can't xor empty string");
+	}
+	luaL_Buffer b;
+	char * buffer = luaL_buffinitsize(L, &b, len1);
+	int i;
+	for (i=0;i<len1;i++) {
+		buffer[i] = s1[i] ^ s2[i % len2];
+	}
+	luaL_addsize(&b, len1);
+	luaL_pushresult(&b);
+	return 1;
+}
+
 // defined in lsha1.c
 int lsha1(lua_State *L);
 int lhmac_sha1(lua_State *L);
 
-int
-luaopen_crypt(lua_State *L) {
+
+LUAMOD_API int
+luaopen_skynet_crypt(lua_State *L) {
 	luaL_checkversion(L);
 	static int init = 0;
 	if (!init) {
 		// Don't need call srandom more than once.
 		init = 1 ;
-		srandom(time(NULL));
+		srandom((random() << 8) ^ (time(NULL) << 16) ^ getpid());
 	}
 	luaL_Reg l[] = {
 		{ "hashkey", lhashkey },
@@ -899,6 +1052,7 @@ luaopen_crypt(lua_State *L) {
 		{ "hexencode", ltohex },
 		{ "hexdecode", lfromhex },
 		{ "hmac64", lhmac64 },
+		{ "hmac64_md5", lhmac64_md5 },
 		{ "dhexchange", ldhexchange },
 		{ "dhsecret", ldhsecret },
 		{ "base64encode", lb64encode },
@@ -906,8 +1060,19 @@ luaopen_crypt(lua_State *L) {
 		{ "sha1", lsha1 },
 		{ "hmac_sha1", lhmac_sha1 },
 		{ "hmac_hash", lhmac_hash },
+		{ "xor_str", lxor_str },
+		{ "padding", NULL },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);
+
+	padding_mode_table(L);
+	lua_setfield(L, -2, "padding");
+
 	return 1;
+}
+
+LUAMOD_API int
+luaopen_client_crypt(lua_State *L) {
+	return luaopen_skynet_crypt(L);
 }

@@ -1,5 +1,5 @@
 local skynet = require "skynet"
-local crypt = require "crypt"
+local crypt = require "skynet.crypt"
 
 local function sha1(text)
 	local c = crypt.sha1(text)

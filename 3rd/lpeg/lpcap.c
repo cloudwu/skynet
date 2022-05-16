@@ -1,5 +1,5 @@
 /*
-** $Id: lpcap.c,v 1.6 2015/06/15 16:09:57 roberto Exp $
+** $Id: lpcap.c $
 ** Copyright 2007, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -271,15 +271,15 @@ int finddyncap (Capture *cap, Capture *last) {
 
 
 /*
-** Calls a runtime capture. Returns number of captures removed by
-** the call, including the initial Cgroup. (Captures to be added are
-** on the Lua stack.)
+** Calls a runtime capture. Returns number of captures "removed" by the
+** call, that is, those inside the group capture. Captures to be added
+** are on the Lua stack.
 */
 int runtimecap (CapState *cs, Capture *close, const char *s, int *rem) {
   int n, id;
   lua_State *L = cs->L;
   int otop = lua_gettop(L);
-  Capture *open = findopen(close);
+  Capture *open = findopen(close);  /* get open group capture */
   assert(captype(open) == Cgroup);
   id = finddyncap(open, close);  /* get first dynamic capture argument */
   close->kind = Cclose;  /* closes the group */
@@ -299,7 +299,7 @@ int runtimecap (CapState *cs, Capture *close, const char *s, int *rem) {
   }
   else
     *rem = 0;  /* no dynamic captures removed */
-  return close - open;  /* number of captures of all kinds removed */
+  return close - open - 1;  /* number of captures to be removed */
 }
 
 
@@ -441,70 +441,88 @@ static int addonestring (luaL_Buffer *b, CapState *cs, const char *what) {
 }
 
 
+#if !defined(MAXRECLEVEL)
+#define MAXRECLEVEL	200
+#endif
+
+
 /*
 ** Push all values of the current capture into the stack; returns
 ** number of values pushed
 */
 static int pushcapture (CapState *cs) {
   lua_State *L = cs->L;
+  int res;
   luaL_checkstack(L, 4, "too many captures");
+  if (cs->reclevel++ > MAXRECLEVEL)
+    return luaL_error(L, "subcapture nesting too deep");
   switch (captype(cs->cap)) {
     case Cposition: {
       lua_pushinteger(L, cs->cap->s - cs->s + 1);
       cs->cap++;
-      return 1;
+      res = 1;
+      break;
     }
     case Cconst: {
       pushluaval(cs);
       cs->cap++;
-      return 1;
+      res = 1;
+      break;
     }
     case Carg: {
       int arg = (cs->cap++)->idx;
       if (arg + FIXEDARGS > cs->ptop)
         return luaL_error(L, "reference to absent extra argument #%d", arg);
       lua_pushvalue(L, arg + FIXEDARGS);
-      return 1;
+      res = 1;
+      break;
     }
     case Csimple: {
       int k = pushnestedvalues(cs, 1);
       lua_insert(L, -k);  /* make whole match be first result */
-      return k;
+      res = k;
+      break;
     }
     case Cruntime: {
       lua_pushvalue(L, (cs->cap++)->idx);  /* value is in the stack */
-      return 1;
+      res = 1;
+      break;
     }
     case Cstring: {
       luaL_Buffer b;
       luaL_buffinit(L, &b);
       stringcap(&b, cs);
       luaL_pushresult(&b);
-      return 1;
+      res = 1;
+      break;
     }
     case Csubst: {
       luaL_Buffer b;
       luaL_buffinit(L, &b);
       substcap(&b, cs);
       luaL_pushresult(&b);
-      return 1;
+      res = 1;
+      break;
     }
     case Cgroup: {
       if (cs->cap->idx == 0)  /* anonymous group? */
-        return pushnestedvalues(cs, 0);  /* add all nested values */
+        res = pushnestedvalues(cs, 0);  /* add all nested values */
       else {  /* named group: add no values */
         nextcap(cs);  /* skip capture */
-        return 0;
+        res = 0;
       }
+      break;
     }
-    case Cbackref: return backrefcap(cs);
-    case Ctable: return tablecap(cs);
-    case Cfunction: return functioncap(cs);
-    case Cnum: return numcap(cs);
-    case Cquery: return querycap(cs);
-    case Cfold: return foldcap(cs);
-    default: assert(0); return 0;
+    case Cbackref: res = backrefcap(cs); break;
+    case Ctable: res = tablecap(cs); break;
+    case Cfunction: res = functioncap(cs); break;
+    case Cnum: res = numcap(cs); break;
+    case Cquery: res = querycap(cs); break;
+    case Cfold: res = foldcap(cs); break;
+    default: assert(0); res = 0;
   }
+  cs->reclevel--;
+  return res;
 }
 
 
@@ -521,7 +539,7 @@ int getcaptures (lua_State *L, const char *s, const char *r, int ptop) {
   int n = 0;
   if (!isclosecap(capture)) {  /* is there any capture? */
     CapState cs;
-    cs.ocap = cs.cap = capture; cs.L = L;
+    cs.ocap = cs.cap = capture; cs.L = L; cs.reclevel = 0;
     cs.s = s; cs.valuecached = 0; cs.ptop = ptop;
     do {  /* collect their values */
       n += pushcapture(&cs);

@@ -1,10 +1,8 @@
 local skynet = require "skynet"
 local gateserver = require "snax.gateserver"
-local netpack = require "netpack"
 
 local watchdog
 local connection = {}	-- fd -> connection : { fd , client, agent , ip, mode }
-local forwarding = {}	-- agent -> connection
 
 skynet.register_protocol {
 	name = "client",
@@ -22,9 +20,12 @@ function handler.message(fd, msg, sz)
 	local c = connection[fd]
 	local agent = c.agent
 	if agent then
-		skynet.redirect(agent, c.client, "client", 0, msg, sz)
+		-- It's safe to redirect msg directly , gateserver framework will not free msg.
+		skynet.redirect(agent, c.client, "client", fd, msg, sz)
 	else
-		skynet.send(watchdog, "lua", "socket", "data", fd, netpack.tostring(msg, sz))
+		skynet.send(watchdog, "lua", "socket", "data", fd, skynet.tostring(msg, sz))
+		-- skynet.tostring will copy msg to a string, so we must free msg here.
+		skynet.trash(msg,sz)
 	end
 end
 
@@ -39,7 +40,6 @@ end
 
 local function unforward(c)
 	if c.agent then
-		forwarding[c.agent] = nil
 		c.agent = nil
 		c.client = nil
 	end
@@ -74,7 +74,6 @@ function CMD.forward(source, fd, client, address)
 	unforward(c)
 	c.client = client or 0
 	c.agent = address or source
-	forwarding[c.agent] = c
 	gateserver.openclient(fd)
 end
 

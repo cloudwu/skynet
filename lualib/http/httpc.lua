@@ -1,84 +1,12 @@
+local skynet = require "skynet"
 local socket = require "http.sockethelper"
-local url = require "http.url"
 local internal = require "http.internal"
-local dns = require "dns"
+local dns = require "skynet.dns"
 local string = string
 local table = table
 
 local httpc = {}
 
-local function request(fd, method, host, url, recvheader, header, content)
-	local read = socket.readfunc(fd)
-	local write = socket.writefunc(fd)
-	local header_content = ""
-	if header then
-		if not header.host then
-			header.host = host
-		end
-		for k,v in pairs(header) do
-			header_content = string.format("%s%s:%s\r\n", header_content, k, v)
-		end
-	else
-		header_content = string.format("host:%s\r\n",host)
-	end
-
-	if content then
-		local data = string.format("%s %s HTTP/1.1\r\n%scontent-length:%d\r\n\r\n", method, url, header_content, #content)
-		write(data)
-		write(content)
-	else
-		local request_header = string.format("%s %s HTTP/1.1\r\n%scontent-length:0\r\n\r\n", method, url, header_content)
-		write(request_header)
-	end
-
-	local tmpline = {}
-	local body = internal.recvheader(read, tmpline, "")
-	if not body then
-		error(socket.socket_error)
-	end
-
-	local statusline = tmpline[1]
-	local code, info = statusline:match "HTTP/[%d%.]+%s+([%d]+)%s+(.*)$"
-	code = assert(tonumber(code))
-
-	local header = internal.parseheader(tmpline,2,recvheader or {})
-	if not header then
-		error("Invalid HTTP response header")
-	end
-
-	local length = header["content-length"]
-	if length then
-		length = tonumber(length)
-	end
-	local mode = header["transfer-encoding"]
-	if mode then
-		if mode ~= "identity" and mode ~= "chunked" then
-			error ("Unsupport transfer-encoding")
-		end
-	end
-
-	if mode == "chunked" then
-		body, header = internal.recvchunkedbody(read, nil, header, body)
-		if not body then
-			error("Invalid response body")
-		end
-	else
-		-- identity mode
-		if length then
-			if #body >= length then
-				body = body:sub(1,length)
-			else
-				local padding = read(length - #body)
-				body = body .. padding
-			end
-		else
-			-- no content-length, read all
-			body = body .. socket.readall(fd)
-		end
-	end
-
-	return code, body
-end
 
 local async_dns
 
@@ -87,24 +15,136 @@ function httpc.dns(server,port)
 	dns.server(server,port)
 end
 
-function httpc.request(method, host, url, recvheader, header, content)
-	local hostname, port = host:match"([^:]+):?(%d*)$"
+
+local function check_protocol(host)
+	local protocol = host:match("^[Hh][Tt][Tt][Pp][Ss]?://")
+	if protocol then
+		host = string.gsub(host, "^"..protocol, "")
+		protocol = string.lower(protocol)
+		if protocol == "https://" then
+			return "https", host
+		elseif protocol == "http://" then
+			return "http", host
+		else
+			error(string.format("Invalid protocol: %s", protocol))
+		end
+	else
+		return "http", host
+	end
+end
+
+local SSLCTX_CLIENT = nil
+local function gen_interface(protocol, fd, hostname)
+	if protocol == "http" then
+		return {
+			init = nil,
+			close = nil,
+			read = socket.readfunc(fd),
+			write = socket.writefunc(fd),
+			readall = function ()
+				return socket.readall(fd)
+			end,
+		}
+	elseif protocol == "https" then
+		local tls = require "http.tlshelper"
+		SSLCTX_CLIENT = SSLCTX_CLIENT or tls.newctx()
+		local tls_ctx = tls.newtls("client", SSLCTX_CLIENT, hostname)
+		return {
+			init = tls.init_requestfunc(fd, tls_ctx),
+			close = tls.closefunc(tls_ctx),
+			read = tls.readfunc(fd, tls_ctx),
+			write = tls.writefunc(fd, tls_ctx),
+			readall = tls.readallfunc(fd, tls_ctx),
+		}
+	else
+		error(string.format("Invalid protocol: %s", protocol))
+	end
+end
+
+local function connect(host, timeout)
+	local protocol
+	protocol, host = check_protocol(host)
+	local hostaddr, port = host:match"([^:]+):?(%d*)$"
 	if port == "" then
-		port = 80
+		port = protocol=="http" and 80 or protocol=="https" and 443
 	else
 		port = tonumber(port)
 	end
-	if async_dns and not hostname:match(".*%d+$") then
-		hostname = dns.resolve(hostname)
+	local hostname
+	if not hostaddr:match(".*%d+$") then
+		hostname = hostaddr
+		if async_dns then
+			hostaddr = dns.resolve(hostname)
+		end
 	end
-	local fd = socket.connect(hostname, port)
-	local ok , statuscode, body = pcall(request, fd,method, host, url, recvheader, header, content)
+	local fd = socket.connect(hostaddr, port, timeout)
+	if not fd then
+		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostaddr, port, timeout))
+	end
+	-- print("protocol hostname port", protocol, hostname, port)
+	local interface = gen_interface(protocol, fd, hostname)
+	if interface.init then
+		interface.init()
+	end
+	if timeout then
+		skynet.timeout(timeout, function()
+			if not interface.finish then
+				socket.shutdown(fd)	-- shutdown the socket fd, need close later.
+			end
+		end)
+	end
+	return fd, interface, host
+end
+
+local function close_interface(interface, fd)
+	interface.finish = true
 	socket.close(fd)
+	if interface.close then
+		interface.close()
+		interface.close = nil
+	end
+end
+
+function httpc.request(method, hostname, url, recvheader, header, content)
+	local fd, interface, host = connect(hostname, httpc.timeout)
+	local ok , statuscode, body , header = pcall(internal.request, interface, method, host, url, recvheader, header, content)
+	if ok then
+		ok, body = pcall(internal.response, interface, statuscode, body, header)
+	end
+	close_interface(interface, fd)
 	if ok then
 		return statuscode, body
 	else
 		error(statuscode)
 	end
+end
+
+function httpc.head(hostname, url, recvheader, header, content)
+	local fd, interface, host = connect(hostname, httpc.timeout)
+	local ok , statuscode = pcall(internal.request, interface, "HEAD", host, url, recvheader, header, content)
+	close_interface(interface, fd)
+	if ok then
+		return statuscode
+	else
+		error(statuscode)
+	end
+end
+
+function httpc.request_stream(method, hostname, url, recvheader, header, content)
+	local fd, interface, host = connect(hostname, httpc.timeout)
+	local ok , statuscode, body , header = pcall(internal.request, interface, method, host, url, recvheader, header, content)
+	interface.finish = true -- don't shutdown fd in timeout
+	local function close_fd()
+		close_interface(interface, fd)
+	end
+	if not ok then
+		close_fd()
+		error(statuscode)
+	end
+	-- todo: stream support timeout
+	local stream = internal.response_stream(interface, statuscode, body, header)
+	stream._onclose = close_fd
+	return stream
 end
 
 function httpc.get(...)

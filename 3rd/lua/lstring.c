@@ -1,5 +1,5 @@
 /*
-** $Id: lstring.c,v 2.56 2015/11/23 11:32:51 roberto Exp $
+** $Id: lstring.c $
 ** String table (keeps all strings handled by Lua)
 ** See Copyright Notice in lua.h
 */
@@ -20,18 +20,15 @@
 #include "lobject.h"
 #include "lstate.h"
 #include "lstring.h"
+#include "atomic.h"
 
-
-#define MEMERRMSG       "not enough memory"
-
+static unsigned int STRSEED;
+static ATOM_SIZET STRID = 0;
 
 /*
-** Lua will use at most ~(2^LUAI_HASHLIMIT) bytes from a string to
-** compute its hash
+** Maximum size for string table.
 */
-#if !defined(LUAI_HASHLIMIT)
-#define LUAI_HASHLIMIT		5
-#endif
+#define MAXSTRTB	cast_int(luaM_limitN(MAX_INT, TString*))
 
 
 /*
@@ -39,60 +36,93 @@
 */
 int luaS_eqlngstr (TString *a, TString *b) {
   size_t len = a->u.lnglen;
-  lua_assert(a->tt == LUA_TLNGSTR && b->tt == LUA_TLNGSTR);
+  lua_assert(a->tt == LUA_VLNGSTR && b->tt == LUA_VLNGSTR);
   return (a == b) ||  /* same instance or... */
     ((len == b->u.lnglen) &&  /* equal length and ... */
      (memcmp(getstr(a), getstr(b), len) == 0));  /* equal contents */
 }
 
+int luaS_eqshrstr (TString *a, TString *b) {
+  lu_byte len = a->shrlen;
+  lua_assert(b->tt == LUA_VSHRSTR);
+  int r = len == b->shrlen && (memcmp(getstr(a), getstr(b), len) == 0);
+  if (r) {
+    if (a->id < b->id) {
+      a->id = b->id;
+    } else {
+      b->id = a->id;
+    }
+  }
+  return r;
+}
+
+void luaS_share (TString *ts) {
+  if (ts == NULL || isshared(ts))
+    return;
+  makeshared(ts);
+  ts->id = ATOM_FDEC(&STRID)-1;
+}
 
 unsigned int luaS_hash (const char *str, size_t l, unsigned int seed) {
-  unsigned int h = seed ^ cast(unsigned int, l);
-  size_t step = (l >> LUAI_HASHLIMIT) + 1;
-  for (; l >= step; l -= step)
+  unsigned int h = seed ^ cast_uint(l);
+  for (; l > 0; l--)
     h ^= ((h<<5) + (h>>2) + cast_byte(str[l - 1]));
   return h;
 }
 
 
 unsigned int luaS_hashlongstr (TString *ts) {
-  lua_assert(ts->tt == LUA_TLNGSTR);
+  lua_assert(ts->tt == LUA_VLNGSTR);
   if (ts->extra == 0) {  /* no hash? */
-    ts->hash = luaS_hash(getstr(ts), ts->u.lnglen, ts->hash);
+    size_t len = ts->u.lnglen;
+    ts->hash = luaS_hash(getstr(ts), len, ts->hash);
     ts->extra = 1;  /* now it has its hash */
   }
   return ts->hash;
 }
 
 
-/*
-** resizes the string table
-*/
-void luaS_resize (lua_State *L, int newsize) {
+static void tablerehash (TString **vect, int osize, int nsize) {
   int i;
-  stringtable *tb = &G(L)->strt;
-  if (newsize > tb->size) {  /* grow table if needed */
-    luaM_reallocvector(L, tb->hash, tb->size, newsize, TString *);
-    for (i = tb->size; i < newsize; i++)
-      tb->hash[i] = NULL;
-  }
-  for (i = 0; i < tb->size; i++) {  /* rehash */
-    TString *p = tb->hash[i];
-    tb->hash[i] = NULL;
-    while (p) {  /* for each node in the list */
+  for (i = osize; i < nsize; i++)  /* clear new elements */
+    vect[i] = NULL;
+  for (i = 0; i < osize; i++) {  /* rehash old part of the array */
+    TString *p = vect[i];
+    vect[i] = NULL;
+    while (p) {  /* for each string in the list */
       TString *hnext = p->u.hnext;  /* save next */
-      unsigned int h = lmod(p->hash, newsize);  /* new position */
-      p->u.hnext = tb->hash[h];  /* chain it */
-      tb->hash[h] = p;
+      unsigned int h = lmod(p->hash, nsize);  /* new position */
+      p->u.hnext = vect[h];  /* chain it into array */
+      vect[h] = p;
       p = hnext;
     }
   }
-  if (newsize < tb->size) {  /* shrink table if needed */
-    /* vanishing slice should be empty */
-    lua_assert(tb->hash[newsize] == NULL && tb->hash[tb->size - 1] == NULL);
-    luaM_reallocvector(L, tb->hash, tb->size, newsize, TString *);
+}
+
+
+/*
+** Resize the string table. If allocation fails, keep the current size.
+** (This can degrade performance, but any non-zero size should work
+** correctly.)
+*/
+void luaS_resize (lua_State *L, int nsize) {
+  stringtable *tb = &G(L)->strt;
+  int osize = tb->size;
+  TString **newvect;
+  if (nsize < osize)  /* shrinking table? */
+    tablerehash(tb->hash, osize, nsize);  /* depopulate shrinking part */
+  newvect = luaM_reallocvector(L, tb->hash, osize, nsize, TString*);
+  if (l_unlikely(newvect == NULL)) {  /* reallocation failed? */
+    if (nsize < osize)  /* was it shrinking table? */
+      tablerehash(tb->hash, nsize, osize);  /* restore to original size */
+    /* leave table as it was */
   }
-  tb->size = newsize;
+  else {  /* allocation succeeded */
+    tb->hash = newvect;
+    tb->size = nsize;
+    if (nsize > osize)
+      tablerehash(newvect, osize, nsize);  /* rehash for new size */
+  }
 }
 
 
@@ -104,11 +134,26 @@ void luaS_clearcache (global_State *g) {
   int i, j;
   for (i = 0; i < STRCACHE_N; i++)
     for (j = 0; j < STRCACHE_M; j++) {
-    if (iswhite(g->strcache[i][j]))  /* will entry be collected? */
-      g->strcache[i][j] = g->memerrmsg;  /* replace it with something fixed */
+      if (iswhite(g->strcache[i][j]))  /* will entry be collected? */
+        g->strcache[i][j] = g->memerrmsg;  /* replace it with something fixed */
     }
 }
 
+#if !defined(luai_makeseed)
+
+#include <time.h>
+
+static unsigned int luai_makeseed(lua_State *L) {
+	size_t buff[4];
+	unsigned int h = time(NULL);
+	buff[0] = cast(size_t, h);
+	buff[1] = cast(size_t, &STRSEED);
+	buff[2] = cast(size_t, &luai_makeseed);
+	buff[3] = cast(size_t, L);
+	return luaS_hash((const char*)buff, sizeof(buff), h);
+}
+
+#endif
 
 /*
 ** Initialize the string table and the string cache
@@ -116,7 +161,13 @@ void luaS_clearcache (global_State *g) {
 void luaS_init (lua_State *L) {
   global_State *g = G(L);
   int i, j;
-  luaS_resize(L, MINSTRTABSIZE);  /* initial size of string table */
+  if (STRSEED == 0) {
+    STRSEED = luai_makeseed(L);
+  }
+  stringtable *tb = &G(L)->strt;
+  tb->hash = luaM_newvector(L, MINSTRTABSIZE, TString*);
+  tablerehash(tb->hash, 0, MINSTRTABSIZE);  /* clear array */
+  tb->size = MINSTRTABSIZE;
   /* pre-create memory-error message */
   g->memerrmsg = luaS_newliteral(L, MEMERRMSG);
   luaC_fix(L, obj2gco(g->memerrmsg));  /* it should never be collected */
@@ -139,13 +190,14 @@ static TString *createstrobj (lua_State *L, size_t l, int tag, unsigned int h) {
   ts = gco2ts(o);
   ts->hash = h;
   ts->extra = 0;
+  ts->id = 0;
   getstr(ts)[l] = '\0';  /* ending 0 */
   return ts;
 }
 
 
 TString *luaS_createlngstrobj (lua_State *L, size_t l) {
-  TString *ts = createstrobj(L, l, LUA_TLNGSTR, G(L)->seed);
+  TString *ts = createstrobj(L, l, LUA_VLNGSTR, STRSEED);
   ts->u.lnglen = l;
   return ts;
 }
@@ -161,44 +213,49 @@ void luaS_remove (lua_State *L, TString *ts) {
 }
 
 
+static void growstrtab (lua_State *L, stringtable *tb) {
+  if (l_unlikely(tb->nuse == MAX_INT)) {  /* too many strings? */
+    luaC_fullgc(L, 1);  /* try to free some... */
+    if (tb->nuse == MAX_INT)  /* still too many? */
+      luaM_error(L);  /* cannot even create a message... */
+  }
+  if (tb->size <= MAXSTRTB / 2)  /* can grow string table? */
+    luaS_resize(L, tb->size * 2);
+}
+
+
 /*
-** checks whether short string exists and reuses it or creates a new one
+** Checks whether short string exists and reuses it or creates a new one.
 */
-static TString *queryshrstr (lua_State *L, const char *str, size_t l, unsigned int h) {
+static TString *internshrstr (lua_State *L, const char *str, size_t l) {
   TString *ts;
   global_State *g = G(L);
-  TString **list = &g->strt.hash[lmod(h, g->strt.size)];
+  stringtable *tb = &g->strt;
+  unsigned int h = luaS_hash(str, l, STRSEED);
+  TString **list = &tb->hash[lmod(h, tb->size)];
   lua_assert(str != NULL);  /* otherwise 'memcmp'/'memcpy' are undefined */
   for (ts = *list; ts != NULL; ts = ts->u.hnext) {
-    if (l == ts->shrlen &&
-        (memcmp(str, getstr(ts), l * sizeof(char)) == 0)) {
+    if (l == ts->shrlen && (memcmp(str, getstr(ts), l * sizeof(char)) == 0)) {
       /* found! */
       if (isdead(g, ts))  /* dead (but not collected yet)? */
         changewhite(ts);  /* resurrect it */
       return ts;
     }
   }
-  return NULL;
-}
-
-static TString *addshrstr (lua_State *L, const char *str, size_t l, unsigned int h) {
-  TString *ts;
-  global_State *g = G(L);
-  TString **list = &g->strt.hash[lmod(h, g->strt.size)];
-  if (g->strt.nuse >= g->strt.size && g->strt.size <= MAX_INT/2) {
-    luaS_resize(L, g->strt.size * 2);
-    list = &g->strt.hash[lmod(h, g->strt.size)];  /* recompute with new size */
+  /* else must create a new string */
+  if (tb->nuse >= tb->size) {  /* need to grow string table? */
+    growstrtab(L, tb);
+    list = &tb->hash[lmod(h, tb->size)];  /* rehash with new size */
   }
-  ts = createstrobj(L, l, LUA_TSHRSTR, h);
+  ts = createstrobj(L, l, LUA_VSHRSTR, h);
   memcpy(getstr(ts), str, l * sizeof(char));
   ts->shrlen = cast_byte(l);
   ts->u.hnext = *list;
   *list = ts;
-  g->strt.nuse++;
+  tb->nuse++;
   return ts;
 }
 
-static TString *internshrstr (lua_State *L, const char *str, size_t l);
 
 /*
 ** new string (with explicit length)
@@ -208,7 +265,7 @@ TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
     return internshrstr(L, str, l);
   else {
     TString *ts;
-    if (l >= (MAX_SIZE - sizeof(TString))/sizeof(char))
+    if (l_unlikely(l >= (MAX_SIZE - sizeof(TString))/sizeof(char)))
       luaM_toobig(L);
     ts = luaS_createlngstrobj(L, l);
     memcpy(getstr(ts), str, l * sizeof(char));
@@ -240,230 +297,19 @@ TString *luaS_new (lua_State *L, const char *str) {
 }
 
 
-Udata *luaS_newudata (lua_State *L, size_t s) {
+Udata *luaS_newudata (lua_State *L, size_t s, int nuvalue) {
   Udata *u;
+  int i;
   GCObject *o;
-  if (s > MAX_SIZE - sizeof(Udata))
+  if (l_unlikely(s > MAX_SIZE - udatamemoffset(nuvalue)))
     luaM_toobig(L);
-  o = luaC_newobj(L, LUA_TUSERDATA, sizeludata(s));
+  o = luaC_newobj(L, LUA_VUSERDATA, sizeudata(nuvalue, s));
   u = gco2u(o);
   u->len = s;
+  u->nuvalue = nuvalue;
   u->metatable = NULL;
-  setuservalue(L, u, luaO_nilobject);
+  for (i = 0; i < nuvalue; i++)
+    setnilvalue(&u->uv[i].uv);
   return u;
 }
 
-/*
- * global shared table
- */
-
-#include "rwlock.h"
-#include "atomic.h"
-#include <stdlib.h>
-
-#define SHRSTR_SLOT 0x10000
-#define HASH_NODE(h) ((h) % SHRSTR_SLOT)
-#define getaddrstr(ts)	(cast(char *, (ts)) + sizeof(UTString))
-
-struct shrmap_slot {
-	struct rwlock lock;
-	TString *str;
-};
-
-struct shrmap {
-	struct shrmap_slot h[SHRSTR_SLOT];
-	int n;
-};
-
-static struct shrmap SSM;
-
-LUA_API void
-luaS_initshr() {
-	struct shrmap * s = &SSM;
-	int i;
-	for (i=0;i<SHRSTR_SLOT;i++) {
-		rwlock_init(&s->h[i].lock);
-	}
-}
-
-LUA_API void
-luaS_exitshr() {
-	int i;
-	for (i=0;i<SHRSTR_SLOT;i++) {
-		TString *str = SSM.h[i].str;
-		while (str) {
-			TString * next = str->u.hnext;
-			free(str);
-			str = next;
-		}
-	}
-}
-
-static TString *
-query_string(unsigned int h, const char *str, lu_byte l) {
-	struct shrmap_slot *s = &SSM.h[HASH_NODE(h)];
-	rwlock_rlock(&s->lock);
-	TString *ts = s->str;
-	while (ts) {
-		if (ts->hash == h &&
-			ts->shrlen == l &&
-			memcmp(str, ts+1, l) == 0) {
-			break;
-		}
-		ts = ts->u.hnext;
-	}
-	rwlock_runlock(&s->lock);
-	return ts;
-}
-
-static TString *
-query_ptr(TString *t) {
-	unsigned int h = t->hash;
-	struct shrmap_slot *s = &SSM.h[HASH_NODE(h)];
-	rwlock_rlock(&s->lock);
-	TString *ts = s->str;
-	while (ts) {
-		if (ts == t)
-			break;
-		ts = ts->u.hnext;
-	}
-	rwlock_runlock(&s->lock);
-	return ts;
-}
-
-static TString *
-new_string(unsigned int h, const char *str, lu_byte l) {
-	size_t sz = sizelstring(l);
-	TString *ts = malloc(sz);
-	memset(ts, 0, sz);
-	ts->tt = LUA_TSHRSTR;
-	ts->hash = h;
-	ts->shrlen = l;
-	memcpy(ts+1, str, l);
-	return ts;
-}
-
-static TString *
-add_string(unsigned int h, const char *str, lu_byte l) {
-	TString * tmp = new_string(h, str, l);
-	struct shrmap_slot *s = &SSM.h[HASH_NODE(h)];
-	rwlock_wlock(&s->lock);
-	TString *ts = s->str;
-	while (ts) {
-		if (ts->hash == h &&
-			ts->shrlen == l &&
-			memcmp(str, ts+1, l) == 0) {
-				break;
-		}
-		ts = ts->u.hnext;
-	}
-	if (ts == NULL) {
-		ts = tmp;
-		ts->u.hnext = s->str;
-		s->str = ts;
-		tmp = NULL;
-	}
-	rwlock_wunlock(&s->lock);
-	if (tmp) {
-		// string is create by other thread, so free tmp
-		free(tmp);
-	}
-	return ts;
-}
-
-static TString *
-internshrstr (lua_State *L, const char *str, size_t l) {
-  TString *ts;
-  global_State *g = G(L);
-  unsigned int h = luaS_hash(str, l, g->seed);
-  unsigned int h0;
-  // lookup global state of this L first
-  ts = queryshrstr (L, str, l, h);
-  if (ts)
-    return ts;
-  // lookup SSM again
-  h0 = luaS_hash(str, l, 0);
-  ts = query_string(h0, str, l);
-  if (ts)
-    return ts;
-  // If SSM.n greate than 0, add it to SSM
-  if (SSM.n > 0) {
-    ATOM_DEC(&SSM.n);
-    return add_string(h0, str, l);
-  }
-  // Else add it to global state (local)
-  return addshrstr (L, str, l, h);
-}
-
-LUA_API void
-luaS_expandshr(int n) {
-  ATOM_ADD(&SSM.n, n);
-}
-
-LUAI_FUNC TString *
-luaS_clonestring(lua_State *L, TString *ts) {
-  unsigned int h;
-  int l;
-  const char * str = getaddrstr(ts);
-  global_State *g = G(L);
-  TString *result;
-  if (ts->tt == LUA_TLNGSTR)
-    return luaS_newlstr(L, str, ts->u.lnglen);
-  // look up global state of this L first
-  l = ts->shrlen;
-  h = luaS_hash(str, l, g->seed);
-  result = queryshrstr (L, str, l, h);
-  if (result)
-    return result;
-  // look up SSM by ptr
-  result = query_ptr(ts);
-  if (result)
-    return result;
-  h = luaS_hash(str, l, 0);
-  result = query_string(h, str, l);
-  if (result)
-    return result;
-  // ts is not in SSM, so recalc hash, and add it to SSM
-  return add_string(h, str, l);
-}
-
-struct slotinfo {
-	int len;
-	int size;
-};
-
-static void
-getslot(struct shrmap_slot *s, struct slotinfo *info) {
-	memset(info, 0, sizeof(*info));
-	rwlock_rlock(&s->lock);
-	TString *ts = s->str;
-	while (ts) {
-		++info->len;
-		info->size += sizelstring(ts->shrlen);
-		ts = ts->u.hnext;
-	}
-	rwlock_runlock(&s->lock);
-}
-
-LUA_API int
-luaS_shrinfo(lua_State *L) {
-	struct slotinfo total;
-	struct slotinfo tmp;
-	memset(&total, 0, sizeof(total));
-	int i;
-	int len = 0;
-	for (i=0;i<SHRSTR_SLOT;i++) {
-		struct shrmap_slot *s = &SSM.h[i];
-		getslot(s, &tmp);
-		len += tmp.len;
-		if (tmp.len > total.len) {
-			total.len = tmp.len;
-		}
-		total.size += tmp.size;
-	}
-	lua_pushinteger(L, len);
-	lua_pushinteger(L, total.size);
-	lua_pushinteger(L, total.len);
-	lua_pushinteger(L, SSM.n);
-	return 4;
-}

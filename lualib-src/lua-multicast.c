@@ -1,3 +1,5 @@
+#define LUA_LIB
+
 #include "skynet.h"
 
 #include <lua.h>
@@ -8,7 +10,7 @@
 #include "atomic.h"
 
 struct mc_package {
-	int reference;
+	ATOM_INT reference;
 	uint32_t size;
 	void *data;
 };
@@ -16,7 +18,7 @@ struct mc_package {
 static int
 pack(lua_State *L, void *data, size_t size) {
 	struct mc_package * pack = skynet_malloc(sizeof(struct mc_package));
-	pack->reference = 0;
+	ATOM_INIT(&pack->reference, 0);
 	pack->size = (uint32_t)size;
 	pack->data = data;
 	struct mc_package ** ret = skynet_malloc(sizeof(*ret));
@@ -60,18 +62,6 @@ mc_packremote(lua_State *L) {
 	return pack(L, msg, size);
 }
 
-static int
-mc_packstring(lua_State *L) {
-	size_t size;
-	const char * msg = luaL_checklstring(L, 1, &size);
-	if (size != (uint32_t)size) {
-		return luaL_error(L, "string is too long");
-	}
-	void * data = skynet_malloc(size);
-	memcpy(data, msg, size);
-	return pack(L, data, size);
-}
-
 /*
 	lightuserdata struct mc_package **
 	integer size (must be sizeof(struct mc_package *)
@@ -82,7 +72,7 @@ static int
 mc_unpacklocal(lua_State *L) {
 	struct mc_package ** pack = lua_touserdata(L,1);
 	int sz = luaL_checkinteger(L,2);
-	if (sz != sizeof(*pack)) {
+	if (sz != sizeof(pack)) {
 		return luaL_error(L, "Invalid multicast package size %d", sz);
 	}
 	lua_pushlightuserdata(L, *pack);
@@ -101,12 +91,14 @@ static int
 mc_bindrefer(lua_State *L) {
 	struct mc_package ** pack = lua_touserdata(L,1);
 	int ref = luaL_checkinteger(L,2);
-	if ((*pack)->reference != 0) {
+	if (ATOM_LOAD(&(*pack)->reference) != 0) {
 		return luaL_error(L, "Can't bind a multicast package more than once");
 	}
-	(*pack)->reference = ref;
+	ATOM_STORE(&(*pack)->reference , ref);
 
 	lua_pushlightuserdata(L, *pack);
+
+	skynet_free(pack);
 
 	return 1;
 }
@@ -118,7 +110,7 @@ static int
 mc_closelocal(lua_State *L) {
 	struct mc_package *pack = lua_touserdata(L,1);
 
-	int ref = ATOM_DEC(&pack->reference);
+	int ref = ATOM_FDEC(&pack->reference)-1;
 	if (ref <= 0) {
 		skynet_free(pack->data);
 		skynet_free(pack);
@@ -141,6 +133,7 @@ mc_remote(lua_State *L) {
 	lua_pushlightuserdata(L, pack->data);
 	lua_pushinteger(L, (lua_Integer)(pack->size));
 	skynet_free(pack);
+	skynet_free(ptr);
 	return 2;
 }
 
@@ -148,20 +141,20 @@ static int
 mc_nextid(lua_State *L) {
 	uint32_t id = (uint32_t)luaL_checkinteger(L, 1);
 	id += 256;
-	lua_pushinteger(L, (uint32_t)id);
+	// remove the highest bit, see #1139
+	lua_pushinteger(L, id & 0x7fffffffu);
 
 	return 1;
 }
 
-int
-luaopen_multicast_core(lua_State *L) {
+LUAMOD_API int
+luaopen_skynet_multicast_core(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "pack", mc_packlocal },
 		{ "unpack", mc_unpacklocal },
 		{ "bind", mc_bindrefer },
 		{ "close", mc_closelocal },
 		{ "remote", mc_remote },
-		{ "packstring", mc_packstring },
 		{ "packremote", mc_packremote },
 		{ "nextid", mc_nextid },
 		{ NULL, NULL },

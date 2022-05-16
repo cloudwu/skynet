@@ -1,7 +1,7 @@
 /*
-** $Id: lptypes.h,v 1.14 2015/09/28 17:17:41 roberto Exp $
+** $Id: lptypes.h $
 ** LPeg - PEG pattern matching for Lua
-** Copyright 2007-2015, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
+** Copyright 2007-2019, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 ** written by Roberto Ierusalimschy
 */
 
@@ -9,17 +9,13 @@
 #define lptypes_h
 
 
-#if !defined(LPEG_DEBUG)
-#define NDEBUG
-#endif
-
 #include <assert.h>
 #include <limits.h>
 
 #include "lua.h"
 
 
-#define VERSION         "1.0.0"
+#define VERSION         "1.0.2"
 
 
 #define PATTERN_T	"lpeg-pattern"
@@ -55,9 +51,9 @@
 #endif
 
 
-/* maximum number of rules in a grammar */
+/* maximum number of rules in a grammar (limited by 'unsigned char') */
 #if !defined(MAXRULES)
-#define MAXRULES        1000
+#define MAXRULES        250
 #endif
 
 

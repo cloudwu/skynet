@@ -39,8 +39,12 @@ skynet_handle_register(struct skynet_context *ctx) {
 	
 	for (;;) {
 		int i;
-		for (i=0;i<s->slot_size;i++) {
-			uint32_t handle = (i+s->handle_index) & HANDLE_MASK;
+		uint32_t handle = s->handle_index;
+		for (i=0;i<s->slot_size;i++,handle++) {
+			if (handle > HANDLE_MASK) {
+				// 0 is reserved
+				handle = 1;
+			}
 			int hash = handle & (s->slot_size-1);
 			if (s->slot[hash] == NULL) {
 				s->slot[hash] = ctx;
@@ -56,9 +60,11 @@ skynet_handle_register(struct skynet_context *ctx) {
 		struct skynet_context ** new_slot = skynet_malloc(s->slot_size * 2 * sizeof(struct skynet_context *));
 		memset(new_slot, 0, s->slot_size * 2 * sizeof(struct skynet_context *));
 		for (i=0;i<s->slot_size;i++) {
-			int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
-			assert(new_slot[hash] == NULL);
-			new_slot[hash] = s->slot[i];
+			if (s->slot[i]) {
+				int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
+				assert(new_slot[hash] == NULL);
+				new_slot[hash] = s->slot[i];
+			}
 		}
 		skynet_free(s->slot);
 		s->slot = new_slot;
@@ -115,13 +121,13 @@ skynet_handle_retireall() {
 			rwlock_rlock(&s->lock);
 			struct skynet_context * ctx = s->slot[i];
 			uint32_t handle = 0;
-			if (ctx)
+			if (ctx) {
 				handle = skynet_context_handle(ctx);
+				++n;
+			}
 			rwlock_runlock(&s->lock);
 			if (handle != 0) {
-				if (skynet_handle_retire(handle)) {
-					++n;
-				}
+				skynet_handle_retire(handle);
 			}
 		}
 		if (n==0)

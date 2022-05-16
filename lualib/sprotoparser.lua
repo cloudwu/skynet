@@ -4,7 +4,9 @@ local table = require "table"
 local packbytes
 local packvalue
 
-if _VERSION == "Lua 5.3" then
+local version = _VERSION:match "5.*"
+
+if version and tonumber(version) >= 5.3 then
 	function packbytes(str)
 		return string.pack("<s4",str)
 	end
@@ -69,7 +71,8 @@ local word = alpha * alnum ^ 0
 local name = C(word)
 local typename = C(word * ("." * word) ^ 0)
 local tag = R"09" ^ 1 / tonumber
-local mainkey = "(" * blank0 * name * blank0 * ")"
+local mainkey = "(" * blank0 * C((word ^ 0)) * blank0 * ")"
+local decimal = "(" * blank0 * C(tag) * blank0 * ")"
 
 local function multipat(pat)
 	return Ct(blank0 * (pat * blanks) ^ 0 * pat^0 * blank0)
@@ -81,7 +84,7 @@ end
 
 local typedef = P {
 	"ALL",
-	FIELD = namedpat("field", (name * blanks * tag * blank0 * ":" * blank0 * (C"*")^-1 * typename * mainkey^0)),
+	FIELD = namedpat("field", name * blanks * tag * blank0 * ":" * blank0 * (C"*")^-1 * typename * (mainkey + decimal)^0),
 	STRUCT = P"{" * multipat(V"FIELD" + V"TYPE") * P"}",
 	TYPE = namedpat("type", P"." * name * blank0 * V"STRUCT" ),
 	SUBPROTO = Ct((C"request" + C"response") * blanks * (typename + V"STRUCT")),
@@ -96,17 +99,31 @@ local convert = {}
 function convert.protocol(all, obj)
 	local result = { tag = obj[2] }
 	for _, p in ipairs(obj[3]) do
-		assert(result[p[1]] == nil)
+		local pt = p[1]
+		if result[pt] ~= nil then
+			error(string.format("redefine %s in protocol %s", pt, obj[1]))
+		end
 		local typename = p[2]
 		if type(typename) == "table" then
 			local struct = typename
 			typename = obj[1] .. "." .. p[1]
 			all.type[typename] = convert.type(all, { typename, struct })
 		end
-		result[p[1]] = typename
+		if typename == "nil" then
+			if p[1] == "response" then
+				result.confirm = true
+			end
+		else
+			result[p[1]] = typename
+		end
 	end
 	return result
 end
+
+local map_keytypes = {
+	integer = true,
+	string = true,
+}
 
 function convert.type(all, obj)
 	local result = {}
@@ -134,8 +151,12 @@ function convert.type(all, obj)
 			end
 			local mainkey = f[5]
 			if mainkey then
-				assert(field.array)
-				field.key = mainkey
+				if fieldtype == "integer" then
+					field.decimal = mainkey
+				else
+					assert(field.array)
+					field.key = mainkey
+				end
 			end
 			field.typename = fieldtype
 		else
@@ -167,6 +188,8 @@ local buildin_types = {
 	integer = 0,
 	boolean = 1,
 	string = 2,
+	binary = 2,	-- binary is a sub type of string
+	double = 3,
 }
 
 local function checktype(types, ptype, t)
@@ -242,7 +265,8 @@ end
 		type 2 : integer
 		tag	3 :	integer
 		array 4	: boolean
-		key 5 : integer # If key exists, array must be true, and it's a map.
+		key 5 : integer # If key exists, array must be true
+		map 6 : boolean # Interpret two fields struct as map when decoding
 	}
 	name 0 : string
 	fields 1 : *field
@@ -253,6 +277,7 @@ end
 	tag	1 :	integer
 	request	2 :	integer	# index
 	response 3 : integer # index
+	confirm 4 : boolean # true means response nil
 }
 
 .group {
@@ -265,7 +290,11 @@ local function packfield(f)
 	local strtbl = {}
 	if f.array then
 		if f.key then
-			table.insert(strtbl, "\6\0")  -- 6 fields
+			if f.map then
+				table.insert(strtbl, "\7\0")  -- 7 fields
+			else
+				table.insert(strtbl, "\6\0")  -- 6 fields
+			end
 		else
 			table.insert(strtbl, "\5\0")  -- 5 fields
 		end
@@ -275,7 +304,11 @@ local function packfield(f)
 	table.insert(strtbl, "\0\0")	-- name	(tag = 0, ref an object)
 	if f.buildin then
 		table.insert(strtbl, packvalue(f.buildin))	-- buildin (tag = 1)
-		table.insert(strtbl, "\1\0")	-- skip (tag = 2)
+		if f.extra then
+			table.insert(strtbl, packvalue(f.extra))	-- f.buildin can be integer or string
+		else
+			table.insert(strtbl, "\1\0")	-- skip (tag = 2)
+		end
 		table.insert(strtbl, packvalue(f.tag))		-- tag (tag = 3)
 	else
 		table.insert(strtbl, "\1\0")	-- skip (tag = 1)
@@ -284,9 +317,12 @@ local function packfield(f)
 	end
 	if f.array then
 		table.insert(strtbl, packvalue(1))	-- array = true (tag = 4)
-	end
-	if f.key then
-		table.insert(strtbl, packvalue(f.key)) -- key tag (tag = 5)
+		if f.key then
+			table.insert(strtbl, packvalue(f.key)) -- key tag (tag = 5)
+			if f.map then
+				table.insert(strtbl, packvalue(f.map)) -- map tag (tag = 6)
+			end
+		end
 	end
 	table.insert(strtbl, packbytes(f.name)) -- external object (name)
 	return packbytes(table.concat(strtbl))
@@ -299,8 +335,12 @@ local function packtype(name, t, alltypes)
 		tmp.array = f.array
 		tmp.name = f.name
 		tmp.tag = f.tag
+		tmp.extra = f.decimal
 
 		tmp.buildin = buildin_types[f.typename]
+		if f.typename == "binary" then
+			tmp.extra = 1	-- binary is sub type of string
+		end
 		local subtype
 		if not tmp.buildin then
 			subtype = assert(alltypes[f.typename])
@@ -308,11 +348,29 @@ local function packtype(name, t, alltypes)
 		else
 			tmp.type = nil
 		end
+		tmp.map = nil
 		if f.key then
-			tmp.key = subtype.fields[f.key]
-			if not tmp.key then
+			assert(f.array)
+			if f.key == "" then
+				tmp.map = 1
+				local c = 0
+				local min_t = math.maxinteger
+				for n, t in pairs(subtype.fields) do
+					c = c + 1
+					if t.tag < min_t then
+						min_t = t.tag
+						f.key = n
+					end
+				end
+				if c ~= 2 then
+					error(string.format("Invalid map definition: %s, must only have two fields", tmp.name))
+				end
+			end
+			local stfield = subtype.fields[f.key]
+			if not stfield or not stfield.buildin then
 				error("Invalid map index :" .. f.key)
 			end
+			tmp.key = stfield.tag
 		else
 			tmp.key = nil
 		end
@@ -352,18 +410,22 @@ local function packproto(name, p, alltypes)
 		"\0\0",	-- name (id=0, ref=0)
 		packvalue(p.tag),	-- tag (tag=1)
 	}
-	if p.request == nil and p.response == nil then
-		tmp[1] = "\2\0"
+	if p.request == nil and p.response == nil and p.confirm == nil then
+		tmp[1] = "\2\0"	-- only two fields
 	else
 		if p.request then
 			table.insert(tmp, packvalue(alltypes[p.request].id)) -- request typename (tag=2)
 		else
-			table.insert(tmp, "\1\0")
+			table.insert(tmp, "\1\0")	-- skip this field (request)
 		end
 		if p.response then
 			table.insert(tmp, packvalue(alltypes[p.response].id)) -- request typename (tag=3)
+		elseif p.confirm then
+			tmp[1] = "\5\0"	-- add confirm field
+			table.insert(tmp, "\1\0")	-- skip this field (response)
+			table.insert(tmp, packvalue(1))	-- confirm = true
 		else
-			tmp[1] = "\3\0"
+			tmp[1] = "\3\0"	-- only three fields
 		end
 	end
 
@@ -386,9 +448,10 @@ local function packgroup(t,p)
 	for idx, name in ipairs(alltypes) do
 		local fields = {}
 		for _, type_fields in ipairs(t[name]) do
-			if buildin_types[type_fields.typename] then
-				fields[type_fields.name] = type_fields.tag
-			end
+			fields[type_fields.name] = {
+				tag = type_fields.tag,
+				buildin = buildin_types[type_fields.typename]
+			}
 		end
 		alltypes[name] = { id = idx - 1, fields = fields }
 	end

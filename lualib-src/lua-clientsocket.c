@@ -2,6 +2,8 @@
 // It's only for demo, limited feature. Don't use it in your project.
 // Rewrite socket library by yourself .
 
+#define LUA_LIB
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
@@ -183,13 +185,48 @@ lreadstdin(lua_State *L) {
 	return 1;
 }
 
-int
-luaopen_clientsocket(lua_State *L) {
+static int
+lshutdown(lua_State *L) {
+	int fd = luaL_checkinteger(L,1);
+	const char *mode = luaL_checkstring(L,2);
+	int v = 0;
+	int i;
+	int read = 1;
+	int write = 2;
+	for (i=0;mode[i];i++) {
+		switch(mode[i]) {
+		case 'r':
+			v |= read;
+			break;
+		case 'w':
+			v |= write;
+			break;
+		default:
+			return luaL_error(L, "Invalid mode %c", mode[i]);
+		}
+	}
+	if (v == 0) {
+		return luaL_error(L, "mode should be r or/and w");
+	}
+	if (v == read)
+		v = SHUT_RD;
+	else if (v == write)
+		v = SHUT_WR;
+	else
+		v = SHUT_RDWR;
+	printf("SHUTDOWN %d %d\n", fd, v);
+	shutdown(fd, v);
+	return 0;
+}
+
+LUAMOD_API int
+luaopen_client_socket(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "connect", lconnect },
 		{ "recv", lrecv },
 		{ "send", lsend },
+		{ "shutdown", lshutdown },
 		{ "close", lclose },
 		{ "usleep", lusleep },
 		{ NULL, NULL },
