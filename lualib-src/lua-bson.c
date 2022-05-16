@@ -1206,6 +1206,24 @@ lobjectid(lua_State *L) {
 	return 1;
 }
 
+static int
+lstr(lua_State *L) {
+	size_t len;
+	const char *str = luaL_checklstring(L, 1, &len);
+	if (len != 14) {
+		return luaL_error(L, "Invalid objectid %s", str);
+	}
+	char s[24];
+	for (int i = 0; i < 12; i++) {
+		uint8_t high = str[i + 2] >> 4 & 0xf;
+		uint8_t low = str[i + 2] & 0xf;
+		snprintf(&s[i * 2], 2, "%hx", high);
+		snprintf(&s[i * 2 + 1], 2, "%hx", low);
+	}
+	lua_pushlstring(L, s, 24);
+	return 1;
+}
+
 int
 luaopen_bson(lua_State *L) {
 	luaL_checkversion(L);
@@ -1224,6 +1242,7 @@ luaopen_bson(lua_State *L) {
 		{ "binary", lbinary },
 		{ "objectid", lobjectid },
 		{ "decode", ldecode },
+		{ "str", lstr },
 		{ NULL,  NULL },
 	};
 
