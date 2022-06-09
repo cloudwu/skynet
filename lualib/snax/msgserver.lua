@@ -100,8 +100,10 @@ function server.logout(username)
 	local u = user_online[username]
 	user_online[username] = nil
 	if u.fd then
-		gateserver.closeclient(u.fd)
-		connection[u.fd] = nil
+		if connection[u.fd] then
+			gateserver.closeclient(u.fd)
+			connection[u.fd] = nil
+		end
 	end
 end
 
@@ -153,10 +155,14 @@ function server.start(conf)
 		handshake[fd] = nil
 		local c = connection[fd]
 		if c then
-			c.fd = nil
-			connection[fd] = nil
 			if conf.disconnect_handler then
 				conf.disconnect_handler(c.username)
+			end
+			-- double check, conf.disconnect_handler may close fd
+			if connection[fd] then
+				c.fd = nil
+				connection[fd] = nil
+				gateserver.closeclient(fd)
 			end
 		end
 	end
