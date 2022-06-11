@@ -26,7 +26,7 @@ return function (name , G, loader)
 				error (string.format("%s method only support string", group))
 			end
 			if type(func) ~= "function" then
-				error (string.format("%s.%s must be function"), group, name)
+				error (string.format("%s.%s must be function", group, name))
 			end
 			if tmp[name] then
 				error (string.format("%s.%s duplicate definition", group, name))
