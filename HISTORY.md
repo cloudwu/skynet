@@ -1,3 +1,39 @@
+v1.5.0 (2021-11-9)
+-----------
+* Update Lua to 5.4.3
+* Fix socket half close issues
+* Fix TLS issues
+* Improve websocket support
+* Improve redis support
+* Rework skynet.init/skynet.require
+* Add socket.onclose
+* Add httpc.request_stream
+
+v1.4.0 (2020-11-16)
+-----------
+* Update Lua to 5.4.2
+* Add skynet.select
+* Improve mysql driver (@zero-rp @xiaojin @yxt945)
+* Improve websocket and ssl (@lvzixun)
+* Improve sproto (double @lvzixun map @t0350)
+* Add padding mode PKCS7 for DES
+* Add jmem in debug console
+* Add skynet_socket_pause for net traffic control
+* Add timestamp to default logger
+
+v1.3.0 (2019-11-19)
+-----------
+* Improve mysql driver (@yxt945)
+* Improve cluster
+* Improve lua shared proto (@hongling0)
+* Improve socket.write
+* Add lua sharetable
+* Add https support (@lvzixun)
+* Add websocket support (@lvzixun)
+* Fix bug in dns
+* Fix some memory leaks
+* jemalloc update to 5.2.1
+
 v1.2.0 (2018-11-6)
 -----------
 * Improve cluster support

@@ -10,7 +10,6 @@
 #include "skynet_monitor.h"
 #include "skynet_imp.h"
 #include "skynet_log.h"
-#include "skynet_timer.h"
 #include "spinlock.h"
 #include "atomic.h"
 
@@ -46,13 +45,13 @@ struct skynet_context {
 	void * cb_ud;
 	skynet_cb cb;
 	struct message_queue *queue;
-	FILE * logfile;
+	ATOM_POINTER logfile;
 	uint64_t cpu_cost;	// in microsec
 	uint64_t cpu_start;	// in microsec
 	char result[32];
 	uint32_t handle;
 	int session_id;
-	int ref;
+	ATOM_INT ref;
 	int message_count;
 	bool init;
 	bool endless;
@@ -62,28 +61,28 @@ struct skynet_context {
 };
 
 struct skynet_node {
-	int total;
+	ATOM_INT total;
 	int init;
 	uint32_t monitor_exit;
 	pthread_key_t handle_key;
-	bool profile;	// default is off
+	bool profile;	// default is on
 };
 
 static struct skynet_node G_NODE;
 
 int 
 skynet_context_total() {
-	return G_NODE.total;
+	return ATOM_LOAD(&G_NODE.total);
 }
 
 static void
 context_inc() {
-	ATOM_INC(&G_NODE.total);
+	ATOM_FINC(&G_NODE.total);
 }
 
 static void
 context_dec() {
-	ATOM_DEC(&G_NODE.total);
+	ATOM_FDEC(&G_NODE.total);
 }
 
 uint32_t 
@@ -137,11 +136,11 @@ skynet_context_new(const char * name, const char *param) {
 
 	ctx->mod = mod;
 	ctx->instance = inst;
-	ctx->ref = 2;
+	ATOM_INIT(&ctx->ref , 2);
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
 	ctx->session_id = 0;
-	ctx->logfile = NULL;
+	ATOM_INIT(&ctx->logfile, (uintptr_t)NULL);
 
 	ctx->init = false;
 	ctx->endless = false;
@@ -194,7 +193,7 @@ skynet_context_newsession(struct skynet_context *ctx) {
 
 void 
 skynet_context_grab(struct skynet_context *ctx) {
-	ATOM_INC(&ctx->ref);
+	ATOM_FINC(&ctx->ref);
 }
 
 void
@@ -207,8 +206,9 @@ skynet_context_reserve(struct skynet_context *ctx) {
 
 static void 
 delete_context(struct skynet_context *ctx) {
-	if (ctx->logfile) {
-		fclose(ctx->logfile);
+	FILE *f = (FILE *)ATOM_LOAD(&ctx->logfile);
+	if (f) {
+		fclose(f);
 	}
 	skynet_module_instance_release(ctx->mod, ctx->instance);
 	skynet_mq_mark_release(ctx->queue);
@@ -219,7 +219,7 @@ delete_context(struct skynet_context *ctx) {
 
 struct skynet_context * 
 skynet_context_release(struct skynet_context *ctx) {
-	if (ATOM_DEC(&ctx->ref) == 0) {
+	if (ATOM_FDEC(&ctx->ref) == 1) {
 		delete_context(ctx);
 		return NULL;
 	}
@@ -264,8 +264,9 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx->handle));
 	int type = msg->sz >> MESSAGE_TYPE_SHIFT;
 	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
-	if (ctx->logfile) {
-		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
+	FILE *f = (FILE *)ATOM_LOAD(&ctx->logfile);
+	if (f) {
+		skynet_log_output(f, msg->source, type, msg->session, msg->data, sz);
 	}
 	++ctx->message_count;
 	int reserve_msg;
@@ -589,11 +590,11 @@ cmd_logon(struct skynet_context * context, const char * param) {
 	if (ctx == NULL)
 		return NULL;
 	FILE *f = NULL;
-	FILE * lastf = ctx->logfile;
+	FILE * lastf = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (lastf == NULL) {
 		f = skynet_log_open(context, handle);
 		if (f) {
-			if (!ATOM_CAS_POINTER(&ctx->logfile, NULL, f)) {
+			if (!ATOM_CAS_POINTER(&ctx->logfile, 0, (uintptr_t)f)) {
 				// logfile opens in other thread, close this one.
 				fclose(f);
 			}
@@ -611,10 +612,10 @@ cmd_logoff(struct skynet_context * context, const char * param) {
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL)
 		return NULL;
-	FILE * f = ctx->logfile;
+	FILE * f = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (f) {
 		// logfile may close in other thread
-		if (ATOM_CAS_POINTER(&ctx->logfile, f, NULL)) {
+		if (ATOM_CAS_POINTER(&ctx->logfile, (uintptr_t)f, (uintptr_t)NULL)) {
 			skynet_log_close(context, f, handle);
 		}
 	}
@@ -806,7 +807,7 @@ skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t
 
 void 
 skynet_globalinit(void) {
-	G_NODE.total = 0;
+	ATOM_INIT(&G_NODE.total , 0);
 	G_NODE.monitor_exit = 0;
 	G_NODE.init = 1;
 	if (pthread_key_create(&G_NODE.handle_key, NULL)) {

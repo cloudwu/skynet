@@ -3,8 +3,8 @@ package.cpath = "luaclib/?.so"
 local socket = require "client.socket"
 local crypt = require "client.crypt"
 
-if _VERSION ~= "Lua 5.3" then
-	error "Use lua 5.3"
+if _VERSION ~= "Lua 5.4" then
+	error "Use lua 5.4"
 end
 
 local fd = assert(socket.connect("127.0.0.1", 8001))

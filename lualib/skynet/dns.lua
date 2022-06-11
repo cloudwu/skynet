@@ -161,7 +161,7 @@ local function parse_resolv_conf()
 
 	local server
 	for line in f:lines() do
-		server = line:match("%s*nameserver%s+([^#;%s]+)")
+		server = line:match("^%s*nameserver%s+([^#;%s]+)")
 		if server then
 			break
 		end
@@ -516,7 +516,7 @@ function dns.resolve(name, ipv6)
 		return answer, answers
 	end
 
-	return remote_resolve(name, ipv6, timeout)
+	return remote_resolve(name, ipv6)
 end
 
 return dns

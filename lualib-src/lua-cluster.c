@@ -111,7 +111,11 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz, int is_push) 
 	const char *name = lua_tolstring(L, 1, &namelen);
 	if (name == NULL || namelen < 1 || namelen > 255) {
 		skynet_free(msg);
-		luaL_error(L, "name is too long %s", name);
+		if (name == NULL) {
+			luaL_error(L, "name is not a string, it's a %s", lua_typename(L, lua_type(L, 1)));
+		} else {
+			luaL_error(L, "name is too long %s", name);
+		}
 	}
 
 	uint8_t buf[TEMP_LENGTH];
@@ -362,6 +366,8 @@ lunpackrequest(lua_State *L) {
 		msg = luaL_checklstring(L,1,&ssz);
 		sz = (int)ssz;
 	}
+	if (sz == 0)
+		return luaL_error(L, "Invalid req package. size == 0");
 	switch (msg[0]) {
 	case 0:
 		return unpackreq_number(L, (const uint8_t *)msg, sz);

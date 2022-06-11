@@ -41,7 +41,7 @@ $(JEMALLOC_STATICLIB) : 3rd/jemalloc/Makefile
 	git submodule update --init
 
 3rd/jemalloc/Makefile : | 3rd/jemalloc/autogen.sh
-	cd 3rd/jemalloc && ./autogen.sh --with-jemalloc-prefix=je_ --disable-valgrind
+	cd 3rd/jemalloc && ./autogen.sh --with-jemalloc-prefix=je_ --enable-prof
 
 jemalloc : $(MALLOC_STATICLIB)
 
@@ -61,7 +61,6 @@ LUA_CLIB_SKYNET = \
   lua-mongo.c \
   lua-netpack.c \
   lua-memory.c \
-  lua-profile.c \
   lua-multicast.c \
   lua-cluster.c \
   lua-crypt.c lsha1.c \
@@ -69,6 +68,7 @@ LUA_CLIB_SKYNET = \
   lua-stm.c \
   lua-debugchannel.c \
   lua-datasheet.c \
+  lua-sharetable.c \
   \
 
 SKYNET_SRC = skynet_main.c skynet_handle.c skynet_module.c skynet_mq.c \
@@ -101,7 +101,7 @@ $(LUA_CLIB_PATH)/skynet.so : $(addprefix lualib-src/,$(LUA_CLIB_SKYNET)) | $(LUA
 	$(CC) $(CFLAGS) $(SHARED) $^ -o $@ -Iskynet-src -Iservice-src -Ilualib-src
 
 $(LUA_CLIB_PATH)/bson.so : lualib-src/lua-bson.c | $(LUA_CLIB_PATH)
-	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@ -Iskynet-src
+	$(CC) $(CFLAGS) $(SHARED) -Iskynet-src $^ -o $@
 
 $(LUA_CLIB_PATH)/md5.so : 3rd/lua-md5/md5.c 3rd/lua-md5/md5lib.c 3rd/lua-md5/compat-5.2.c | $(LUA_CLIB_PATH)
 	$(CC) $(CFLAGS) $(SHARED) -I3rd/lua-md5 $^ -o $@ 
@@ -119,7 +119,8 @@ $(LUA_CLIB_PATH)/lpeg.so : 3rd/lpeg/lpcap.c 3rd/lpeg/lpcode.c 3rd/lpeg/lpprint.c
 	$(CC) $(CFLAGS) $(SHARED) -I3rd/lpeg $^ -o $@ 
 
 clean :
-	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so
+	rm -f $(SKYNET_BUILD_PATH)/skynet $(CSERVICE_PATH)/*.so $(LUA_CLIB_PATH)/*.so && \
+  rm -rf $(SKYNET_BUILD_PATH)/*.dSYM $(CSERVICE_PATH)/*.dSYM $(LUA_CLIB_PATH)/*.dSYM
 
 cleanall: clean
 ifneq (,$(wildcard 3rd/jemalloc/Makefile))

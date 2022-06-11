@@ -91,6 +91,16 @@ function provider.test(name)
 	end
 end
 
+function provider.close(name)
+	local s = svr[name]
+	if not s or s.booting then
+		return skynet.ret(skynet.pack(nil))
+	end
+
+	svr[name] = nil
+	skynet.ret(skynet.pack(s.address))
+end
+
 skynet.start(function()
 	skynet.dispatch("lua", function(session, address, cmd, ...)
 		provider[cmd](...)

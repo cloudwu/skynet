@@ -1,5 +1,5 @@
 /*
-** $Id: lpprint.h,v 1.2 2015/06/12 18:18:08 roberto Exp $
+** $Id: lpprint.h $
 */
 
 

@@ -34,6 +34,16 @@ function service.new(name, mainfunc, ...)
 	return address
 end
 
+function service.close(name)
+	local addr = skynet.call(get_provider(), "lua", "close", name)
+	if addr then
+        cache[name] = nil
+		skynet.kill(addr)
+		return true
+	end
+	return false
+end
+
 function service.query(name)
 	if not cache[name] then
 		cache[name] = skynet.call(get_provider(), "lua", "query", name)

@@ -1,5 +1,5 @@
 /*
-** $Id: lptree.c,v 1.22 2016/09/13 18:10:22 roberto Exp $
+** $Id: lptree.c $
 ** Copyright 2013, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
 */
 
@@ -716,6 +716,7 @@ static int capture_aux (lua_State *L, int cap, int labelidx) {
 
 /*
 ** Fill a tree with an empty capture, using an empty (TTrue) sibling.
+** (The 'key' field must be filled by the caller to finish the tree.)
 */
 static TTree *auxemptycap (TTree *tree, int cap) {
   tree->tag = TCapture;
@@ -726,15 +727,17 @@ static TTree *auxemptycap (TTree *tree, int cap) {
 
 
 /*
-** Create a tree for an empty capture
+** Create a tree for an empty capture.
 */
-static TTree *newemptycap (lua_State *L, int cap) {
-  return auxemptycap(newtree(L, 2), cap);
+static TTree *newemptycap (lua_State *L, int cap, int key) {
+  TTree *tree = auxemptycap(newtree(L, 2), cap);
+  tree->key = key;
+  return tree;
 }
 
 
 /*
-** Create a tree for an empty capture with an associated Lua value
+** Create a tree for an empty capture with an associated Lua value.
 */
 static TTree *newemptycapkey (lua_State *L, int cap, int idx) {
   TTree *tree = auxemptycap(newtree(L, 2), cap);
@@ -795,16 +798,15 @@ static int lp_simplecapture (lua_State *L) {
 
 
 static int lp_poscapture (lua_State *L) {
-  newemptycap(L, Cposition);
+  newemptycap(L, Cposition, 0);
   return 1;
 }
 
 
 static int lp_argcapture (lua_State *L) {
   int n = (int)luaL_checkinteger(L, 1);
-  TTree *tree = newemptycap(L, Carg);
-  tree->key = n;
   luaL_argcheck(L, 0 < n && n <= SHRT_MAX, 1, "invalid argument index");
+  newemptycap(L, Carg, n);
   return 1;
 }
 

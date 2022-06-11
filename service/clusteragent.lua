@@ -81,11 +81,12 @@ local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
 		local addr = register_name["@" .. name]
 		if addr then
 			ok = true
-			msg, sz = skynet.pack(addr)
+			msg = skynet.packstring(addr)
 		else
 			ok = false
 			msg = "name not found"
 		end
+		sz = nil
 	else
 		if cluster.isname(addr) then
 			addr = register_name[addr]

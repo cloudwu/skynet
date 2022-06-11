@@ -129,19 +129,6 @@ skynet_module_query(const char * name) {
 	return result;
 }
 
-void 
-skynet_module_insert(struct skynet_module *mod) {
-	SPIN_LOCK(M)
-
-	struct skynet_module * m = _query(mod->name);
-	assert(m == NULL && M->count < MAX_MODULE_TYPE);
-	int index = M->count;
-	M->m[index] = *mod;
-	++M->count;
-
-	SPIN_UNLOCK(M)
-}
-
 void * 
 skynet_module_instance_create(struct skynet_module *m) {
 	if (m->create) {

@@ -35,12 +35,6 @@ get_time() {
 #endif
 }
 
-struct snlua {
-	lua_State * L;
-	struct skynet_context * ctx;
-	const char * preload;
-};
-
 static int
 traceback (lua_State *L) {
 	const char *msg = lua_tostring(L, 1);
@@ -52,18 +46,16 @@ traceback (lua_State *L) {
 	return 1;
 }
 
+struct callback_context {
+	lua_State *L;
+};
+
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
-	lua_State *L = ud;
+	struct callback_context *cb_ctx = (struct callback_context *)ud;
+	lua_State *L = cb_ctx->L;
 	int trace = 1;
 	int r;
-	int top = lua_gettop(L);
-	if (top == 0) {
-		lua_pushcfunction(L, traceback);
-		lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
-	} else {
-		assert(top == 2);
-	}
 	lua_pushvalue(L,2);
 
 	lua_pushinteger(L, type);
@@ -88,9 +80,6 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	case LUA_ERRERR:
 		skynet_error(context, "lua error in error : [%x to %s : %d]", source , self, session);
 		break;
-	case LUA_ERRGCMM:
-		skynet_error(context, "lua gc error : [%x to %s : %d]", source , self, session);
-		break;
 	};
 
 	lua_pop(L,1);
@@ -111,15 +100,17 @@ lcallback(lua_State *L) {
 	int forward = lua_toboolean(L, 2);
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);
-	lua_rawsetp(L, LUA_REGISTRYINDEX, _cb);
-
-	lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
-	lua_State *gL = lua_tothread(L,-1);
+	struct callback_context *cb_ctx = (struct callback_context *)lua_newuserdata(L, sizeof(*cb_ctx));
+	cb_ctx->L = lua_newthread(L);
+	lua_pushcfunction(cb_ctx->L, traceback);
+	lua_setuservalue(L, -2);
+	lua_setfield(L, LUA_REGISTRYINDEX, "callback_context");
+	lua_xmove(L, cb_ctx->L, 1);
 
 	if (forward) {
-		skynet_callback(context, gL, forward_cb);
+		skynet_callback(context, cb_ctx, forward_cb);
 	} else {
-		skynet_callback(context, gL, _cb);
+		skynet_callback(context, cb_ctx, _cb);
 	}
 
 	return 0;

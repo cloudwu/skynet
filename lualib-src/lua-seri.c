@@ -115,7 +115,7 @@ rball_init(struct read_block * rb, char * buffer, int size) {
 	rb->ptr = 0;
 }
 
-static void *
+static const void *
 rb_read(struct read_block *rb, int sz) {
 	if (rb->len < sz) {
 		return NULL;
@@ -256,17 +256,19 @@ wb_table_hash(lua_State *L, struct write_block * wb, int index, int depth, int a
 	wb_nil(wb);
 }
 
-static void
+static int
 wb_table_metapairs(lua_State *L, struct write_block *wb, int index, int depth) {
 	uint8_t n = COMBINE_TYPE(TYPE_TABLE, 0);
 	wb_push(wb, &n, 1);
 	lua_pushvalue(L, index);
-	lua_call(L, 1, 3);
+	if (lua_pcall(L, 1, 3,0) != LUA_OK)
+		return 1;
 	for(;;) {
 		lua_pushvalue(L, -2);
 		lua_pushvalue(L, -2);
 		lua_copy(L, -5, -3);
-		lua_call(L, 2, 2);
+		if (lua_pcall(L, 2, 2, 0) != LUA_OK)
+			return 1;
 		int type = lua_type(L, -2);
 		if (type == LUA_TNIL) {
 			lua_pop(L, 4);
@@ -277,19 +279,24 @@ wb_table_metapairs(lua_State *L, struct write_block *wb, int index, int depth) {
 		lua_pop(L, 1);
 	}
 	wb_nil(wb);
+	return 0;
 }
 
-static void
+static int
 wb_table(lua_State *L, struct write_block *wb, int index, int depth) {
-	luaL_checkstack(L, LUA_MINSTACK, NULL);
+	if (!lua_checkstack(L, LUA_MINSTACK)) {
+		lua_pushstring(L, "out of memory");
+		return 1;
+	}
 	if (index < 0) {
 		index = lua_gettop(L) + index + 1;
 	}
 	if (luaL_getmetafield(L, index, "__pairs") != LUA_TNIL) {
-		wb_table_metapairs(L, wb, index, depth);
+		return wb_table_metapairs(L, wb, index, depth);
 	} else {
 		int array_size = wb_table_array(L, wb, index, depth);
 		wb_table_hash(L, wb, index, depth, array_size);
+		return 0;
 	}
 }
 
@@ -330,7 +337,10 @@ pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 		if (index < 0) {
 			index = lua_gettop(L) + index + 1;
 		}
-		wb_table(L, b, index, depth+1);
+		if (wb_table(L, b, index, depth+1)) {
+			wb_free(b);
+			lua_error(L);
+		}
 		break;
 	}
 	default:
@@ -363,7 +373,7 @@ get_integer(lua_State *L, struct read_block *rb, int cookie) {
 		return 0;
 	case TYPE_NUMBER_BYTE: {
 		uint8_t n;
-		uint8_t * pn = rb_read(rb,sizeof(n));
+		const uint8_t * pn = (const uint8_t *)rb_read(rb,sizeof(n));
 		if (pn == NULL)
 			invalid_stream(L,rb);
 		n = *pn;
@@ -371,7 +381,7 @@ get_integer(lua_State *L, struct read_block *rb, int cookie) {
 	}
 	case TYPE_NUMBER_WORD: {
 		uint16_t n;
-		uint16_t * pn = rb_read(rb,sizeof(n));
+		const void * pn = rb_read(rb,sizeof(n));
 		if (pn == NULL)
 			invalid_stream(L,rb);
 		memcpy(&n, pn, sizeof(n));
@@ -379,7 +389,7 @@ get_integer(lua_State *L, struct read_block *rb, int cookie) {
 	}
 	case TYPE_NUMBER_DWORD: {
 		int32_t n;
-		int32_t * pn = rb_read(rb,sizeof(n));
+		const void * pn = rb_read(rb,sizeof(n));
 		if (pn == NULL)
 			invalid_stream(L,rb);
 		memcpy(&n, pn, sizeof(n));
@@ -387,7 +397,7 @@ get_integer(lua_State *L, struct read_block *rb, int cookie) {
 	}
 	case TYPE_NUMBER_QWORD: {
 		int64_t n;
-		int64_t * pn = rb_read(rb,sizeof(n));
+		const void * pn = rb_read(rb,sizeof(n));
 		if (pn == NULL)
 			invalid_stream(L,rb);
 		memcpy(&n, pn, sizeof(n));
@@ -402,7 +412,7 @@ get_integer(lua_State *L, struct read_block *rb, int cookie) {
 static double
 get_real(lua_State *L, struct read_block *rb) {
 	double n;
-	double * pn = rb_read(rb,sizeof(n));
+	const void * pn = rb_read(rb,sizeof(n));
 	if (pn == NULL)
 		invalid_stream(L,rb);
 	memcpy(&n, pn, sizeof(n));
@@ -412,7 +422,7 @@ get_real(lua_State *L, struct read_block *rb) {
 static void *
 get_pointer(lua_State *L, struct read_block *rb) {
 	void * userdata = 0;
-	void ** v = (void **)rb_read(rb,sizeof(userdata));
+	const void * v = rb_read(rb,sizeof(userdata));
 	if (v == NULL) {
 		invalid_stream(L,rb);
 	}
@@ -422,7 +432,7 @@ get_pointer(lua_State *L, struct read_block *rb) {
 
 static void
 get_buffer(lua_State *L, struct read_block *rb, int len) {
-	char * p = rb_read(rb,len);
+	const char * p = (const char *)rb_read(rb,len);
 	if (p == NULL) {
 		invalid_stream(L,rb);
 	}
@@ -435,7 +445,7 @@ static void
 unpack_table(lua_State *L, struct read_block *rb, int array_size) {
 	if (array_size == MAX_COOKIE-1) {
 		uint8_t type;
-		uint8_t *t = rb_read(rb, sizeof(type));
+		const uint8_t * t = (const uint8_t *)rb_read(rb, sizeof(type));
 		if (t==NULL) {
 			invalid_stream(L,rb);
 		}
@@ -488,7 +498,7 @@ push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 		break;
 	case TYPE_LONG_STRING: {
 		if (cookie == 2) {
-			uint16_t *plen = rb_read(rb, 2);
+			const void * plen = rb_read(rb, 2);
 			if (plen == NULL) {
 				invalid_stream(L,rb);
 			}
@@ -499,7 +509,7 @@ push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 			if (cookie != 4) {
 				invalid_stream(L,rb);
 			}
-			uint32_t *plen = rb_read(rb, 4);
+			const void * plen = rb_read(rb, 4);
 			if (plen == NULL) {
 				invalid_stream(L,rb);
 			}
@@ -523,7 +533,7 @@ push_value(lua_State *L, struct read_block *rb, int type, int cookie) {
 static void
 unpack_one(lua_State *L, struct read_block *rb) {
 	uint8_t type;
-	uint8_t *t = rb_read(rb, sizeof(type));
+	const uint8_t * t = (const uint8_t *)rb_read(rb, sizeof(type));
 	if (t==NULL) {
 		invalid_stream(L, rb);
 	}
@@ -584,7 +594,7 @@ luaseri_unpack(lua_State *L) {
 			luaL_checkstack(L,LUA_MINSTACK,NULL);
 		}
 		uint8_t type = 0;
-		uint8_t *t = rb_read(&rb, sizeof(type));
+		const uint8_t * t = (const uint8_t *)rb_read(&rb, sizeof(type));
 		if (t==NULL)
 			break;
 		type = *t;

@@ -1,5 +1,5 @@
 /*
-** $Id: lpcap.h,v 1.3 2016/09/13 17:45:58 roberto Exp $
+** $Id: lpcap.h $
 */
 
 #if !defined(lpcap_h)
@@ -44,6 +44,7 @@ typedef struct CapState {
   int ptop;  /* index of last argument to 'match' */
   const char *s;  /* original string */
   int valuecached;  /* value stored in cache slot */
+  int reclevel;  /* recursion level */
 } CapState;
 
 

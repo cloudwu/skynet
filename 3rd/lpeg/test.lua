@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
--- $Id: test.lua,v 1.112 2017/01/14 18:55:22 roberto Exp $
+-- $Id: test.lua $
 
 -- require"strict"    -- just to be pedantic
 
@@ -421,6 +421,16 @@ do
   assert(t[lim] == lim)
   checkerr("too many", function () p = p / print end)
   checkerr("too many", seq, lim + 1)
+end
+
+
+do
+  -- nesting of captures too deep
+  local p = m.C(1)
+  for i = 1, 300 do
+    p = m.Ct(p)
+  end
+  checkerr("too deep", p.match, p, "x")
 end
 
 
@@ -1186,6 +1196,9 @@ assert(not match("abbcde", " [b-z] + "))
 assert(match("abb\"de", '"abb"["]"de"') == 7)
 assert(match("abceeef", "'ac' ? 'ab' * 'c' { 'e' * } / 'abceeef' ") == "eee")
 assert(match("abceeef", "'ac'? 'ab'* 'c' { 'f'+ } / 'abceeef' ") == 8)
+
+assert(re.match("aaand", "[a]^2") == 3)
+
 local t = {match("abceefe", "( ( & 'e' {} ) ? . ) * ")}
 checkeq(t, {4, 5, 7})
 local t = {match("abceefe", "((&&'e' {})? .)*")}
@@ -1359,6 +1372,13 @@ x = c:match[[
 checkeq(x, {tag='x', 'hi', {tag = 'b', 'hello'}, 'but',
                      {'totheend'}})
 
+
+-- test for folding captures
+c = re.compile([[
+  S <- (number (%s+ number)*) ~> add
+  number <- %d+ -> tonumber
+]], {tonumber = tonumber, add = function (a,b) return a + b end})
+assert(c:match("3 401 50") == 3 + 401 + 50)
 
 -- tests for look-ahead captures
 x = {re.match("alo", "&(&{.}) !{'b'} {&(...)} &{..} {...} {!.}")}

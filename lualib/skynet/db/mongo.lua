@@ -112,38 +112,15 @@ local function mongo_auth(mongoc)
 				mongoc.__sock:changebackup(backup)
 			end
 			if rs_data.ismaster	then
-				if rawget(mongoc, "__pickserver") then
-					rawset(mongoc, "__pickserver", nil)
-				end
 				return
+			elseif rs_data.primary then
+				local host,	port = __parse_addr(rs_data.primary)
+				mongoc.host	= host
+				mongoc.port	= port
+				mongoc.__sock:changehost(host, port)
 			else
-				if rs_data.primary then
-					local host,	port = __parse_addr(rs_data.primary)
-					mongoc.host	= host
-					mongoc.port	= port
-					mongoc.__sock:changehost(host, port)
-				else
-					skynet.error("WARNING: NO PRIMARY RETURN " .. rs_data.me)
-					-- determine the primary db using hosts
-					local pickserver = {}
-					if rawget(mongoc, "__pickserver") == nil then
-						for _, v in ipairs(rs_data.hosts) do
-							if v ~= rs_data.me then
-								table.insert(pickserver, v)
-							end
-							rawset(mongoc, "__pickserver", pickserver)
-						end
-					end
-					if #mongoc.__pickserver <= 0 then
-						error("CAN NOT DETERMINE THE PRIMARY DB")
-					end
-					skynet.error("INFO: TRY TO CONNECT " .. mongoc.__pickserver[1])
-					local host, port = __parse_addr(mongoc.__pickserver[1])
-					table.remove(mongoc.__pickserver, 1)
-					mongoc.host	= host
-					mongoc.port	= port
-					mongoc.__sock:changehost(host, port)
-				end
+				-- socketchannel would try the next host in backup list
+				error ("No primary return : " .. tostring(rs_data.me))
 			end
 		end
 	end
@@ -356,14 +333,16 @@ function mongo_collection:insert(doc)
 end
 
 local function werror(r)
-	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError)
+	local ok = (r.ok == 1 and not r.writeErrors and not r.writeConcernError and not r.errmsg)
 
 	local err
 	if not ok then
 		if r.writeErrors then
 			err = r.writeErrors[1].errmsg
-		else
+		elseif r.writeConcernError then
 			err = r.writeConcernError.errmsg
+		else
+			err = r.errmsg
 		end
 	end
 	return ok, err, r
@@ -386,6 +365,18 @@ function mongo_collection:batch_insert(docs)
 	sock:request(pack)
 end
 
+function mongo_collection:safe_batch_insert(docs)
+	for i = 1, #docs do
+		if docs[i]._id == nil then
+			docs[i]._id = bson.objectid()
+		end
+		docs[i] = bson_encode(docs[i])
+	end
+
+	local r = self.database:runCommand("insert", self.name, "documents", docs)
+	return werror(r)
+end
+
 function mongo_collection:update(selector,update,upsert,multi)
 	local flags	= (upsert and 1	or 0) +	(multi and 2 or	0)
 	local sock = self.connection.__sock
@@ -403,6 +394,21 @@ function mongo_collection:safe_update(selector, update, upsert, multi)
 	return werror(r)
 end
 
+function mongo_collection:safe_batch_update(updates)
+	local updates_tb = {}
+	for i = 1, #updates do
+		updates_tb[i] = bson_encode({
+			q = updates[i].query,
+			u = updates[i].update,
+			upsert = updates[i].upsert,
+			multi = updates[i].multi,
+		})
+	end
+
+	local r = self.database:runCommand("update", self.name, "updates", updates_tb)
+	return werror(r)
+end
+
 function mongo_collection:delete(selector, single)
 	local sock = self.connection.__sock
 	local pack = driver.delete(self.full_name, single, bson_encode(selector))
@@ -414,6 +420,18 @@ function mongo_collection:safe_delete(selector, single)
 		q = selector,
 		limit = single and 1 or 0,
 	})})
+	return werror(r)
+end
+
+function mongo_collection:safe_batch_delete(selectors, single)
+	local delete_tb = {}
+	for i = 1, #selectors do
+		delete_tb[i] = bson_encode({
+			q = selectors[i],
+			limit = single and 1 or 0,
+		})
+	end
+	local r = self.database:runCommand("delete", self.name, "deletes", delete_tb)
 	return werror(r)
 end
 

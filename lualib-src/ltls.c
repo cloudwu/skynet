@@ -119,19 +119,20 @@ _bio_read(lua_State* L, struct tls_context* tls_p) {
     if(pending >0) {
         luaL_Buffer b;
         luaL_buffinit(L, &b);
-        do {
+        while(pending > 0) {
             read = BIO_read(tls_p->out_bio, outbuff, sizeof(outbuff));
-            // printf("_bio_read:%d pending:%d\n", read, pending);
-            if(read > sizeof(outbuff)) {
-                luaL_error(L, "invalid BIO_read:%d", read);
-            }else if(read == -2) {
-                luaL_error(L, "BIO_read not implemented in the specific BIO type");
-            }else if (read > 0) {
+            // printf("BIO_read read:%d pending:%d\n", read, pending);
+            if(read <= 0) {
+                luaL_error(L, "BIO_read error:%d", read);
+            }else if(read <= sizeof(outbuff)) {
                 all_read += read;
                 luaL_addlstring(&b, (const char*)outbuff, read);
+            }else {
+                luaL_error(L, "invalid BIO_read:%d", read);
             }
-        }while(read == sizeof(outbuff));
-        if(all_read>0){
+            pending = BIO_ctrl_pending(tls_p->out_bio);
+        }
+        if(all_read>0) {
             luaL_pushresult(&b);
         }
     }
@@ -145,13 +146,14 @@ _bio_write(lua_State* L, struct tls_context* tls_p, const char* s, size_t len) {
     size_t sz = len;
     while(sz > 0) {
         int written = BIO_write(tls_p->in_bio, p, sz);
-        if(written > sz) {
-            luaL_error(L, "invalid BIO_write");
-        }else if(written > 0) {
+        // printf("BIO_write written:%d sz:%zu\n", written, sz);
+        if(written <= 0) {
+            luaL_error(L, "BIO_write error:%d", written);
+        }else if (written <= sz) {
             p += written;
             sz -= written;
-        }else if (written == -2) {
-            luaL_error(L, "BIO_write not implemented in the specific BIO type");
+        }else {
+            luaL_error(L, "invalid BIO_write:%d", written);
         }
     }
 }
@@ -178,13 +180,20 @@ _ltls_context_handshake(lua_State* L) {
         int ret = SSL_do_handshake(tls_p->ssl);
         if(ret == 1) {
             return 0;
-        } else if (ret == -1) {
-            int all_read = _bio_read(L, tls_p);
-            if(all_read>0) {
-                return 1;
+        } else if (ret < 0) {
+            int err = SSL_get_error(tls_p->ssl, ret);
+            ERR_clear_error();
+            if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+                int all_read = _bio_read(L, tls_p);
+                if(all_read>0) {
+                    return 1;
+                }
+            } else {
+                luaL_error(L, "SSL_do_handshake error:%d ret:%d", err, ret);
             }
         } else {
             int err = SSL_get_error(tls_p->ssl, ret);
+            ERR_clear_error();
             luaL_error(L, "SSL_do_handshake error:%d ret:%d", err, ret);
         }
     }
@@ -210,18 +219,19 @@ _ltls_context_read(lua_State* L) {
 
     do {
         read = SSL_read(tls_p->ssl, outbuff, sizeof(outbuff));
-        if(read < 0) {
+        if(read <= 0) {
             int err = SSL_get_error(tls_p->ssl, read);
-            if(err == SSL_ERROR_WANT_READ) {
+            ERR_clear_error();
+            if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
                 break;
             }
             luaL_error(L, "SSL_read error:%d", err);
-        }else if(read > sizeof(outbuff)) {
-            luaL_error(L, "invalid SSL_read");
-        }else if (read > 0) {
+        }else if(read <= sizeof(outbuff)) {
             luaL_addlstring(&b, outbuff, read);
+        }else {
+            luaL_error(L, "invalid SSL_read:%d", read);
         }
-    }while(read == sizeof(outbuff));
+    }while(true);
     luaL_pushresult(&b);
     return 1;
 }
@@ -233,16 +243,17 @@ _ltls_context_write(lua_State* L) {
     size_t slen = 0;
     char* unencrypted_data = (char*)lua_tolstring(L, 2, &slen);
 
-    while(slen >0) {
+    while(slen > 0) {
         int written = SSL_write(tls_p->ssl, unencrypted_data,  slen);
-        if(written < 0) {
+        if(written <= 0) {
             int err = SSL_get_error(tls_p->ssl, written);
+            ERR_clear_error();
             luaL_error(L, "SSL_write error:%d", err);
-        }else if(written > slen) {
-            luaL_error(L, "invalid SSL_write");
-        }else if(written>0) {
+        }else if(written <= slen) {
             unencrypted_data += written;
             slen -= written;
+        }else {
+            luaL_error(L, "invalid SSL_write:%d", written);
         }
     }
 
@@ -277,9 +288,9 @@ _lctx_cert(lua_State* L) {
         luaL_error(L, "need private key");
     }
 
-    int ret = SSL_CTX_use_certificate_file(ctx_p->ctx, certfile, SSL_FILETYPE_PEM);
+    int ret = SSL_CTX_use_certificate_chain_file(ctx_p->ctx, certfile);
     if(ret != 1) {
-        luaL_error(L, "SSL_CTX_use_certificate_file error:%d", ret);
+        luaL_error(L, "SSL_CTX_use_certificate_chain_file error:%d", ret);
     }
 
     ret = SSL_CTX_use_PrivateKey_file(ctx_p->ctx, key, SSL_FILETYPE_PEM);
@@ -310,10 +321,13 @@ _lctx_ciphers(lua_State* L) {
 
 static int
 lnew_ctx(lua_State* L) {
-    struct ssl_ctx* ctx_p = (struct ssl_ctx*)lua_newuserdata(L, sizeof(*ctx_p));
+    struct ssl_ctx* ctx_p = (struct ssl_ctx*)lua_newuserdatauv(L, sizeof(*ctx_p), 0);
     ctx_p->ctx = SSL_CTX_new(SSLv23_method());
     if(!ctx_p->ctx) {
-        luaL_error(L, "SSL_CTX_new client faild.");
+        unsigned int err = ERR_get_error();
+        char buf[256];
+        ERR_error_string_n(err, buf, sizeof(buf));
+        luaL_error(L, "SSL_CTX_new client faild. %s\n", buf);
     }
 
     if(luaL_newmetatable(L, "_TLS_SSLCTX_METATABLE_")) {
@@ -335,15 +349,19 @@ lnew_ctx(lua_State* L) {
 
 static int
 lnew_tls(lua_State* L) {
-    struct tls_context* tls_p = (struct tls_context*)lua_newuserdata(L, sizeof(*tls_p));
+    struct tls_context* tls_p = (struct tls_context*)lua_newuserdatauv(L, sizeof(*tls_p), 1);
     tls_p->is_close = false;
     const char* method = luaL_optstring(L, 1, "nil");
     struct ssl_ctx* ctx_p = _check_sslctx(L, 2);
     lua_pushvalue(L, 2);
-    lua_setuservalue(L, -2); // set ssl_ctx associated to tls_context
+    lua_setiuservalue(L, -2, 1); // set ssl_ctx associated to tls_context
 
     if(strcmp(method, "client") == 0) {
         _init_client_context(L, tls_p, ctx_p);
+        if (!lua_isnoneornil(L, 3)) {
+            const char* hostname = luaL_checkstring(L, 3);
+            SSL_set_tlsext_host_name(tls_p->ssl, hostname);
+        }
     }else if(strcmp(method, "server") == 0) {
         _init_server_context(L, tls_p, ctx_p);
     } else {
@@ -368,9 +386,11 @@ lnew_tls(lua_State* L) {
     return 1;
 }
 
-
 int
 luaopen_ltls_c(lua_State* L) {
+    if(!TLS_IS_INIT) {
+        luaL_error(L, "ltls need init, Put enablessl = true in you config file.");
+    }
     luaL_Reg l[] = {
         {"newctx", lnew_ctx},
         {"newtls", lnew_tls},
@@ -381,18 +401,24 @@ luaopen_ltls_c(lua_State* L) {
     return 1;
 }
 
-void __attribute__((constructor)) ltls_init(void) {
+// for ltls init
+static int
+ltls_init_constructor(lua_State* L) {
 #ifndef OPENSSL_EXTERNAL_INITIALIZATION
-    SSL_library_init();
-    SSL_load_error_strings();
-    ERR_load_BIO_strings();
-    OpenSSL_add_all_algorithms();
-    TLS_IS_INIT = true;
+    if(!TLS_IS_INIT) {
+        SSL_library_init();
+        SSL_load_error_strings();
+        ERR_load_BIO_strings();
+        OpenSSL_add_all_algorithms();
+    }
 #endif
+    TLS_IS_INIT = true;
+    return 0;
 }
 
-
-void __attribute__((destructor)) ltls_destory(void) {
+static int
+ltls_init_destructor(lua_State* L) {
+#ifndef OPENSSL_EXTERNAL_INITIALIZATION
     if(TLS_IS_INIT) {
         ENGINE_cleanup();
         CONF_modules_unload(1);
@@ -401,4 +427,19 @@ void __attribute__((destructor)) ltls_destory(void) {
         sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
         CRYPTO_cleanup_all_ex_data();
     }
+#endif
+    TLS_IS_INIT = false;
+    return 0;
+}
+
+int
+luaopen_ltls_init_c(lua_State* L) {
+    luaL_Reg l[] = {
+        {"constructor", ltls_init_constructor},
+        {"destructor", ltls_init_destructor},
+        {NULL, NULL},
+    };
+    luaL_checkversion(L);
+    luaL_newlib(L, l);
+    return 1;
 }

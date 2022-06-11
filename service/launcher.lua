@@ -22,44 +22,58 @@ function command.LIST()
 	return list
 end
 
-function command.STAT()
+local function list_srv(ti, fmt_func, ...)
 	local list = {}
-	for k,v in pairs(services) do
-		local ok, stat = pcall(skynet.call,k,"debug","STAT")
-		if not ok then
-			stat = string.format("ERROR (%s)",v)
+	local sessions = {}
+	local req = skynet.request()
+	for addr in pairs(services) do
+		local r = { addr, "debug", ... }
+		req:add(r)
+		sessions[r] = addr
+	end
+	for req, resp in req:select(ti) do
+		local addr = req[1]
+		if resp then
+			local stat = resp[1]
+			list[skynet.address(addr)] = fmt_func(stat, addr)
+		else
+			list[skynet.address(addr)] = fmt_func("ERROR", addr)
 		end
-		list[skynet.address(k)] = stat
+		sessions[req] = nil
+	end
+	for session, addr in pairs(sessions) do
+		list[skynet.address(addr)] = fmt_func("TIMEOUT", addr)
 	end
 	return list
 end
 
+function command.STAT(addr, ti)
+	return list_srv(ti, function(v) return v end, "STAT")
+end
+
 function command.KILL(_, handle)
-	handle = handle_to_address(handle)
 	skynet.kill(handle)
 	local ret = { [skynet.address(handle)] = tostring(services[handle]) }
 	services[handle] = nil
 	return ret
 end
 
-function command.MEM()
-	local list = {}
-	for k,v in pairs(services) do
-		local ok, kb = pcall(skynet.call,k,"debug","MEM")
-		if not ok then
-			list[skynet.address(k)] = string.format("ERROR (%s)",v)
+function command.MEM(addr, ti)
+	return list_srv(ti, function(kb, addr)
+		local v = services[addr]
+		if type(kb) == "string" then
+			return string.format("%s (%s)", kb, v)
 		else
-			list[skynet.address(k)] = string.format("%.2f Kb (%s)",kb,v)
+			return string.format("%.2f Kb (%s)",kb,v)
 		end
-	end
-	return list
+	end, "MEM")
 end
 
-function command.GC()
+function command.GC(addr, ti)
 	for k,v in pairs(services) do
 		skynet.send(k,"debug","GC")
 	end
-	return command.MEM()
+	return command.MEM(addr, ti)
 end
 
 function command.REMOVE(_, handle, kill)
