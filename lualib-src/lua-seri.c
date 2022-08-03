@@ -256,17 +256,19 @@ wb_table_hash(lua_State *L, struct write_block * wb, int index, int depth, int a
 	wb_nil(wb);
 }
 
-static void
+static int
 wb_table_metapairs(lua_State *L, struct write_block *wb, int index, int depth) {
 	uint8_t n = COMBINE_TYPE(TYPE_TABLE, 0);
 	wb_push(wb, &n, 1);
 	lua_pushvalue(L, index);
-	lua_call(L, 1, 3);
+	if (lua_pcall(L, 1, 3,0) != LUA_OK)
+		return 1;
 	for(;;) {
 		lua_pushvalue(L, -2);
 		lua_pushvalue(L, -2);
 		lua_copy(L, -5, -3);
-		lua_call(L, 2, 2);
+		if (lua_pcall(L, 2, 2, 0) != LUA_OK)
+			return 1;
 		int type = lua_type(L, -2);
 		if (type == LUA_TNIL) {
 			lua_pop(L, 4);
@@ -277,19 +279,24 @@ wb_table_metapairs(lua_State *L, struct write_block *wb, int index, int depth) {
 		lua_pop(L, 1);
 	}
 	wb_nil(wb);
+	return 0;
 }
 
-static void
+static int
 wb_table(lua_State *L, struct write_block *wb, int index, int depth) {
-	luaL_checkstack(L, LUA_MINSTACK, NULL);
+	if (!lua_checkstack(L, LUA_MINSTACK)) {
+		lua_pushstring(L, "out of memory");
+		return 1;
+	}
 	if (index < 0) {
 		index = lua_gettop(L) + index + 1;
 	}
 	if (luaL_getmetafield(L, index, "__pairs") != LUA_TNIL) {
-		wb_table_metapairs(L, wb, index, depth);
+		return wb_table_metapairs(L, wb, index, depth);
 	} else {
 		int array_size = wb_table_array(L, wb, index, depth);
 		wb_table_hash(L, wb, index, depth, array_size);
+		return 0;
 	}
 }
 
@@ -330,7 +337,10 @@ pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 		if (index < 0) {
 			index = lua_gettop(L) + index + 1;
 		}
-		wb_table(L, b, index, depth+1);
+		if (wb_table(L, b, index, depth+1)) {
+			wb_free(b);
+			lua_error(L);
+		}
 		break;
 	}
 	default:

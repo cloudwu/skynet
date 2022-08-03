@@ -47,10 +47,11 @@ spinlock_destroy(struct spinlock *lock) {
 
 #else  // __STDC_NO_ATOMICS__
 
-#include <stdatomic.h>
-#define atomic_test_and_set_(ptr) atomic_exchange_explicit(ptr, 1, memory_order_acquire)
-#define atomic_clear_(ptr) atomic_store_explicit(ptr, 0, memory_order_release);
-#define atomic_load_relaxed_(ptr) atomic_load_explicit(ptr, memory_order_relaxed)
+#include "atomic.h"
+
+#define atomic_test_and_set_(ptr) STD_ atomic_exchange_explicit(ptr, 1, STD_ memory_order_acquire)
+#define atomic_clear_(ptr) STD_ atomic_store_explicit(ptr, 0, STD_ memory_order_release);
+#define atomic_load_relaxed_(ptr) STD_ atomic_load_explicit(ptr, STD_ memory_order_relaxed)
 
 #if defined(__x86_64__)
 #include <immintrin.h> // For _mm_pause
@@ -60,12 +61,12 @@ spinlock_destroy(struct spinlock *lock) {
 #endif
 
 struct spinlock {
-	atomic_int lock;
+	STD_ atomic_int lock;
 };
 
 static inline void
 spinlock_init(struct spinlock *lock) {
-	atomic_init(&lock->lock, 0);
+	STD_ atomic_init(&lock->lock, 0);
 }
 
 static inline void

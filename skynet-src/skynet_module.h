@@ -17,7 +17,6 @@ struct skynet_module {
 	skynet_dl_signal signal;
 };
 
-void skynet_module_insert(struct skynet_module *mod);
 struct skynet_module * skynet_module_query(const char * name);
 void * skynet_module_instance_create(struct skynet_module *);
 int skynet_module_instance_init(struct skynet_module *, void * inst, struct skynet_context *ctx, const char * parm);

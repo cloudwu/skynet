@@ -89,10 +89,10 @@ buffer_reserve(struct buffer *b, int sz) {
 	} while (b->cap <= b->size + sz);
 
 	if (b->ptr == b->buffer) {
-		b->ptr = skynet_malloc(b->cap);
+		b->ptr = (uint8_t*)malloc(b->cap);
 		memcpy(b->ptr, b->buffer, b->size);
 	} else {
-		b->ptr = skynet_realloc(b->ptr, b->cap);
+		b->ptr = (uint8_t*)realloc(b->ptr, b->cap);
 	}
 }
 
@@ -208,7 +208,7 @@ static int
 op_reply(lua_State *L) {
 	size_t data_len = 0;
 	const char * data = luaL_checklstring(L,1,&data_len);
-	struct {
+	struct reply_type {
 //		int32_t length; // total message size, including this
 		int32_t request_id; // identifier for this message
 		int32_t response_id; // requestID from the original request
@@ -218,7 +218,8 @@ op_reply(lua_State *L) {
 		int32_t cursor_id[2];
 		int32_t starting;
 		int32_t number;
-	} const *reply = (const void *)data;
+	};
+	const struct reply_type* reply = (const struct reply_type*)data;
 
 	if (data_len < sizeof(*reply)) {
 		lua_pushboolean(L, 0);

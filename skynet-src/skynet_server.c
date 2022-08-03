@@ -10,7 +10,6 @@
 #include "skynet_monitor.h"
 #include "skynet_imp.h"
 #include "skynet_log.h"
-#include "skynet_timer.h"
 #include "spinlock.h"
 #include "atomic.h"
 
@@ -66,7 +65,7 @@ struct skynet_node {
 	int init;
 	uint32_t monitor_exit;
 	pthread_key_t handle_key;
-	bool profile;	// default is off
+	bool profile;	// default is on
 };
 
 static struct skynet_node G_NODE;

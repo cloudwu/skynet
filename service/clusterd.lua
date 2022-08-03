@@ -5,6 +5,7 @@ local cluster = require "skynet.cluster.core"
 local config_name = skynet.getenv "cluster"
 local node_address = {}
 local node_sender = {}
+local node_sender_closed = {}
 local command = {}
 local config = {}
 local nodename = cluster.nodename()
@@ -56,17 +57,21 @@ local function open_channel(t, key)
 		if succ then
 			t[key] = c
 			ct.channel = c
+                        node_sender_closed[key] = nil
 		else
 			err = string.format("changenode [%s] (%s:%s) failed", key, host, port)
 		end
 	elseif address == false then
 		c = node_sender[key]
-		if c == nil then
-			-- no sender, always succ
+		if c == nil or node_sender_closed[key] then
+			-- no sender or closed, always succ
 			succ = true
 		else
 			-- trun off the sender
 			succ, err = pcall(skynet.call, c, "lua", "changenode", false)
+                        if succ then --trun off failed, wait next index todo turn off
+                                node_sender_closed[key] = true
+                        end
 		end
 	else
 		err = string.format("cluster node [%s] is absent.", key)
