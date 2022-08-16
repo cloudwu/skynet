@@ -527,6 +527,8 @@ socket_server_release(struct socket_server *ss) {
 	close(ss->sendctrl_fd);
 	close(ss->recvctrl_fd);
 	sp_release(ss->event_fd);
+	if (ss->reserve_fd >= 0)
+		close(ss->reserve_fd);
 	FREE(ss);
 }
 
