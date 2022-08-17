@@ -114,6 +114,7 @@ struct socket {
 
 struct socket_server {
 	volatile uint64_t time;
+	int reserve_fd;	// for EMFILE
 	int recvctrl_fd;
 	int sendctrl_fd;
 	int checkctrl;
@@ -405,6 +406,7 @@ socket_server_create(uint64_t time) {
 	ss->recvctrl_fd = fd[0];
 	ss->sendctrl_fd = fd[1];
 	ss->checkctrl = 1;
+	ss->reserve_fd = dup(1);	// reserve an extra fd for EMFILE
 
 	for (i=0;i<MAX_SOCKET;i++) {
 		struct socket *s = &ss->slot[i];
@@ -525,6 +527,8 @@ socket_server_release(struct socket_server *ss) {
 	close(ss->sendctrl_fd);
 	close(ss->recvctrl_fd);
 	sp_release(ss->event_fd);
+	if (ss->reserve_fd >= 0)
+		close(ss->reserve_fd);
 	FREE(ss);
 }
 
@@ -1581,6 +1585,16 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 			result->id = s->id;
 			result->ud = 0;
 			result->data = strerror(errno);
+
+			// See https://stackoverflow.com/questions/47179793/how-to-gracefully-handle-accept-giving-emfile-and-close-the-connection
+			if (ss->reserve_fd >= 0) {
+				close(ss->reserve_fd);
+				client_fd = accept(s->fd, &u.s, &len);
+				if (client_fd >= 0) {
+					close(client_fd);
+				}
+				ss->reserve_fd = dup(1);
+			}
 			return -1;
 		} else {
 			return 0;
