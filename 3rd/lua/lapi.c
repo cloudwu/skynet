@@ -114,13 +114,8 @@ LUA_API int lua_checkstack (lua_State *L, int n) {
   api_check(L, n >= 0, "negative 'n'");
   if (L->stack_last - L->top > n)  /* stack large enough? */
     res = 1;  /* yes; check is OK */
-  else {  /* no; need to grow stack */
-    int inuse = cast_int(L->top - L->stack) + EXTRA_STACK;
-    if (inuse > LUAI_MAXSTACK - n)  /* can grow without overflow? */
-      res = 0;  /* no */
-    else  /* try to grow stack */
-      res = luaD_growstack(L, n, 0);
-  }
+  else  /* need to grow stack */
+    res = luaD_growstack(L, n, 0);
   if (res && ci->top < L->top + n)
     ci->top = L->top + n;  /* adjust frame top */
   lua_unlock(L);
@@ -202,7 +197,7 @@ LUA_API void lua_settop (lua_State *L, int idx) {
   newtop = L->top + diff;
   if (diff < 0 && L->tbclist >= newtop) {
     lua_assert(hastocloseCfunc(ci->nresults));
-    luaF_close(L, newtop, CLOSEKTOP, 0);
+    newtop = luaF_close(L, newtop, CLOSEKTOP, 0);
   }
   L->top = newtop;  /* correct top only after closing any upvalue */
   lua_unlock(L);
@@ -215,8 +210,7 @@ LUA_API void lua_closeslot (lua_State *L, int idx) {
   level = index2stack(L, idx);
   api_check(L, hastocloseCfunc(L->ci->nresults) && L->tbclist == level,
      "no variable to close at given level");
-  luaF_close(L, level, CLOSEKTOP, 0);
-  level = index2stack(L, idx);  /* stack may be moved */
+  level = luaF_close(L, level, CLOSEKTOP, 0);
   setnilvalue(s2v(level));
   lua_unlock(L);
 }
@@ -1129,16 +1123,18 @@ LUA_API void lua_clonefunction (lua_State *L, const void * fp) {
 }
 
 LUA_API void lua_sharefunction (lua_State *L, int index) {
+  LClosure *f;
   if (!lua_isfunction(L,index) || lua_iscfunction(L,index))
     luaG_runerror(L, "Only Lua function can share");
-  LClosure *f = cast(LClosure *, lua_topointer(L, index));
+  f = cast(LClosure *, lua_topointer(L, index));
   luaF_shareproto(f->p);
 }
 
 LUA_API void lua_sharestring (lua_State *L, int index) {
+  TString *ts;
   if (lua_type(L,index) != LUA_TSTRING)
     luaG_runerror(L, "need a string to share");
-  TString *ts = tsvalue(index2value(L,index));
+  ts = tsvalue(index2value(L,index));
   luaS_share(ts);
 }
 

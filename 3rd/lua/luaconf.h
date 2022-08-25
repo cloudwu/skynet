@@ -728,7 +728,7 @@
 ** CHANGE it if you need a different limit. This limit is arbitrary;
 ** its only purpose is to stop Lua from consuming unlimited stack
 ** space (and to reserve some numbers for pseudo-indices).
-** (It must fit into max(size_t)/32.)
+** (It must fit into max(size_t)/32 and max(int)/2.)
 */
 #if LUAI_IS32INT
 #define LUAI_MAXSTACK		1000000

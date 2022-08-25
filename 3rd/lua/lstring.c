@@ -43,9 +43,10 @@ int luaS_eqlngstr (TString *a, TString *b) {
 }
 
 int luaS_eqshrstr (TString *a, TString *b) {
+  int r;
   lu_byte len = a->shrlen;
   lua_assert(b->tt == LUA_VSHRSTR);
-  int r = len == b->shrlen && (memcmp(getstr(a), getstr(b), len) == 0);
+  r = len == b->shrlen && (memcmp(getstr(a), getstr(b), len) == 0);
   if (r) {
     if (a->id < b->id) {
       a->id = b->id;
@@ -161,10 +162,11 @@ static unsigned int luai_makeseed(lua_State *L) {
 void luaS_init (lua_State *L) {
   global_State *g = G(L);
   int i, j;
+  stringtable *tb;
   if (STRSEED == 0) {
     STRSEED = luai_makeseed(L);
   }
-  stringtable *tb = &G(L)->strt;
+  tb = &G(L)->strt;
   tb->hash = luaM_newvector(L, MINSTRTABSIZE, TString*);
   tablerehash(tb->hash, 0, MINSTRTABSIZE);  /* clear array */
   tb->size = MINSTRTABSIZE;

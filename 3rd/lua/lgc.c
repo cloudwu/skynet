@@ -1043,7 +1043,25 @@ void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt) {
 ** =======================================================
 */
 
-static void setpause (global_State *g);
+
+/*
+** Set the "time" to wait before starting a new GC cycle; cycle will
+** start when memory use hits the threshold of ('estimate' * pause /
+** PAUSEADJ). (Division by 'estimate' should be OK: it cannot be zero,
+** because Lua cannot even start with less than PAUSEADJ bytes).
+*/
+static void setpause (global_State *g) {
+  l_mem threshold, debt;
+  int pause = getgcparam(g->gcpause);
+  l_mem estimate = g->GCestimate / PAUSEADJ;  /* adjust 'estimate' */
+  lua_assert(estimate > 0);
+  threshold = (pause < MAX_LMEM / estimate)  /* overflow? */
+            ? estimate * pause  /* no overflow */
+            : MAX_LMEM;  /* overflow; truncate to maximum */
+  debt = gettotalbytes(g) - threshold;
+  if (debt > 0) debt = 0;
+  luaE_setdebt(g, debt);
+}
 
 
 /*
@@ -1292,6 +1310,15 @@ static void atomic2gen (lua_State *L, global_State *g) {
 
 
 /*
+** Set debt for the next minor collection, which will happen when
+** memory grows 'genminormul'%.
+*/
+static void setminordebt (global_State *g) {
+  luaE_setdebt(g, -(cast(l_mem, (gettotalbytes(g) / 100)) * g->genminormul));
+}
+
+
+/*
 ** Enter generational mode. Must go until the end of an atomic cycle
 ** to ensure that all objects are correctly marked and weak tables
 ** are cleared. Then, turn all objects into old and finishes the
@@ -1303,6 +1330,7 @@ static lu_mem entergen (lua_State *L, global_State *g) {
   luaC_runtilstate(L, bitmask(GCSpropagate));  /* start new cycle */
   numobjs = atomic(L);  /* propagates all and then do the atomic stuff */
   atomic2gen(L, g);
+  setminordebt(g);  /* set debt assuming next cycle will be minor */
   return numobjs;
 }
 
@@ -1345,15 +1373,6 @@ void luaC_changemode (lua_State *L, int newmode) {
 static lu_mem fullgen (lua_State *L, global_State *g) {
   enterinc(g);
   return entergen(L, g);
-}
-
-
-/*
-** Set debt for the next minor collection, which will happen when
-** memory grows 'genminormul'%.
-*/
-static void setminordebt (global_State *g) {
-  luaE_setdebt(g, -(cast(l_mem, (gettotalbytes(g) / 100)) * g->genminormul));
 }
 
 
@@ -1428,8 +1447,8 @@ static void genstep (lua_State *L, global_State *g) {
       lu_mem numobjs = fullgen(L, g);  /* do a major collection */
       if (gettotalbytes(g) < majorbase + (majorinc / 2)) {
         /* collected at least half of memory growth since last major
-           collection; keep doing minor collections */
-        setminordebt(g);
+           collection; keep doing minor collections. */
+        lua_assert(g->lastatomic == 0);
       }
       else {  /* bad collection */
         g->lastatomic = numobjs;  /* signal that last collection was bad */
@@ -1453,26 +1472,6 @@ static void genstep (lua_State *L, global_State *g) {
 ** GC control
 ** =======================================================
 */
-
-
-/*
-** Set the "time" to wait before starting a new GC cycle; cycle will
-** start when memory use hits the threshold of ('estimate' * pause /
-** PAUSEADJ). (Division by 'estimate' should be OK: it cannot be zero,
-** because Lua cannot even start with less than PAUSEADJ bytes).
-*/
-static void setpause (global_State *g) {
-  l_mem threshold, debt;
-  int pause = getgcparam(g->gcpause);
-  l_mem estimate = g->GCestimate / PAUSEADJ;  /* adjust 'estimate' */
-  lua_assert(estimate > 0);
-  threshold = (pause < MAX_LMEM / estimate)  /* overflow? */
-            ? estimate * pause  /* no overflow */
-            : MAX_LMEM;  /* overflow; truncate to maximum */
-  debt = gettotalbytes(g) - threshold;
-  if (debt > 0) debt = 0;
-  luaE_setdebt(g, debt);
-}
 
 
 /*

@@ -37,6 +37,13 @@
 
 
 /* macro to check stack size, preserving 'p' */
+#define checkstackp(L,n,p)  \
+  luaD_checkstackaux(L, n, \
+    ptrdiff_t t__ = savestack(L, p),  /* save 'p' */ \
+    p = restorestack(L, t__))  /* 'pos' part: restore 'p' */
+
+
+/* macro to check stack size and GC, preserving 'p' */
 #define checkstackGCp(L,n,p)  \
   luaD_checkstackaux(L, n, \
     ptrdiff_t t__ = savestack(L, p);  /* save 'p' */ \
@@ -58,7 +65,8 @@ LUAI_FUNC int luaD_protectedparser (lua_State *L, ZIO *z, const char *name,
 LUAI_FUNC void luaD_hook (lua_State *L, int event, int line,
                                         int fTransfer, int nTransfer);
 LUAI_FUNC void luaD_hookcall (lua_State *L, CallInfo *ci);
-LUAI_FUNC int luaD_pretailcall (lua_State *L, CallInfo *ci, StkId func,                                                    int narg1, int delta);
+LUAI_FUNC int luaD_pretailcall (lua_State *L, CallInfo *ci, StkId func,
+                                              int narg1, int delta);
 LUAI_FUNC CallInfo *luaD_precall (lua_State *L, StkId func, int nResults);
 LUAI_FUNC void luaD_call (lua_State *L, StkId func, int nResults);
 LUAI_FUNC void luaD_callnoyield (lua_State *L, StkId func, int nResults);

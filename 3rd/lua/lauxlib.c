@@ -526,7 +526,8 @@ static void newbox (lua_State *L) {
 
 /*
 ** Compute new size for buffer 'B', enough to accommodate extra 'sz'
-** bytes.
+** bytes. (The test for "double is not big enough" also gets the
+** case when the multiplication by 2 overflows.)
 */
 static size_t newbuffsize (luaL_Buffer *B, size_t sz) {
   size_t newsize = B->size * 2;  /* double buffer size */
@@ -611,7 +612,7 @@ LUALIB_API void luaL_pushresultsize (luaL_Buffer *B, size_t sz) {
 ** box (if existent) is not on the top of the stack. So, instead of
 ** calling 'luaL_addlstring', it replicates the code using -2 as the
 ** last argument to 'prepbuffsize', signaling that the box is (or will
-** be) bellow the string being added to the buffer. (Box creation can
+** be) below the string being added to the buffer. (Box creation can
 ** trigger an emergency GC, so we should not remove the string from the
 ** stack before we have the space guaranteed.)
 */
@@ -739,17 +740,18 @@ static int errfile (lua_State *L, const char *what, int fnameindex) {
 }
 
 
-static int skipBOM (LoadF *lf) {
-  const char *p = "\xEF\xBB\xBF";  /* UTF-8 BOM mark */
-  int c;
-  lf->n = 0;
-  do {
-    c = getc(lf->f);
-    if (c == EOF || c != *(const unsigned char *)p++) return c;
-    lf->buff[lf->n++] = c;  /* to be read by the parser */
-  } while (*p != '\0');
-  lf->n = 0;  /* prefix matched; discard it */
-  return getc(lf->f);  /* return next character */
+/*
+** Skip an optional BOM at the start of a stream. If there is an
+** incomplete BOM (the first character is correct but the rest is
+** not), returns the first character anyway to force an error
+** (as no chunk can start with 0xEF).
+*/
+static int skipBOM (FILE *f) {
+  int c = getc(f);  /* read first character */
+  if (c == 0xEF && getc(f) == 0xBB && getc(f) == 0xBF)  /* correct BOM? */
+    return getc(f);  /* ignore BOM and return next char */
+  else  /* no (valid) BOM */
+    return c;  /* return first character */
 }
 
 
@@ -760,13 +762,13 @@ static int skipBOM (LoadF *lf) {
 ** first "valid" character of the file (after the optional BOM and
 ** a first-line comment).
 */
-static int skipcomment (LoadF *lf, int *cp) {
-  int c = *cp = skipBOM(lf);
+static int skipcomment (FILE *f, int *cp) {
+  int c = *cp = skipBOM(f);
   if (c == '#') {  /* first line is a comment (Unix exec. file)? */
     do {  /* skip first line */
-      c = getc(lf->f);
+      c = getc(f);
     } while (c != EOF && c != '\n');
-    *cp = getc(lf->f);  /* skip end-of-line, if present */
+    *cp = getc(f);  /* next character after comment, if present */
     return 1;  /* there was a comment */
   }
   else return 0;  /* no comment */
@@ -788,12 +790,16 @@ LUALIB_API int luaL_loadfilex_ (lua_State *L, const char *filename,
     lf.f = fopen(filename, "r");
     if (lf.f == NULL) return errfile(L, "open", fnameindex);
   }
-  if (skipcomment(&lf, &c))  /* read initial portion */
-    lf.buff[lf.n++] = '\n';  /* add line to correct line numbers */
-  if (c == LUA_SIGNATURE[0] && filename) {  /* binary file? */
-    lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode */
-    if (lf.f == NULL) return errfile(L, "reopen", fnameindex);
-    skipcomment(&lf, &c);  /* re-read initial portion */
+  lf.n = 0;
+  if (skipcomment(lf.f, &c))  /* read initial portion */
+    lf.buff[lf.n++] = '\n';  /* add newline to correct line numbers */
+  if (c == LUA_SIGNATURE[0]) {  /* binary file? */
+    lf.n = 0;  /* remove possible newline */
+    if (filename) {  /* "real" file? */
+      lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode */
+      if (lf.f == NULL) return errfile(L, "reopen", fnameindex);
+      skipcomment(lf.f, &c);  /* re-read initial portion */
+    }
   }
   if (c != EOF)
     lf.buff[lf.n++] = c;  /* 'c' is the first character of the stream */
@@ -1116,7 +1122,7 @@ struct codecache {
 static struct codecache CC;
 
 static void
-clearcache() {
+clearcache(void) {
 	if (CC.L == NULL)
 		return;
 	SPIN_LOCK(&CC)
@@ -1126,9 +1132,12 @@ clearcache() {
 }
 
 static void
-init() {
+init(void) {
 	CC.L = luaL_newstate();
 }
+
+
+void luaL_initcodecache(void);
 
 LUALIB_API void
 luaL_initcodecache(void) {
@@ -1137,13 +1146,15 @@ luaL_initcodecache(void) {
 
 static const void *
 load_proto(const char *key) {
+  lua_State *L;
+  const void * result;
   if (CC.L == NULL)
     return NULL;
   SPIN_LOCK(&CC)
-    lua_State *L = CC.L;
+    L = CC.L;
     lua_pushstring(L, key);
     lua_rawget(L, LUA_REGISTRYINDEX);
-    const void * result = lua_touserdata(L, -1);
+    result = lua_touserdata(L, -1);
     lua_pop(L, 1);
   SPIN_UNLOCK(&CC)
 
@@ -1199,9 +1210,10 @@ static int cache_mode(lua_State *L) {
 		"ON",
 		NULL,
 	};
+	int t,r;
 	if (lua_isnoneornil(L,1)) {
-		int t = lua_rawgetp(L, LUA_REGISTRYINDEX, &cache_key);
-		int r = lua_tointeger(L, -1);
+		t = lua_rawgetp(L, LUA_REGISTRYINDEX, &cache_key);
+		r = lua_tointeger(L, -1);
 		if (t == LUA_TNUMBER) {
 			if (r < 0  || r >= CACHE_ON) {
 				r = CACHE_ON;
@@ -1212,7 +1224,7 @@ static int cache_mode(lua_State *L) {
 		lua_pushstring(L, lst[r]);
 		return 1;
 	}
-	int t = luaL_checkoption(L, 1, "OFF" , lst);
+	t = luaL_checkoption(L, 1, "OFF" , lst);
 	lua_pushinteger(L, t);
 	lua_rawsetp(L, LUA_REGISTRYINDEX, &cache_key);
 	return 0;
@@ -1221,10 +1233,14 @@ static int cache_mode(lua_State *L) {
 LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
                                              const char *mode) {
   int level = cache_level(L);
-  if (level == CACHE_OFF || filename == NULL) {
+  const void * proto;
+  lua_State * eL;
+  int err;
+  const void * oldv;
+  if (level == CACHE_OFF) {
     return luaL_loadfilex_(L, filename, mode);
   }
-  const void * proto = load_proto(filename);
+  proto = load_proto(filename);
   if (proto) {
     lua_clonefunction(L, proto);
     return LUA_OK;
@@ -1232,12 +1248,12 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   if (level == CACHE_EXIST) {
     return luaL_loadfilex_(L, filename, mode);
   }
-  lua_State * eL = luaL_newstate();
+  eL = luaL_newstate();
   if (eL == NULL) {
     lua_pushliteral(L, "New state failed");
     return LUA_ERRMEM;
   }
-  int err = luaL_loadfilex_(eL, filename, mode);
+  err = luaL_loadfilex_(eL, filename, mode);
   if (err != LUA_OK) {
     size_t sz = 0;
     const char * msg = lua_tolstring(eL, -1, &sz);
@@ -1247,7 +1263,7 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   }
   lua_sharefunction(eL, -1);
   proto = lua_topointer(eL, -1);
-  const void * oldv = save_proto(filename, proto);
+  oldv = save_proto(filename, proto);
   if (oldv) {
     lua_close(eL);
     lua_clonefunction(L, oldv);
@@ -1265,6 +1281,8 @@ cache_clear(lua_State *L) {
 	clearcache();
 	return 0;
 }
+
+int luaopen_cache(lua_State *L);
 
 LUAMOD_API int luaopen_cache(lua_State *L) {
 	luaL_Reg l[] = {
