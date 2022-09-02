@@ -331,7 +331,7 @@ start_listen(struct gate *g, char * listen_addr) {
 		portstr[0] = '\0';
 		host = listen_addr;
 	}
-	g->listen_id = skynet_socket_listen(ctx, host, port, BACKLOG);
+	g->listen_id = skynet_socket_listen(ctx, host, &port, BACKLOG);
 	if (g->listen_id < 0) {
 		return 1;
 	}

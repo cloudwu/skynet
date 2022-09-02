@@ -77,9 +77,9 @@ end
 
 function cluster.open(port)
 	if type(port) == "string" then
-		skynet.call(clusterd, "lua", "listen", port)
+		return skynet.call(clusterd, "lua", "listen", port)
 	else
-		skynet.call(clusterd, "lua", "listen", "0.0.0.0", port)
+		return skynet.call(clusterd, "lua", "listen", "0.0.0.0", port)
 	end
 end
 

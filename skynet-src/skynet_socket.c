@@ -127,7 +127,7 @@ skynet_socket_sendbuffer_lowpriority(struct skynet_context *ctx, struct socket_s
 }
 
 int 
-skynet_socket_listen(struct skynet_context *ctx, const char *host, int port, int backlog) {
+skynet_socket_listen(struct skynet_context *ctx, const char *host, int *port, int backlog) {
 	uint32_t source = skynet_context_handle(ctx);
 	return socket_server_listen(SOCKET_SERVER, source, host, port, backlog);
 }
