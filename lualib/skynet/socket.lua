@@ -417,6 +417,7 @@ function socket.listen(host, port, backlog)
 		connected = false,
 		listen = true,
 	}
+	assert(socket_pool[id] == nil)
 	socket_pool[id] = s
 	suspend(s)
 	return id, s.addr, s.port
