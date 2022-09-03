@@ -175,7 +175,7 @@ skynet_socket_nodelay(struct skynet_context *ctx, int id) {
 }
 
 int 
-skynet_socket_udp(struct skynet_context *ctx, const char * addr, int *port) {
+skynet_socket_udp(struct skynet_context *ctx, const char * addr, int port) {
 	uint32_t source = skynet_context_handle(ctx);
 	return socket_server_udp(SOCKET_SERVER, source, addr, port);
 }

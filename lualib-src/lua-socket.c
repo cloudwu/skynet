@@ -648,13 +648,12 @@ ludp(lua_State *L) {
 		host = address_port(L, tmp, addr, 2, &port);
 	}
 
-	int id = skynet_socket_udp(ctx, host, &port);
+	int id = skynet_socket_udp(ctx, host, port);
 	if (id < 0) {
 		return luaL_error(L, "udp init failed");
 	}
 	lua_pushinteger(L, id);
-	lua_pushinteger(L, port);
-	return 2;
+	return 1;
 }
 
 static int
