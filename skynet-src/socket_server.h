@@ -54,7 +54,7 @@ struct socket_udp_address;
 
 // create an udp socket handle, attach opaque with it . udp socket don't need call socket_server_start to recv message
 // if port != 0, bind the socket . if addr == NULL, bind ipv4 0.0.0.0 . If you want to use ipv6, addr can be "::" and port 0.
-int socket_server_udp(struct socket_server *, uintptr_t opaque, const char * addr, int port);
+int socket_server_udp(struct socket_server *, uintptr_t opaque, const char * addr, int *port);
 // set default dest address, return 0 when success
 int socket_server_udp_connect(struct socket_server *, int id, const char * addr, int port);
 // If the socket_udp_address is NULL, use last call socket_server_udp_connect address instead

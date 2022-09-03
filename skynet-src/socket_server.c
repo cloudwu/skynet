@@ -2070,7 +2070,7 @@ socket_server_userobject(struct socket_server *ss, struct socket_object_interfac
 // UDP
 
 int 
-socket_server_udp(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
+socket_server_udp(struct socket_server *ss, uintptr_t opaque, const char * addr, int *port) {
 	int fd;
 	int family;
 	if (port != 0 || addr != NULL) {
