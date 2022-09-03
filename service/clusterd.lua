@@ -148,9 +148,8 @@ function command.listen(source, addr, port)
 		local address = assert(node_address[addr], addr .. " is down")
 		addr, port = string.match(address, "([^:]+):(.*)$")
 	end
-
-	local param = { address = addr, port = port }
-	skynet.ret(skynet.pack(skynet.call(gate, "lua", "open", param)))
+	skynet.call(gate, "lua", "open", { address = addr, port = port })
+	skynet.ret(skynet.pack(nil))
 end
 
 function command.sender(source, node)

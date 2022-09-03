@@ -29,7 +29,7 @@ void skynet_socket_updatetime();
 
 int skynet_socket_sendbuffer(struct skynet_context *ctx, struct socket_sendbuffer *buffer);
 int skynet_socket_sendbuffer_lowpriority(struct skynet_context *ctx, struct socket_sendbuffer *buffer);
-int skynet_socket_listen(struct skynet_context *ctx, const char *host, int *port, int backlog);
+int skynet_socket_listen(struct skynet_context *ctx, const char *host, int port, int backlog);
 int skynet_socket_connect(struct skynet_context *ctx, const char *host, int port);
 int skynet_socket_bind(struct skynet_context *ctx, int fd);
 void skynet_socket_close(struct skynet_context *ctx, int id);

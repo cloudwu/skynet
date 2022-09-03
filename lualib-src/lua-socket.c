@@ -488,14 +488,13 @@ llisten(lua_State *L) {
 	int port = luaL_checkinteger(L,2);
 	int backlog = luaL_optinteger(L,3,BACKLOG);
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
-	int id = skynet_socket_listen(ctx, host, &port, backlog);
+	int id = skynet_socket_listen(ctx, host,port,backlog);
 	if (id < 0) {
 		return luaL_error(L, "Listen error");
 	}
 
 	lua_pushinteger(L,id);
-	lua_pushinteger(L,port);
-	return 2;
+	return 1;
 }
 
 static size_t

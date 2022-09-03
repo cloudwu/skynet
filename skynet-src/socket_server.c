@@ -1936,7 +1936,7 @@ socket_server_shutdown(struct socket_server *ss, uintptr_t opaque, int id) {
 // return -1 means failed
 // or return AF_INET or AF_INET6
 static int
-do_bind(const char *host, int *port, int protocol, int *family) {
+do_bind(const char *host, int port, int protocol, int *family) {
 	int fd;
 	int status;
 	int reuse = 1;
@@ -1946,7 +1946,7 @@ do_bind(const char *host, int *port, int protocol, int *family) {
 	if (host == NULL || host[0] == 0) {
 		host = "0.0.0.0";	// INADDR_ANY
 	}
-	sprintf(portstr, "%d", *port);
+	sprintf(portstr, "%d", port);
 	memset( &ai_hints, 0, sizeof( ai_hints ) );
 	ai_hints.ai_family = AF_UNSPEC;
 	if (protocol == IPPROTO_TCP) {
@@ -1973,15 +1973,6 @@ do_bind(const char *host, int *port, int protocol, int *family) {
 	if (status != 0)
 		goto _failed;
 
-	if (*port == 0) {
-		union sockaddr_all sa;
-		socklen_t len = sizeof(sa);
-
-		if (getsockname(fd, (struct sockaddr *)&sa, &len) == 0) {
-			*port = ntohs((*family == AF_INET) ? sa.v4.sin_port : sa.v6.sin6_port);
-		}
-	}
-
 	freeaddrinfo( ai_list );
 	return fd;
 _failed:
@@ -1992,7 +1983,7 @@ _failed_fd:
 }
 
 static int
-do_listen(const char * host, int *port, int backlog) {
+do_listen(const char * host, int port, int backlog) {
 	int family = 0;
 	int listen_fd = do_bind(host, port, IPPROTO_TCP, &family);
 	if (listen_fd < 0) {
@@ -2005,8 +1996,8 @@ do_listen(const char * host, int *port, int backlog) {
 	return listen_fd;
 }
 
-int
-socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * addr, int *port, int backlog) {
+int 
+socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * addr, int port, int backlog) {
 	int fd = do_listen(addr, port, backlog);
 	if (fd < 0) {
 		return -1;

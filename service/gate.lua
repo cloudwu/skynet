@@ -11,9 +11,8 @@ skynet.register_protocol {
 
 local handler = {}
 
-function handler.open(source, conf, port)
+function handler.open(source, conf)
 	watchdog = conf.watchdog or source
-	return port
 end
 
 function handler.message(fd, msg, sz)
