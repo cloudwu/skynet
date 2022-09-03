@@ -103,13 +103,17 @@ socket_message[1] = function(id, size, data)
 end
 
 -- SKYNET_SOCKET_TYPE_CONNECT = 2
-socket_message[2] = function(id, _ , addr)
+socket_message[2] = function(id, ud , addr)
 	local s = socket_pool[id]
 	if s == nil then
 		return
 	end
 	-- log remote addr
 	if not s.connected then	-- resume may also post connect message
+		if s.listen then
+			s.addr = addr
+			s.port = ud
+		end
 		s.connected = true
 		wakeup(s)
 	end
@@ -220,7 +224,10 @@ local function connect(id, func)
 		protocol = "TCP",
 	}
 	assert(not socket_onclose[id], "socket has onclose callback")
-	assert(not socket_pool[id], "socket is not closed")
+	local s2 = socket_pool[id]
+	if s2 and not s2.listen then
+		error("socket is not closed")
+	end
 	socket_pool[id] = s
 	suspend(s)
 	local err = s.connecting
@@ -404,7 +411,15 @@ function socket.listen(host, port, backlog)
 		host, port = string.match(host, "([^:]+):(.+)$")
 		port = tonumber(port)
 	end
-	return driver.listen(host, port, backlog)
+	local id = driver.listen(host, port, backlog)
+	local s = {
+		id = id,
+		connected = false,
+		listen = true,
+	}
+	socket_pool[id] = s
+	suspend(s)
+	return id, s.addr, s.port
 end
 
 -- abandon use to forward socket id to other service

@@ -118,7 +118,7 @@ local function console_main_loop(stdin, print, addr)
 end
 
 skynet.start(function()
-	local listen_socket = socket.listen (ip, port)
+	local listen_socket, ip, port = socket.listen (ip, port)
 	skynet.error("Start debug console at " .. ip .. ":" .. port)
 	socket.start(listen_socket , function(id, addr)
 		local function print(...)

@@ -263,11 +263,8 @@ skynet.start(function()
 			end
 		end)
 		skynet.wait()
-		socket.close(slave_fd)
-	else
-		-- slave_fd does not start, so use close_fd.
-		socket.close_fd(slave_fd)
 	end
+	socket.close(slave_fd)
 	skynet.error("Shakehand ready")
 	skynet.fork(ready)
 end)

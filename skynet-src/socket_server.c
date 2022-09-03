@@ -1089,7 +1089,28 @@ listen_socket(struct socket_server *ss, struct request_listen * request, struct 
 		goto _failed;
 	}
 	ATOM_STORE(&s->type , SOCKET_TYPE_PLISTEN);
-	return -1;
+	result->opaque = request->opaque;
+	result->id = id;
+	result->ud = 0;
+	result->data = "listen";
+
+	union sockaddr_all u;
+	socklen_t slen = sizeof(u);
+	if (getsockname(listen_fd, &u.s, &slen) == 0) {
+		void * sin_addr = (u.s.sa_family == AF_INET) ? (void*)&u.v4.sin_addr : (void *)&u.v6.sin6_addr;
+		if (inet_ntop(u.s.sa_family, sin_addr, ss->buffer, sizeof(ss->buffer)) == 0) {
+			result->data = strerror(errno);
+			return SOCKET_ERR;
+		}
+		int sin_port = ntohs((u.s.sa_family == AF_INET) ? u.v4.sin_port : u.v6.sin6_port);
+		result->data = ss->buffer;
+		result->ud = sin_port;
+	} else {
+		result->data = strerror(errno);
+		return SOCKET_ERR;
+	}
+
+	return SOCKET_OPEN;
 _failed:
 	close(listen_fd);
 	result->opaque = request->opaque;

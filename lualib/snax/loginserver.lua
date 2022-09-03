@@ -177,7 +177,7 @@ local function launch_master(conf)
 				skynet.error(string.format("invalid client (fd = %d) error = %s", fd, err))
 			end
 		end
-		socket.close_fd(fd)	-- We haven't call socket.start, so use socket.close_fd rather than socket.close.
+		socket.close(fd)
 	end)
 end
 
