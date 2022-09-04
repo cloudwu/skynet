@@ -146,10 +146,15 @@ function command.listen(source, addr, port)
 	local gate = skynet.newservice("gate")
 	if port == nil then
 		local address = assert(node_address[addr], addr .. " is down")
-		addr, port = string.match(address, "([^:]+):(.*)$")
+		addr, port = string.match(address, "(.+):([^:]+)$")
+		port = tonumber(port)
+		assert(port ~= 0)
+		skynet.call(gate, "lua", "open", { address = addr, port = port })
+		skynet.ret(skynet.pack(addr, port))
+	else
+		local realaddr, realport = skynet.call(gate, "lua", "open", { address = addr, port = port })
+		skynet.ret(skynet.pack(realaddr, realport))
 	end
-	local addr, port = skynet.call(gate, "lua", "open", { address = addr, port = port })
-	skynet.ret(skynet.pack(addr, port))
 end
 
 function command.sender(source, node)
