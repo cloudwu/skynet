@@ -13,6 +13,7 @@ local handler = {}
 
 function handler.open(source, conf)
 	watchdog = conf.watchdog or source
+	return conf.address, conf.port
 end
 
 function handler.message(fd, msg, sz)

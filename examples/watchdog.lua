@@ -40,7 +40,7 @@ function SOCKET.data(fd, msg)
 end
 
 function CMD.start(conf)
-	skynet.call(gate, "lua", "open" , conf)
+	return skynet.call(gate, "lua", "open" , conf)
 end
 
 function CMD.close(fd)
