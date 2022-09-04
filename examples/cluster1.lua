@@ -19,8 +19,8 @@ skynet.start(function()
 	print(skynet.call(sdb, "lua", "SET", "b", "foobar2"))
 	print(skynet.call(sdb, "lua", "GET", "a"))
 	print(skynet.call(sdb, "lua", "GET", "b"))
-	cluster.open "db"
-	cluster.open "db2"
+	skynet.error("Open db", cluster.open "db")
+	skynet.error("Open db2", cluster.open "db2")
 	-- unique snax service
 	snax.uniqueservice "pingserver"
 end)
