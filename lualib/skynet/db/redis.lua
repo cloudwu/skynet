@@ -210,6 +210,12 @@ function command:sismember(key, value)
 	return fd:request(compose_message ("SISMEMBER", table.pack(key, value)), read_boolean)
 end
 
+-- return multiple values, you need to use table
+function command:eval(script, argv)
+	local fd = self[1]
+	return fd:request(compose_message("EVAL", table.pack(script, 0, table.unpack(argv))), read_response)
+end
+
 local function compose_table(lines, msg)
 	local tinsert = table.insert
 	tinsert(lines, count_cache[#msg])
