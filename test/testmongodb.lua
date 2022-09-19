@@ -14,7 +14,7 @@ local function _create_client()
 		{
 			host = host, port = port,
 			username = username, password = password,
-			authdb = db_name,
+			authdb = "admin",
 		}
 	)
 end
@@ -209,7 +209,7 @@ local function test_safe_batch_delete()
 	db.testcoll:safe_batch_delete(docs)
 
 	local ret = db.testcoll:find()
-	assert(length == ret:count(), "test safe batch delete failed")
+	assert((length - del_num) == ret:count(), "test safe batch delete failed")
 end
 
 skynet.start(function()

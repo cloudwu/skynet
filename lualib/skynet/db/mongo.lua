@@ -1,5 +1,7 @@
 local bson = require "bson"
-local socket = require "skynet.socket"
+
+require "skynet.socket"
+
 local socketchannel	= require "skynet.socketchannel"
 local skynet = require "skynet"
 local driver = require "skynet.mongo.driver"
@@ -68,11 +70,9 @@ local collection_meta =	{
 local function dispatch_reply(so)
 	local len_reply	= so:read(4)
 	local reply	= so:read(driver.length(len_reply))
-	local result = { result	= {} }
-	local succ,	reply_id, document,	cursor_id, startfrom = driver.reply(reply, result.result)
+	local result = {}
+	local succ,	reply_id, document = driver.reply(reply)
 	result.document	= document
-	result.cursor_id = cursor_id
-	result.startfrom = startfrom
 	result.data	= reply
 	return reply_id, succ, result
 end
@@ -298,15 +298,35 @@ function mongo_db:runCommand(cmd,cmd_v,...)
 	local sock = conn.__sock
 	local bson_cmd
 	if not cmd_v then
-		bson_cmd = bson_encode_order(cmd,1)
+		-- ensure cmd remains in first place
+		bson_cmd = bson_encode_order(cmd,1, "$db", self.name)
 	else
-		bson_cmd = bson_encode_order(cmd,cmd_v,...)
+		bson_cmd = bson_encode_order(cmd,cmd_v, "$db", self.name, ...)
 	end
-	local pack = driver.query(request_id, 0, self.__cmd, 0,	1, bson_cmd)
+
+	local pack = driver.op_msg(request_id, 0, bson_cmd)
 	-- we must hold	req	(req.data),	because	req.document is	a lightuserdata, it's a	pointer	to the string (req.data)
 	local req =	sock:request(pack, request_id)
 	local doc =	req.document
 	return bson_decode(doc)
+end
+
+--- send command without response
+function mongo_db:send_command(cmd, cmd_v, ...)
+	local conn = self.connection
+	local request_id = conn:genId()
+	local sock = conn.__sock
+	local bson_cmd
+	if not cmd_v then
+		-- ensure cmd remains in first place
+		bson_cmd = bson_encode_order(cmd, 1, "$db", self.name, "writeConcern", {w=0})
+	else
+		bson_cmd = bson_encode_order(cmd, cmd_v, "$db", self.name, "writeConcern", {w=0}, ...)
+	end
+
+	local pack = driver.op_msg(request_id, 2, bson_cmd)
+	sock:request(pack)
+	return {ok=1} -- fake successful response
 end
 
 function mongo_db:getCollection(collection)
@@ -326,10 +346,7 @@ function mongo_collection:insert(doc)
 	if doc._id == nil then
 		doc._id	= bson.objectid()
 	end
-	local sock = self.connection.__sock
-	local pack = driver.insert(0, self.full_name, bson_encode(doc))
-	-- flags support 1:	ContinueOnError
-	sock:request(pack)
+	self.database:send_command("insert", self.name, "documents", {bson_encode(doc)})
 end
 
 local function werror(r)
@@ -353,6 +370,11 @@ function mongo_collection:safe_insert(doc)
 	return werror(r)
 end
 
+function mongo_collection:raw_safe_insert(doc)
+	local r = self.database:runCommand("insert", self.name, "documents", {doc})
+	return werror(r)
+end
+
 function mongo_collection:batch_insert(docs)
 	for	i=1,#docs do
 		if docs[i]._id == nil then
@@ -360,10 +382,11 @@ function mongo_collection:batch_insert(docs)
 		end
 		docs[i]	= bson_encode(docs[i])
 	end
-	local sock = self.connection.__sock
-	local pack = driver.insert(0, self.full_name, docs)
-	sock:request(pack)
+
+	self.database:send_command("insert", self.name, "documents", docs)
 end
+
+mongo_collection.insert_many = mongo_collection.batch_insert
 
 function mongo_collection:safe_batch_insert(docs)
 	for i = 1, #docs do
@@ -377,21 +400,39 @@ function mongo_collection:safe_batch_insert(docs)
 	return werror(r)
 end
 
-function mongo_collection:update(selector,update,upsert,multi)
-	local flags	= (upsert and 1	or 0) +	(multi and 2 or	0)
-	local sock = self.connection.__sock
-	local pack = driver.update(self.full_name, flags, bson_encode(selector), bson_encode(update))
-	sock:request(pack)
+mongo_collection.safe_insert_many = mongo_collection.safe_batch_insert
+
+function mongo_collection:update(query,update,upsert,multi)
+	self.database:send_command("update", self.name, "updates", {bson_encode({
+		q = query,
+		u = update,
+		upsert = upsert,
+		multi = multi
+	})})
 end
 
-function mongo_collection:safe_update(selector, update, upsert, multi)
+function mongo_collection:safe_update(query, update, upsert, multi)
 	local r = self.database:runCommand("update", self.name, "updates", {bson_encode({
-		q = selector,
+		q = query,
 		u = update,
 		upsert = upsert,
 		multi = multi,
 	})})
 	return werror(r)
+end
+
+function mongo_collection:batch_update(updates)
+	local updates_tb = {}
+	for i = 1, #updates do
+		updates_tb[i] = bson_encode({
+			q = updates[i].query,
+			u = updates[i].update,
+			upsert = updates[i].upsert,
+			multi = updates[i].multi,
+		})
+	end
+
+	self.database:send_command("update", self.name, "updates", updates_tb)
 end
 
 function mongo_collection:safe_batch_update(updates)
@@ -409,25 +450,31 @@ function mongo_collection:safe_batch_update(updates)
 	return werror(r)
 end
 
-function mongo_collection:delete(selector, single)
-	local sock = self.connection.__sock
-	local pack = driver.delete(self.full_name, single, bson_encode(selector))
-	sock:request(pack)
+function mongo_collection:raw_safe_update(update)
+	local r = self.database:runCommand("update", self.name, "updates", {update})
+	return werror(r)
 end
 
-function mongo_collection:safe_delete(selector, single)
+function mongo_collection:delete(query, single)
+	self.database:runCommand("delete", self.name, "deletes", {bson_encode({
+		q = query,
+		limit = single and 1 or 0,
+	})})
+end
+
+function mongo_collection:safe_delete(query, single)
 	local r = self.database:runCommand("delete", self.name, "deletes", {bson_encode({
-		q = selector,
+		q = query,
 		limit = single and 1 or 0,
 	})})
 	return werror(r)
 end
 
-function mongo_collection:safe_batch_delete(selectors, single)
+function mongo_collection:safe_batch_delete(deletes, single)
 	local delete_tb = {}
-	for i = 1, #selectors do
+	for i = 1, #deletes do
 		delete_tb[i] = bson_encode({
-			q = selectors[i],
+			q = deletes[i],
 			limit = single and 1 or 0,
 		})
 	end
@@ -435,30 +482,29 @@ function mongo_collection:safe_batch_delete(selectors, single)
 	return werror(r)
 end
 
-function mongo_collection:findOne(query, selector)
-	local conn = self.connection
-	local request_id = conn:genId()
-	local sock = conn.__sock
-	local pack = driver.query(request_id, 0, self.full_name, 0,	1, query and bson_encode(query)	or empty_bson, selector	and	bson_encode(selector))
-	-- we must hold	req	(req.data),	because	req.document is	a lightuserdata, it's a	pointer	to the string (req.data)
-	local req =	sock:request(pack, request_id)
-	local doc =	req.document
-	return bson_decode(doc)
+function mongo_collection:raw_safe_delete(delete)
+	local r = self.database:runCommand("delete", self.name, "deletes", {delete})
+	return werror(r)
 end
 
-function mongo_collection:find(query, selector)
+function mongo_collection:findOne(query, projection)
+	local cursor = self:find(query, projection)
+	return cursor:hasNext() and cursor:next()
+end
+
+function mongo_collection:find(query, projection)
 	return setmetatable( {
 		__collection = self,
 		__query	= query	and	bson_encode(query) or empty_bson,
-		__selector = selector and bson_encode(selector),
+		__projection = projection and bson_encode(projection) or empty_bson,
 		__ptr =	nil,
 		__data = nil,
 		__cursor = nil,
 		__document = {},
 		__flags	= 0,
 		__skip = 0,
-		__sortquery = nil,
 		__limit = 0,
+		__sort = empty_bson,
 	} ,	cursor_meta)
 end
 
@@ -479,7 +525,7 @@ function mongo_cursor:sort(key, key_v, ...)
 		local key_list = unfold({}, key, key_v , ...)
 		key = bson_encode_order(table.unpack(key_list))
 	end
-	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key}
+	self.__sort = key
 	return self
 end
 
@@ -610,21 +656,37 @@ function mongo_collection:findAndModify(doc)
 	return self.database:runCommand(table.unpack(cmd))
 end
 
+-- https://docs.mongodb.com/manual/reference/command/aggregate/
+-- collection:aggregate({ { ["$project"] = {tags = 1} } }, {cursor={}})
+-- @param pipeline: array
+-- @param options: map
+-- @return
+function mongo_collection:aggregate(pipeline, options)
+	assert(pipeline)
+	local cmd = {"aggregate", self.name, "pipeline", pipeline}
+	for k, v in pairs(options) do
+		table.insert(cmd, k)
+		table.insert(cmd, v)
+	end
+	return self.database:runCommand(table.unpack(cmd))
+end
+
 function mongo_cursor:hasNext()
 	if self.__ptr == nil then
 		if self.__document == nil then
 			return false
 		end
-		local conn = self.__collection.connection
-		local request_id = conn:genId()
-		local sock = conn.__sock
-		local pack
+		local response
+
+		local database = self.__collection.database
 		if self.__data == nil then
-			local query = self.__sortquery or self.__query
-			pack = driver.query(request_id, self.__flags, self.__collection.full_name, self.__skip, self.__limit, query, self.__selector)
+			local name = self.__collection.name
+			response = database:runCommand("find", name, "filter", self.__query, "sort", self.__sort,
+				"skip", self.__skip, "limit", self.__limit, "projection", self.__projection)
 		else
-			if self.__cursor then
-				pack = driver.more(request_id, self.__collection.full_name, self.__limit, self.__cursor)
+			if self.__cursor  and self.__cursor > 0 then
+				local name = self.__collection.name
+				response = database:runCommand("getMore", bson.int64(self.__cursor), "collection", name, "batchSize", self.__limit)
 			else
 				-- no more
 				self.__document	= nil
@@ -633,45 +695,31 @@ function mongo_cursor:hasNext()
 			end
 		end
 
-		local ok, result = pcall(sock.request,sock,pack, request_id)
-
-		local doc =	result.document
-		local cursor = result.cursor_id
-
-		if ok then
-			if doc then
-				local doc = result.result
-				self.__document	= doc
-				self.__data	= result.data
-				self.__ptr = 1
-				self.__cursor =	cursor
-				local limit = self.__limit
-				if cursor and limit > 0 then
-					limit = limit - #doc
-					if limit <= 0 then
-						-- reach limit
-						self:close()
-					end
-					self.__limit = limit
-				end
-				return true
-			else
-				self.__document	= nil
-				self.__data	= nil
-				self.__cursor =	nil
-				return false
-			end
-		else
+		if response.ok ~= 1 then
 			self.__document	= nil
 			self.__data	= nil
 			self.__cursor =	nil
-			if doc then
-				local err =	bson_decode(doc)
-				error(err["$err"])
-			else
-				error("Reply from mongod error")
-			end
+			error(response["$err"] or "Reply from mongod error")
 		end
+
+		local cursor = response.cursor
+		self.__document = cursor.firstBatch or cursor.nextBatch
+		self.__data = response
+		self.__ptr = 1
+		self.__cursor = cursor.id
+
+		local limit = self.__limit
+		if cursor.id > 0 and limit > 0 then
+			limit = limit - #self.__document
+			if limit <= 0 then
+				-- reach limit
+				self:close()
+			end
+
+			self.__limit = limit
+		end
+
+		return true
 	end
 
 	return true
@@ -681,7 +729,7 @@ function mongo_cursor:next()
 	if self.__ptr == nil then
 		error "Call	hasNext	first"
 	end
-	local r	= bson_decode(self.__document[self.__ptr])
+	local r	= self.__document[self.__ptr]
 	self.__ptr = self.__ptr	+ 1
 	if self.__ptr >	#self.__document then
 		self.__ptr = nil
@@ -692,9 +740,8 @@ end
 
 function mongo_cursor:close()
 	if self.__cursor then
-		local sock = self.__collection.connection.__sock
-		local pack = driver.kill(self.__cursor)
-		sock:request(pack)
+		local coll = self.__collection
+		coll.database:send_command("killCursors", coll.name, "cursors", {self.__cursor})
 		self.__cursor = nil
 	end
 end
