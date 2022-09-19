@@ -158,7 +158,7 @@ struct header_t {
 //	number request_id
 //  document first
 static int
-op_reply(lua_State *L) {
+unpack_reply(lua_State *L) {
 	size_t data_len = 0;
 	const char * data = luaL_checklstring(L,1,&data_len);
 	const struct header_t* h = (const struct header_t*)data;
@@ -263,7 +263,7 @@ LUAMOD_API int
 luaopen_skynet_mongo_driver(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] ={
-		{ "reply", op_reply }, // 接收响应
+		{ "reply", unpack_reply }, // 接收响应
 		{ "length", reply_length },
 		{ "op_msg", op_msg},
 		{ NULL, NULL },
