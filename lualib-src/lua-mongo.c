@@ -109,6 +109,7 @@ write_int8(struct buffer *b, int8_t v) {
 	b->ptr[b->size++] = uv;
 }
 
+/*
 static inline void
 write_bytes(struct buffer *b, const void * buf, int sz) {
 	buffer_reserve(b,sz);
@@ -116,7 +117,6 @@ write_bytes(struct buffer *b, const void * buf, int sz) {
 	b->size += sz;
 }
 
-/*
 static void
 write_string(struct buffer *b, const char *key, size_t sz) {
 	buffer_reserve(b,sz+1);
