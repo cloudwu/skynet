@@ -79,10 +79,19 @@ function test_find_and_remove()
 	db.testcoll:dropIndex("*")
 	db.testcoll:drop()
 
+	local cursor = db.testcoll:find()
+	assert(cursor:hasNext() == false)
+
 	db.testcoll:ensureIndex({test_key = 1}, {test_key2 = -1}, {unique = true, name = "test_index"})
 
 	ok, err, ret = db.testcoll:safe_insert({test_key = 1, test_key2 = 1})
 	assert(ok and ret and ret.n == 1, err)
+
+	cursor = db.testcoll:find()
+	assert(cursor:hasNext() == true)
+	local v = cursor:next()
+	assert(v)
+	assert(v.test_key == 1)
 
 	ok, err, ret = db.testcoll:safe_insert({test_key = 1, test_key2 = 2})
 	assert(ok and ret and ret.n == 1, err)
