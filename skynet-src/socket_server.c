@@ -1365,7 +1365,7 @@ dec_sending_ref(struct socket_server *ss, int id) {
 static int
 ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	int fd = ss->recvctrl_fd;
-	// the length of message is one byte, so 256+8 buffer size is enough.
+	// the length of message is one byte, so 256 buffer size is enough.
 	uint8_t buffer[256];
 	uint8_t header[2];
 	block_readpipe(fd, header, sizeof(header));
