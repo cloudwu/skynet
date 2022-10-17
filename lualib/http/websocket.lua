@@ -140,7 +140,7 @@ local function read_handshake(self, upgrade_ops)
     end
 
     -- read 'x-real-ip' header from nginx
-    self.real_ip = header["x-real-ip"] or ""
+    self.real_ip = header["x-real-ip"]
 
     -- response handshake
     local accept = crypt.base64encode(crypt.sha1(sw_key .. self.guid))
