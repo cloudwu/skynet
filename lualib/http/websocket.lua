@@ -139,6 +139,9 @@ local function read_handshake(self, upgrade_ops)
         end
     end
 
+    -- read 'x-real-ip' header from nginx
+    self.real_ip = header["x-real-ip"]
+
     -- response handshake
     local accept = crypt.base64encode(crypt.sha1(sw_key .. self.guid))
     local resp = "HTTP/1.1 101 Switching Protocols\r\n"..
@@ -495,6 +498,11 @@ end
 function M.addrinfo(id)
     local ws_obj = assert(ws_pool[id])
     return ws_obj.addr
+end
+
+function M.real_ip(id)
+    local ws_obj = assert(ws_pool[id])
+    return ws_obj.real_ip
 end
 
 function M.close(id, code ,reason)
