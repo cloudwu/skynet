@@ -690,7 +690,7 @@ function mongo_cursor:hasNext()
 		else
 			if self.__cursor  and self.__cursor > 0 then
 				local name = self.__collection.name
-				response = database:runCommand("getMore", bson_int64(self.__cursor), "collection", name, "batchSize", self.__limit)
+				response = database:runCommand("getMore", bson_int64(self.__cursor), "collection", name)
 			else
 				-- no more
 				self.__document	= nil
