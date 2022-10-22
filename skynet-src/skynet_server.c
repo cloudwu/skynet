@@ -1,5 +1,5 @@
 #include "skynet.h"
-
+#include "skynet_socket.h"
 #include "skynet_server.h"
 #include "skynet_module.h"
 #include "skynet_handle.h"
@@ -330,6 +330,12 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		skynet_monitor_trigger(sm, msg.source , handle);
 
 		if (ctx->cb == NULL) {
+			// 当msg.data为skynet_socket_message时，需要释放 sm->buffer
+			if ((msg.sz >> MESSAGE_TYPE_SHIFT) == PTYPE_SOCKET)
+			{
+				struct skynet_socket_message *sm = msg.data;
+				skynet_free(sm->buffer);
+			}
 			skynet_free(msg.data);
 		} else {
 			dispatch_message(ctx, &msg);
