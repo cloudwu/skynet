@@ -289,6 +289,10 @@ local function co_create(f)
 	return co
 end
 
+function skynet.get_co_pool_len()
+	return #coroutine_pool
+end
+
 local function dispatch_wakeup()
 	while true do
 		local token = tremove(wakeup_queue,1)
