@@ -603,6 +603,11 @@ lnodename(lua_State *L) {
 	pid_t pid = getpid();
 	char hostname[256];
 	if (gethostname(hostname, sizeof(hostname))==0) {
+		int i;
+		for (i=0; hostname[i]; i++) {
+			if (hostname[i] <= ' ')
+				hostname[i] = '_';
+		}
 		lua_pushfstring(L, "%s%d", hostname, (int)pid);
 	} else {
 		lua_pushfstring(L, "noname%d", (int)pid);
