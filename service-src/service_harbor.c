@@ -245,7 +245,7 @@ static void
 report_harbor_down(struct harbor *h, int id) {
 	char down[64];
 	int n = sprintf(down, "D %d",id);
-
+	close_harbor(h, id);
 	skynet_send(h->ctx, 0, h->slave, PTYPE_TEXT, 0, down, n);
 }
 

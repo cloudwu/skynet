@@ -101,6 +101,7 @@ local function monitor_slave(slave_id, slave_address)
 	skynet.error("slave " ..slave_id .. " is down")
 	local message = pack_package("D", slave_id)
 	slave_node[slave_id].fd = 0
+	slave_node[slave_id] = nil
 	for k,v in pairs(slave_node) do
 		socket.write(v.fd, message)
 	end

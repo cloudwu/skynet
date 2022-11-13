@@ -95,7 +95,7 @@ local function monitor_master(master_fd)
 				end
 			elseif t == 'D' then
 				local fd = slaves[id_name]
-				slaves[id_name] = false
+				slaves[id_name] = nil
 				if fd then
 					monitor_clear(id_name)
 					socket.close(fd)
