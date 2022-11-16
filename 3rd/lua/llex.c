@@ -138,12 +138,12 @@ TString *luaX_newstring (LexState *ls, const char *str, size_t l) {
   if (!ttisnil(o))  /* string already present? */
     ts = keystrval(nodefromval(o));  /* get saved copy */
   else {  /* not in use yet */
-    TValue *stv = s2v(L->top++);  /* reserve stack space for string */
+    TValue *stv = s2v(L->top.p++);  /* reserve stack space for string */
     setsvalue(L, stv, ts);  /* temporarily anchor the string */
     luaH_finishset(L, ls->h, stv, o, stv);  /* t[string] = string */
     /* table is not a metatable, so it does not need to invalidate cache */
     luaC_checkGC(L);
-    L->top--;  /* remove string from stack */
+    L->top.p--;  /* remove string from stack */
   }
   return ts;
 }

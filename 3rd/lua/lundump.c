@@ -120,10 +120,10 @@ static TString *loadStringN (LoadState *S, Proto *p) {
   }
   else {  /* long string */
     ts = luaS_createlngstrobj(L, size);  /* create string */
-    setsvalue2s(L, L->top, ts);  /* anchor it ('loadVector' can GC) */
+    setsvalue2s(L, L->top.p, ts);  /* anchor it ('loadVector' can GC) */
     luaD_inctop(L);
     loadVector(S, getstr(ts), size);  /* load directly in final place */
-    L->top--;  /* pop string */
+    L->top.p--;  /* pop string */
   }
   luaC_objbarrier(L, p, ts);
   return ts;
@@ -321,7 +321,7 @@ LClosure *luaU_undump(lua_State *L, ZIO *Z, const char *name) {
   S.Z = Z;
   checkHeader(&S);
   cl = luaF_newLclosure(L, loadByte(&S));
-  setclLvalue2s(L, L->top, cl);
+  setclLvalue2s(L, L->top.p, cl);
   luaD_inctop(L);
   cl->p = luaF_newproto(L);
   luaC_objbarrier(L, cl, cl->p);

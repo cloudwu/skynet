@@ -260,9 +260,7 @@ static int getfield (lua_State *L, const char *key, int d, int delta) {
     res = d;
   }
   else {
-    /* unsigned avoids overflow when lua_Integer has 32 bits */
-    if (!(res >= 0 ? (lua_Unsigned)res <= (lua_Unsigned)INT_MAX + delta
-                   : (lua_Integer)INT_MIN + delta <= res))
+    if (!(res >= 0 ? res - delta <= INT_MAX : INT_MIN + delta <= res))
       return luaL_error(L, "field '%s' is out-of-bound", key);
     res -= delta;
   }

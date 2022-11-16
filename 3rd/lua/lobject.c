@@ -62,7 +62,7 @@ static lua_Integer intarith (lua_State *L, int op, lua_Integer v1,
     case LUA_OPBOR: return intop(|, v1, v2);
     case LUA_OPBXOR: return intop(^, v1, v2);
     case LUA_OPSHL: return luaV_shiftl(v1, v2);
-    case LUA_OPSHR: return luaV_shiftl(v1, -v2);
+    case LUA_OPSHR: return luaV_shiftr(v1, v2);
     case LUA_OPUNM: return intop(-, 0, v1);
     case LUA_OPBNOT: return intop(^, ~l_castS2U(0), v1);
     default: lua_assert(0); return 0;
@@ -413,8 +413,8 @@ typedef struct BuffFS {
 */
 static void pushstr (BuffFS *buff, const char *str, size_t lstr) {
   lua_State *L = buff->L;
-  setsvalue2s(L, L->top, luaS_newlstr(L, str, lstr));
-  L->top++;  /* may use one slot from EXTRA_STACK */
+  setsvalue2s(L, L->top.p, luaS_newlstr(L, str, lstr));
+  L->top.p++;  /* may use one slot from EXTRA_STACK */
   if (!buff->pushed)  /* no previous string on the stack? */
     buff->pushed = 1;  /* now there is one */
   else  /* join previous string with new one */
@@ -542,7 +542,7 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
   addstr2buff(&buff, fmt, strlen(fmt));  /* rest of 'fmt' */
   clearbuff(&buff);  /* empty buffer into the stack */
   lua_assert(buff.pushed == 1);
-  return svalue(s2v(L->top - 1));
+  return svalue(s2v(L->top.p - 1));
 }
 
 

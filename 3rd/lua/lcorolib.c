@@ -76,7 +76,7 @@ static int luaB_auxwrap (lua_State *L) {
   if (l_unlikely(r < 0)) {  /* error? */
     int stat = lua_status(co);
     if (stat != LUA_OK && stat != LUA_YIELD) {  /* error in the coroutine? */
-      stat = lua_resetthread(co);  /* close its tbc variables */
+      stat = lua_resetthread(co, L);  /* close its tbc variables */
       lua_assert(stat != LUA_OK);
       lua_xmove(co, L, 1);  /* move error message to the caller */
     }
@@ -172,7 +172,7 @@ static int luaB_close (lua_State *L) {
   int status = auxstatus(L, co);
   switch (status) {
     case COS_DEAD: case COS_YIELD: {
-      status = lua_resetthread(co);
+      status = lua_resetthread(co, L);
       if (status == LUA_OK) {
         lua_pushboolean(L, 1);
         return 1;

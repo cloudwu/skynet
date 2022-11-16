@@ -8,6 +8,7 @@
 #define ldo_h
 
 
+#include "llimits.h"
 #include "lobject.h"
 #include "lstate.h"
 #include "lzio.h"
@@ -23,7 +24,7 @@
 ** at every check.
 */
 #define luaD_checkstackaux(L,n,pre,pos)  \
-	if (l_unlikely(L->stack_last - L->top <= (n))) \
+	if (l_unlikely(L->stack_last.p - L->top.p <= (n))) \
 	  { pre; luaD_growstack(L, n, 1); pos; } \
         else { condmovestack(L,pre,pos); }
 
@@ -32,8 +33,8 @@
 
 
 
-#define savestack(L,p)		((char *)(p) - (char *)L->stack)
-#define restorestack(L,n)	((StkId)((char *)L->stack + (n)))
+#define savestack(L,pt)		(cast_charp(pt) - cast_charp(L->stack.p))
+#define restorestack(L,n)	cast(StkId, cast_charp(L->stack.p) + (n))
 
 
 /* macro to check stack size, preserving 'p' */
