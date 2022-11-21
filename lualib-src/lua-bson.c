@@ -519,7 +519,10 @@ is_rawarray(lua_State *L) {
 	}
 	lua_Integer firstkey = lua_isinteger(L, -2) ? lua_tointeger(L, -2) : 0;
 	lua_pop(L, 2);
-	return firstkey > 0;
+	if (firstkey <= 1) {
+		return firstkey > 0;
+	}
+	return firstkey <= lua_rawlen(L, -1);
 }
 
 static void
