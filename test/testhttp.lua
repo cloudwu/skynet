@@ -44,11 +44,43 @@ local function http_head_test()
 	end
 end
 
+local function http_keep_alive_test()
+	httpc.timeout = 100
+	httpc.keep_alive_time = 3
+
+	local function loop_request()
+		for i = 1,3 do
+			local respheader = {}
+			local status, body ,handle = httpc.keep_alive_request('GET','http://baidu.com','/',respheader)
+			if i == 1 then
+				setmetatable(handle,{__gc = function(hdl) print("gc fd = ",hdl.fd) end})
+			end
+			print("-----------------",i,"------------------------")
+			print("[header] =====>")
+			for k,v in pairs(respheader) do
+				print(k,v)
+			end
+			print("[body] =====>", status)
+			print(body)
+			print("request by fd = ",handle.fd)
+			print("-----------------",i,"------------------------")
+			skynet.sleep(200)
+		end
+	end
+	loop_request()
+	skynet.sleep(500)
+	loop_request()
+	skynet.send(skynet.self(),'debug','GC')
+	skynet.sleep(500)
+	skynet.send(skynet.self(),'debug','GC')
+end
+
 local function main()
 	dns.server()
 
 	http_stream_test()
 	http_head_test()
+	http_keep_alive_test()
 
 	http_test("http")
 	if not pcall(require,"ltls.c") then

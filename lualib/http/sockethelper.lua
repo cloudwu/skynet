@@ -106,4 +106,8 @@ function sockethelper.shutdown(fd)
 	socket.shutdown(fd)
 end
 
+function sockethelper.disconnected(fd)
+	return socket.disconnected(fd)
+end
+
 return sockethelper

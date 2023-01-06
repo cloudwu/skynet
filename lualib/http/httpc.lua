@@ -2,6 +2,7 @@ local skynet = require "skynet"
 local socket = require "http.sockethelper"
 local internal = require "http.internal"
 local dns = require "skynet.dns"
+local queue = require "skynet.queue"
 local string = string
 local table = table
 
@@ -167,6 +168,121 @@ function httpc.post(host, url, form, recvheader)
 	end
 
 	return httpc.request("POST", host, url, recvheader, header, table.concat(body , "&"))
+end
+
+local keep_alive_handle_map = {}
+local handle_queue_map = {}
+
+local function create_keep_alive_handle(hostname)
+  	local is_close = false
+	local timeout = httpc.timeout	-- get httpc.timeout before any blocked api
+  	local fd,interface,host = connect(hostname,timeout)
+	interface.finish = true
+	local function close_connect()
+		if is_close then return end
+		is_close = true
+		close_interface(interface,fd)
+	end
+
+	local keep_alive_time = httpc.keep_alive_time
+  	local last_req_time = skynet.time()
+  	local req_look = false
+
+  	local release_obj
+
+	local obj = {
+		fd = fd,
+		request = function(method,url,recvheader, header, content)
+			local is_finish = false
+			skynet.timeout(timeout,function()
+				if not is_finish then
+					close_connect()
+					error(string.format("%s request timeout url:%s, timeout:%s", hostname, url, timeout))
+				end
+			end)
+
+			last_req_time = skynet.time()
+			req_look = true
+			local ok , statuscode, body , header = pcall(internal.request, interface, method, host, url, recvheader, header, content)
+			if ok then
+				ok, body = pcall(internal.response, interface, statuscode, body, header)
+			end
+			req_look = false
+			is_finish = true
+			return ok , statuscode, body
+		end,
+
+		disconnected = function()
+			return socket.disconnected(fd)
+		end,
+
+		close = function()
+			close_connect()
+		end,
+		check_keep_alive = function()
+			if is_close or not keep_alive_time then return end
+			while not is_close do
+				local cur_time = skynet.time()
+				if not req_look and cur_time - last_req_time > keep_alive_time then
+					close_connect()
+					release_obj()
+				break
+				end
+				skynet.sleep(500)
+			end
+		end
+	}
+
+	release_obj = function()
+		local handle_obj = keep_alive_handle_map[hostname]
+		if handle_obj == obj then
+			keep_alive_handle_map[hostname] = nil
+			handle_queue_map[hostname] = nil
+		end
+	end
+
+	skynet.fork(obj.check_keep_alive)
+	return obj
+end
+
+local function get_keep_alive_handle(hostname)
+	local handle = keep_alive_handle_map[hostname]
+	if not handle or handle.disconnected() then
+		if handle then
+			handle.close()
+		end
+		handle = create_keep_alive_handle(hostname)
+		keep_alive_handle_map[hostname] = handle
+	end
+	return handle
+end
+
+local function keep_alive_request(method, hostname, url, recvheader, header, content)
+	local try_cnt = 2			--for the first time,the server may be disconnected,so try a second time
+	for i = 1,try_cnt do
+		local handle = get_keep_alive_handle(hostname)
+		local ok, statuscode, body = handle.request(method,url,recvheader, header, content)
+		if ok then
+			return statuscode, body, handle
+		else
+			if i == try_cnt then
+				error(statuscode)
+			else
+				skynet.yield()   --execute socket cb first,It may be due to disconnection
+			end
+		end
+	end
+	return nil
+end
+
+function httpc.keep_alive_request(method, hostname, url, recvheader, header, content)
+	local handle_queue = handle_queue_map[hostname]
+	if not handle_queue then
+		handle_queue_map[hostname] = queue()
+		handle_queue = handle_queue_map[hostname]
+	end
+
+	return handle_queue(keep_alive_request,method, hostname, url, recvheader, header, content)
 end
 
 return httpc
