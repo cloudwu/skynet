@@ -226,7 +226,7 @@ local function create_keep_alive_handle(hostname)
 				if not req_look and cur_time - last_req_time > keep_alive_time then
 					close_connect()
 					release_obj()
-				break
+					break
 				end
 				skynet.sleep(500)
 			end
