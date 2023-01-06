@@ -186,7 +186,7 @@ local function create_keep_alive_handle(hostname)
 
 	local keep_alive_time = httpc.keep_alive_time
   	local last_req_time = skynet.time()
-  	local req_look = false
+  	local req_lock = false
 
   	local release_obj
 
@@ -202,12 +202,12 @@ local function create_keep_alive_handle(hostname)
 			end)
 
 			last_req_time = skynet.time()
-			req_look = true
+			req_lock = true
 			local ok , statuscode, body , header = pcall(internal.request, interface, method, host, url, recvheader, header, content)
 			if ok then
 				ok, body = pcall(internal.response, interface, statuscode, body, header)
 			end
-			req_look = false
+			req_lock = false
 			is_finish = true
 			return ok , statuscode, body
 		end,
