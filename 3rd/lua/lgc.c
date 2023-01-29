@@ -1687,12 +1687,15 @@ static void incstep (lua_State *L, global_State *g) {
 }
 
 /*
-** performs a basic GC step if collector is running
+** Performs a basic GC step if collector is running. (If collector is
+** not running, set a reasonable debt to avoid it being called at
+** every single check.)
 */
 void luaC_step (lua_State *L) {
   global_State *g = G(L);
-  lua_assert(!g->gcemergency);
-  if (gcrunning(g)) {  /* running? */
+  if (!gcrunning(g))  /* not running? */
+    luaE_setdebt(g, -2000);
+  else {
     if(isdecGCmodegen(g))
       genstep(L, g);
     else

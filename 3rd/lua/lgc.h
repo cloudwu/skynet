@@ -177,17 +177,18 @@
 #define luaC_checkGC(L)		luaC_condGC(L,(void)0,(void)0)
 
 
-#define luaC_barrier(L,p,v) (  \
-	(iscollectable(v) && isblack(p) && ispurewhite(gcvalue(v))) ?  \
-	luaC_barrier_(L,obj2gco(p),gcvalue(v)) : cast_void(0))
-
-#define luaC_barrierback(L,p,v) (  \
-	(iscollectable(v) && isblack(p) && ispurewhite(gcvalue(v))) ? \
-	luaC_barrierback_(L,p) : cast_void(0))
-
 #define luaC_objbarrier(L,p,o) (  \
 	(isblack(p) && ispurewhite(o)) ? \
 	luaC_barrier_(L,obj2gco(p),obj2gco(o)) : cast_void(0))
+
+#define luaC_barrier(L,p,v) (  \
+	iscollectable(v) ? luaC_objbarrier(L,p,gcvalue(v)) : cast_void(0))
+
+#define luaC_objbarrierback(L,p,o) (  \
+	(isblack(p) && ispurewhite(o)) ? luaC_barrierback_(L,p) : cast_void(0))
+
+#define luaC_barrierback(L,p,v) (  \
+	iscollectable(v) ? luaC_objbarrierback(L, p, gcvalue(v)) : cast_void(0))
 
 LUAI_FUNC void luaC_fix (lua_State *L, GCObject *o);
 LUAI_FUNC void luaC_freeallobjects (lua_State *L);

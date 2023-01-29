@@ -633,7 +633,8 @@ static int pmain (lua_State *L) {
   }
   luaL_openlibs(L);  /* open standard libraries */
   createargtable(L, argv, argc, script);  /* create table 'arg' */
-  lua_gc(L, LUA_GCGEN, 0, 0);  /* GC in generational mode */
+  lua_gc(L, LUA_GCRESTART);  /* start GC... */
+  lua_gc(L, LUA_GCGEN, 0, 0);  /* ...in generational mode */
   if (!(args & has_E)) {  /* no option '-E'? */
     if (handle_luainit(L) != LUA_OK)  /* run LUA_INIT */
       return 0;  /* error running LUA_INIT */
@@ -665,6 +666,7 @@ int main (int argc, char **argv) {
     l_message(argv[0], "cannot create state: not enough memory");
     return EXIT_FAILURE;
   }
+  lua_gc(L, LUA_GCSTOP);  /* stop GC while buidling state */
   lua_pushcfunction(L, &pmain);  /* to call 'pmain' in protected mode */
   lua_pushinteger(L, argc);  /* 1st argument */
   lua_pushlightuserdata(L, argv); /* 2nd argument */

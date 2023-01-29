@@ -131,6 +131,16 @@ typedef void * (*lua_Alloc) (void *ud, void *ptr, size_t osize, size_t nsize);
 typedef void (*lua_WarnFunction) (void *ud, const char *msg, int tocont);
 
 
+/*
+** Type used by the debug API to collect debug information
+*/
+typedef struct lua_Debug lua_Debug;
+
+
+/*
+** Functions to be called by the debugger in specific events
+*/
+typedef void (*lua_Hook) (lua_State *L, lua_Debug *ar);
 
 
 /*
@@ -445,12 +455,6 @@ LUA_API void (lua_closeslot) (lua_State *L, int idx);
 #define LUA_MASKRET	(1 << LUA_HOOKRET)
 #define LUA_MASKLINE	(1 << LUA_HOOKLINE)
 #define LUA_MASKCOUNT	(1 << LUA_HOOKCOUNT)
-
-typedef struct lua_Debug lua_Debug;  /* activation record */
-
-
-/* Functions to be called by the debugger in specific events */
-typedef void (*lua_Hook) (lua_State *L, lua_Debug *ar);
 
 
 LUA_API int (lua_getstack) (lua_State *L, int level, lua_Debug *ar);
