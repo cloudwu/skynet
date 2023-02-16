@@ -90,6 +90,7 @@ function gateserver.start(handler)
 	MSG.more = dispatch_queue
 
 	function MSG.open(fd, msg)
+		client_number = client_number + 1
 		if client_number >= maxclient then
 			socketdriver.shutdown(fd)
 			return
@@ -98,7 +99,6 @@ function gateserver.start(handler)
 			socketdriver.nodelay(fd)
 		end
 		connection[fd] = true
-		client_number = client_number + 1
 		handler.connect(fd, msg)
 	end
 
