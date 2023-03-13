@@ -55,6 +55,10 @@ function skynet.register_protocol(class)
 	proto[id] = class
 end
 
+function skynet.get_protocol(typename)
+	return proto[typename]
+end
+
 local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
