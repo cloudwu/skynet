@@ -45,6 +45,7 @@ local skynet = {
 
 -- code cache
 skynet.cache = require "skynet.codecache"
+skynet._proto = proto
 
 function skynet.register_protocol(class)
 	local name = class.name
@@ -53,10 +54,6 @@ function skynet.register_protocol(class)
 	assert(type(name) == "string" and type(id) == "number" and id >=0 and id <=255)
 	proto[name] = class
 	proto[id] = class
-end
-
-function skynet.get_protocol(typename)
-	return proto[typename]
 end
 
 local session_id_coroutine = {}
