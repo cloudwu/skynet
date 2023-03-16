@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <assert.h>
+#include <errno.h>
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -482,6 +483,8 @@ llisten(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = skynet_socket_listen(ctx, host,port,backlog);
 	if (id < 0) {
+		if (errno > 0)
+			return luaL_error(L, "Listen error:%s", strerror(errno));
 		return luaL_error(L, "Listen error");
 	}
 
