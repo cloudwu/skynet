@@ -898,7 +898,7 @@ encode_array(sproto_callback cb, struct sproto_arg *args, uint8_t *data, int siz
 		buffer = encode_integer_array(cb,args,buffer,size, &noarray);
 		if (buffer == NULL)
 			return -1;
-	
+
 		if (noarray) {
 			return 0;
 		}
@@ -1089,25 +1089,32 @@ expand64(uint32_t v) {
 }
 
 static int
+decode_empty_array(sproto_callback cb, struct sproto_arg *args) {
+	// It's empty array, call cb with index == -1 to create the empty array.
+	args->index = -1;
+	args->value = NULL;
+	args->length = 0;
+	return cb(args);
+}
+
+static int
 decode_array(sproto_callback cb, struct sproto_arg *args, uint8_t * stream) {
 	uint32_t sz = todword(stream);
 	int type = args->type;
 	int i;
 	if (sz == 0) {
-		// It's empty array, call cb with index == -1 to create the empty array.
-		args->index = -1;
-		args->value = NULL;
-		args->length = 0;
-		cb(args);
-		return 0;
-	}	
+		return decode_empty_array(cb, args);
+	}
 	stream += SIZEOF_LENGTH;
 	switch (type) {
 	case SPROTO_TDOUBLE:
 	case SPROTO_TINTEGER: {
+		if (--sz == 0) {
+			// An empty array but with a len prefix
+			return decode_empty_array(cb, args);
+		}
 		int len = *stream;
 		++stream;
-		--sz;
 		if (len == SIZEOF_INT32) {
 			if (sz % SIZEOF_INT32 != 0)
 				return -1;
