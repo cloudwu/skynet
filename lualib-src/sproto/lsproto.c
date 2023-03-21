@@ -84,14 +84,16 @@ lua_seti(lua_State *L, int index, lua_Integer n) {
 #if defined(SPROTO_WEAK_TYPE)
 static int64_t
 tointegerx (lua_State *L, int idx, int *isnum) {
-	int64_t v;
-	if (lua_isnumber(L, idx)) {
-		v = (int64_t)(round(lua_tonumber(L, idx)));
-		if (isnum) *isnum = 1;
-		return v;
-	} else {
-		return lua_tointegerx(L, idx, isnum);
+	int _isnum = 0;
+	int64_t v = lua_tointegerx(L, idx, &_isnum);
+	if (!_isnum){
+		double num = lua_tonumberx(L, idx, &_isnum);
+		if(_isnum) {
+			v = (int64_t)llround(num);
+		}
 	}
+	if(isnum) *isnum = _isnum;
+	return v;
 }
 
 static int
@@ -613,7 +615,7 @@ getbuffer(lua_State *L, int index, size_t *sz) {
 /*
 	lightuserdata sproto_type
 	string source	/  (lightuserdata , integer)
-	return table
+	return table, sz(decoded bytes)
  */
 static int
 ldecode(lua_State *L) {
