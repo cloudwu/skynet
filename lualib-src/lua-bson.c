@@ -522,7 +522,7 @@ is_rawarray(lua_State *L) {
 	if (firstkey <= 1) {
 		return firstkey > 0;
 	}
-	return firstkey <= lua_rawlen(L, -1);
+	return firstkey <= lua_rawlen(L, -1) && lua_rawlen(L, -1);
 }
 
 static void
