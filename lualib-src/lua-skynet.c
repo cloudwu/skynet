@@ -10,7 +10,6 @@
 #include <lauxlib.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <assert.h>
 #include <inttypes.h>
 
@@ -49,8 +48,13 @@ traceback (lua_State *L) {
 
 struct callback_context {
 	lua_State *L;
-	bool calling;
 };
+
+struct precb_context {
+	struct callback_context *cb_ctx;
+	int forward;
+};
+
 
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
@@ -66,9 +70,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	lua_pushinteger(L, session);
 	lua_pushinteger(L, source);
 
-	cb_ctx->calling = true;
 	r = lua_pcall(L, 5, 0 , trace);
-	cb_ctx->calling = false;
 
 	if (r == LUA_OK) {
 		return 0;
@@ -98,39 +100,46 @@ forward_cb(struct skynet_context * context, void * ud, int type, int session, ui
 	return 1;
 }
 
+static void
+clear_last_context(lua_State *L) {
+  if (lua_getfield(L, LUA_REGISTRYINDEX, "callback_context") == LUA_TUSERDATA) {
+    lua_pushnil(L);
+    lua_setiuservalue(L, -2, 2);
+  }
+  lua_pop(L, 1);
+}
+
+static int
+_cb_pre(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
+    struct precb_context *precb_ctx = (struct precb_context *)ud;
+    struct callback_context *cb_ctx = precb_ctx->cb_ctx;
+    int forward = precb_ctx->forward;
+    free(precb_ctx);
+    clear_last_context(cb_ctx->L);
+    skynet_cb cb = (forward)?(forward_cb):(_cb);
+    skynet_callback(context, cb_ctx, cb);
+    return cb(context, cb_ctx, type, session, source, msg, sz);
+}
+
 static int
 lcallback(lua_State *L) {
-	struct callback_context *cb_ctx = NULL;
-	// save calling callback context
-	do {
-		if(lua_getfield(L, LUA_REGISTRYINDEX, "callback_context") == LUA_TUSERDATA) {
-			cb_ctx = lua_touserdata(L, -1);
-			if(cb_ctx && cb_ctx->calling) {
-				lua_setfield(L, LUA_REGISTRYINDEX, "last_callback_context");
-				break;
-			}
-		}
-		lua_pop(L, 1);
-	} while(false);
-
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	int forward = lua_toboolean(L, 2);
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);
-	cb_ctx = (struct callback_context *)lua_newuserdata(L, sizeof(*cb_ctx));
+	struct callback_context * cb_ctx = (struct callback_context *)lua_newuserdatauv(L, sizeof(*cb_ctx), 2);
 	cb_ctx->L = lua_newthread(L);
-	cb_ctx->calling = false;
 	lua_pushcfunction(cb_ctx->L, traceback);
-	lua_setuservalue(L, -2);
+	lua_setiuservalue(L, -2, 1);
+	lua_getfield(L, LUA_REGISTRYINDEX, "callback_context");
+	lua_setiuservalue(L, -2, 2);
 	lua_setfield(L, LUA_REGISTRYINDEX, "callback_context");
 	lua_xmove(L, cb_ctx->L, 1);
 
-	if (forward) {
-		skynet_callback(context, cb_ctx, forward_cb);
-	} else {
-		skynet_callback(context, cb_ctx, _cb);
-	}
-
+	struct precb_context* precb_ctx = malloc(sizeof(*precb_ctx));
+	precb_ctx->cb_ctx = cb_ctx;
+	precb_ctx->forward = forward;
+	skynet_callback(context, precb_ctx, _cb_pre);
 	return 0;
 }
 
