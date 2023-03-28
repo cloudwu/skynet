@@ -111,14 +111,19 @@ clear_last_context(lua_State *L) {
 
 static int
 _cb_pre(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
-    struct precb_context *precb_ctx = (struct precb_context *)ud;
-    struct callback_context *cb_ctx = precb_ctx->cb_ctx;
-    int forward = precb_ctx->forward;
-    free(precb_ctx);
+    struct callback_context *cb_ctx = (struct callback_context *)ud;
     clear_last_context(cb_ctx->L);
-    skynet_cb cb = (forward)?(forward_cb):(_cb);
-    skynet_callback(context, cb_ctx, cb);
-    return cb(context, cb_ctx, type, session, source, msg, sz);
+    skynet_callback(context, ud, _cb);
+    return _cb(context, cb_ctx, type, session, source, msg, sz);
+}
+
+static int
+_forward_pre(struct skynet_context *context, void *ud, int type, int session, uint32_t source, const void *msg, size_t sz)
+{
+    struct callback_context *cb_ctx = (struct callback_context *)ud;
+    clear_last_context(cb_ctx->L);
+    skynet_callback(context, ud, forward_cb);
+    return forward_cb(context, cb_ctx, type, session, source, msg, sz);
 }
 
 static int
@@ -136,10 +141,11 @@ lcallback(lua_State *L) {
 	lua_setfield(L, LUA_REGISTRYINDEX, "callback_context");
 	lua_xmove(L, cb_ctx->L, 1);
 
-	struct precb_context* precb_ctx = malloc(sizeof(*precb_ctx));
-	precb_ctx->cb_ctx = cb_ctx;
-	precb_ctx->forward = forward;
-	skynet_callback(context, precb_ctx, _cb_pre);
+    if(forward) {
+        skynet_callback(context, cb_ctx, _forward_pre);
+    } else {
+        skynet_callback(context, cb_ctx, _cb_pre);
+    }
 	return 0;
 }
 
