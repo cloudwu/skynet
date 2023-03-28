@@ -101,7 +101,7 @@ forward_cb(struct skynet_context * context, void * ud, int type, int session, ui
 static int
 lcallback(lua_State *L) {
 	struct callback_context *cb_ctx = NULL;
-	// save calling coroutine
+	// save calling callback context
 	do {
 		if(lua_getfield(L, LUA_REGISTRYINDEX, "callback_context") == LUA_TUSERDATA) {
 			cb_ctx = lua_touserdata(L, -1);
