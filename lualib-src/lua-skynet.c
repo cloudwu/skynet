@@ -10,6 +10,7 @@
 #include <lauxlib.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <assert.h>
 #include <inttypes.h>
 
@@ -48,6 +49,7 @@ traceback (lua_State *L) {
 
 struct callback_context {
 	lua_State *L;
+	bool calling;
 };
 
 static int
@@ -64,7 +66,9 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	lua_pushinteger(L, session);
 	lua_pushinteger(L, source);
 
+	cb_ctx->calling = true;
 	r = lua_pcall(L, 5, 0 , trace);
+	cb_ctx->calling = false;
 
 	if (r == LUA_OK) {
 		return 0;
@@ -96,12 +100,26 @@ forward_cb(struct skynet_context * context, void * ud, int type, int session, ui
 
 static int
 lcallback(lua_State *L) {
+	struct callback_context *cb_ctx = NULL;
+	// save calling coroutine
+	do {
+		if(lua_getfield(L, LUA_REGISTRYINDEX, "callback_context") == LUA_TUSERDATA) {
+			cb_ctx = lua_touserdata(L, -1);
+			if(cb_ctx && cb_ctx->calling) {
+				lua_setfield(L, LUA_REGISTRYINDEX, "last_callback_context");
+				break;
+			}
+		}
+		lua_pop(L, 1);
+	} while(false);
+
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 	int forward = lua_toboolean(L, 2);
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);
-	struct callback_context *cb_ctx = (struct callback_context *)lua_newuserdata(L, sizeof(*cb_ctx));
+	cb_ctx = (struct callback_context *)lua_newuserdata(L, sizeof(*cb_ctx));
 	cb_ctx->L = lua_newthread(L);
+	cb_ctx->calling = false;
 	lua_pushcfunction(cb_ctx->L, traceback);
 	lua_setuservalue(L, -2);
 	lua_setfield(L, LUA_REGISTRYINDEX, "callback_context");
