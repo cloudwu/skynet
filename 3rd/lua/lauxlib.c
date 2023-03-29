@@ -1237,7 +1237,7 @@ LUALIB_API int luaL_loadfilex (lua_State *L, const char *filename,
   lua_State * eL;
   int err;
   const void * oldv;
-  if (level == CACHE_OFF) {
+  if (level == CACHE_OFF || filename == NULL) {
     return luaL_loadfilex_(L, filename, mode);
   }
   proto = load_proto(filename);
