@@ -50,12 +50,6 @@ struct callback_context {
 	lua_State *L;
 };
 
-struct precb_context {
-	struct callback_context *cb_ctx;
-	int forward;
-};
-
-
 static int
 _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	struct callback_context *cb_ctx = (struct callback_context *)ud;
@@ -141,11 +135,7 @@ lcallback(lua_State *L) {
 	lua_setfield(L, LUA_REGISTRYINDEX, "callback_context");
 	lua_xmove(L, cb_ctx->L, 1);
 
-    if(forward) {
-        skynet_callback(context, cb_ctx, _forward_pre);
-    } else {
-        skynet_callback(context, cb_ctx, _cb_pre);
-    }
+	skynet_callback(context, cb_ctx, (forward)?(_forward_pre):(_cb_pre));
 	return 0;
 }
 
