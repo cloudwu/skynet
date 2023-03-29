@@ -96,28 +96,27 @@ forward_cb(struct skynet_context * context, void * ud, int type, int session, ui
 
 static void
 clear_last_context(lua_State *L) {
-  if (lua_getfield(L, LUA_REGISTRYINDEX, "callback_context") == LUA_TUSERDATA) {
-    lua_pushnil(L);
-    lua_setiuservalue(L, -2, 2);
-  }
-  lua_pop(L, 1);
+	if (lua_getfield(L, LUA_REGISTRYINDEX, "callback_context") == LUA_TUSERDATA) {
+		lua_pushnil(L);
+		lua_setiuservalue(L, -2, 2);
+	}
+	lua_pop(L, 1);
 }
 
 static int
 _cb_pre(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
-    struct callback_context *cb_ctx = (struct callback_context *)ud;
-    clear_last_context(cb_ctx->L);
-    skynet_callback(context, ud, _cb);
-    return _cb(context, cb_ctx, type, session, source, msg, sz);
+	struct callback_context *cb_ctx = (struct callback_context *)ud;
+	clear_last_context(cb_ctx->L);
+	skynet_callback(context, ud, _cb);
+	return _cb(context, cb_ctx, type, session, source, msg, sz);
 }
 
 static int
-_forward_pre(struct skynet_context *context, void *ud, int type, int session, uint32_t source, const void *msg, size_t sz)
-{
-    struct callback_context *cb_ctx = (struct callback_context *)ud;
-    clear_last_context(cb_ctx->L);
-    skynet_callback(context, ud, forward_cb);
-    return forward_cb(context, cb_ctx, type, session, source, msg, sz);
+_forward_pre(struct skynet_context *context, void *ud, int type, int session, uint32_t source, const void *msg, size_t sz) {
+	struct callback_context *cb_ctx = (struct callback_context *)ud;
+	clear_last_context(cb_ctx->L);
+	skynet_callback(context, ud, forward_cb);
+	return forward_cb(context, cb_ctx, type, session, source, msg, sz);
 }
 
 static int
