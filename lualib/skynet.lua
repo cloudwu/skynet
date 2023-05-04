@@ -985,6 +985,9 @@ function skynet.task(ret)
 	end
 	local tt = type(ret)
 	if tt == "table" then
+		ret.count = ret.count or 0
+		assert(math.floor(ret.count) == ret.count and ret.count >= 0,
+		"non-negative integer expected, got " .. ret.count)
 		for session,co in pairs(session_id_coroutine) do
 			local key = string.format("%s session: %d", tostring(co), session)
 			if co == "BREAK" then
@@ -993,6 +996,10 @@ function skynet.task(ret)
 				ret[key] = timeout_traceback[co]
 			else
 				ret[key] = traceback(co)
+			end
+			ret.count = ret.count - 1
+			if ret.count == 0 then
+				return
 			end
 		end
 		return
@@ -1017,7 +1024,10 @@ function skynet.task(ret)
 	end
 end
 
-function skynet.uniqtask()
+function skynet.uniqtask(count_)
+	count_ = count_ or 0
+	assert(math.floor(count_) == count_ and count_ >= 0,
+	"non-negative integer expected, got " .. count_)
 	local stacks = {}
 	for session, co in pairs(session_id_coroutine) do
 		local stack = traceback(co)
@@ -1027,6 +1037,10 @@ function skynet.uniqtask()
 			info.sessions[#info.sessions+1] = session
 		end
 		stacks[stack] = info
+		count_ = count_ - 1
+		if count_ == 0 then
+			break
+		end
 	end
 	local ret = {}
 	for stack, info in pairs(stacks) do

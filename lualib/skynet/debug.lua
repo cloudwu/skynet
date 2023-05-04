@@ -55,18 +55,19 @@ local function init(skynet, export)
 			end
 		end
 
-		function dbgcmd.TASK(session)
+		function dbgcmd.TASK(session, count)
 			if session then
 				skynet.ret(skynet.pack(skynet.task(session)))
 			else
 				local task = {}
+				task.count = count
 				skynet.task(task)
 				skynet.ret(skynet.pack(task))
 			end
 		end
 
-		function dbgcmd.UNIQTASK()
-			skynet.ret(skynet.pack(skynet.uniqtask()))
+		function dbgcmd.UNIQTASK(count)
+			skynet.ret(skynet.pack(skynet.uniqtask(count)))
 		end
 
 		function dbgcmd.INFO(...)
