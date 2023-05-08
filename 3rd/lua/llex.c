@@ -128,7 +128,7 @@ l_noret luaX_syntaxerror (LexState *ls, const char *msg) {
 ** ensuring there is only one copy of each unique string.  The table
 ** here is used as a set: the string enters as the key, while its value
 ** is irrelevant. We use the string itself as the value only because it
-** is a TValue readly available. Later, the code generation can change
+** is a TValue readily available. Later, the code generation can change
 ** this value.
 */
 TString *luaX_newstring (LexState *ls, const char *str, size_t l) {

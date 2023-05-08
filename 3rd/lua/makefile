@@ -20,7 +20,7 @@ SYSCFLAGS=
 SYSLDFLAGS=
 SYSLIBS=
 
-MYCFLAGS=-I../../skynet-src -g
+MYCFLAGS= -I../../skynet-src -g
 MYLDFLAGS=
 MYLIBS=
 MYOBJS=
@@ -30,7 +30,7 @@ CMCFLAGS=
 
 # == END OF USER SETTINGS -- NO NEED TO CHANGE ANYTHING BELOW THIS LINE =======
 
-PLATS= guess aix bsd c89 freebsd generic linux linux-readline macosx mingw posix solaris
+PLATS= guess aix bsd c89 freebsd generic ios linux linux-readline macosx mingw posix solaris
 
 LUA_A=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o ltm.o lundump.o lvm.o lzio.o
@@ -44,7 +44,7 @@ LUAC_T=	luac
 LUAC_O=	luac.o
 
 ALL_O= $(BASE_O) $(LUA_O) $(LUAC_O)
-ALL_T= $(LUA_A) $(LUA_T)
+ALL_T= $(LUA_A) $(LUA_T) $(LUAC_T)
 ALL_A= $(LUA_A)
 
 # Targets start here.
@@ -116,6 +116,9 @@ FreeBSD NetBSD OpenBSD freebsd:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_READLINE -I/usr/include/edit" SYSLIBS="-Wl,-E -ledit" CC="cc"
 
 generic: $(ALL)
+
+ios:
+	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_IOS"
 
 Linux linux:	linux-noreadline
 
