@@ -60,6 +60,7 @@ local session_id_coroutine = {}
 local session_coroutine_id = {}
 local session_coroutine_address = {}
 local session_coroutine_tracetag = {}
+local session_id_callback = {}
 local unresponse = {}
 
 local wakeup_queue = {}
@@ -379,6 +380,18 @@ function skynet.timeout(ti, func)
 	assert(session_id_coroutine[session] == nil)
 	session_id_coroutine[session] = co
 	return co	-- for debug
+end
+
+function skynet.nctimeout(ti, func)
+	local session = c.intcommand("TIMEOUT",ti)
+	assert(session)
+	assert(session_id_callback[session] == nil)
+	session_id_callback[session] = func
+	return function()
+		if session_id_callback[session] then
+			session_id_callback[session] = false
+		end
+	end
 end
 
 local function suspend_sleep(session, token)
@@ -777,7 +790,13 @@ local function raw_dispatch_message(prototype, msg, sz, session, source)
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
 		elseif co == nil then
-			unknown_response(session, source, msg, sz)
+			local cb = session_id_callback[session]
+			if cb == nil then
+				unknown_response(session, source, msg, sz)
+			else
+				if cb then skynet.fork(cb) end
+				session_id_callback[session] = nil
+			end
 		else
 			local tag = session_coroutine_tracetag[co]
 			if tag then c.trace(tag, "resume") end
