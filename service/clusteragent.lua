@@ -1,5 +1,4 @@
 local skynet = require "skynet"
-local sc = require "skynet.socketchannel"
 local socket = require "skynet.socket"
 local cluster = require "skynet.cluster.core"
 local ignoreret = skynet.ignoreret
