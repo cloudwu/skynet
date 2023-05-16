@@ -21,7 +21,9 @@ local channel_socket_meta = {
 }
 
 local socket_error = setmetatable({}, {__tostring = function() return "[Error: socket]" end })	-- alias for error object
+local timeout_error = setmetatable({}, {__tostring = function() return "[Error: timeout]" end })	-- alias for timeout error object
 socket_channel.error = socket_error
+socket_channel.timeout_error = timeout_error
 
 function socket_channel.channel(desc)
 	local c = {
@@ -41,6 +43,7 @@ function socket_channel.channel(desc)
 		__nodelay = desc.nodelay,
 		__overload_notify = desc.overload,
 		__overload = false,
+		__timeout = desc.timeout and desc.timeout * 100,
 	}
 
 	return setmetatable(c, channel_meta)
@@ -455,6 +458,15 @@ end
 local function wait_for_response(self, response)
 	local co = coroutine.running()
 	push_response(self, response, co)
+	if self.__timeout and self.__response then
+		skynet.timeout(self.__timeout, function()
+			if self.__thread[response] then
+				self.__thread[response] = nil
+				self.__result[co] = timeout_error
+				skynet.wakeup(co)
+			end
+		end)
+	end
 	skynet.wait(co)
 
 	local result = self.__result[co]
@@ -468,6 +480,8 @@ local function wait_for_response(self, response)
 		else
 			error(socket_error)
 		end
+	elseif result == timeout_error then
+		error(timeout_error)
 	else
 		assert(result, result_data)
 		return result_data
@@ -527,6 +541,11 @@ function channel:close()
 	end
 end
 
+--- reset connection
+function channel:reset()
+	self:changehost(self.__host, self.__port)
+end
+
 function channel:changehost(host, port)
 	self.__host = host
 	if port then
@@ -539,6 +558,12 @@ end
 
 function channel:changebackup(backup)
 	self.__backup = backup
+end
+
+--- set a timeout on blocking request
+---@param ti float a nonnegative floating point number expressing seconds
+function channel:settimeout(ti)
+	self.__timeout = ti * 100
 end
 
 channel_meta.__gc = channel.close
