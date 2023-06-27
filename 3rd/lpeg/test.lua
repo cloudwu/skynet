@@ -1,7 +1,5 @@
 #!/usr/bin/env lua
 
--- $Id: test.lua $
-
 -- require"strict"    -- just to be pedantic
 
 local m = require"lpeg"
@@ -48,8 +46,8 @@ end
 
 print"General tests for LPeg library"
 
-assert(type(m.version()) == "string")
-print("version " .. m.version())
+assert(type(m.version) == "string")
+print(m.version)
 assert(m.type("alo") ~= "pattern")
 assert(m.type(io.input) ~= "pattern")
 assert(m.type(m.P"alo") == "pattern")
@@ -70,6 +68,8 @@ assert(m.match(#m.P(true) * "a", "a") == 2)
 assert(m.match("a" * #m.P(false), "a") == nil)
 assert(m.match("a" * #m.P(true), "a") == 2)
 
+assert(m.match(m.P(1)^0, "abcd") == 5)
+assert(m.match(m.S("")^0, "abcd") == 1)
 
 -- tests for locale
 do
@@ -118,6 +118,8 @@ eqcharset(m.S"\0", "\0")
 eqcharset(m.S"\1\0\2", m.R"\0\2")
 eqcharset(m.S"\1\0\2", m.R"\1\2" + "\0")
 eqcharset(m.S"\1\0\2" - "\0", m.R"\1\2")
+
+eqcharset(m.S("\0\255"), m.P"\0" + "\255")   -- charset extremes
 
 local word = alpha^1 * (1 - alpha)^0
 
@@ -406,7 +408,7 @@ assert(p:match('abcx') == 5 and p:match('ayzx') == 5 and not p:match'abc')
 
 
 do
-  -- large dynamic Cc
+  print "testing large dynamic Cc"
   local lim = 2^16 - 1
   local c = 0
   local function seq (n) 
@@ -491,8 +493,8 @@ local function f_term (v1, op, v2, d)
 end
 
 G = m.P{ "Exp",
-  Exp = m.Cf(V"Factor" * m.Cg(FactorOp * V"Factor")^0, f_factor);
-  Factor = m.Cf(V"Term" * m.Cg(TermOp * V"Term")^0, f_term);
+  Exp = V"Factor" * (FactorOp * V"Factor" % f_factor)^0;
+  Factor = V"Term" * (TermOp * V"Term" % f_term)^0;
   Term = Number / tonumber  +  Open * V"Exp" * Close;
 }
 
@@ -864,6 +866,7 @@ print"+"
 -- accumulator capture
 function f (x) return x + 1 end
 assert(m.match(m.Cf(m.Cc(0) * m.C(1)^0, f), "alo alo") == 7)
+assert(m.match(m.Cc(0) * (m.C(1) % f)^0, "alo alo") == 7)
 
 t = {m.match(m.Cf(m.Cc(1,2,3), error), "")}
 checkeq(t, {1})
@@ -873,7 +876,7 @@ t = p:match("a=b;c=du;xux=yuy;")
 checkeq(t, {a="b", c="du", xux="yuy"})
 
 
--- errors in accumulator capture
+-- errors in fold capture
 
 -- no initial capture
 checkerr("no initial value", m.match, m.Cf(m.P(5), print), 'aaaaaa')
@@ -881,8 +884,14 @@ checkerr("no initial value", m.match, m.Cf(m.P(5), print), 'aaaaaa')
 checkerr("no initial value", m.match, m.Cf(m.P(500), print),
                                string.rep('a', 600))
 
--- nested capture produces no initial value
-checkerr("no initial value", m.match, m.Cf(m.P(1) / {}, print), "alo")
+
+-- errors in accumulator capture
+
+-- no initial capture
+checkerr("no previous value", m.match, m.P(5) % print, 'aaaaaa')
+-- no initial capture (very long match forces fold to be a pair open-close)
+checkerr("no previous value", m.match, m.P(500) % print,
+                               string.rep('a', 600))
 
 
 -- tests for loop checker
@@ -985,16 +994,45 @@ for i = 1, 10 do
   assert(p:match("aaaaaaaaaaa") == 11 - i + 1)
 end
 
-print"+"
 
 
--- tests for back references
+print "testing back references"
+
 checkerr("back reference 'x' not found", m.match, m.Cb('x'), '')
 checkerr("back reference 'b' not found", m.match, m.Cg(1, 'a') * m.Cb('b'), 'a')
 
 p = m.Cg(m.C(1) * m.C(1), "k") * m.Ct(m.Cb("k"))
 t = p:match("ab")
 checkeq(t, {"a", "b"})
+
+
+do
+  -- some basic cases
+  assert(m.match(m.Cg(m.Cc(3), "a") * m.Cb("a"), "a") == 3)
+  assert(m.match(m.Cg(m.C(1), 133) * m.Cb(133), "X") == "X")
+
+  -- first reference to 'x' should not see the group enclosing it
+  local p = m.Cg(m.Cb('x'), 'x') * m.Cb('x')
+  checkerr("back reference 'x' not found", m.match, p, '')
+
+  local p = m.Cg(m.Cb('x') * m.C(1), 'x') * m.Cb('x')
+  checkerr("back reference 'x' not found", m.match, p, 'abc')
+
+  -- reference to 'x' should not see the group enclosed in another capture
+  local s = string.rep("a", 30)
+  local p = (m.C(1)^-4 * m.Cg(m.C(1), 'x')) / {} * m.Cb('x')
+  checkerr("back reference 'x' not found", m.match, p, s)
+
+  local p = (m.C(1)^-20 * m.Cg(m.C(1), 'x')) / {} * m.Cb('x')
+  checkerr("back reference 'x' not found", m.match, p, s)
+
+  -- second reference 'k' should refer to 10 and first ref. 'k'
+  p = m.Cg(m.Cc(20), 'k') * m.Cg(m.Cc(10) * m.Cb('k') * m.C(1), 'k')
+      * (m.Cb('k') / function (a,b,c) return a*10 + b + tonumber(c) end)
+  -- 10 * 10 (Cc) + 20 (Cb) + 7 (C) == 127
+  assert(p:match("756") == 127)
+
+end
 
 p = m.P(true)
 for i = 1, 10 do p = p * m.Cg(1, i) end
@@ -1030,6 +1068,17 @@ assert(p:match('acd') == 4)
 
 local function id (s, i, ...)
   return true, ...
+end
+
+do   -- run-time capture in an end predicate (should discard its value)
+  local x = 0
+  function foo (s, i)
+      x = x + 1
+      return true, x
+  end
+
+  local p = #(m.Cmt("", foo) * "xx") * m.Cmt("", foo)
+  assert(p:match("xx") == 2)
 end
 
 assert(m.Cmt(m.Cs((m.Cmt(m.S'abc' / { a = 'x', c = 'y' }, id) +
@@ -1156,7 +1205,7 @@ end
 
 
 -- bug in 1.0: problems with math-times returning too many captures
-do
+if _VERSION >= "Lua 5.2" then
   local lim = 2^11 - 10
   local res = {m.match(manyCmt(lim), "a")}
   assert(#res == lim and res[1] == lim - 1 and res[lim] == 0)
@@ -1171,9 +1220,91 @@ t = {p:match('abacc')}
 checkeq(t, {'a', 'aa', 20, 'a', 'aaa', 'aaa'})
 
 
+do  print"testing large grammars"
+  local lim = 1000    -- number of rules
+  local t = {}
+
+  for i = 3, lim do
+    t[i] = m.V(i - 1)   -- each rule calls previous one
+  end
+  t[1] = m.V(lim)    -- start on last rule
+  t[2] = m.C("alo")  -- final rule
+
+  local P = m.P(t)   -- build grammar
+  assert(P:match("alo") == "alo")
+
+  t[#t + 1] = m.P("x")   -- one more rule...
+  checkerr("too many rules", m.P, t)
+end
+
+
+print "testing UTF-8 ranges"
+
+do   -- a few typical UTF-8 ranges
+  local p = m.utfR(0x410, 0x44f)^1 / "cyr: %0"
+          + m.utfR(0x4e00, 0x9fff)^1 / "cjk: %0"
+          + m.utfR(0x1F600, 0x1F64F)^1 / "emot: %0"
+          + m.utfR(0, 0x7f)^1 / "ascii: %0"
+          + m.utfR(0, 0x10ffff) / "other: %0"
+
+  p = m.Ct(p^0) * -m.P(1)
+
+  local cyr = "ждюя"
+  local emot = "\240\159\152\128\240\159\153\128"   --  😀🙀
+  local cjk = "专举乸"
+  local ascii = "alo"
+  local last = "\244\143\191\191"                -- U+10FFFF
+
+  local s = cyr .. "—" .. emot .. "—" .. cjk .. "—" .. ascii .. last
+  t = (p:match(s))
+
+  assert(t[1] == "cyr: " .. cyr and t[2] == "other: —" and
+         t[3] == "emot: " .. emot and t[4] == "other: —" and
+         t[5] == "cjk: " .. cjk and t[6] == "other: —" and
+         t[7] == "ascii: " .. ascii and t[8] == "other: " .. last and
+         t[9] == nil)
+
+  -- failing UTF-8 matches and borders
+  assert(not m.match(m.utfR(10, 0x2000), "\9"))
+  assert(not m.match(m.utfR(10, 0x2000), "\226\128\129"))
+  assert(m.match(m.utfR(10, 0x2000), "\10") == 2)
+  assert(m.match(m.utfR(10, 0x2000), "\226\128\128") == 4)
+end
+
+
+do   -- valid and invalid code points
+  local p = m.utfR(0, 0x10ffff)^0
+  assert(p:match("汉字\128") == #"汉字" + 1)
+  assert(p:match("\244\159\191") == 1)
+  assert(p:match("\244\159\191\191") == 1)
+  assert(p:match("\255") == 1)
+
+   -- basic errors
+  checkerr("empty range", m.utfR, 1, 0)
+  checkerr("invalid code point", m.utfR, 1, 0x10ffff + 1)
+end
+
+
+do  -- back references (fixed width)
+  -- match a byte after a CJK point
+  local p = m.B(m.utfR(0x4e00, 0x9fff)) * m.C(1)
+  p = m.P{ p + m.P(1) * m.V(1) }   -- search for 'p'
+  assert(p:match("ab д 专X x") == "X")
+
+  -- match a byte after a hebrew point
+  local p = m.B(m.utfR(0x5d0, 0x5ea)) * m.C(1)
+  p = m.P(#"ש") * p
+  assert(p:match("שX") == "X")
+
+  checkerr("fixed length", m.B, m.utfR(0, 0x10ffff))
+end
+
+
+
 -------------------------------------------------------------------
 -- Tests for 're' module
 -------------------------------------------------------------------
+print"testing 're' module"
 
 local re = require "re"
 
@@ -1307,6 +1438,12 @@ e = compile([[
 e = compile("{[0-9]+'.'?[0-9]*} -> sin", math)
 assert(e:match("2.34") == math.sin(2.34))
 
+e = compile("'pi' -> math", _G)
+assert(e:match("pi") == math.pi)
+
+e = compile("[ ]* 'version' -> _VERSION", _G)
+assert(e:match("  version") == _VERSION)
+
 
 function eq (_, _, a, b) return a == b end
 
@@ -1376,6 +1513,13 @@ checkeq(x, {tag='x', 'hi', {tag = 'b', 'hello'}, 'but',
 -- test for folding captures
 c = re.compile([[
   S <- (number (%s+ number)*) ~> add
+  number <- %d+ -> tonumber
+]], {tonumber = tonumber, add = function (a,b) return a + b end})
+assert(c:match("3 401 50") == 3 + 401 + 50)
+
+-- test for accumulator captures
+c = re.compile([[
+  S <- number (%s+ number >> add)*
   number <- %d+ -> tonumber
 ]], {tonumber = tonumber, add = function (a,b) return a + b end})
 assert(c:match("3 401 50") == 3 + 401 + 50)
