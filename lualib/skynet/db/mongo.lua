@@ -457,7 +457,7 @@ function mongo_collection:raw_safe_update(update)
 end
 
 function mongo_collection:delete(query, single)
-	self.database:runCommand("delete", self.name, "deletes", {bson_encode({
+	self.database:send_command("delete", self.name, "deletes", {bson_encode({
 		q = query,
 		limit = single and 1 or 0,
 	})})
