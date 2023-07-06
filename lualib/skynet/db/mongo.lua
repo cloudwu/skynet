@@ -505,7 +505,6 @@ function mongo_collection:find(query, projection)
 		__data = nil,
 		__cursor = nil,
 		__document = {},
-		__flags	= 0,
 		__skip = 0,
 		__limit = 0,
 		__sort = empty_bson,
@@ -543,21 +542,61 @@ function mongo_cursor:limit(amount)
 	return self
 end
 
-function mongo_cursor:count(with_limit_and_skip)
-	local cmd = {
-		'count', self.__collection.name,
-		'query', self.__query,
-	}
-	if with_limit_and_skip then
-		local len = #cmd
-		cmd[len+1] = 'limit'
-		cmd[len+2] = self.__limit
-		cmd[len+3] = 'skip'
-		cmd[len+4] = self.__skip
+local function format_aggregate_cmd(self, with_limit_and_skip, is_count)
+	local pipeline = {}
+	for key, value  in pairs(self.__pipeline) do
+		pipeline[key] = value
 	end
-	local ret = self.__collection.database:runCommand(table.unpack(cmd))
-	assert(ret and ret.ok == 1)
-	return ret.n
+	if with_limit_and_skip then
+		if is_count and self.__sort then
+			table.insert(pipeline, { ["$sort"] = self.__sort })
+		end
+		if self.__skip > 0 then
+			table.insert(pipeline, { ["$skip"] = self.__skip })
+		end
+		if self.__limit > 0 then
+			table.insert(pipeline, { ["$limit"] = self.__limit })
+		end
+	end
+	if is_count then
+		table.insert(pipeline, { ["$count"] = "__count" })
+	end
+	local cmd = {"aggregate", self.__collection.name, "pipeline", pipeline}
+	for k, v in pairs(self.__options) do
+		table.insert(cmd, k)
+		table.insert(cmd, v)
+	end
+	--aggregate command without the cursor option unless the command includes the explain option. 
+	--Unless you include the explain option, you must specify the cursor option.
+	if not self.__options.cursor and not self.__options.explain then
+		table.insert(cmd, "cursor")
+		table.insert(cmd, {})
+	end
+	return cmd
+end
+
+function mongo_cursor:count(with_limit_and_skip)
+	if self.__pipeline then
+		local database = self.__collection.database
+		local ret = database:runCommand(table.unpack(format_aggregate_cmd(self, with_limit_and_skip, true)))
+		assert(ret and ret.ok == 1)
+		return ret.cursor.firstBatch[1].__count
+	else
+		local cmd = {
+			'count', self.__collection.name,
+			'query', self.__query,
+		}
+		if with_limit_and_skip then
+			local len = #cmd
+			cmd[len+1] = 'limit'
+			cmd[len+2] = self.__limit
+			cmd[len+3] = 'skip'
+			cmd[len+4] = self.__skip
+		end
+		local ret = self.__collection.database:runCommand(table.unpack(cmd))
+		assert(ret and ret.ok == 1)
+		return ret.n
+	end
 end
 
 
@@ -667,12 +706,17 @@ end
 -- @return
 function mongo_collection:aggregate(pipeline, options)
 	assert(pipeline)
-	local cmd = {"aggregate", self.name, "pipeline", pipeline}
-	for k, v in pairs(options) do
-		table.insert(cmd, k)
-		table.insert(cmd, v)
-	end
-	return self.database:runCommand(table.unpack(cmd))
+	return setmetatable( {
+		__collection = self,
+		__pipeline = pipeline,
+		__options = options or { cursor = {} },
+		__ptr =	nil,
+		__data = nil,
+		__cursor = nil,
+		__document = {},
+		__skip = 0,
+		__limit = 0,
+	} ,	cursor_meta)
 end
 
 function mongo_cursor:hasNext()
@@ -684,9 +728,13 @@ function mongo_cursor:hasNext()
 
 		local database = self.__collection.database
 		if self.__data == nil then
-			local name = self.__collection.name
-			response = database:runCommand("find", name, "filter", self.__query, "sort", self.__sort,
-				"skip", self.__skip, "limit", self.__limit, "projection", self.__projection)
+			if self.__pipeline then
+				response = database:runCommand(table.unpack(format_aggregate_cmd(self, true)))
+			else
+				local name = self.__collection.name
+				response = database:runCommand("find", name, "filter", self.__query, "sort", self.__sort,
+					"skip", self.__skip, "limit", self.__limit, "projection", self.__projection)
+			end
 		else
 			if self.__cursor  and self.__cursor > 0 then
 				local name = self.__collection.name
@@ -703,7 +751,7 @@ function mongo_cursor:hasNext()
 			self.__document	= nil
 			self.__data	= nil
 			self.__cursor =	nil
-			error(response["$err"] or "Reply from mongod error")
+			error(response["$err"] or response["errmsg"] or "Reply from mongod error")
 		end
 
 		local cursor = response.cursor
