@@ -543,10 +543,7 @@ function mongo_cursor:limit(amount)
 end
 
 local function format_aggregate_cmd(self, with_limit_and_skip, is_count)
-	local pipeline = {}
-	for key, value  in pairs(self.__pipeline) do
-		pipeline[key] = value
-	end
+	local pipeline = table.move(self.__pipeline, 1, #self.__pipeline, 1, {})
 	if with_limit_and_skip then
 		if is_count and self.__sort then
 			table.insert(pipeline, { ["$sort"] = self.__sort })
