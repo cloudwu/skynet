@@ -28,6 +28,11 @@ local cursor_meta =	{
 	__index	= mongo_cursor,
 }
 
+local aggregate_cursor = {}
+local aggregate_cursor_meta = {
+	__index	= aggregate_cursor,
+}
+
 local mongo_client = {}
 
 local client_meta =	{
@@ -505,7 +510,6 @@ function mongo_collection:find(query, projection)
 		__data = nil,
 		__cursor = nil,
 		__document = {},
-		__flags	= 0,
 		__skip = 0,
 		__limit = 0,
 		__sort = empty_bson,
@@ -544,18 +548,13 @@ function mongo_cursor:limit(amount)
 end
 
 function mongo_cursor:count(with_limit_and_skip)
-	local cmd = {
-		'count', self.__collection.name,
-		'query', self.__query,
-	}
+	local ret
 	if with_limit_and_skip then
-		local len = #cmd
-		cmd[len+1] = 'limit'
-		cmd[len+2] = self.__limit
-		cmd[len+3] = 'skip'
-		cmd[len+4] = self.__skip
+		ret = self.__collection.database:runCommand('count', self.__collection.name, 'query', self.__query,
+			'limit', self.__limit, 'skip', self.__skip)
+	else
+		ret = self.__collection.database:runCommand('count', self.__collection.name, 'query', self.__query)
 	end
-	local ret = self.__collection.database:runCommand(table.unpack(cmd))
 	assert(ret and ret.ok == 1)
 	return ret.n
 end
@@ -667,12 +666,27 @@ end
 -- @return
 function mongo_collection:aggregate(pipeline, options)
 	assert(pipeline)
-	local cmd = {"aggregate", self.name, "pipeline", pipeline}
-	for k, v in pairs(options) do
-		table.insert(cmd, k)
-		table.insert(cmd, v)
+	local options_cmd
+	if options then
+		options_cmd = {}
+		for k, v in pairs(options) do
+			table.insert(options_cmd, k)
+			table.insert(options_cmd, v)
+		end
 	end
-	return self.database:runCommand(table.unpack(cmd))
+	local len = #pipeline
+	return setmetatable( {
+		__collection = self,
+		__pipeline =  table.move(pipeline, 1, len, 1, {}),
+		__pipeline_len = len,
+		__options = options_cmd,
+		__ptr =	nil,
+		__data = nil,
+		__cursor = nil,
+		__document = {},
+		__skip = 0,
+		__limit = 0,
+	} ,	aggregate_cursor_meta)
 end
 
 function mongo_cursor:hasNext()
@@ -703,7 +717,7 @@ function mongo_cursor:hasNext()
 			self.__document	= nil
 			self.__data	= nil
 			self.__cursor =	nil
-			error(response["$err"] or "Reply from mongod error")
+			error(response["errmsg"] or "Reply from mongod error")
 		end
 
 		local cursor = response.cursor
@@ -753,5 +767,113 @@ function mongo_cursor:close()
 		self.__cursor = nil
 	end
 end
+
+local function format_pipeline(self, with_limit_and_skip, is_count)
+	local len = self.__pipeline_len
+	if self.__sort and not is_count then
+		len = len + 1
+		self.__pipeline[len] = { ["$sort"] = self.__sort }
+	end
+	if with_limit_and_skip then
+		if self.__skip > 0 then
+			len = len + 1
+			self.__pipeline[len] = { ["$skip"] = self.__skip }
+		end
+		if self.__limit > 0 then
+			len = len + 1
+			self.__pipeline[len] = { ["$limit"] = self.__limit }
+		end
+	end
+	if is_count then
+		len = len + 1
+		self.__pipeline[len] = { ["$count"] = "__count" }
+	end
+	for i = #self.__pipeline, len + 1, -1 do
+		table.remove(self.__pipeline, i)
+	end
+	return self.__pipeline
+end
+
+function aggregate_cursor:count(with_limit_and_skip)
+	local ret
+	local name = self.__collection.name
+	local database = self.__collection.database
+	if self.__options then
+		ret = database:runCommand("aggregate", name, "pipeline", format_pipeline(self, with_limit_and_skip, true),
+			table.unpack(self.__options))
+	else
+		ret = database:runCommand("aggregate", name, "pipeline", format_pipeline(self, with_limit_and_skip, true),
+			"cursor", empty_bson)
+	end
+	if ret.ok ~= 1 then
+		error(ret["errmsg"] or "Reply from mongod error")
+	end
+	return ret.cursor.firstBatch[1].__count
+end
+
+function aggregate_cursor:hasNext()
+	if self.__ptr == nil then
+		if self.__document == nil then
+			return false
+		end
+		local ret
+		local name = self.__collection.name
+		local database = self.__collection.database
+		if self.__data == nil then
+			if self.__options then
+				ret = database:runCommand("aggregate", name, "pipeline", format_pipeline(self, true), table.unpack(self.__options))
+			else
+				ret = database:runCommand("aggregate", name, "pipeline", format_pipeline(self, true), "cursor", empty_bson)
+			end
+		else
+			if self.__cursor  and self.__cursor > 0 then
+				ret = database:runCommand("getMore", bson_int64(self.__cursor), "collection", name)
+			else
+				-- no more
+				self.__document	= nil
+				self.__data	= nil
+				return false
+			end
+		end
+
+		if ret.ok ~= 1 then
+			self.__document	= nil
+			self.__data	= nil
+			self.__cursor =	nil
+			error(ret["errmsg"] or "Reply from mongod error")
+		end
+
+		local cursor = ret.cursor
+		self.__document = cursor.firstBatch or cursor.nextBatch
+		self.__data = ret
+		self.__ptr = 1
+		self.__cursor = cursor.id
+
+		local limit = self.__limit
+		if cursor.id > 0 and limit > 0 then
+			limit = limit - #self.__document
+			if limit <= 0 then
+				-- reach limit
+				self:close()
+			end
+
+			self.__limit = limit
+		end
+
+		if cursor.id == 0 and #self.__document == 0 then -- nomore
+			return false
+		end
+
+		return true
+	end
+
+	return true
+end
+
+aggregate_cursor.sort =  mongo_cursor.sort
+aggregate_cursor.skip = mongo_cursor.skip
+aggregate_cursor.limit = mongo_cursor.limit
+aggregate_cursor.next = mongo_cursor.next
+aggregate_cursor.close = mongo_cursor.close
 
 return mongo
