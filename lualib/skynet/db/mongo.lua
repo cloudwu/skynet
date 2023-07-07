@@ -768,29 +768,34 @@ function mongo_cursor:close()
 	end
 end
 
+local sort_stage = { ["$sort"] = true }
+local skip_stage = { ["$skip"] = 0 }
+local limit_stage = { ["$limit"] = 0 }
+local count_stage = { ["$count"] = "__count" }
 local function format_pipeline(self, with_limit_and_skip, is_count)
 	local len = self.__pipeline_len
 	if self.__sort and not is_count then
 		len = len + 1
-		self.__pipeline[len] = { ["$sort"] = self.__sort }
+		sort_stage["$sort"] = self.__sort
+		self.__pipeline[len] = sort_stage
 	end
 	if with_limit_and_skip then
 		if self.__skip > 0 then
 			len = len + 1
-			self.__pipeline[len] = { ["$skip"] = self.__skip }
+			skip_stage["$skip"] = self.__skip
+			self.__pipeline[len] = skip_stage
 		end
 		if self.__limit > 0 then
 			len = len + 1
-			self.__pipeline[len] = { ["$limit"] = self.__limit }
+			limit_stage["$limit"]  = self.__limit
+			self.__pipeline[len] = limit_stage
 		end
 	end
 	if is_count then
 		len = len + 1
-		self.__pipeline[len] = { ["$count"] = "__count" }
+		self.__pipeline[len] = count_stage
 	end
-	for i = #self.__pipeline, len + 1, -1 do
-		table.remove(self.__pipeline, i)
-	end
+	for i = 1, 2 do self.__pipeline[len + i] = nil end
 	return self.__pipeline
 end
 
