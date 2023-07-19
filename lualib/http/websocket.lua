@@ -9,6 +9,15 @@ local socket_error = sockethelper.socket_error
 local GLOBAL_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 local MAX_FRAME_SIZE = 256 * 1024 -- max frame is 256K
 
+local assert = assert
+local pairs = pairs
+local error = error
+local string = string
+local xpcall = xpcall
+local debug = debug
+local table = table
+local tonumber = tonumber
+
 local M = {}
 
 
@@ -526,5 +535,6 @@ function M.close(id, code ,reason)
     end
 end
 
+M.is_close = _isws_closed
 
 return M
