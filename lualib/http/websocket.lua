@@ -535,8 +535,6 @@ function M.close(id, code ,reason)
     end
 end
 
-function M.is_close(id)
-	return _isws_closed(id)
-end
+M.is_close = _isws_closed
 
 return M
