@@ -455,7 +455,10 @@ function skynet.killthread(thread)
 	if addr then
 		session_coroutine_address[co] = nil
 		session_coroutine_tracetag[co] = nil
-		c.send(addr, skynet.PTYPE_ERROR, session_coroutine_id[co], "")
+		local session = session_coroutine_id[co]
+		if session > 0 then
+			c.send(addr, skynet.PTYPE_ERROR, session, "")
+		end
 		session_coroutine_id[co] = nil
 	end
 	if watching_session[session] then
