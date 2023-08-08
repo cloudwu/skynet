@@ -564,6 +564,10 @@ function skynet.setenv(key, value)
 	c.command("SETENV",key .. " " ..value)
 end
 
+function skynet.resetenv(key, value)
+	c.command("RESETENV",key .. " " ..value)
+end
+
 function skynet.send(addr, typename, ...)
 	local p = proto[typename]
 	return c.send(addr, p.id, 0 , p.pack(...))

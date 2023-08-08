@@ -45,6 +45,17 @@ skynet_setenv(const char *key, const char *value) {
 }
 
 void
+skynet_resetenv(const char *key, const char *value) {
+	SPIN_LOCK(E)
+	
+	lua_State *L = E->L;
+	lua_pushstring(L,value);
+	lua_setglobal(L,key);
+
+	SPIN_UNLOCK(E)
+}
+
+void
 skynet_env_init() {
 	E = skynet_malloc(sizeof(*E));
 	SPIN_INIT(E)
