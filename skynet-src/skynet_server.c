@@ -671,6 +671,7 @@ static struct command_func cmd_funcs[] = {
 	{ "LAUNCH", cmd_launch },
 	{ "GETENV", cmd_getenv },
 	{ "SETENV", cmd_setenv },
+	{ "RESETENV", cmd_resetenv },
 	{ "STARTTIME", cmd_starttime },
 	{ "ABORT", cmd_abort },
 	{ "MONITOR", cmd_monitor },
