@@ -69,6 +69,101 @@ local watching_session = {}
 local error_queue = {}
 local fork_queue = { h = 1, t = 0 }
 
+local auxsend, auxtimeout
+do ---- avoid session rewind conflict
+	local csend = c.send
+	local cintcommand = c.intcommand
+	local dangerzone
+	local dangerzone_size = 0x1000
+	local dangerzone_low = 0x70000000
+	local dangerzone_up	= dangerzone_low + dangerzone_size
+
+	local set_checkrewind	-- set auxsend and auxtimeout for safezone
+	local set_checkconflict -- set auxsend and auxtimeout for dangerzone
+
+	local function reset_dangerzone(session)
+		dangerzone_up = session
+		dangerzone_low = session
+		dangerzone = { [session] = true }
+		for s in pairs(session_id_coroutine) do
+			if s < dangerzone_low then
+				dangerzone_low = s
+			elseif s > dangerzone_up then
+				dangerzone_up = s
+			end
+			dangerzone[s] = true
+		end
+		dangerzone_low = dangerzone_low - dangerzone_size
+	end
+
+	-- in dangerzone, we should check if the next session already exist.
+	local function checkconflict(session)
+		local next_session = session + 1
+		if next_session > dangerzone_up then
+			-- leave dangerzone
+			reset_dangerzone(session)
+			assert(next_session > dangerzone_up)
+			set_checkrewind()
+			return
+		end
+		while true do
+			if not dangerzone[next_session] then
+				return
+			end
+			if not session_id_coroutine[next_session] then
+				reset_dangerzone(session)
+				return
+			end
+			-- skip the session already exist.
+			next_session = c.genid() + 1
+		end
+	end
+
+	local function auxsend_checkconflict(addr, proto, msg, sz)
+		local session = csend(addr, proto, nil, msg, sz)
+		checkconflict(session)
+		return session
+	end
+
+	local function auxtimeout_checkconflict(timeout)
+		local session = cintcommand("TIMEOUT", timeout)
+		checkconflict(session)
+		return session
+	end
+
+	local function auxsend_checkrewind(addr, proto, msg, sz)
+		local session = csend(addr, proto, nil, msg, sz)
+		if session and session > dangerzone_low and session < dangerzone_up then
+			-- enter dangerzone
+			set_checkconflict(session)
+		end
+		return session
+	end
+
+	local function auxtimeout_checkrewind(timeout)
+		local session = cintcommand("TIMEOUT", timeout)
+		if session and session > dangerzone_low and session < dangerzone_up then
+			-- enter dangerzone
+			set_checkconflict(session)
+		end
+		return session
+	end
+
+	set_checkrewind = function()
+		auxsend = auxsend_checkrewind
+		auxtimeout = auxtimeout_checkrewind
+	end
+
+	set_checkconflict = function(session)
+		reset_dangerzone(session)
+		auxsend = auxsend_checkconflict
+		auxtimeout = auxtimeout_checkconflict
+	end
+
+	-- in safezone at the beginning
+	set_checkrewind()
+end
+
 do ---- request/select
 	local function send_requests(self)
 		local sessions = {}
