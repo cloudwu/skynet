@@ -98,6 +98,9 @@ do ---- avoid session rewind conflict
 
 	-- in dangerzone, we should check if the next session already exist.
 	local function checkconflict(session)
+		if session == nil then
+			return
+		end
 		local next_session = session + 1
 		if next_session > dangerzone_up then
 			-- leave dangerzone
