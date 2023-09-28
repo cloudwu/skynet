@@ -180,7 +180,7 @@ do ---- request/select
 				c.trace(tag, "call", 4)
 				c.send(addr, skynet.PTYPE_TRACE, 0, tag)
 			end
-			local session = c.send(addr, p.id , nil , p.pack(tunpack(req, 3, req.n)))
+			local session = auxsend(addr, p.id , p.pack(tunpack(req, 3, req.n)))
 			if session == nil then
 				err = err or {}
 				err[#err+1] = req
@@ -283,7 +283,7 @@ do ---- request/select
 		self._error = send_requests(self)
 		self._resp = {}
 		if timeout then
-			self._timeout = c.intcommand("TIMEOUT",timeout)
+			self._timeout = auxtimeout(timeout)
 			session_id_coroutine[self._timeout] = self._thread
 		end
 
@@ -468,7 +468,7 @@ end
 skynet.trace_timeout(false)	-- turn off by default
 
 function skynet.timeout(ti, func)
-	local session = c.intcommand("TIMEOUT",ti)
+	local session = auxtimeout(ti)
 	assert(session)
 	local co = co_create_for_timeout(func, ti)
 	assert(session_id_coroutine[session] == nil)
@@ -487,7 +487,7 @@ local function suspend_sleep(session, token)
 end
 
 function skynet.sleep(ti, token)
-	local session = c.intcommand("TIMEOUT",ti)
+	local session = auxtimeout(ti)
 	assert(session)
 	token = token or coroutine.running()
 	local succ, ret = suspend_sleep(session, token)
@@ -700,7 +700,7 @@ function skynet.call(addr, typename, ...)
 	end
 
 	local p = proto[typename]
-	local session = c.send(addr, p.id , nil , p.pack(...))
+	local session = auxsend(addr, p.id , p.pack(...))
 	if session == nil then
 		error("call to invalid address " .. skynet.address(addr))
 	end
@@ -714,7 +714,7 @@ function skynet.rawcall(addr, typename, msg, sz)
 		c.send(addr, skynet.PTYPE_TRACE, 0, tag)
 	end
 	local p = proto[typename]
-	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
+	local session = assert(auxsend(addr, p.id , msg, sz), "call to invalid address")
 	return yield_call(addr, session)
 end
 
@@ -722,7 +722,7 @@ function skynet.tracecall(tag, addr, typename, msg, sz)
 	c.trace(tag, "tracecall begin")
 	c.send(addr, skynet.PTYPE_TRACE, 0, tag)
 	local p = proto[typename]
-	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
+	local session = assert(auxsend(addr, p.id , msg, sz), "call to invalid address")
 	local msg, sz = yield_call(addr, session)
 	c.trace(tag, "tracecall end")
 	return msg, sz
