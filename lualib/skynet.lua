@@ -107,18 +107,23 @@ do ---- avoid session rewind conflict
 			reset_dangerzone(session)
 			assert(next_session > dangerzone_up)
 			set_checkrewind()
-			return
+		else
+			while true do
+				if not dangerzone[next_session] then
+					break
+				end
+				if not session_id_coroutine[next_session] then
+					reset_dangerzone(session)
+					break
+				end
+				-- skip the session already exist.
+				next_session = c.genid() + 1
+			end
 		end
-		while true do
-			if not dangerzone[next_session] then
-				return
-			end
-			if not session_id_coroutine[next_session] then
-				reset_dangerzone(session)
-				return
-			end
-			-- skip the session already exist.
-			next_session = c.genid() + 1
+		-- session will rewind after 0x7fffffff
+		if next_session == 0x80000000 and dangerzone[1] then
+			assert(c.genid() == 1)
+			return checkconflict(1)
 		end
 	end
 
@@ -136,7 +141,7 @@ do ---- avoid session rewind conflict
 
 	local function auxsend_checkrewind(addr, proto, msg, sz)
 		local session = csend(addr, proto, nil, msg, sz)
-		if session and session > dangerzone_low and session < dangerzone_up then
+		if session and session > dangerzone_low and session <= dangerzone_up then
 			-- enter dangerzone
 			set_checkconflict(session)
 		end
@@ -145,7 +150,7 @@ do ---- avoid session rewind conflict
 
 	local function auxtimeout_checkrewind(timeout)
 		local session = cintcommand("TIMEOUT", timeout)
-		if session and session > dangerzone_low and session < dangerzone_up then
+		if session and session > dangerzone_low and session <= dangerzone_up then
 			-- enter dangerzone
 			set_checkconflict(session)
 		end
