@@ -153,6 +153,7 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->endless = false;
 
 	ctx->cpu_cost = 0;
+	// echo
 	ctx->cpu_start = 0;
 	ctx->message_count = 0;
 	ctx->profile = G_NODE.profile;
