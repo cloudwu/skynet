@@ -21,6 +21,7 @@
 struct monitor {
 	int count;
 	struct skynet_monitor ** m;
+	// 条件变量作用见语雀
 	pthread_cond_t cond;
 	pthread_mutex_t mutex;
 	int sleep;
@@ -98,6 +99,8 @@ thread_monitor(void *p) {
 	skynet_initthread(THREAD_MONITOR);
 	for (;;) {
 		CHECK_ABORT
+		// 对每个模块都检查一次，等待5秒，每秒检查消息是否消耗完，如果消耗完，则监控得到的version会变化。
+		// 如果没有变化则提示程序可能进入了死循环
 		for (i=0;i<n;i++) {
 			skynet_monitor_check(m->m[i]);
 		}
@@ -190,18 +193,24 @@ start(int thread) {
 
 	m->m = skynet_malloc(thread * sizeof(struct skynet_monitor *));
 	int i;
+	// 为每个线程创建监控
 	for (i=0;i<thread;i++) {
 		m->m[i] = skynet_monitor_new();
 	}
+	// 初始化线程锁
 	if (pthread_mutex_init(&m->mutex, NULL)) {
 		fprintf(stderr, "Init mutex error");
 		exit(1);
 	}
+	// 初始化条件变量， pthread_cond_t 用法见语雀
 	if (pthread_cond_init(&m->cond, NULL)) {
 		fprintf(stderr, "Init cond error");
 		exit(1);
 	}
 
+	// 1.创建监控线程（监控消息队列是否发生阻塞）
+	// 2.创建定时器线程
+	// 3.创建socket线程
 	create_thread(&pid[0], thread_monitor, m);
 	create_thread(&pid[1], thread_timer, m);
 	create_thread(&pid[2], thread_socket, m);
@@ -230,8 +239,8 @@ start(int thread) {
 	free_monitor(m);
 }
 
-static void
 bootstrap(struct skynet_context * logger, const char * cmdline) {
+static void
 	int sz = strlen(cmdline);
 	char name[sz+1];
 	char args[sz+1];
@@ -268,6 +277,7 @@ skynet_start(struct skynet_config * config) {
 			exit(1);
 		}
 	}
+	// skynet的四种线程，1.worker线程 2.monitor线程 3.timer线程 4.socket线程
 	skynet_harbor_init(config->harbor);
 	skynet_handle_init(config->harbor);
 	skynet_mq_init();

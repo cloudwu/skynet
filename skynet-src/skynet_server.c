@@ -60,12 +60,13 @@ struct skynet_context {
 	CHECKCALLING_DECL
 };
 
+// 进程的节点
 struct skynet_node {
-	ATOM_INT total;
-	int init;
-	uint32_t monitor_exit;
-	pthread_key_t handle_key;
-	bool profile;	// default is on
+	ATOM_INT total; // 模块的数量
+	int init; // 此结构是否初始化
+	uint32_t monitor_exit; // 观察模块退出的server
+	pthread_key_t handle_key;// 保存每个线程当前的handle值
+	bool profile;	// 这个profile是用来干啥的
 };
 
 static struct skynet_node G_NODE;
@@ -123,15 +124,21 @@ drop_message(struct skynet_message *msg, void *ud) {
 
 struct skynet_context * 
 skynet_context_new(const char * name, const char *param) {
+	// 创建一个名字为name的模块，这个函数里面是先查询是否存在这个模块
+	// 如果存在这个模块则直接返回这个模块，如果不存在这个模块则创建一个这个模块
 	struct skynet_module * mod = skynet_module_query(name);
 
 	if (mod == NULL)
 		return NULL;
-
+	// 创建一个这个模块的实例，调用这个模块的类似构造函数的东西创建自身
+	/* pis：这两个过程类似于先查找有没有这个类，如果有这个类，则调用初始化生成这个类，在这个过程中
+		mod查询出来都是相同的东西，而create出来的实例是不相同的
+	*/
 	void *inst = skynet_module_instance_create(mod);
 	if (inst == NULL)
 		return NULL;
 	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
+	// 这个东西其实就是个类似注释的东西，没有实际的作用
 	CHECKCALLING_INIT(ctx)
 
 	ctx->mod = mod;
@@ -152,11 +159,14 @@ skynet_context_new(const char * name, const char *param) {
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
 	ctx->handle = 0;	
 	ctx->handle = skynet_handle_register(ctx);
+	// 给这个服务创建一个消息队列
 	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
 	// init function maybe use ctx->handle, so it must init at last
+	// 全局的服务节点数加一，这个操作是原子的
 	context_inc();
 
 	CHECKCALLING_BEGIN(ctx)
+	// 初始化这个服务的参数
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
 	CHECKCALLING_END(ctx)
 	if (r == 0) {
@@ -808,8 +818,10 @@ skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t
 void 
 skynet_globalinit(void) {
 	ATOM_INIT(&G_NODE.total , 0);
-	G_NODE.monitor_exit = 0;
-	G_NODE.init = 1;
+	G_NODE.monitor_exit = 0; //初始化从此模块退出的服务为0
+	G_NODE.init = 1;// 标记这个结构已经初始化过了
+	// G_NODE.handle_key 当前节点线程的hangle，
+	// pthread_key_create函数，线程存储。详细用法见语雀skynet源码笔记
 	if (pthread_key_create(&G_NODE.handle_key, NULL)) {
 		fprintf(stderr, "pthread_key_create failed");
 		exit(1);
@@ -826,6 +838,7 @@ skynet_globalexit(void) {
 void
 skynet_initthread(int m) {
 	uintptr_t v = (uint32_t)(-m);
+	// 设置线程存储
 	pthread_setspecific(G_NODE.handle_key, (void *)v);
 }
 

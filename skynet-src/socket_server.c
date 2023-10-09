@@ -382,6 +382,7 @@ socket_server_create(uint64_t time) {
 	int i;
 	int fd[2];
 	poll_fd efd = sp_create();
+	// 这样使用函数调用有个好处就是，可以很清晰明了的表明，函数的返回值意义
 	if (sp_invalid(efd)) {
 		skynet_error(NULL, "socket-server: create event pool failed.");
 		return NULL;

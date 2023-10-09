@@ -47,6 +47,8 @@ skynet_setenv(const char *key, const char *value) {
 void
 skynet_env_init() {
 	E = skynet_malloc(sizeof(*E));
+	// 对上面申请的内存加一个自旋锁
 	SPIN_INIT(E)
+	// 再将E中的L绑定一个lua的虚拟机
 	E->L = luaL_newstate();
 }

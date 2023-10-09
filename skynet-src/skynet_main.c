@@ -79,6 +79,7 @@ int sigign() {
 	sa.sa_handler = SIG_IGN;
 	sa.sa_flags = 0;
 	sigemptyset(&sa.sa_mask);
+	// 将SIGPIPE的行为替换为sa结构体定义的形式，表示当前进程忽略SIGPIPE信号
 	sigaction(SIGPIPE, &sa, 0);
 	return 0;
 }
@@ -124,24 +125,29 @@ main(int argc, char *argv[]) {
 			"usage: skynet configfilename\n");
 		return 1;
 	}
-
+	// 初始化服务节点数据，并且设置线程存储
 	skynet_globalinit();
+	// 申请一块skynet内存，对内存加一个自旋锁，并且绑定一个lua虚拟机
 	skynet_env_init();
-
+	// 为什么要定义这个忽略信号
+	// 忽略系统信号，自定义信号捕获，从而做出区别于操作系统的行为
 	sigign();
 
 	struct skynet_config config;
 
 #ifdef LUA_CACHELIB
 	// init the lock of code cache
+	// 这里需要这样，是因为重新起服的时候仍然可能持有lua虚拟机缓存吗
 	luaL_initcodecache();
 #endif
 
 	struct lua_State *L = luaL_newstate();
 	luaL_openlibs(L);	// link lua lib
 
+	// lua虚拟机载入配置文件
 	int err =  luaL_loadbufferx(L, load_config, strlen(load_config), "=[skynet config]", "t");
 	assert(err == LUA_OK);
+	// 将配置文件推进虚拟机中加载
 	lua_pushstring(L, config_file);
 
 	err = lua_pcall(L, 1, 1, 0);

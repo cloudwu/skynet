@@ -9,8 +9,11 @@ typedef void (*skynet_dl_release)(void * inst);
 typedef void (*skynet_dl_signal)(void * inst, int signal);
 
 struct skynet_module {
+	// c服务的名称
 	const char * name;
+	// 访问so库的dl句柄
 	void * module;
+	// 绑定so库中的函数
 	skynet_dl_create create;
 	skynet_dl_init init;
 	skynet_dl_release release;

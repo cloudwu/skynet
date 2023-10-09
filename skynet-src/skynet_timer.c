@@ -227,6 +227,7 @@ skynet_timeout(uint32_t handle, int time, int session) {
 static void
 systime(uint32_t *sec, uint32_t *cs) {
 	struct timespec ti;
+	// 获取当前CPU时钟
 	clock_gettime(CLOCK_REALTIME, &ti);
 	*sec = (uint32_t)ti.tv_sec;
 	*cs = (uint32_t)(ti.tv_nsec / 10000000);
