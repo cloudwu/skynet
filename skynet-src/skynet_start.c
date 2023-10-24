@@ -23,8 +23,14 @@ struct monitor {
 	struct skynet_monitor ** m;
 	pthread_cond_t cond;
 	pthread_mutex_t mutex;
+	pthread_cond_t timecond;
+	pthread_mutex_t timemutex;
+	pthread_cond_t workcond;
 	int sleep;
 	int quit;
+	uint64_t start_time;
+	uint64_t fast_time;
+	uint32_t once_addtime;
 };
 
 struct worker_parm {
@@ -33,6 +39,7 @@ struct worker_parm {
 	int weight;
 };
 
+static struct monitor *M;
 static volatile int SIG = 0;
 
 static void
@@ -134,11 +141,13 @@ thread_timer(void *p) {
 		skynet_socket_updatetime();
 		CHECK_ABORT
 		wakeup(m,m->count-1);
-		usleep(2500);
 		if (SIG) {
 			signal_hup();
 			SIG = 0;
 		}
+		pthread_mutex_lock(&m->timemutex);
+		pthread_cond_wait(&m->timecond, &m->timemutex);
+		pthread_mutex_unlock(&m->timemutex);
 	}
 	// wakeup socket thread
 	skynet_socket_exit();
@@ -147,6 +156,47 @@ thread_timer(void *p) {
 	m->quit = 1;
 	pthread_cond_broadcast(&m->cond);
 	pthread_mutex_unlock(&m->mutex);
+	return NULL;
+}
+
+static void *
+thread_fasttimer(void *p) {
+	struct monitor * m = p;
+	skynet_initthread(THREAD_FAST_TIMER);
+	uint64_t remain_time;
+	uint32_t once_addtime;
+	for (;;) {
+		CHECK_ABORT
+		if (m->fast_time > 0) {
+			pthread_mutex_lock(&m->timemutex);
+			skynet_error(NULL,"fasttime begin");
+			for(;;) {
+				remain_time = m->fast_time - (M->start_time + skynet_now());
+				if (remain_time <= 0)break;
+
+				if (remain_time > m->once_addtime) {
+					once_addtime = m->once_addtime;
+				} else {
+					once_addtime = remain_time;
+				}
+				skynet_time_fast(once_addtime);
+				skynet_updatetime();
+				skynet_socket_updatetime();
+				pthread_mutex_lock(&m->mutex);
+				pthread_cond_broadcast(&m->cond);
+				pthread_cond_wait(&m->workcond, &m->mutex);
+				pthread_mutex_unlock(&m->mutex);
+			}
+			m->fast_time = 0;
+			m->once_addtime = 0;
+			skynet_error(NULL,"fasttime end");
+			pthread_mutex_unlock(&m->timemutex);
+		}
+
+		pthread_cond_signal(&m->timecond);
+		usleep(2500);
+	}
+
 	return NULL;
 }
 
@@ -164,8 +214,11 @@ thread_worker(void *p) {
 		if (q == NULL) {
 			if (pthread_mutex_lock(&m->mutex) == 0) {
 				++ m->sleep;
+				if (m->sleep == m->count) {
+					pthread_cond_signal(&m->workcond);
+				}
 				// "spurious wakeup" is harmless,
-				// because skynet_context_message_dispatch() can be call at any time.
+				// because skynet_context_message_dispatch() can be call at any time.	
 				if (!m->quit)
 					pthread_cond_wait(&m->cond, &m->mutex);
 				-- m->sleep;
@@ -184,9 +237,14 @@ start(int thread) {
 	pthread_t pid[thread+3];
 
 	struct monitor *m = skynet_malloc(sizeof(*m));
+	M = m;
 	memset(m, 0, sizeof(*m));
 	m->count = thread;
 	m->sleep = 0;
+	m->fast_time = 0;
+	m->once_addtime = 0;
+	m->start_time = skynet_starttime();
+	m->start_time *= 100;
 
 	m->m = skynet_malloc(thread * sizeof(struct skynet_monitor *));
 	int i;
@@ -201,10 +259,23 @@ start(int thread) {
 		fprintf(stderr, "Init cond error");
 		exit(1);
 	}
+	if (pthread_mutex_init(&m->timemutex, NULL)) {
+		fprintf(stderr, "Init mutex error");
+		exit(1);
+	}
+	if (pthread_cond_init(&m->timecond, NULL)) {
+		fprintf(stderr, "Init timecond error");
+		exit(1);
+	}
+	if (pthread_cond_init(&m->workcond, NULL)) {
+		fprintf(stderr, "Init workcond error");
+		exit(1);
+	}
 
 	create_thread(&pid[0], thread_monitor, m);
 	create_thread(&pid[1], thread_timer, m);
 	create_thread(&pid[2], thread_socket, m);
+	create_thread(&pid[3], thread_fasttimer, m);
 
 	static int weight[] = { 
 		-1, -1, -1, -1, 0, 0, 0, 0,
@@ -220,10 +291,10 @@ start(int thread) {
 		} else {
 			wp[i].weight = 0;
 		}
-		create_thread(&pid[i+3], thread_worker, &wp[i]);
+		create_thread(&pid[i+4], thread_worker, &wp[i]);
 	}
 
-	for (i=0;i<thread+3;i++) {
+	for (i=0;i<thread+4;i++) {
 		pthread_join(pid[i], NULL); 
 	}
 
@@ -294,4 +365,19 @@ skynet_start(struct skynet_config * config) {
 	if (config->daemon) {
 		daemon_exit(config->daemon);
 	}
+}
+
+
+uint64_t skynet_fast_time(uint64_t ftime, uint32_t once_add) {
+	pthread_mutex_lock(&M->timemutex);
+	uint64_t now_time = M->start_time + skynet_now();
+	if (ftime < now_time && once_add > 0) {
+		skynet_error(NULL,"fasttime must be greater than the current time now_time= %lld fasttime = %lld once_add=%u",now_time,ftime,once_add);
+		pthread_mutex_unlock(&M->timemutex);
+		return 0;
+	}
+	M->fast_time = ftime;
+	M->once_addtime = once_add;
+	pthread_mutex_unlock(&M->timemutex);
+	return ftime;
 }

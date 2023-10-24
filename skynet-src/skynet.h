@@ -39,6 +39,7 @@ void skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb);
 
 uint32_t skynet_current_handle(void);
 uint64_t skynet_now(void);
+uint64_t skynet_fast_time(uint64_t ftime, uint32_t once_add);
 void skynet_debug_memory(const char *info);	// for debug use, output current service memory to stderr
 
 #endif

@@ -47,6 +47,7 @@ struct timer {
 };
 
 static struct timer * TI = NULL;
+uint64_t fast_time;
 
 static inline struct timer_node *
 link_clear(struct link_list *list) {
@@ -239,6 +240,7 @@ gettime() {
 	clock_gettime(CLOCK_MONOTONIC, &ti);
 	t = (uint64_t)ti.tv_sec * 100;
 	t += ti.tv_nsec / 10000000;
+	t += fast_time;
 	return t;
 }
 
@@ -269,8 +271,14 @@ skynet_now(void) {
 	return TI->current;
 }
 
+void
+skynet_time_fast(uint32_t addtime) {
+	fast_time += addtime;
+}
+
 void 
 skynet_timer_init(void) {
+	fast_time = 0;
 	TI = timer_create_timer();
 	uint32_t current = 0;
 	systime(&TI->starttime, &current);

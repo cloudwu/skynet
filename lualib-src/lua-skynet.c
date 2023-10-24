@@ -425,6 +425,15 @@ lhpc(lua_State *L) {
 	return 1;
 }
 
+static int
+lfast_time(lua_State *L) {
+	uint64_t time = luaL_checkinteger(L,1);
+	uint32_t once_add = luaL_checkinteger(L,2);
+ 	time = skynet_fast_time(time,once_add);
+	lua_pushinteger(L,time);
+	return 1;
+}
+
 #define MAX_LEVEL 3
 
 struct source_info {
@@ -519,6 +528,7 @@ luaopen_skynet_core(lua_State *L) {
 		{ "trash" , ltrash },
 		{ "now", lnow },
 		{ "hpc", lhpc },	// getHPCounter
+		{ "fast_time", lfast_time},
 		{ NULL, NULL },
 	};
 

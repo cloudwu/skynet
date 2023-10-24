@@ -166,6 +166,7 @@ function COMMAND.help()
 		dumpheap = "dumpheap : dump heap profilling",
 		killtask = "killtask address threadname : threadname listed by task",
 		dbgcmd = "run address debug command",
+		fasttime = "fast forward time to specified timestamp",
 	}
 end
 
@@ -469,4 +470,16 @@ function COMMAND.profactive(flag)
 	end
 	local active = memory.profactive()
 	return "heap profilling is ".. (active and "active" or "deactive")
+end
+
+function COMMAND.fasttime(timestamp,once_add)
+	timestamp = tonumber(timestamp)
+	once_add = tonumber(once_add)
+	assert(timestamp and timestamp > 0,"err timestamp " .. tostring(timestamp))
+	assert(once_add and once_add > 0,"err once_add " .. tostring(once_add))
+	local fast_time = core.fast_time(timestamp * 100,once_add * 100)
+	if fast_time <= 0 then
+		return "fasttime faild"
+	end
+	return string.format("fasttime to %s",os.date("%Y%m%d-%H:%M:%S",timestamp))
 end
