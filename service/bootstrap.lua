@@ -42,7 +42,7 @@ skynet.start(function()
 	skynet.newservice "service_mgr"
 
 	local enablessl = skynet.getenv "enablessl"
-	if enablessl then
+	if enablessl == "true" then
 		service.new("ltls_holder", function ()
 			local c = require "ltls.init.c"
 			c.constructor()
