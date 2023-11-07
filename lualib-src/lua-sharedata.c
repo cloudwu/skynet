@@ -306,6 +306,7 @@ convtable(lua_State *L) {
 		for (i=0;i<sizehash;i++) {
 			tbl->hash[i].valuetype = VALUETYPE_NIL;
 			tbl->hash[i].nocolliding = 0;
+			tbl->hash[i].next = -1;
 		}
 		tbl->sizehash = sizehash;
 
