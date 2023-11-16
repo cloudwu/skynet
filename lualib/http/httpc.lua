@@ -114,7 +114,7 @@ function httpc.request(method, hostname, url, recvheader, header, content)
 	close_interface(interface, fd)
 	if ok then
 		return statuscode, body
-	elseif statuscode == 200 then
+	elseif type(statuscode) == "number" then
 		error(body)
 	else
 		error(statuscode)
