@@ -584,7 +584,7 @@ local function _compose_stmt_execute(self, stmt, cursor_type, args)
         for i = 1, null_count do
             local byte = 0
             for j = 0, 7 do
-                if field_index < arg_num then
+                if field_index <= arg_num then
                     if args[field_index] == nil then
                         byte = byte | (1 << j)
                     else
