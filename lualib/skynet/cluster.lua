@@ -55,9 +55,7 @@ local function get_sender(node)
 	return s
 end
 
-function cluster.get_sender(node)
-	return get_sender(node)
-end
+cluster.get_sender = get_sender
 
 function cluster.call(node, address, ...)
 	-- skynet.pack(...) will free by cluster.core.packrequest
