@@ -76,6 +76,27 @@ local function write_handshake(self, host, url, header)
     end
 end
 
+local function reader_with_payload(self, payload)
+    local sz_payload = #payload
+    if sz_payload == 0 then
+        return
+    end
+    local read = self.read
+    function self.read (sz)
+        if sz == nil or sz == sz_payload then
+            self.read = read
+            return payload
+        end
+        if sz < sz_payload then
+            local ret = payload:sub(1, sz)
+            payload = payload:sub(sz + 1)
+            sz_payload = #payload
+            return ret
+        end
+        self.read = read
+        return payload .. read(sz - sz_payload)
+    end
+end
 
 local function read_handshake(self, upgrade_ops)
     local header, method, url
@@ -83,10 +104,11 @@ local function read_handshake(self, upgrade_ops)
         header, method, url = upgrade_ops.header, upgrade_ops.method, upgrade_ops.url
     else
         local tmpline = {}
-        local header_body = internal.recvheader(self.read, tmpline, "")
-        if not header_body then
+        local payload = internal.recvheader(self.read, tmpline, "")
+        if not payload then
             return 413
         end
+        reader_with_payload(self, payload)
 
         local request = assert(tmpline[1])
         local httpver
