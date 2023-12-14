@@ -33,49 +33,6 @@ local function _isws_closed(id)
     return not ws_pool[id]
 end
 
-
-local function write_handshake(self, host, url, header)
-    local key = crypt.base64encode(crypt.randomkey()..crypt.randomkey())
-    local request_header = {
-        ["Upgrade"] = "websocket",
-        ["Connection"] = "Upgrade",
-        ["Sec-WebSocket-Version"] = "13",
-        ["Sec-WebSocket-Key"] = key
-    }
-    if header then
-        for k,v in pairs(header) do
-            assert(request_header[k] == nil, k)
-            request_header[k] = v
-        end
-    end
-
-    local recvheader = {}
-    local code, body = internal.request(self, "GET", host, url, recvheader, request_header)
-    if code ~= 101 then
-        error(string.format("websocket handshake error: code[%s] info:%s", code, body))
-    end
-	assert(body == "")	-- todo: M.read may need handle it
-
-    if not recvheader["upgrade"] or recvheader["upgrade"]:lower() ~= "websocket" then
-        error("websocket handshake upgrade must websocket")
-    end
-
-    if not recvheader["connection"] or recvheader["connection"]:lower() ~= "upgrade" then
-        error("websocket handshake connection must upgrade")
-    end
-
-    local sw_key = recvheader["sec-websocket-accept"]
-    if not sw_key then
-        error("websocket handshake need Sec-WebSocket-Accept")
-    end
-
-    local guid = self.guid
-    sw_key = crypt.base64decode(sw_key)
-    if sw_key ~= crypt.sha1(key .. guid) then
-        error("websocket handshake invalid Sec-WebSocket-Accept")
-    end
-end
-
 local function reader_with_payload(self, payload)
     local sz_payload = #payload
     if sz_payload == 0 then
@@ -95,6 +52,48 @@ local function reader_with_payload(self, payload)
         end
         self.read = read
         return payload .. read(sz - sz_payload)
+    end
+end
+
+local function write_handshake(self, host, url, header)
+    local key = crypt.base64encode(crypt.randomkey()..crypt.randomkey())
+    local request_header = {
+        ["Upgrade"] = "websocket",
+        ["Connection"] = "Upgrade",
+        ["Sec-WebSocket-Version"] = "13",
+        ["Sec-WebSocket-Key"] = key
+    }
+    if header then
+        for k,v in pairs(header) do
+            assert(request_header[k] == nil, k)
+            request_header[k] = v
+        end
+    end
+
+    local recvheader = {}
+    local code, payload = internal.request(self, "GET", host, url, recvheader, request_header)
+    if code ~= 101 then
+        error(string.format("websocket handshake error: code[%s] info:%s", code, payload))
+    end
+    reader_with_payload(self, payload)
+
+    if not recvheader["upgrade"] or recvheader["upgrade"]:lower() ~= "websocket" then
+        error("websocket handshake upgrade must websocket")
+    end
+
+    if not recvheader["connection"] or recvheader["connection"]:lower() ~= "upgrade" then
+        error("websocket handshake connection must upgrade")
+    end
+
+    local sw_key = recvheader["sec-websocket-accept"]
+    if not sw_key then
+        error("websocket handshake need Sec-WebSocket-Accept")
+    end
+
+    local guid = self.guid
+    sw_key = crypt.base64decode(sw_key)
+    if sw_key ~= crypt.sha1(key .. guid) then
+        error("websocket handshake invalid Sec-WebSocket-Accept")
     end
 end
 
