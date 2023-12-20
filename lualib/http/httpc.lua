@@ -83,15 +83,15 @@ local function connect(host, timeout)
 	end
 	-- print("protocol hostname port", protocol, hostname, port)
 	local interface = gen_interface(protocol, fd, hostname)
-	if interface.init then
-		interface.init()
-	end
 	if timeout then
 		skynet.timeout(timeout, function()
 			if not interface.finish then
 				socket.shutdown(fd)	-- shutdown the socket fd, need close later.
 			end
 		end)
+	end
+	if interface.init then
+		interface.init()
 	end
 	return fd, interface, host
 end
