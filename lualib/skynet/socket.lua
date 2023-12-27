@@ -330,7 +330,7 @@ function socket.read(id, sz)
 	if ret then
 		return ret
 	end
-	if not s.connected then
+	if s.closing or not s.connected then
 		return false, driver.readall(s.buffer, s.pool)
 	end
 
