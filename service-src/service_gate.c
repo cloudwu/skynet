@@ -147,7 +147,7 @@ _ctrl(struct gate * g, const void * msg, int sz) {
 		}
 		return;
 	}
-	skynet_error(ctx, "[gate] Unkown command : %s", command);
+	skynet_error(ctx, "[gate] Unknown command : %s", command);
 }
 
 static void
