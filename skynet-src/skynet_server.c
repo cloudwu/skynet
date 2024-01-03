@@ -118,7 +118,7 @@ drop_message(struct skynet_message *msg, void *ud) {
 	uint32_t source = d->handle;
 	assert(source);
 	// report error to the message source
-	skynet_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
+	skynet_send(NULL, source, msg->source, PTYPE_ERROR, msg->session, NULL, 0);
 }
 
 struct skynet_context * 
