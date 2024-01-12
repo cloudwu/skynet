@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local httpc = require "http.httpc"
+local httpurl = require "http.url"
 local dns = require "skynet.dns"
 
 local function http_test(protocol)
@@ -44,11 +45,25 @@ local function http_head_test()
 	end
 end
 
+local function http_url_test()
+	local url = "http://baidu.com/get?k1=1&k2=2&k4=a%20space&k5=b%20space&k5=b%20space&k5=b%20space"
+	local path, query = httpurl.parse(url)
+	print("url", path, query)
+	local qret = httpurl.parse_query(query)
+	for k, v in pairs(qret) do
+		print(k, v)
+	end
+	assert(#qret["k5"] == 3)
+	assert(qret[1] == qret[2])
+	assert(qret[1] == qret[3])
+end
+
 local function main()
 	dns.server()
 
 	http_stream_test()
 	http_head_test()
+	http_url_test()
 
 	http_test("http")
 	if not pcall(require,"ltls.c") then
