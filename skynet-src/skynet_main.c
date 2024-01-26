@@ -121,7 +121,9 @@ main(int argc, char *argv[]) {
 		config_file = argv[1];
 	} else {
 		fprintf(stderr, "Need a config file. Please read skynet wiki : https://github.com/cloudwu/skynet/wiki/Config\n"
-			"usage: skynet configfilename\n");
+			"usage: skynet configfilename\n"
+			SKYNET_VER
+			"\n");
 		return 1;
 	}
 

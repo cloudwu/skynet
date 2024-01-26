@@ -6,6 +6,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define SKYNET              "skynet"
+#define SKYNET_VERSION      "1.7.0"
+#define SKYNET_VER          SKYNET "/" SKYNET_VERSION
+
 #define PTYPE_TEXT 0
 #define PTYPE_RESPONSE 1
 #define PTYPE_MULTICAST 2

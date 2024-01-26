@@ -643,6 +643,11 @@ cmd_signal(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+static const char *
+cmd_version(struct skynet_context * context, const char * param) {
+	return SKYNET_VERSION;
+}
+
 static struct command_func cmd_funcs[] = {
 	{ "TIMEOUT", cmd_timeout },
 	{ "REG", cmd_reg },
@@ -660,6 +665,7 @@ static struct command_func cmd_funcs[] = {
 	{ "LOGON", cmd_logon },
 	{ "LOGOFF", cmd_logoff },
 	{ "SIGNAL", cmd_signal },
+	{ "VERSION", cmd_version },
 	{ NULL, NULL },
 };
 

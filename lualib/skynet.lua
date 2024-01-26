@@ -1158,6 +1158,10 @@ function skynet.memlimit(bytes)
 	skynet.memlimit = nil	-- set only once
 end
 
+function skynet.version()
+	return (c.command("VERSION"))
+end
+
 -- Inject internal debug framework
 local debug = require "skynet.debug"
 debug.init(skynet, {
