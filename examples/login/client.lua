@@ -79,7 +79,6 @@ local function encode_token(token)
 end
 
 local etoken = crypt.desencode(secret, encode_token(token))
-local b = crypt.base64encode(etoken)
 writeline(fd, crypt.base64encode(etoken))
 
 local result = readline()
