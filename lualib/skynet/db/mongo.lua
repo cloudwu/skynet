@@ -696,6 +696,13 @@ function mongo_collection:aggregate(pipeline, options)
 	} ,	aggregate_cursor_meta)
 end
 
+local function add_hint(self)
+	local h = self.__hint
+	if h then
+		return "hint", h
+	end
+end
+
 function mongo_cursor:hasNext()
 	if self.__ptr == nil then
 		if self.__document == nil then
@@ -706,13 +713,8 @@ function mongo_cursor:hasNext()
 		local database = self.__collection.database
 		if self.__data == nil then
 			local name = self.__collection.name
-			local cmd_list = {"find", name, "filter", self.__query, "sort", self.__sort,
-				"skip", self.__skip, "limit", self.__limit, "projection", self.__projection}
-			if self.__hint then
-				table.insert(cmd_list, "hint")
-				table.insert(cmd_list, self.__hint)
-			end
-			response = database:runCommand(table.unpack(cmd_list))
+			response = database:runCommand("find", name, "filter", self.__query, "sort", self.__sort,
+				"skip", self.__skip, "limit", self.__limit, "projection", self.__projection, add_hint(self))
 		else
 			if self.__cursor  and self.__cursor > 0 then
 				local name = self.__collection.name
