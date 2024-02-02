@@ -511,9 +511,10 @@ function mongo_collection:find(query, projection)
 		__data = nil,
 		__cursor = nil,
 		__document = {},
+		__sort = empty_bson,
 		__skip = 0,
 		__limit = 0,
-		__sort = empty_bson,
+		__hint = nil
 	} ,	cursor_meta)
 end
 
@@ -545,6 +546,11 @@ end
 
 function mongo_cursor:limit(amount)
 	self.__limit = amount
+	return self
+end
+
+function mongo_cursor:hint(indexName)
+	self.__hint = indexName
 	return self
 end
 
@@ -690,6 +696,13 @@ function mongo_collection:aggregate(pipeline, options)
 	} ,	aggregate_cursor_meta)
 end
 
+local function add_hint(self)
+	local h = self.__hint
+	if h then
+		return "hint", h
+	end
+end
+
 function mongo_cursor:hasNext()
 	if self.__ptr == nil then
 		if self.__document == nil then
@@ -701,7 +714,7 @@ function mongo_cursor:hasNext()
 		if self.__data == nil then
 			local name = self.__collection.name
 			response = database:runCommand("find", name, "filter", self.__query, "sort", self.__sort,
-				"skip", self.__skip, "limit", self.__limit, "projection", self.__projection)
+				"skip", self.__skip, "limit", self.__limit, "projection", self.__projection, add_hint(self))
 		else
 			if self.__cursor  and self.__cursor > 0 then
 				local name = self.__collection.name
