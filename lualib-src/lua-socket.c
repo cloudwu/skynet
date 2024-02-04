@@ -20,7 +20,7 @@
 #include "skynet.h"
 #include "skynet_socket.h"
 
-#define BACKLOG 32
+#define BACKLOG 511
 // 2 ** 12 == 4096
 #define LARGE_PAGE_NODE 12
 #define POOL_SIZE_WARNING 32
