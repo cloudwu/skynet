@@ -56,6 +56,27 @@ local function sharetable_service()
 		skynet.ret()
 	end
 
+    function sharetable.inc_update(source, filename, reserve_stack, ptr, len)
+        local m = files[filename]
+        if not m then
+            skynet.ret()
+            return
+        end
+        local retptr = m:inc_update(skynet.unpack, reserve_stack, ptr, len)
+        skynet.trash(ptr, len)
+        skynet.ret(skynet.pack(retptr))
+    end
+
+    function sharetable.get_update(source, filename)
+        local m = files[filename]
+        if not m then
+            skynet.ret()
+            return
+        end
+        local ptr = m:get_update()
+        skynet.ret(skynet.pack(ptr))
+    end
+
 	local function query_file(source, filename)
 		local m = files[filename]
 		local ptr = m:getptr()
@@ -137,6 +158,25 @@ local function sharetable_service()
 			clients[source] = nil
 		end
 		-- no return
+	end
+
+    function sharetable.new_thread_counter(source, filename)
+		local m = files[filename]
+		if m == nil then
+			skynet.ret()
+			return
+		end
+        return skynet.ret(skynet.pack(m:new_thread_counter()))
+    end
+
+	function sharetable.query_ptr(source, filename)
+		local m = files[filename]
+		if m == nil then
+			skynet.ret()
+			return
+		end
+		local ptr = m:getptr()
+		skynet.ret(skynet.pack(ptr))
 	end
 
 	skynet.dispatch("lua", function(_,source,cmd,...)
@@ -246,6 +286,33 @@ function sharetable.queryall(filenamelist)
         list[filename] = t
     end
     return list
+end
+
+function sharetable.inc_update(filename, tbl, reserve_stack)
+	assert(type(tbl) == "table")
+	local ptr = skynet.call(sharetable.address, "lua", "inc_update", filename, reserve_stack, skynet.pack(tbl))
+    if ptr then
+        local t = core.clone(ptr)
+        return t
+    end
+end
+
+function sharetable.get_update(filename)
+	local ptr = skynet.call(sharetable.address, "lua", "get_update", filename)
+    if ptr then
+        local t = core.clone(ptr)
+        return t
+    end
+end
+
+function sharetable.new_thread_counter(filename)
+	local ptr = skynet.call(sharetable.address, "lua", "new_thread_counter", filename)
+    return ptr
+end
+
+function sharetable.query_ptr(filename)
+	local newptr = skynet.call(sharetable.address, "lua", "query_ptr", filename)
+    return newptr
 end
 
 local pairs = pairs

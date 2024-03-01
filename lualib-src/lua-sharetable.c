@@ -3,8 +3,12 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include <string.h>
 
 #include "lgc.h"
+#include "ltable.h"
+
+#include "atomic.h"
 
 #ifdef makeshared
 
@@ -114,6 +118,10 @@ struct state_ud {
 	lua_State *L;
 };
 
+struct thread_counter {
+	ATOM_INT count;
+};
+
 static int
 close_state(lua_State *L) {
 	struct state_ud *ud = (struct state_ud *)luaL_checkudata(L, 1, "BOXMATRIXSTATE");
@@ -149,6 +157,150 @@ get_size(lua_State *L) {
 	return 1;
 }
 
+static
+int iter_aux (lua_State *L) {
+    luaL_checktype(L, 1, LUA_TTABLE);
+    lua_settop(L, 2);  /* create a 2nd argument if there isn't one */
+    if (lua_next(L, 1))
+        return 2;
+    else {
+        lua_pushnil(L);
+        return 1;
+    }
+}
+
+static int
+pairs_iter(lua_State *L) {
+    luaL_checktype(L, 1, LUA_TTABLE);
+    lua_settop(L, 2);  /* create a 2nd argument if there isn't one */
+    lua_pushcfunction(L, iter_aux);
+    lua_pushvalue(L, 1);
+    lua_pushvalue(L, 2);
+    int ok = lua_pcall(L, 2, 2, 0);
+    if (ok != LUA_OK || lua_type(L, -1) == LUA_TNIL) {
+        if (luaL_getmetafield(L, 1, "__index") == LUA_TNIL) {  /* no metamethod? */
+            if (ok != LUA_OK) {
+                lua_pop(L, 1); // pop errormsg
+		        luaL_error(L, "invalid key to 'next'");
+            } else {
+                return 1;
+            }
+        } else {
+            lua_pushcfunction(L, iter_aux); // iterate __index table
+            lua_insert(L, -2);
+            if ( ok != LUA_OK)
+                lua_pushvalue(L, 2); // push key
+            else
+                lua_pushnil(L);
+            lua_call(L, 2, 2);
+            return 2;
+        }
+    }
+    return 2;
+}
+
+static int
+pairs_func(lua_State *L) {
+    lua_pushcfunction(L, pairs_iter);
+    lua_pushvalue(L, 1);
+    lua_pushnil(L);
+    return 3;
+}
+
+static int
+len_func(lua_State *L) {
+    lua_Integer len = (lua_Integer)lua_rawlen(L, 1);
+    if (luaL_getmetafield(L, 1, "__index") == LUA_TNIL) {  /* no metamethod? */
+        lua_pushinteger(L, len);
+    } else {
+        lua_Integer i = len + 1;
+        lua_Integer sum_len = len;
+        for (;;i++) {
+            if (lua_geti(L, -1, i) == LUA_TNIL) {
+                break;
+            }
+            lua_pop(L, 1);
+            sum_len = i;
+        }
+        lua_pushinteger(L, sum_len);
+    }
+    return 1;
+}
+
+static void
+convert_pairs(lua_State *L) {
+	if (lua_type(L, -1) != LUA_TTABLE) {
+		luaL_error(L, "Not a table, it's a %s.", lua_typename(L, lua_type(L, -1)));
+	}
+    lua_pushnil(L);
+    while (lua_next(L, -2) != 0) {
+        int tk = lua_type(L, -2);
+        if (tk == LUA_TSTRING) {
+            const char *key = lua_tostring(L, -2);
+            if (strcmp(key, "__pairs") == 0) {
+                lua_pushcfunction(L, pairs_func);
+		        lua_pushvalue(L, -1);
+                lua_copy(L, -4, -2);
+                lua_settable(L, -5);
+            } else if (strcmp(key, "__len") == 0) {
+                lua_pushcfunction(L, len_func);
+		        lua_pushvalue(L, -1);
+                lua_copy(L, -4, -2);
+                lua_settable(L, -5);
+            }
+        }
+        int tv = lua_type(L, -1);
+        if ( tv == LUA_TTABLE)
+            convert_pairs(L);
+        lua_pop(L, 1);
+    }
+}
+
+static int
+inc_update(lua_State *L) {
+    struct state_ud *ud = (struct state_ud *)luaL_checkudata(L, 1, "BOXMATRIXSTATE");
+    if (ud->L) {
+	    lua_checkstack(ud->L, lua_tointeger(L, 3));
+        lua_pushcfunction(ud->L, lua_tocfunction(L, 2));
+        lua_pushlightuserdata(ud->L, lua_touserdata(L, 4));
+        lua_pushinteger(ud->L, lua_tointeger(L, 5));
+        if (lua_pcall(ud->L, 2, 1, 0) != LUA_OK)
+            lua_error(ud->L);
+        convert_pairs(ud->L);
+        //lua_gc(ud->L, LUA_GCCOLLECT, 0);
+        lua_pushcfunction(ud->L, make_matrix);
+        lua_insert(ud->L, -2);
+        lua_call(ud->L, 1, 1);
+		const void * v = lua_topointer(ud->L, -1);
+		lua_pushlightuserdata(L, (void *)v);
+        return 1;
+    }
+    return 0;
+}
+
+static int
+get_update(lua_State *L) {
+    struct state_ud *ud = (struct state_ud *)luaL_checkudata(L, 1, "BOXMATRIXSTATE");
+    if (ud->L) {
+		const void * v = lua_topointer(ud->L, -1);
+		lua_pushlightuserdata(L, (void *)v);
+        return 1;
+    }
+    return 0;
+}
+
+static int
+new_thread_counter(lua_State *L) {
+    struct state_ud *ud = (struct state_ud *)luaL_checkudata(L, 1, "BOXMATRIXSTATE");
+    if (ud->L) {
+	    struct thread_counter *c = (struct thread_counter *)lua_newuserdatauv(ud->L, sizeof(*c), 0);
+        lua_setfield(L, LUA_REGISTRYINDEX, "SHARETABLE_THREADCOUNTER");
+        c->count = 0;
+		lua_pushlightuserdata(L, (void *)c);
+        return 1;
+    }
+    return 0;
+}
 
 static int
 box_state(lua_State *L, lua_State *mL) {
@@ -163,6 +315,12 @@ box_state(lua_State *L, lua_State *mL) {
 		lua_setfield(L, -2, "getptr");
 		lua_pushcfunction(L, get_size);
 		lua_setfield(L, -2, "size");
+		lua_pushcfunction(L, inc_update);
+		lua_setfield(L, -2, "inc_update");
+		lua_pushcfunction(L, get_update);
+		lua_setfield(L, -2, "get_update");
+		lua_pushcfunction(L, new_thread_counter);
+		lua_setfield(L, -2, "new_thread_counter");
 	}
 	lua_setmetatable(L, -2);
 
@@ -240,6 +398,47 @@ matrix_from_file(lua_State *L) {
 	return box_state(L, mL);
 }
 
+static int
+lset_sharedtable(lua_State *L) {
+	Table *t = (Table *)lua_topointer(L, 1);
+    TValue *key = s2v(L->top.p - 2);
+    TValue *v = s2v(L->top.p - 1);
+    TValue *slot = (TValue *)luaH_get(t, key);
+    if (ttype(v) != ttype(slot)) // nil value only distinguish by tt_
+        setnilvalue(slot);
+    setobj2t(L,slot, v);
+    return 0;
+}
+
+static int
+linc_thread_cnt(lua_State *L) {
+	struct thread_counter *counter_ptr = (struct thread_counter *)lua_touserdata(L, 1);
+	ATOM_FINC(&counter_ptr->count);
+    return 0;
+}
+
+static int
+lget_thread_cnt(lua_State *L) {
+	struct thread_counter *counter_ptr = (struct thread_counter *)lua_touserdata(L, 1);
+    lua_pushinteger(L, ATOM_LOAD(&counter_ptr->count));
+    return 1;
+}
+
+static int
+lreset_thread_cnt(lua_State *L) {
+	struct thread_counter *counter_ptr = (struct thread_counter *)lua_touserdata(L, 1);
+    ATOM_FSUB(&counter_ptr->count, ATOM_LOAD(&counter_ptr->count));
+    return 0;
+}
+
+static int
+lset_metatable(lua_State *L) {
+	Table *t = (Table *)lua_topointer(L, 1); // raw table
+	Table *mt = (Table *)lua_topointer(L, 2); // metatable
+    t->metatable = mt;
+    return 0;
+}
+
 LUAMOD_API int
 luaopen_skynet_sharetable_core(lua_State *L) {
 	luaL_checkversion(L);
@@ -248,6 +447,11 @@ luaopen_skynet_sharetable_core(lua_State *L) {
 		{ "stackvalues", lco_stackvalues }, 
 		{ "matrix", matrix_from_file },
 		{ "is_sharedtable", lis_sharedtable },
+		{ "set_table", lset_sharedtable },
+		{ "inc_thread_cnt", linc_thread_cnt },
+		{ "get_thread_cnt", lget_thread_cnt },
+		{ "reset_thread_cnt", lreset_thread_cnt },
+		{ "set_metatable", lset_metatable },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L, l);
