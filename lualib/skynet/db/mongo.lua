@@ -763,7 +763,7 @@ function mongo_cursor:hasNext()
 		self.__cursor = cursor.id
 
 		local limit = self.__limit
-		if cursor.id > 0 and limit > 0 then
+		if limit and limit > 0 and cursor.id > 0 then
 			limit = limit - #self.__document
 			if limit <= 0 then
 				-- reach limit
