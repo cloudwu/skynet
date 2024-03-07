@@ -584,7 +584,7 @@ local function _compose_stmt_execute(self, stmt, cursor_type, args)
         for i = 1, null_count do
             local byte = 0
             for j = 0, 7 do
-                if field_index < arg_num then
+                if field_index <= arg_num then
                     if args[field_index] == nil then
                         byte = byte | (1 << j)
                     else
@@ -841,6 +841,9 @@ local function _get_datetime(data, pos)
     if len == 7 then
         year, month, day, hour, minute, second, pos = string.unpack("<I2BBBBB", data, pos)
         value = strformat("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second)
+    elseif len == 4 then
+        year, month, day, pos = string.unpack("<I2BB", data, pos)
+        value = strformat("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, 0, 0, 0)
     else
         value = "2017-09-09 20:08:09"
         --unsupported format

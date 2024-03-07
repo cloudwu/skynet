@@ -1,3 +1,11 @@
+v1.7.0 (2023-11-13)
+-----------
+* Update Lua to 5.4.6
+* Update lpeg to 1.1.0
+* Improve mongo driver
+* Fix service session rewind issue
+* Add websocket.is_closed
+
 v1.6.0 (2022-11-16)
 -----------
 * Update Lua to 5.4.4 (github Nov 8, 2022)

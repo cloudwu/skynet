@@ -1,7 +1,3 @@
-/*
-** $Id: lptree.c $
-** Copyright 2013, Lua.org & PUC-Rio  (see 'lpeg.html' for license)
-*/
 
 #include <ctype.h>
 #include <limits.h>
@@ -16,16 +12,17 @@
 #include "lpcode.h"
 #include "lpprint.h"
 #include "lptree.h"
+#include "lpcset.h"
 
 
 /* number of siblings for each tree */
 const byte numsiblings[] = {
   0, 0, 0,	/* char, set, any */
-  0, 0,		/* true, false */	
-  1,		/* rep */
+  0, 0, 0,	/* true, false, utf-range */
+  1,		/* acc */
   2, 2,		/* seq, choice */
   1, 1,		/* not, and */
-  0, 0, 2, 1,  /* call, opencall, rule, grammar */
+  0, 0, 2, 1, 1,  /* call, opencall, rule, prerule, grammar */
   1,  /* behind */
   1, 1  /* capture, runtime capture */
 };
@@ -338,7 +335,7 @@ static Pattern *getpattern (lua_State *L, int idx) {
 
 
 static int getsize (lua_State *L, int idx) {
-  return (lua_rawlen(L, idx) - sizeof(Pattern)) / sizeof(TTree) + 1;
+  return (lua_rawlen(L, idx) - offsetof(Pattern, tree)) / sizeof(TTree);
 }
 
 
@@ -351,18 +348,18 @@ static TTree *gettree (lua_State *L, int idx, int *len) {
 
 
 /*
-** create a pattern. Set its uservalue (the 'ktable') equal to its
-** metatable. (It could be any empty sequence; the metatable is at
-** hand here, so we use it.)
+** create a pattern followed by a tree with 'len' nodes. Set its
+** uservalue (the 'ktable') equal to its metatable. (It could be any
+** empty sequence; the metatable is at hand here, so we use it.)
 */
 static TTree *newtree (lua_State *L, int len) {
-  size_t size = (len - 1) * sizeof(TTree) + sizeof(Pattern);
+  size_t size = offsetof(Pattern, tree) + len * sizeof(TTree);
   Pattern *p = (Pattern *)lua_newuserdata(L, size);
   luaL_getmetatable(L, PATTERN_T);
   lua_pushvalue(L, -1);
   lua_setuservalue(L, -3);
   lua_setmetatable(L, -2);
-  p->code = NULL;  p->codesize = 0;
+  p->code = NULL;
   return p->tree;
 }
 
@@ -374,17 +371,44 @@ static TTree *newleaf (lua_State *L, int tag) {
 }
 
 
-static TTree *newcharset (lua_State *L) {
-  TTree *tree = newtree(L, bytes2slots(CHARSETSIZE) + 1);
-  tree->tag = TSet;
-  loopset(i, treebuffer(tree)[i] = 0);
-  return tree;
+/*
+** Create a tree for a charset, optimizing for special cases: empty set,
+** full set, and singleton set.
+*/
+static TTree *newcharset (lua_State *L, byte *cs) {
+  charsetinfo info;
+  Opcode op = charsettype(cs, &info);
+  switch (op) {
+    case IFail: return newleaf(L, TFalse);  /* empty set */
+    case IAny: return newleaf(L, TAny);  /* full set */
+    case IChar: {  /* singleton set */
+      TTree *tree =newleaf(L, TChar);
+      tree->u.n = info.offset;
+      return tree;
+    }
+    default: {  /* regular set */
+      int i;
+      int bsize =  /* tree size in bytes */
+                  (int)offsetof(TTree, u.set.bitmap) + info.size;
+      TTree *tree = newtree(L, bytes2slots(bsize));
+      assert(op == ISet);
+      tree->tag = TSet;
+      tree->u.set.offset = info.offset;
+      tree->u.set.size = info.size;
+      tree->u.set.deflt = info.deflt;
+      for (i = 0; i < info.size; i++) {
+        assert(&treebuffer(tree)[i] < (byte*)tree + bsize);
+        treebuffer(tree)[i] = cs[info.offset + i];
+      }
+      return tree;
+    }
+  }
 }
 
 
 /*
-** add to tree a sequence where first sibling is 'sib' (with size
-** 'sibsize'); returns position for second sibling
+** Add to tree a sequence where first sibling is 'sib' (with size
+** 'sibsize'); return position for second sibling.
 */
 static TTree *seqaux (TTree *tree, TTree *sib, int sibsize) {
   tree->tag = TSeq; tree->u.ps = sibsize + 1;
@@ -553,8 +577,8 @@ static int lp_choice (lua_State *L) {
   TTree *t1 = getpatt(L, 1, NULL);
   TTree *t2 = getpatt(L, 2, NULL);
   if (tocharset(t1, &st1) && tocharset(t2, &st2)) {
-    TTree *t = newcharset(L);
-    loopset(i, treebuffer(t)[i] = st1.cs[i] | st2.cs[i]);
+    loopset(i, st1.cs[i] |= st2.cs[i]);
+    newcharset(L, st1.cs);
   }
   else if (nofail(t1) || t2->tag == TFalse)
     lua_pushvalue(L, 1);  /* true / x => true, x / false => x */
@@ -630,8 +654,8 @@ static int lp_sub (lua_State *L) {
   TTree *t1 = getpatt(L, 1, &s1);
   TTree *t2 = getpatt(L, 2, &s2);
   if (tocharset(t1, &st1) && tocharset(t2, &st2)) {
-    TTree *t = newcharset(L);
-    loopset(i, treebuffer(t)[i] = st1.cs[i] & ~st2.cs[i]);
+    loopset(i, st1.cs[i] &= ~st2.cs[i]);
+    newcharset(L, st1.cs);
   }
   else {
     TTree *tree = newtree(L, 2 + s1 + s2);
@@ -649,11 +673,13 @@ static int lp_sub (lua_State *L) {
 static int lp_set (lua_State *L) {
   size_t l;
   const char *s = luaL_checklstring(L, 1, &l);
-  TTree *tree = newcharset(L);
+  byte buff[CHARSETSIZE];
+  clearset(buff);
   while (l--) {
-    setchar(treebuffer(tree), (byte)(*s));
+    setchar(buff, (byte)(*s));
     s++;
   }
+  newcharset(L, buff);
   return 1;
 }
 
@@ -661,14 +687,68 @@ static int lp_set (lua_State *L) {
 static int lp_range (lua_State *L) {
   int arg;
   int top = lua_gettop(L);
-  TTree *tree = newcharset(L);
+  byte buff[CHARSETSIZE];
+  clearset(buff);
   for (arg = 1; arg <= top; arg++) {
     int c;
     size_t l;
     const char *r = luaL_checklstring(L, arg, &l);
     luaL_argcheck(L, l == 2, arg, "range must have two characters");
     for (c = (byte)r[0]; c <= (byte)r[1]; c++)
-      setchar(treebuffer(tree), c);
+      setchar(buff, c);
+  }
+  newcharset(L, buff);
+  return 1;
+}
+
+
+/*
+** Fills a tree node with basic information about the UTF-8 code point
+** 'cpu': its value in 'n', its length in 'cap', and its first byte in
+** 'key'
+*/
+static void codeutftree (lua_State *L, TTree *t, lua_Unsigned cpu, int arg) {
+  int len, fb, cp;
+  cp = (int)cpu;
+  if (cp <= 0x7f) {  /* one byte? */
+    len = 1;
+    fb = cp;
+  } else if (cp <= 0x7ff) {
+    len = 2;
+    fb = 0xC0 | (cp >> 6);
+  } else if (cp <= 0xffff) {
+    len = 3;
+    fb = 0xE0 | (cp >> 12);
+  }
+  else {
+    luaL_argcheck(L, cpu <= 0x10ffffu, arg, "invalid code point");
+    len = 4;
+    fb = 0xF0 | (cp >> 18);
+  }
+  t->u.n = cp;
+  t->cap = len;
+  t->key = fb;
+}
+
+
+static int lp_utfr (lua_State *L) {
+  lua_Unsigned from = (lua_Unsigned)luaL_checkinteger(L, 1);
+  lua_Unsigned to = (lua_Unsigned)luaL_checkinteger(L, 2);
+  luaL_argcheck(L, from <= to, 2, "empty range");
+  if (to <= 0x7f) {  /* ascii range? */
+    uint f;
+    byte buff[CHARSETSIZE];  /* code it as a regular charset */
+    clearset(buff);
+    for (f = (int)from; f <= to; f++)
+      setchar(buff, f);
+    newcharset(L, buff);
+  }
+  else {  /* multi-byte utf-8 range */
+    TTree *tree = newtree(L, 2);
+    tree->tag = TUTFR;
+    codeutftree(L, tree, from, 1);
+    sib1(tree)->tag = TXInfo;
+    codeutftree(L, sib1(tree), to, 2);
   }
   return 1;
 }
@@ -763,8 +843,15 @@ static int lp_divcapture (lua_State *L) {
       tree->key = n;
       return 1;
     }
-    default: return luaL_argerror(L, 2, "invalid replacement value");
+    default:
+      return luaL_error(L, "unexpected %s as 2nd operand to LPeg '/'",
+                           luaL_typename(L, 2));
   }
+}
+
+
+static int lp_acccapture (lua_State *L) {
+  return capture_aux(L, Cacc, 2);
 }
 
 
@@ -906,7 +993,7 @@ static int collectrules (lua_State *L, int arg, int *totalsize) {
   int size;  /* accumulator for total size */
   lua_newtable(L);  /* create position table */
   getfirstrule(L, arg, postab);
-  size = 2 + getsize(L, postab + 2);  /* TGrammar + TRule + rule */
+  size = 3 + getsize(L, postab + 2);  /* TGrammar + TRule + TXInfo + rule */
   lua_pushnil(L);  /* prepare to traverse grammar table */
   while (lua_next(L, arg) != 0) {
     if (lua_tonumber(L, -2) == 1 ||
@@ -920,11 +1007,11 @@ static int collectrules (lua_State *L, int arg, int *totalsize) {
     lua_pushvalue(L, -2);  /* push key (to insert into position table) */
     lua_pushinteger(L, size);
     lua_settable(L, postab);
-    size += 1 + getsize(L, -1);  /* update size */
+    size += 2 + getsize(L, -1);  /* add 'TRule + TXInfo + rule' to size */
     lua_pushvalue(L, -2);  /* push key (for next lua_next) */
     n++;
   }
-  *totalsize = size + 1;  /* TTrue to finish list of rules */
+  *totalsize = size + 1;  /* space for 'TTrue' finishing list of rules */
   return n;
 }
 
@@ -936,11 +1023,13 @@ static void buildgrammar (lua_State *L, TTree *grammar, int frule, int n) {
     int ridx = frule + 2*i + 1;  /* index of i-th rule */
     int rulesize;
     TTree *rn = gettree(L, ridx, &rulesize);
+    TTree *pr = sib1(nd);  /* points to rule's prerule */
     nd->tag = TRule;
     nd->key = 0;  /* will be fixed when rule is used */
-    nd->cap = i;  /* rule number */
-    nd->u.ps = rulesize + 1;  /* point to next rule */
-    memcpy(sib1(nd), rn, rulesize * sizeof(TTree));  /* copy rule */
+    pr->tag = TXInfo;
+    pr->u.n = i;  /* rule number */
+    nd->u.ps = rulesize + 2;  /* point to next rule */
+    memcpy(sib1(pr), rn, rulesize * sizeof(TTree));  /* copy rule */
     mergektable(L, ridx, sib1(nd));  /* merge its ktable into new one */
     nd = sib2(nd);  /* move to next rule */
   }
@@ -976,7 +1065,7 @@ static int checkloops (TTree *tree) {
 ** twice in 'passed', there is path from it back to itself without
 ** advancing the subject.
 */
-static int verifyerror (lua_State *L, int *passed, int npassed) {
+static int verifyerror (lua_State *L, unsigned short *passed, int npassed) {
   int i, j;
   for (i = npassed - 1; i >= 0; i--) {  /* search for a repetition */
     for (j = i - 1; j >= 0; j--) {
@@ -1001,12 +1090,12 @@ static int verifyerror (lua_State *L, int *passed, int npassed) {
 ** counts the elements in 'passed'.
 ** Assume ktable at the top of the stack.
 */
-static int verifyrule (lua_State *L, TTree *tree, int *passed, int npassed,
-                       int nb) {
+static int verifyrule (lua_State *L, TTree *tree, unsigned short *passed,
+                                     int npassed, int nb) {
  tailcall:
   switch (tree->tag) {
     case TChar: case TSet: case TAny:
-    case TFalse:
+    case TFalse: case TUTFR:
       return nb;  /* cannot pass from here */
     case TTrue:
     case TBehind:  /* look-behind cannot have calls */
@@ -1014,7 +1103,7 @@ static int verifyrule (lua_State *L, TTree *tree, int *passed, int npassed,
     case TNot: case TAnd: case TRep:
       /* return verifyrule(L, sib1(tree), passed, npassed, 1); */
       tree = sib1(tree); nb = 1; goto tailcall;
-    case TCapture: case TRunTime:
+    case TCapture: case TRunTime: case TXInfo:
       /* return verifyrule(L, sib1(tree), passed, npassed, nb); */
       tree = sib1(tree); goto tailcall;
     case TCall:
@@ -1030,10 +1119,10 @@ static int verifyrule (lua_State *L, TTree *tree, int *passed, int npassed,
       /* return verifyrule(L, sib2(tree), passed, npassed, nb); */
       tree = sib2(tree); goto tailcall;
     case TRule:
-      if (npassed >= MAXRULES)
-        return verifyerror(L, passed, npassed);
+      if (npassed >= MAXRULES)  /* too many steps? */
+        return verifyerror(L, passed, npassed);  /* error */
       else {
-        passed[npassed++] = tree->key;
+        passed[npassed++] = tree->key;  /* add rule to path */
         /* return verifyrule(L, sib1(tree), passed, npassed); */
         tree = sib1(tree); goto tailcall;
       }
@@ -1045,7 +1134,7 @@ static int verifyrule (lua_State *L, TTree *tree, int *passed, int npassed,
 
 
 static void verifygrammar (lua_State *L, TTree *grammar) {
-  int passed[MAXRULES];
+  unsigned short passed[MAXRULES];
   TTree *rule;
   /* check left-recursive rules */
   for (rule = sib1(grammar); rule->tag == TRule; rule = sib2(rule)) {
@@ -1105,7 +1194,7 @@ static Instruction *prepcompile (lua_State *L, Pattern *p, int idx) {
   lua_getuservalue(L, idx);  /* push 'ktable' (may be used by 'finalfix') */
   finalfix(L, 0, NULL, p->tree);
   lua_pop(L, 1);  /* remove 'ktable' */
-  return compile(L, p);
+  return compile(L, p, getsize(L, idx));
 }
 
 
@@ -1128,7 +1217,7 @@ static int lp_printcode (lua_State *L) {
   printktable(L, 1);
   if (p->code == NULL)  /* not compiled yet? */
     prepcompile(L, p, 1);
-  printpatt(p->code, p->codesize);
+  printpatt(p->code);
   return 0;
 }
 
@@ -1164,9 +1253,10 @@ static int lp_match (lua_State *L) {
   const char *s = luaL_checklstring(L, SUBJIDX, &l);
   size_t i = initposition(L, l);
   int ptop = lua_gettop(L);
+  luaL_argcheck(L, l < MAXINDT, SUBJIDX, "subject too long");
   lua_pushnil(L);  /* initialize subscache */
   lua_pushlightuserdata(L, capture);  /* initialize caplistidx */
-  lua_getuservalue(L, 1);  /* initialize penvidx */
+  lua_getuservalue(L, 1);  /* initialize ktableidx */
   r = match(L, s, s + i, s + l, code, capture, ptop);
   if (r == NULL) {
     lua_pushnil(L);
@@ -1195,12 +1285,6 @@ static int lp_setmax (lua_State *L) {
 }
 
 
-static int lp_version (lua_State *L) {
-  lua_pushstring(L, VERSION);
-  return 1;
-}
-
-
 static int lp_type (lua_State *L) {
   if (testpattern(L, 1))
     lua_pushliteral(L, "pattern");
@@ -1212,16 +1296,22 @@ static int lp_type (lua_State *L) {
 
 int lp_gc (lua_State *L) {
   Pattern *p = getpattern(L, 1);
-  realloccode(L, p, 0);  /* delete code block */
+  freecode(L, p);  /* delete code block */
   return 0;
 }
 
 
+/*
+** Create a charset representing a category of characters, given by
+** the predicate 'catf'.
+*/
 static void createcat (lua_State *L, const char *catname, int (catf) (int)) {
-  TTree *t = newcharset(L);
-  int i;
-  for (i = 0; i <= UCHAR_MAX; i++)
-    if (catf(i)) setchar(treebuffer(t), i);
+  int c;
+  byte buff[CHARSETSIZE];
+  clearset(buff);
+  for (c = 0; c <= UCHAR_MAX; c++)
+    if (catf(c)) setchar(buff, c);
+  newcharset(L, buff);
   lua_setfield(L, -2, catname);
 }
 
@@ -1269,8 +1359,9 @@ static struct luaL_Reg pattreg[] = {
   {"P", lp_P},
   {"S", lp_set},
   {"R", lp_range},
+  {"utfR", lp_utfr},
   {"locale", lp_locale},
-  {"version", lp_version},
+  {"version", NULL},
   {"setmaxstack", lp_setmax},
   {"type", lp_type},
   {NULL, NULL}
@@ -1284,6 +1375,7 @@ static struct luaL_Reg metareg[] = {
   {"__gc", lp_gc},
   {"__len", lp_and},
   {"__div", lp_divcapture},
+  {"__mod", lp_acccapture},
   {"__unm", lp_not},
   {"__sub", lp_sub},
   {NULL, NULL}
@@ -1299,6 +1391,8 @@ int luaopen_lpeg (lua_State *L) {
   luaL_newlib(L, pattreg);
   lua_pushvalue(L, -1);
   lua_setfield(L, -3, "__index");
+  lua_pushliteral(L, "LPeg " VERSION);
+  lua_setfield(L, -2, "version");
   return 1;
 }
 

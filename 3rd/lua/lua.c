@@ -666,7 +666,7 @@ int main (int argc, char **argv) {
     l_message(argv[0], "cannot create state: not enough memory");
     return EXIT_FAILURE;
   }
-  lua_gc(L, LUA_GCSTOP);  /* stop GC while buidling state */
+  lua_gc(L, LUA_GCSTOP);  /* stop GC while building state */
   lua_pushcfunction(L, &pmain);  /* to call 'pmain' in protected mode */
   lua_pushinteger(L, argc);  /* 1st argument */
   lua_pushlightuserdata(L, argv); /* 2nd argument */

@@ -656,18 +656,19 @@ static const char *funcnamefromcall (lua_State *L, CallInfo *ci,
 
 
 /*
-** Check whether pointer 'o' points to some value in the stack
-** frame of the current function. Because 'o' may not point to a
-** value in this stack, we cannot compare it with the region
-** boundaries (undefined behaviour in ISO C).
+** Check whether pointer 'o' points to some value in the stack frame of
+** the current function and, if so, returns its index.  Because 'o' may
+** not point to a value in this stack, we cannot compare it with the
+** region boundaries (undefined behavior in ISO C).
 */
-static int isinstack (CallInfo *ci, const TValue *o) {
-  StkId pos;
-  for (pos = ci->func.p + 1; pos < ci->top.p; pos++) {
-    if (o == s2v(pos))
-      return 1;
+static int instack (CallInfo *ci, const TValue *o) {
+  int pos;
+  StkId base = ci->func.p + 1;
+  for (pos = 0; base + pos < ci->top.p; pos++) {
+    if (o == s2v(base + pos))
+      return pos;
   }
-  return 0;  /* not found */
+  return -1;  /* not found */
 }
 
 
@@ -708,9 +709,11 @@ static const char *varinfo (lua_State *L, const TValue *o) {
   const char *kind = NULL;
   if (isLua(ci)) {
     kind = getupvalname(ci, o, &name);  /* check whether 'o' is an upvalue */
-    if (!kind && isinstack(ci, o))  /* no? try a register */
-      kind = getobjname(ci_func(ci)->p, currentpc(ci),
-                        cast_int(cast(StkId, o) - (ci->func.p + 1)), &name);
+    if (!kind) {  /* not an upvalue? */
+      int reg = instack(ci, o);  /* try a register */
+      if (reg >= 0)  /* is 'o' a register? */
+        kind = getobjname(ci_func(ci)->p, currentpc(ci), reg, &name);
+    }
   }
   return formatvarinfo(L, kind, name);
 }
@@ -845,7 +848,7 @@ static int changedline (const Proto *p, int oldpc, int newpc) {
   if (p->lineinfo == NULL)  /* no debug information? */
     return 0;
   if (newpc - oldpc < MAXIWTHABS / 2) {  /* not too far apart? */
-    int delta = 0;  /* line diference */
+    int delta = 0;  /* line difference */
     int pc = oldpc;
     for (;;) {
       int lineinfo = p->lineinfo[++pc];

@@ -680,7 +680,7 @@ mainloop(struct skynet_context * context, void * ud, int type, int session, uint
 			if (id) {
 				report_harbor_down(h,id);
 			} else {
-				skynet_error(context, "Unkown fd (%d) closed", message->id);
+				skynet_error(context, "Unknown fd (%d) closed", message->id);
 			}
 			break;
 		}

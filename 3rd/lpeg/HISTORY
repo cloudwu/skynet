@@ -1,4 +1,13 @@
-HISTORY for LPeg 1.0.2
+HISTORY for LPeg 1.1.0
+
+* Changes from version 1.0.2 to 1.1.0
+  ---------------------------------
+  + accumulator capture
+  + UTF-8 ranges
+  + Larger limit for number of rules in a grammar
+  + Larger limit for number of captures in a match
+  + bug fixes
+  + other small improvements
 
 * Changes from version 1.0.1 to 1.0.2
   ---------------------------------

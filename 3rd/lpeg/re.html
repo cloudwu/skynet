@@ -1,22 +1,21 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+   "//www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html>
 <head>
     <title>LPeg.re - Regex syntax for LPEG</title>
     <link rel="stylesheet"
-          href="http://www.inf.puc-rio.br/~roberto/lpeg/doc.css"
+          href="//www.inf.puc-rio.br/~roberto/lpeg/doc.css"
           type="text/css"/>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 </head>
 <body>
 
-<!-- $Id: re.html $ -->
 
 <div id="container">
 	
 <div id="product">
   <div id="product_logo">
-    <a href="http://www.inf.puc-rio.br/~roberto/lpeg/">
+    <a href="//www.inf.puc-rio.br/~roberto/lpeg/">
     <img alt="LPeg logo" src="lpeg-128.gif"/>
     </a>
   </div>
@@ -62,6 +61,20 @@ Constructions are listed in order of decreasing precedence.
 <table border="1">
 <tbody><tr><td><b>Syntax</b></td><td><b>Description</b></td></tr>
 <tr><td><code>( p )</code></td> <td>grouping</td></tr>
+<tr><td><code>&amp; p</code></td> <td>and predicate</td></tr>
+<tr><td><code>! p</code></td> <td>not predicate</td></tr>
+<tr><td><code>p1 p2</code></td> <td>concatenation</td></tr>
+<tr><td><code>p1 / p2</code></td> <td>ordered choice</td></tr>
+<tr><td><code>p ?</code></td> <td>optional match</td></tr>
+<tr><td><code>p *</code></td> <td>zero or more repetitions</td></tr>
+<tr><td><code>p +</code></td> <td>one or more repetitions</td></tr>
+<tr><td><code>p^num</code></td>
+      <td>exactly <code>num</code> repetitions</td></tr>
+<tr><td><code>p^+num</code></td>
+      <td>at least <code>num</code> repetitions</td></tr>
+<tr><td><code>p^-num</code></td>
+      <td>at most <code>num</code> repetitions</td></tr>
+<tr><td>(<code>name &lt;- p</code>)<sup>+</sup></td> <td>grammar</td></tr>
 <tr><td><code>'string'</code></td> <td>literal string</td></tr>
 <tr><td><code>"string"</code></td> <td>literal string</td></tr>
 <tr><td><code>[class]</code></td> <td>character class</td></tr>
@@ -70,22 +83,15 @@ Constructions are listed in order of decreasing precedence.
   <td>pattern <code>defs[name]</code> or a pre-defined pattern</td></tr>
 <tr><td><code>name</code></td><td>non terminal</td></tr>
 <tr><td><code>&lt;name&gt;</code></td><td>non terminal</td></tr>
+
 <tr><td><code>{}</code></td> <td>position capture</td></tr>
 <tr><td><code>{ p }</code></td> <td>simple capture</td></tr>
 <tr><td><code>{: p :}</code></td> <td>anonymous group capture</td></tr>
 <tr><td><code>{:name: p :}</code></td> <td>named group capture</td></tr>
 <tr><td><code>{~ p ~}</code></td> <td>substitution capture</td></tr>
 <tr><td><code>{| p |}</code></td> <td>table capture</td></tr>
-<tr><td><code>=name</code></td> <td>back reference
-</td></tr>
-<tr><td><code>p ?</code></td> <td>optional match</td></tr>
-<tr><td><code>p *</code></td> <td>zero or more repetitions</td></tr>
-<tr><td><code>p +</code></td> <td>one or more repetitions</td></tr>
-<tr><td><code>p^num</code></td> <td>exactly <code>n</code> repetitions</td></tr>
-<tr><td><code>p^+num</code></td>
-      <td>at least <code>n</code> repetitions</td></tr>
-<tr><td><code>p^-num</code></td>
-      <td>at most <code>n</code> repetitions</td></tr>
+<tr><td><code>=name</code></td> <td>back reference</td></tr>
+
 <tr><td><code>p -&gt; 'string'</code></td> <td>string capture</td></tr>
 <tr><td><code>p -&gt; "string"</code></td> <td>string capture</td></tr>
 <tr><td><code>p -&gt; num</code></td> <td>numbered capture</td></tr>
@@ -94,16 +100,13 @@ equivalent to <code>p / defs[name]</code></td></tr>
 <tr><td><code>p =&gt; name</code></td> <td>match-time capture
 equivalent to <code>lpeg.Cmt(p, defs[name])</code></td></tr>
 <tr><td><code>p ~&gt; name</code></td> <td>fold capture
-equivalent to <code>lpeg.Cf(p, defs[name])</code></td></tr>
-<tr><td><code>& p</code></td> <td>and predicate</td></tr>
-<tr><td><code>! p</code></td> <td>not predicate</td></tr>
-<tr><td><code>p1 p2</code></td> <td>concatenation</td></tr>
-<tr><td><code>p1 / p2</code></td> <td>ordered choice</td></tr>
-<tr><td>(<code>name &lt;- p</code>)<sup>+</sup></td> <td>grammar</td></tr>
+(deprecated)</td></tr>
+<tr><td><code>p &gt;&gt; name</code></td> <td>accumulator capture
+equivalent to <code>(p % defs[name])</code></td></tr>
 </tbody></table>
 <p>
 Any space appearing in a syntax description can be
-replaced by zero or more space characters and Lua-style comments
+replaced by zero or more space characters and Lua-style short comments
 (<code>--</code> until end of line).
 </p>
 
@@ -200,9 +203,10 @@ print(re.match("the number 423 is odd", "({%a+} / .)*"))
 --&gt; the    number    is    odd
 
 -- returns the first numeral in a string
-print(re.match("the number 423 is odd", "s <- {%d+} / . s"))
+print(re.match("the number 423 is odd", "s &lt;- {%d+} / . s"))
 --&gt; 423
 
+-- substitutes a dot for each vowel in a string
 print(re.gsub("hello World", "[aeiou]", "."))
 --&gt; h.ll. W.rld
 </pre>
@@ -329,7 +333,7 @@ respecting the indentation:
 <pre class="example">
 p = re.compile[[
   block &lt;- {| {:ident:' '*:} line
-           ((=ident !' ' line) / &(=ident ' ') block)* |}
+           ((=ident !' ' line) / &amp;(=ident ' ') block)* |}
   line &lt;- {[^%nl]*} %nl
 ]]
 </pre>
@@ -416,6 +420,7 @@ prefix          &lt;- '&amp;' S prefix / '!' S prefix / suffix
 suffix          &lt;- primary S (([+*?]
                             / '^' [+-]? num
                             / '-&gt;' S (string / '{}' / name)
+                            / '&gt&gt;' S name
                             / '=&gt;' S name) S)*
 
 primary         &lt;- '(' exp ')' / string / class / defined
@@ -423,6 +428,7 @@ primary         &lt;- '(' exp ')' / string / class / defined
                  / '=' name
                  / '{}'
                  / '{~' exp '~}'
+                 / '{|' exp '|}'
                  / '{' exp '}'
                  / '.'
                  / name S !arrow
@@ -436,7 +442,7 @@ item            &lt;- defined / range / .
 range           &lt;- . '-' [^]]
 
 S               &lt;- (%s / '--' [^%nl]*)*   -- spaces and comments
-name            &lt;- [A-Za-z][A-Za-z0-9_]*
+name            &lt;- [A-Za-z_][A-Za-z0-9_]*
 arrow           &lt;- '&lt;-'
 num             &lt;- [0-9]+
 string          &lt;- '"' [^"]* '"' / "'" [^']* "'"
@@ -452,37 +458,9 @@ print(re.match(p, p))   -- a self description must match itself
 <h2><a name="license">License</a></h2>
 
 <p>
-Copyright &copy; 2008-2015 Lua.org, PUC-Rio.
-</p>
-<p>
-Permission is hereby granted, free of charge,
-to any person obtaining a copy of this software and
-associated documentation files (the "Software"),
-to deal in the Software without restriction,
-including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software,
-and to permit persons to whom the Software is
-furnished to do so,
-subject to the following conditions:
-</p>
+This module is part of the <a href="lpeg.html">LPeg</a> package and shares
+its <a href="lpeg.html#license">license</a>.
 
-<p>
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions of the Software.
-</p>
-
-<p>
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-</p>
 
 </div> <!-- id="content" -->
 

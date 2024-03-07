@@ -1,7 +1,3 @@
-/*
-** $Id: lpprint.h $
-*/
-
 
 #if !defined(lpprint_h)
 #define lpprint_h
@@ -13,11 +9,11 @@
 
 #if defined(LPEG_DEBUG)
 
-void printpatt (Instruction *p, int n);
+void printpatt (Instruction *p);
 void printtree (TTree *tree, int ident);
 void printktable (lua_State *L, int idx);
 void printcharset (const byte *st);
-void printcaplist (Capture *cap, Capture *limit);
+void printcaplist (Capture *cap);
 void printinst (const Instruction *op, const Instruction *p);
 
 #else
@@ -26,7 +22,7 @@ void printinst (const Instruction *op, const Instruction *p);
 	luaL_error(L, "function only implemented in debug mode")
 #define printtree(tree,i)  \
 	luaL_error(L, "function only implemented in debug mode")
-#define printpatt(p,n)  \
+#define printpatt(p)  \
 	luaL_error(L, "function only implemented in debug mode")
 
 #endif

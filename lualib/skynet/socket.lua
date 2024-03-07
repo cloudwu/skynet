@@ -154,7 +154,7 @@ socket_message[5] = function(id, _, err)
 		return
 	end
 	if s.callback then
-		skynet.error("socket: accpet error:", err)
+		skynet.error("socket: accept error:", err)
 		return
 	end
 	if s.connected then
@@ -330,7 +330,7 @@ function socket.read(id, sz)
 	if ret then
 		return ret
 	end
-	if not s.connected then
+	if s.closing or not s.connected then
 		return false, driver.readall(s.buffer, s.pool)
 	end
 

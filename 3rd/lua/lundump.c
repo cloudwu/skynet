@@ -248,6 +248,8 @@ static void loadDebug (LoadState *S, Proto *f) {
     f->locvars[i].endpc = loadInt(S);
   }
   n = loadInt(S);
+  if (n != 0)  /* does it have debug information? */
+    n = f->sizeupvalues;  /* must be this many */
   for (i = 0; i < n; i++)
     f->upvalues[i].name = loadStringN(S, f);
 }
