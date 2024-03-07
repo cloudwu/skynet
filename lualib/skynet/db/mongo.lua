@@ -511,10 +511,7 @@ function mongo_collection:find(query, projection)
 		__data = nil,
 		__cursor = nil,
 		__document = {},
-		__sort = empty_bson,
-		__skip = 0,
-		__limit = 0,
-		__hint = nil
+		__sort = empty_bson
 	} ,	cursor_meta)
 end
 
@@ -554,15 +551,47 @@ function mongo_cursor:hint(indexName)
 	return self
 end
 
+function mongo_cursor:maxTimeMS(ms)
+	self.__maxTimeMS = ms
+	return self
+end
+
+local opt_func = {}
+
+local function opt_define(name)
+	local key = "__" .. name
+	opt_func[name] = function (self, ...)
+		local v = self[key]
+		if v ~= nil then
+			return name, v, ...
+		else
+			return ...
+		end
+	end
+end
+
+opt_define "skip"
+opt_define "limit"
+opt_define "hint"
+opt_define "maxTimeMS"
+
+local function add_opt(self, opt, ...)
+	if opt == nil then
+		return
+	end
+	return opt_func[opt](self, add_opt(self, ...))
+end
+
 function mongo_cursor:count(with_limit_and_skip)
 	local ret
 	if with_limit_and_skip then
 		ret = self.__collection.database:runCommand('count', self.__collection.name, 'query', self.__query,
-			'limit', self.__limit, 'skip', self.__skip)
+			add_opt(self, "skip", "limit", "hint", "maxTimeMS"))
 	else
-		ret = self.__collection.database:runCommand('count', self.__collection.name, 'query', self.__query)
+		ret = self.__collection.database:runCommand('count', self.__collection.name, 'query', self.__query,
+			add_opt(self, "hint", "maxTimeMS"))
 	end
-	assert(ret and ret.ok == 1)
+	assert(ret.ok == 1, ret.errmsg)
 	return ret.n
 end
 
@@ -696,13 +725,6 @@ function mongo_collection:aggregate(pipeline, options)
 	} ,	aggregate_cursor_meta)
 end
 
-local function add_hint(self)
-	local h = self.__hint
-	if h then
-		return "hint", h
-	end
-end
-
 function mongo_cursor:hasNext()
 	if self.__ptr == nil then
 		if self.__document == nil then
@@ -714,7 +736,7 @@ function mongo_cursor:hasNext()
 		if self.__data == nil then
 			local name = self.__collection.name
 			response = database:runCommand("find", name, "filter", self.__query, "sort", self.__sort,
-				"skip", self.__skip, "limit", self.__limit, "projection", self.__projection, add_hint(self))
+				"projection", self.__projection, add_opt(self, "skip", "limit", "hint", "maxTimeMS"))
 		else
 			if self.__cursor  and self.__cursor > 0 then
 				local name = self.__collection.name
