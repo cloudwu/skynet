@@ -511,6 +511,8 @@ function mongo_collection:find(query, projection)
 		__data = nil,
 		__cursor = nil,
 		__document = {},
+		__limit = 0,
+		__skip = 0,
 		__sort = empty_bson
 	} ,	cursor_meta)
 end
