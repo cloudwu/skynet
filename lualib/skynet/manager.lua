@@ -52,13 +52,13 @@ end
 
 function skynet.register(name)
 	if not globalname(name) then
-		c.command("REG", name)
+		return c.command("REG", name)
 	end
 end
 
 function skynet.name(name, handle)
 	if not globalname(name, handle) then
-		c.command("NAME", name .. " " .. skynet.address(handle))
+		return c.command("NAME", name .. " " .. skynet.address(handle))
 	end
 end
 
