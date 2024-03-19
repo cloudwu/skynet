@@ -9,7 +9,7 @@
 #include <string.h>
 
 #define DEFAULT_SLOT_SIZE 4
-#define MAX_SLOT_SIZE 0x40000000
+#define MAX_NAME_COUNT 0x40000000
 
 struct handle_name {
 	char * name;
@@ -188,7 +188,7 @@ static void
 _insert_name_before(struct handle_storage *s, char *name, uint32_t handle, int before) {
 	if (s->name_count >= s->name_cap) {
 		s->name_cap *= 2;
-		assert(s->name_cap <= MAX_SLOT_SIZE);
+		assert(s->name_cap <= MAX_NAME_COUNT);
 		struct handle_name * n = skynet_malloc(s->name_cap * sizeof(struct handle_name));
 		int i;
 		for (i=0;i<before;i++) {
