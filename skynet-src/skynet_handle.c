@@ -190,13 +190,8 @@ _insert_name_before(struct handle_storage *s, char *name, uint32_t handle, int b
 		s->name_cap *= 2;
 		assert(s->name_cap <= MAX_SLOT_SIZE);
 		struct handle_name * n = skynet_malloc(s->name_cap * sizeof(struct handle_name));
-		int i;
-		for (i=0;i<before;i++) {
-			n[i] = s->name[i];
-		}
-		for (i=before;i<s->name_count;i++) {
-			n[i+1] = s->name[i];
-		}
+		memcpy(n, s->name, before * sizeof(struct handle_name));
+		memcpy(n + before + 1, s->name + before, (s->name_count - before) * sizeof(struct handle_name));
 		skynet_free(s->name);
 		s->name = n;
 	} else {
