@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
+#include <math.h>
 
 #define TYPE_NIL 0
 #define TYPE_BOOLEAN 1
@@ -317,6 +318,10 @@ pack_one(lua_State *L, struct write_block *b, int index, int depth) {
 			wb_integer(b, x);
 		} else {
 			lua_Number n = lua_tonumber(L,index);
+			if (isnan(n)) {
+				wb_free(b);
+				luaL_error(L, "serialize can't pack 'nan' number value");
+			}
 			wb_real(b,n);
 		}
 		break;
