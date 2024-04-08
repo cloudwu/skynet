@@ -262,7 +262,7 @@ function server.start(conf)
 		if p == nil then
 			p = { fd }
 			u.response[session] = p
-			local ok, result = pcall(conf.request_handler, u.username, message)
+			local ok, result = pcall(request_handler, u.username, message)
 			-- NOTICE: YIELD here, socket may close.
 			result = result or ""
 			if not ok then
