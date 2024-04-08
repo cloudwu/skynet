@@ -2,8 +2,12 @@ local skynet = require "skynet"
 local socket = require "http.sockethelper"
 local internal = require "http.internal"
 local dns = require "skynet.dns"
+
 local string = string
 local table = table
+local pcall = pcall
+local error = error
+local pairs = pairs
 
 local httpc = {}
 
