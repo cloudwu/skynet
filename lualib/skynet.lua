@@ -653,7 +653,9 @@ function skynet.exit()
 		c.send(address, skynet.PTYPE_ERROR, 0, "")
 	end
 	c.callback(function(prototype, msg, sz, session, source)
-		c.send(source, skynet.PTYPE_ERROR, session, "")
+		if session ~= 0 and source ~= 0 then
+			c.send(source, skynet.PTYPE_ERROR, session, "")
+		end
 	end)
 	c.command("EXIT")
 	-- quit service
