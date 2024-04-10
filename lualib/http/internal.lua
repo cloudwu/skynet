@@ -1,5 +1,11 @@
 local table = table
 local type = type
+local string = string
+local tonumber = tonumber
+local pcall = pcall
+local assert = assert
+local error = error
+local pairs = pairs
 
 local M = {}
 

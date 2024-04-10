@@ -352,7 +352,7 @@ v0.6.0 (2014-8-18)
 * add sharedata
 * bugfix: service exit before init would not report back
 * add skynet.response and check multicall skynet.ret
-* skynet.newservice throw error when lanuch faild
+* skynet.newservice throw error when lanuch failed
 * Don't check imported function in snax.hotfix
 * snax service add change SERVICE_PATH and add it to package.path
 * skynet.redirect support string address
