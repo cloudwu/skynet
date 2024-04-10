@@ -8,23 +8,21 @@ local tostring = tostring
 local readbytes = socket.read
 local writebytes = socket.write
 
-local err_info = nil
-
 local sockethelper = {}
 local socket_error = setmetatable({} , { 
-	__tostring = function()
-		local info = "[Socket Error] " .. tostring(err_info)
-		err_info = nil
-		return info
+	__tostring = function(self)
+		local info = self.err_info
+		self.err_info = nil
+		return info or "[Socket Error]"
 	end,
+
+	__call = function (self, info)
+		self.err_info = "[Socket Error] : " .. tostring(info)
+		return self
+	end
 })
 
-local error_info = function(info)
-	err_info = info
-end
-
 sockethelper.socket_error = socket_error
-sockethelper.error_info = error_info
 
 local function preread(fd, str)
 	return function (sz)
@@ -44,8 +42,7 @@ local function preread(fd, str)
 					if ret then
 						return str .. ret
 					else
-						error_info("read faild " .. fd)
-						error(socket_error)
+						error(socket_error("read failed fd = " .. fd))
 					end
 				end
 			end
@@ -54,8 +51,7 @@ local function preread(fd, str)
 			if ret then
 				return ret
 			else
-				error_info("read faild " .. fd)
-				error(socket_error)
+				error(socket_error("read failed fd = " .. fd))
 			end
 		end
 	end
@@ -70,8 +66,7 @@ function sockethelper.readfunc(fd, pre)
 		if ret then
 			return ret
 		else
-			error_info("read faild " .. fd)
-			error(socket_error)
+			error(socket_error("read failed fd = " .. fd))
 		end
 	end
 end
@@ -82,8 +77,7 @@ function sockethelper.writefunc(fd)
 	return function(content)
 		local ok = writebytes(fd, content)
 		if not ok then
-			error_info("write faild fd = " .. fd)
-			error(socket_error)
+			error(socket_error("write failed fd = " .. fd))
 		end
 	end
 end
@@ -120,8 +114,7 @@ function sockethelper.connect(host, port, timeout)
 	if fd then
 		return fd
 	end
-	error_info("connect faild host = " .. host .. ' port = '.. port .. ' timeout = ' .. timeout .. ' err = ' .. tostring(err) .. ' is_time_out = '.. tostring(is_time_out))
-	error(socket_error)
+	error(socket_error("connect failed host = " .. host .. ' port = '.. port .. ' timeout = ' .. timeout .. ' err = ' .. tostring(err) .. ' is_time_out = '.. tostring(is_time_out)))
 end
 
 function sockethelper.close(fd)
