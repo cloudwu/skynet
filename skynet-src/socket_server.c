@@ -192,20 +192,20 @@ struct request_udp {
 
 /*
 	The first byte is TYPE
-
-	S Start socket
+	R Resume socket
+	S Pause socket
 	B Bind socket
 	L Listen socket
 	K Close socket
 	O Connect to (Open)
-	X Exit
+	X Exit socket thread
+	W Enable write
 	D Send package (high)
 	P Send package (low)
 	A Send UDP package
+	C set udp address
 	T Set opt
 	U Create UDP socket
-	C set udp address
-	Q query info
  */
 
 struct request_package {
@@ -1372,6 +1372,7 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	int type = header[0];
 	int len = header[1];
 	block_readpipe(fd, buffer, len);
+
 	// ctrl command only exist in local fd, so don't worry about endian.
 	switch (type) {
 	case 'R':
