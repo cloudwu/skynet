@@ -11,42 +11,39 @@
 struct skynet_env {
 	struct spinlock lock;
 	lua_State *L;
-};
+} E;
 
-static struct skynet_env *E = NULL;
-
-const char * 
+const char *
 skynet_getenv(const char *key) {
-	SPIN_LOCK(E)
+	SPIN_LOCK(&E)
 
-	lua_State *L = E->L;
-	
+	lua_State *L = E.L;
+
 	lua_getglobal(L, key);
 	const char * result = lua_tostring(L, -1);
 	lua_pop(L, 1);
 
-	SPIN_UNLOCK(E)
+	SPIN_UNLOCK(&E)
 
 	return result;
 }
 
-void 
+void
 skynet_setenv(const char *key, const char *value) {
-	SPIN_LOCK(E)
-	
-	lua_State *L = E->L;
+	SPIN_LOCK(&E)
+
+	lua_State *L = E.L;
 	lua_getglobal(L, key);
 	assert(lua_isnil(L, -1));
 	lua_pop(L,1);
 	lua_pushstring(L,value);
 	lua_setglobal(L,key);
 
-	SPIN_UNLOCK(E)
+	SPIN_UNLOCK(&E)
 }
 
 void
 skynet_env_init() {
-	E = skynet_malloc(sizeof(*E));
-	SPIN_INIT(E)
-	E->L = luaL_newstate();
+	SPIN_INIT(&E)
+	E.L = luaL_newstate();
 }

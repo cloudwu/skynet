@@ -86,34 +86,35 @@ update_xmalloc_stat_free(uint32_t handle, size_t __n) {
 }
 
 inline static void*
-fill_prefix(char* ptr) {
+fill_prefix(void* ptr) {
 	uint32_t handle = skynet_current_handle();
+	// TODO: unrecommended usage of malloc_usable_size
 	size_t size = je_malloc_usable_size(ptr);
 	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
-	memcpy(&p->handle, &handle, sizeof(handle));
+	p->handle = handle;
 #ifdef MEMORY_CHECK
 	uint32_t dogtag = MEMORY_ALLOCTAG;
-	memcpy(&p->dogtag, &dogtag, sizeof(dogtag));
+	p->dogtag = dogtag;
 #endif
 	update_xmalloc_stat_alloc(handle, size);
 	return ptr;
 }
 
 inline static void*
-clean_prefix(char* ptr) {
+clean_prefix(void* ptr) {
 	size_t size = je_malloc_usable_size(ptr);
 	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
 	uint32_t handle;
-	memcpy(&handle, &p->handle, sizeof(handle));
+	handle = p->handle;
 #ifdef MEMORY_CHECK
 	uint32_t dogtag;
-	memcpy(&dogtag, &p->dogtag, sizeof(dogtag));
+	dogtag = p->dogtag;
 	if (dogtag == MEMORY_FREETAG) {
 		fprintf(stderr, "xmalloc: double free in :%08x\n", handle);
 	}
 	assert(dogtag == MEMORY_ALLOCTAG);	// memory out of bounds
 	dogtag = MEMORY_FREETAG;
-	memcpy(&p->dogtag, &dogtag, sizeof(dogtag));
+	p->dogtag = dogtag;
 #endif
 	update_xmalloc_stat_free(handle, size);
 	return ptr;
