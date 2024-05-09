@@ -4,6 +4,7 @@ local skynet_require = require "skynet.require"
 local tostring = tostring
 local coroutine = coroutine
 local assert = assert
+local error = error
 local pairs = pairs
 local pcall = pcall
 local table = table
