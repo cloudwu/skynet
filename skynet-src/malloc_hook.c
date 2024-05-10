@@ -102,7 +102,7 @@ fill_prefix(char* ptr, size_t sz, uint32_t cookie_size) {
 	return ret;
 }
 
-inline uint32_t
+inline static uint32_t
 get_cookie_size(char *ptr) {
 	uint32_t cookie_size;
 	memcpy(&cookie_size, ptr - sizeof(cookie_size), sizeof(cookie_size));
