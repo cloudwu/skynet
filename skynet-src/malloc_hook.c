@@ -216,9 +216,10 @@ skynet_free(void *ptr) {
 void *
 skynet_calloc(size_t nmemb, size_t size) {
 	uint32_t cookie_n = (PREFIX_SIZE+size-1)/size;
-	void* ptr = je_calloc(nmemb + cookie_n, size );
-	if(!ptr) malloc_oom((nmemb + cookie_n) * size);
-	return fill_prefix(ptr, size, cookie_n * size);
+	uint32_t n = nmemb + cookie_n;
+	void* ptr = je_calloc(n, size);
+	if(!ptr) malloc_oom(n * size);
+	return fill_prefix(ptr, size, n * size);
 }
 
 static inline uint32_t
