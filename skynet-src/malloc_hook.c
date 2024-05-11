@@ -24,10 +24,12 @@ struct mem_data {
 };
 
 struct mem_cookie {
+	size_t size;
 	uint32_t handle;
 #ifdef MEMORY_CHECK
 	uint32_t dogtag;
 #endif
+	uint32_t cookie_size;	// should be the last
 };
 
 #define SLOT_SIZE 0x10000
@@ -86,37 +88,42 @@ update_xmalloc_stat_free(uint32_t handle, size_t __n) {
 }
 
 inline static void*
-fill_prefix(char* ptr) {
+fill_prefix(char* ptr, size_t sz, uint32_t cookie_size) {
 	uint32_t handle = skynet_current_handle();
-	size_t size = je_malloc_usable_size(ptr);
-	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
-	memcpy(&p->handle, &handle, sizeof(handle));
+	struct mem_cookie *p = (struct mem_cookie *)ptr;
+	char * ret = ptr + cookie_size;
+	p->size = sz;
+	p->handle = handle;
 #ifdef MEMORY_CHECK
-	uint32_t dogtag = MEMORY_ALLOCTAG;
-	memcpy(&p->dogtag, &dogtag, sizeof(dogtag));
+	p->dogtag = MEMORY_ALLOCTAG;
 #endif
-	update_xmalloc_stat_alloc(handle, size);
-	return ptr;
+	update_xmalloc_stat_alloc(handle, sz);
+	memcpy(ret - sizeof(uint32_t), &cookie_size, sizeof(cookie_size));
+	return ret;
+}
+
+inline static uint32_t
+get_cookie_size(char *ptr) {
+	uint32_t cookie_size;
+	memcpy(&cookie_size, ptr - sizeof(cookie_size), sizeof(cookie_size));
+	return cookie_size;
 }
 
 inline static void*
 clean_prefix(char* ptr) {
-	size_t size = je_malloc_usable_size(ptr);
-	struct mem_cookie *p = (struct mem_cookie *)(ptr + size - sizeof(struct mem_cookie));
-	uint32_t handle;
-	memcpy(&handle, &p->handle, sizeof(handle));
+	uint32_t cookie_size = get_cookie_size(ptr);
+	struct mem_cookie *p = (struct mem_cookie *)(ptr - cookie_size);
+	uint32_t handle = p->handle;
 #ifdef MEMORY_CHECK
-	uint32_t dogtag;
-	memcpy(&dogtag, &p->dogtag, sizeof(dogtag));
+	uint32_t dogtag = p->dogtag;
 	if (dogtag == MEMORY_FREETAG) {
 		fprintf(stderr, "xmalloc: double free in :%08x\n", handle);
 	}
 	assert(dogtag == MEMORY_ALLOCTAG);	// memory out of bounds
-	dogtag = MEMORY_FREETAG;
-	memcpy(&p->dogtag, &dogtag, sizeof(dogtag));
+	p->dogtag = MEMORY_FREETAG;
 #endif
-	update_xmalloc_stat_free(handle, size);
-	return ptr;
+	update_xmalloc_stat_free(handle, p->size);
+	return p;
 }
 
 static void malloc_oom(size_t size) {
@@ -185,7 +192,7 @@ void *
 skynet_malloc(size_t size) {
 	void* ptr = je_malloc(size + PREFIX_SIZE);
 	if(!ptr) malloc_oom(size);
-	return fill_prefix(ptr);
+	return fill_prefix(ptr, size, PREFIX_SIZE);
 }
 
 void *
@@ -193,9 +200,10 @@ skynet_realloc(void *ptr, size_t size) {
 	if (ptr == NULL) return skynet_malloc(size);
 
 	void* rawptr = clean_prefix(ptr);
-	void *newptr = je_realloc(rawptr, size+PREFIX_SIZE);
+	uint32_t cookie_size = get_cookie_size(ptr);
+	void *newptr = je_realloc(rawptr, size+cookie_size);
 	if(!newptr) malloc_oom(size);
-	return fill_prefix(newptr);
+	return fill_prefix(newptr, size, cookie_size);
 }
 
 void
@@ -206,31 +214,51 @@ skynet_free(void *ptr) {
 }
 
 void *
-skynet_calloc(size_t nmemb,size_t size) {
-	void* ptr = je_calloc(nmemb + ((PREFIX_SIZE+size-1)/size), size );
-	if(!ptr) malloc_oom(size);
-	return fill_prefix(ptr);
+skynet_calloc(size_t nmemb, size_t size) {
+	uint32_t cookie_n = (PREFIX_SIZE+size-1)/size;
+	uint32_t n = nmemb + cookie_n;
+	void* ptr = je_calloc(n, size);
+	if(!ptr) malloc_oom(n * size);
+	return fill_prefix(ptr, n * size, cookie_n * size);
+}
+
+static inline uint32_t
+alignment_cookie_size(size_t alignment) {
+	if (alignment >= PREFIX_SIZE)
+		return alignment;
+	switch (alignment) {
+	case 4 :
+		return (PREFIX_SIZE + 3) / 4 * 4;
+	case 8 :
+		return (PREFIX_SIZE + 7) / 8 * 8;
+	case 16 :
+		return (PREFIX_SIZE + 15) / 16 * 16;
+	}
+	return (PREFIX_SIZE + alignment - 1) / alignment * alignment;
 }
 
 void *
 skynet_memalign(size_t alignment, size_t size) {
-	void* ptr = je_memalign(alignment, size + PREFIX_SIZE);
+	uint32_t cookie_size = alignment_cookie_size(alignment);
+	void* ptr = je_memalign(alignment, size + cookie_size);
 	if(!ptr) malloc_oom(size);
-	return fill_prefix(ptr);
+	return fill_prefix(ptr, size, cookie_size);
 }
 
 void *
 skynet_aligned_alloc(size_t alignment, size_t size) {
-	void* ptr = je_aligned_alloc(alignment, size + (size_t)((PREFIX_SIZE + alignment -1) & ~(alignment-1)));
+	uint32_t cookie_size = alignment_cookie_size(alignment);
+	void* ptr = je_aligned_alloc(alignment, size + cookie_size);
 	if(!ptr) malloc_oom(size);
-	return fill_prefix(ptr);
+	return fill_prefix(ptr, size, cookie_size);
 }
 
 int
 skynet_posix_memalign(void **memptr, size_t alignment, size_t size) {
-	int err = je_posix_memalign(memptr, alignment, size + PREFIX_SIZE);
+	uint32_t cookie_size = alignment_cookie_size(alignment);
+	int err = je_posix_memalign(memptr, alignment, size + cookie_size);
 	if (err) malloc_oom(size);
-	fill_prefix(*memptr);
+	fill_prefix(*memptr, size, cookie_size);
 	return err;
 }
 
