@@ -84,11 +84,11 @@ int sigign() {
 }
 
 static const char * load_config = "\
-	local result = {}\n\
+	local result = setmetatable({}, { __index = _G })\n\
 	local function getenv(name) return assert(os.getenv(name), [[os.getenv() failed: ]] .. name) end\n\
 	local sep = package.config:sub(1,1)\n\
 	local current_path = [[.]]..sep\n\
-	local function include(filename)\n\
+	function include(filename)\n\
 		local last_path = current_path\n\
 		local path, name = filename:match([[(.*]]..sep..[[)(.*)$]])\n\
 		if path then\n\
@@ -107,10 +107,9 @@ static const char * load_config = "\
 		assert(load(code,[[@]]..filename,[[t]],result))()\n\
 		current_path = last_path\n\
 	end\n\
-	setmetatable(result, { __index = { include = include } })\n\
 	local config_name = ...\n\
 	include(config_name)\n\
-	setmetatable(result, nil)\n\
+	include = nil\n\
 	return result\n\
 ";
 
