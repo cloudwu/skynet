@@ -12,6 +12,8 @@
 #include <lauxlib.h>
 #include <signal.h>
 #include <assert.h>
+#include <unistd.h>
+#include <sys/sysctl.h>
 
 static int
 optint(const char *key, int opt) {
@@ -81,6 +83,27 @@ int sigign() {
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGPIPE, &sa, 0);
 	return 0;
+}
+
+static int
+processor_num() {
+#ifdef __APPLE__
+	int mib[2];
+	size_t len;
+	int processors;
+	mib[0] = CTL_HW;
+	mib[1] = HW_NCPU;
+	len = sizeof(processors);
+	if (sysctl(mib, 2, &processors, &len, NULL, 0) != -1 && processors >= 1) {
+		assert(len == sizeof(processors), "processors invalid");
+		return processors;
+	}
+	return 1;
+#else
+	int processors = sysconf(_SC_NPROCESSORS_ONLN);
+	assert(processors > 0, "processors invalid");
+	return processors;
+#endif
 }
 
 static const char * load_config = "\
@@ -153,7 +176,7 @@ main(int argc, char *argv[]) {
 	_init_env(L);
 	lua_close(L);
 
-	config.thread =  optint("thread",8);
+	config.thread =  optint("thread", processor_num());
 	config.module_path = optstring("cpath","./cservice/?.so");
 	config.harbor = optint("harbor", 1);
 	config.bootstrap = optstring("bootstrap","snlua bootstrap");
