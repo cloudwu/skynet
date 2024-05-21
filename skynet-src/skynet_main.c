@@ -95,13 +95,13 @@ processor_num() {
 	mib[1] = HW_NCPU;
 	len = sizeof(processors);
 	if (sysctl(mib, 2, &processors, &len, NULL, 0) != -1 && processors >= 1) {
-		assert(len == sizeof(processors), "processors invalid");
+		assert(len == sizeof(processors));
 		return processors;
 	}
 	return 1;
 #else
 	int processors = sysconf(_SC_NPROCESSORS_ONLN);
-	assert(processors > 0, "processors invalid");
+	assert(processors > 0);
 	return processors;
 #endif
 }
