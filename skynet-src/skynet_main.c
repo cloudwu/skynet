@@ -102,7 +102,15 @@ static const char * load_config = "\
 		end\n\
 		local f = assert(io.open(current_path .. name))\n\
 		local code = assert(f:read [[*a]])\n\
-		code = string.gsub(code, [[%$([%w_%d]+)]], getenv)\n\
+		code = string.gsub(code, [[%$([%w_%d]+)]], function(s)\n\
+			local value = getenv(s)\n\
+			local n = tonumber(value)\n\
+			if n then\n\
+				return n\n\
+			end\n\
+			return string.format('\"%s\"', value)\n\
+		end)\n\
+		print(code)\n\
 		f:close()\n\
 		assert(load(code,[[@]]..filename,[[t]],result))()\n\
 		current_path = last_path\n\
