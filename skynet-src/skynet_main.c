@@ -110,7 +110,6 @@ static const char * load_config = "\
 			end\n\
 			return string.format('\"%s\"', value)\n\
 		end)\n\
-		print(code)\n\
 		f:close()\n\
 		assert(load(code,[[@]]..filename,[[t]],result))()\n\
 		current_path = last_path\n\
