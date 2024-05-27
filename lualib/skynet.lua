@@ -70,7 +70,7 @@ local watching_session = {}
 local error_queue = {}
 local fork_queue = { h = 1, t = 0 }
 
-local auxsend, auxtimeout
+local auxsend, auxtimeout, auxwait
 do ---- avoid session rewind conflict
 	local csend = c.send
 	local cintcommand = c.intcommand
@@ -140,6 +140,12 @@ do ---- avoid session rewind conflict
 		return session
 	end
 
+	local function auxwait_checkconflict()
+		local session = c.genid()
+		checkconflict(session)
+		return session
+	end
+
 	local function auxsend_checkrewind(addr, proto, msg, sz)
 		local session = csend(addr, proto, nil, msg, sz)
 		if session and session > dangerzone_low and session <= dangerzone_up then
@@ -158,15 +164,26 @@ do ---- avoid session rewind conflict
 		return session
 	end
 
+	local function auxwait_checkrewind()
+		local session = c.genid()
+		if session > dangerzone_low and session <= dangerzone_up then
+			-- enter dangerzone
+			set_checkconflict(session)
+		end
+		return session
+	end
+
 	set_checkrewind = function()
 		auxsend = auxsend_checkrewind
 		auxtimeout = auxtimeout_checkrewind
+		auxwait = auxwait_checkrewind
 	end
 
 	set_checkconflict = function(session)
 		reset_dangerzone(session)
 		auxsend = auxsend_checkconflict
 		auxtimeout = auxtimeout_checkconflict
+		auxwait = auxwait_checkconflict
 	end
 
 	-- in safezone at the beginning
@@ -516,7 +533,7 @@ function skynet.yield()
 end
 
 function skynet.wait(token)
-	local session = c.genid()
+	local session = auxwait()
 	token = token or coroutine.running()
 	suspend_sleep(session, token)
 	sleep_session[token] = nil
