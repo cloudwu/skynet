@@ -166,7 +166,7 @@ do ---- avoid session rewind conflict
 
 	local function auxwait_checkrewind()
 		local session = c.genid()
-		if session and session > dangerzone_low and session <= dangerzone_up then
+		if session > dangerzone_low and session <= dangerzone_up then
 			-- enter dangerzone
 			set_checkconflict(session)
 		end
