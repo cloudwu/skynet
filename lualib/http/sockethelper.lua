@@ -114,7 +114,7 @@ function sockethelper.connect(host, port, timeout)
 	if fd then
 		return fd
 	end
-	error(socket_error("connect failed host = " .. host .. ' port = '.. port .. ' timeout = ' .. timeout .. ' err = ' .. tostring(err) .. ' is_time_out = '.. tostring(is_time_out)))
+	error(socket_error("connect failed host = " .. host .. ' port = '.. port .. ' timeout = ' .. tostring(timeout) .. ' err = ' .. tostring(err) .. ' is_time_out = '.. tostring(is_time_out)))
 end
 
 function sockethelper.close(fd)
