@@ -32,7 +32,7 @@ logger_release(struct logger * inst) {
 	skynet_free(inst);
 }
 
-#define SIZETIMEFMT	250
+#define SIZETIMEFMT	30
 
 static int
 timestring(struct logger *inst, char tmp[SIZETIMEFMT]) {
