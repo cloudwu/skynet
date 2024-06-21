@@ -393,6 +393,7 @@ handle_exit(struct skynet_context * context, uint32_t handle) {
 struct command_func {
 	const char *name;
 	const char * (*func)(struct skynet_context * context, const char * param);
+	int size;
 };
 
 static const char *
@@ -643,36 +644,51 @@ cmd_signal(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+#define KV(k, v) { k, v, sizeof(k)-1 }
+static int cmd_funcs_init = 0;
 static struct command_func cmd_funcs[] = {
-	{ "TIMEOUT", cmd_timeout },
-	{ "REG", cmd_reg },
-	{ "QUERY", cmd_query },
-	{ "NAME", cmd_name },
-	{ "EXIT", cmd_exit },
-	{ "KILL", cmd_kill },
-	{ "LAUNCH", cmd_launch },
-	{ "GETENV", cmd_getenv },
-	{ "SETENV", cmd_setenv },
-	{ "STARTTIME", cmd_starttime },
-	{ "ABORT", cmd_abort },
-	{ "MONITOR", cmd_monitor },
-	{ "STAT", cmd_stat },
-	{ "LOGON", cmd_logon },
-	{ "LOGOFF", cmd_logoff },
-	{ "SIGNAL", cmd_signal },
-	{ NULL, NULL },
+	KV("TIMEOUT", cmd_timeout),
+	KV("REG", cmd_reg),
+	KV("QUERY", cmd_query),
+	KV("NAME", cmd_name),
+	KV("EXIT", cmd_exit),
+	KV("KILL", cmd_kill),
+	KV("LAUNCH", cmd_launch),
+	KV("GETENV", cmd_getenv),
+	KV("SETENV", cmd_setenv),
+	KV("STARTTIME", cmd_starttime),
+	KV("ABORT", cmd_abort),
+	KV("MONITOR", cmd_monitor),
+	KV("STAT", cmd_stat),
+	KV("LOGON", cmd_logon),
+	KV("LOGOFF", cmd_logoff),
+	KV("SIGNAL", cmd_signal)
 };
+#define SZ_COMMAND_FUNC (sizeof(cmd_funcs) / sizeof(cmd_funcs[0]))
+typedef int (*cmp_func)(const void*, const void*);
+
+static int
+cmp_sort(struct command_func *a, struct command_func *b) {
+	if ( a->size != b->size )
+		return a->size - b->size;
+	return strncmp(a->name, b->name, b->size);
+}
 
 const char * 
-skynet_command(struct skynet_context * context, const char * cmd , const char * param) {
-	struct command_func * method = &cmd_funcs[0];
-	while(method->name) {
-		if (strcmp(cmd, method->name) == 0) {
-			return method->func(context, param);
-		}
-		++method;
+skynet_command(struct skynet_context * context, const char * cmd, const char * param) {
+	if (!cmd_funcs_init) {
+		qsort(cmd_funcs, SZ_COMMAND_FUNC, sizeof(cmd_funcs[0]), (cmp_func)cmp_sort);
+		cmd_funcs_init = 1;
 	}
 
+	struct command_func * method;
+	struct command_func key;
+	key.name = cmd;
+	key.size = strlen(cmd);
+
+	method = bserarch(&key, cmd_funcs, SZ_COMMAND_FUNC, sizeof(cmd_funcs[0]), (cmp_func)cmp_sort);
+	if (method)
+		return method->func(context, param);
 	return NULL;
 }
 
