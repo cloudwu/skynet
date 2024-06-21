@@ -686,7 +686,7 @@ skynet_command(struct skynet_context * context, const char * cmd, const char * p
 	key.name = cmd;
 	key.size = strlen(cmd);
 
-	method = bserarch(&key, cmd_funcs, SZ_COMMAND_FUNC, sizeof(cmd_funcs[0]), (cmp_func)cmp_sort);
+	method = bsearch(&key, cmd_funcs, SZ_COMMAND_FUNC, sizeof(key), (cmp_func)cmp_sort);
 	if (method)
 		return method->func(context, param);
 	return NULL;
