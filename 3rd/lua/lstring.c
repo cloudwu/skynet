@@ -45,8 +45,7 @@ int luaS_eqlngstr (TString *a, TString *b) {
 int luaS_eqshrstr (TString *a, TString *b) {
   int r;
   lu_byte len = a->shrlen;
-  lua_assert(b->tt == LUA_VSHRSTR);
-  r = len == b->shrlen && (memcmp(getstr(a), getstr(b), len) == 0);
+  r = len == b->shrlen && (memcmp(getshrstr(a), getshrstr(b), len) == 0);
   if (r) {
     if (a->id < b->id) {
       a->id = b->id;
