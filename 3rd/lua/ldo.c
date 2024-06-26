@@ -409,7 +409,7 @@ static void rethook (lua_State *L, CallInfo *ci, int nres) {
 ** stack, below original 'func', so that 'luaD_precall' can call it. Raise
 ** an error if there is no '__call' metafield.
 */
-StkId luaD_tryfuncTM (lua_State *L, StkId func) {
+static StkId tryfuncTM (lua_State *L, StkId func) {
   const TValue *tm;
   StkId p;
   checkstackGCp(L, 1, func);  /* space for metamethod */
@@ -568,7 +568,7 @@ int luaD_pretailcall (lua_State *L, CallInfo *ci, StkId func,
       return -1;
     }
     default: {  /* not a function */
-      func = luaD_tryfuncTM(L, func);  /* try to get '__call' metamethod */
+      func = tryfuncTM(L, func);  /* try to get '__call' metamethod */
       /* return luaD_pretailcall(L, ci, func, narg1 + 1, delta); */
       narg1++;
       goto retry;  /* try again */
@@ -609,7 +609,7 @@ CallInfo *luaD_precall (lua_State *L, StkId func, int nresults) {
       return ci;
     }
     default: {  /* not a function */
-      func = luaD_tryfuncTM(L, func);  /* try to get '__call' metamethod */
+      func = tryfuncTM(L, func);  /* try to get '__call' metamethod */
       /* return luaD_precall(L, func, nresults); */
       goto retry;  /* try again with metamethod */
     }
@@ -792,6 +792,10 @@ static void resume (lua_State *L, void *ud) {
     lua_assert(L->status == LUA_YIELD);
     L->status = LUA_OK;  /* mark that it is running (again) */
     if (isLua(ci)) {  /* yielded inside a hook? */
+      /* undo increment made by 'luaG_traceexec': instruction was not
+         executed yet */
+      lua_assert(ci->callstatus & CIST_HOOKYIELD);
+      ci->u.l.savedpc--;
       L->top.p = firstArg;  /* discard arguments */
       luaV_execute(L, ci);  /* just continue running Lua code */
     }

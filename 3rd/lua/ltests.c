@@ -73,8 +73,9 @@ static void badexit (const char *fmt, const char *s1, const char *s2) {
 
 
 static int tpanic (lua_State *L) {
-  const char *msg = lua_tostring(L, -1);
-  if (msg == NULL) msg = "error object is not a string";
+  const char *msg = (lua_type(L, -1) == LUA_TSTRING)
+                  ? lua_tostring(L, -1)
+                  : "error object is not a string";
   return (badexit("PANIC: unprotected error in call to Lua API (%s)\n",
                    msg, NULL),
           0);  /* do not return to Lua */
@@ -1533,7 +1534,7 @@ static int runC (lua_State *L, lua_State *L1, const char *pc) {
       lua_newthread(L1);
     }
     else if EQ("resetthread") {
-      lua_pushinteger(L1, lua_resetthread(L1, L));
+      lua_pushinteger(L1, lua_resetthread(L1));  /* deprecated */
     }
     else if EQ("newuserdata") {
       lua_newuserdata(L1, getnum);
@@ -1648,6 +1649,11 @@ static int runC (lua_State *L, lua_State *L1, const char *pc) {
       int i = getindex;
       int nres;
       status = lua_resume(lua_tothread(L1, i), L, getnum, &nres);
+    }
+    else if EQ("traceback") {
+      const char *msg = getstring;
+      int level = getnum;
+      luaL_traceback(L1, L1, msg, level);
     }
     else if EQ("return") {
       int n = getnum;

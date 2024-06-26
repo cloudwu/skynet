@@ -254,7 +254,7 @@ LUAI_FUNC unsigned int luaH_realasize (const Table *t) {
     return t->alimit;  /* this is the size */
   else {
     unsigned int size = t->alimit;
-    /* compute the smallest power of 2 not smaller than 'n' */
+    /* compute the smallest power of 2 not smaller than 'size' */
     size |= (size >> 1);
     size |= (size >> 2);
     size |= (size >> 4);
@@ -664,7 +664,8 @@ static Node *getfreepos (Table *t) {
 ** put new key in its main position; otherwise (colliding node is in its main
 ** position), new key goes to an empty position.
 */
-void luaH_newkey (lua_State *L, Table *t, const TValue *key, TValue *value) {
+static void luaH_newkey (lua_State *L, Table *t, const TValue *key,
+                                                 TValue *value) {
   Node *mp;
   TValue aux;
   if (l_unlikely(isshared(t)))
@@ -725,22 +726,36 @@ void luaH_newkey (lua_State *L, Table *t, const TValue *key, TValue *value) {
 
 /*
 ** Search function for integers. If integer is inside 'alimit', get it
-** directly from the array part. Otherwise, if 'alimit' is not equal to
-** the real size of the array, key still can be in the array part. In
-** this case, try to avoid a call to 'luaH_realasize' when key is just
-** one more than the limit (so that it can be incremented without
-** changing the real size of the array).
+** directly from the array part. Otherwise, if 'alimit' is not
+** the real size of the array, the key still can be in the array part.
+** In this case, do the "Xmilia trick" to check whether 'key-1' is
+** smaller than the real size.
+** The trick works as follow: let 'p' be an integer such that
+**   '2^(p+1) >= alimit > 2^p', or  '2^(p+1) > alimit-1 >= 2^p'.
+** That is, 2^(p+1) is the real size of the array, and 'p' is the highest
+** bit on in 'alimit-1'. What we have to check becomes 'key-1 < 2^(p+1)'.
+** We compute '(key-1) & ~(alimit-1)', which we call 'res'; it will
+** have the 'p' bit cleared. If the key is outside the array, that is,
+** 'key-1 >= 2^(p+1)', then 'res' will have some bit on higher than 'p',
+** therefore it will be larger or equal to 'alimit', and the check
+** will fail. If 'key-1 < 2^(p+1)', then 'res' has no bit on higher than
+** 'p', and as the bit 'p' itself was cleared, 'res' will be smaller
+** than 2^p, therefore smaller than 'alimit', and the check succeeds.
+** As special cases, when 'alimit' is 0 the condition is trivially false,
+** and when 'alimit' is 1 the condition simplifies to 'key-1 < alimit'.
+** If key is 0 or negative, 'res' will have its higher bit on, so that
+** if cannot be smaller than alimit.
 */
 const TValue *luaH_getint (Table *t, lua_Integer key) {
-  if (l_castS2U(key) - 1u < t->alimit)  /* 'key' in [1, t->alimit]? */
+  lua_Unsigned alimit = t->alimit;
+  if (l_castS2U(key) - 1u < alimit)  /* 'key' in [1, t->alimit]? */
     return &t->array[key - 1];
-  else if (!limitequalsasize(t) &&  /* key still may be in the array part? */
-           (l_castS2U(key) == t->alimit + 1 ||
-            l_castS2U(key) - 1u < luaH_realasize(t))) {
+  else if (!isrealasize(t) &&  /* key still may be in the array part? */
+           (((l_castS2U(key) - 1u) & ~(alimit - 1u)) < alimit)) {
     t->alimit = cast_uint(key);  /* probably '#t' is here now */
     return &t->array[key - 1];
   }
-  else {
+  else {  /* key is not in the array part; check the hash */
     Node *n = hashint(t, key);
     for (;;) {  /* check whether 'key' is somewhere in the chain */
       if (keyisinteger(n) && keyival(n) == key)

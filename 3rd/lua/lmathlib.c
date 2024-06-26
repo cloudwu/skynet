@@ -249,6 +249,15 @@ static int math_type (lua_State *L) {
 ** ===================================================================
 */
 
+/*
+** This code uses lots of shifts. ANSI C does not allow shifts greater
+** than or equal to the width of the type being shifted, so some shifts
+** are written in convoluted ways to match that restriction. For
+** preprocessor tests, it assumes a width of 32 bits, so the maximum
+** shift there is 31 bits.
+*/
+
+
 /* number of binary digits in the mantissa of a float */
 #define FIGS	l_floatatt(MANT_DIG)
 
@@ -271,16 +280,19 @@ static int math_type (lua_State *L) {
 
 /* 'long' has at least 64 bits */
 #define Rand64		unsigned long
+#define SRand64		long
 
 #elif !defined(LUA_USE_C89) && defined(LLONG_MAX)
 
 /* there is a 'long long' type (which must have at least 64 bits) */
 #define Rand64		unsigned long long
+#define SRand64		long long
 
 #elif ((LUA_MAXUNSIGNED >> 31) >> 31) >= 3
 
 /* 'lua_Unsigned' has at least 64 bits */
 #define Rand64		lua_Unsigned
+#define SRand64		lua_Integer
 
 #endif
 
@@ -319,23 +331,30 @@ static Rand64 nextrand (Rand64 *state) {
 }
 
 
-/* must take care to not shift stuff by more than 63 slots */
-
-
 /*
 ** Convert bits from a random integer into a float in the
 ** interval [0,1), getting the higher FIG bits from the
 ** random unsigned integer and converting that to a float.
+** Some old Microsoft compilers cannot cast an unsigned long
+** to a floating-point number, so we use a signed long as an
+** intermediary. When lua_Number is float or double, the shift ensures
+** that 'sx' is non negative; in that case, a good compiler will remove
+** the correction.
 */
 
 /* must throw out the extra (64 - FIGS) bits */
 #define shift64_FIG	(64 - FIGS)
 
-/* to scale to [0, 1), multiply by scaleFIG = 2^(-FIGS) */
+/* 2^(-FIGS) == 2^-1 / 2^(FIGS-1) */
 #define scaleFIG	(l_mathop(0.5) / ((Rand64)1 << (FIGS - 1)))
 
 static lua_Number I2d (Rand64 x) {
-  return (lua_Number)(trim64(x) >> shift64_FIG) * scaleFIG;
+  SRand64 sx = (SRand64)(trim64(x) >> shift64_FIG);
+  lua_Number res = (lua_Number)(sx) * scaleFIG;
+  if (sx < 0)
+    res += l_mathop(1.0);  /* correct the two's complement if negative */
+  lua_assert(0 <= res && res < 1);
+  return res;
 }
 
 /* convert a 'Rand64' to a 'lua_Unsigned' */
@@ -470,8 +489,6 @@ static lua_Number I2d (Rand64 x) {
 }
 
 #else	/* 32 < FIGS <= 64 */
-
-/* must take care to not shift stuff by more than 31 slots */
 
 /* 2^(-FIGS) = 1.0 / 2^30 / 2^3 / 2^(FIGS-33) */
 #define scaleFIG  \

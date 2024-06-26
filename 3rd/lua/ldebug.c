@@ -31,7 +31,7 @@
 
 
 
-#define noLuaClosure(f)		((f) == NULL || (f)->c.tt == LUA_VCCL)
+#define LuaClosure(f)		((f) != NULL && (f)->c.tt == LUA_VLCL)
 
 
 static const char *funcnamefromcall (lua_State *L, CallInfo *ci,
@@ -254,7 +254,7 @@ LUA_API const char *lua_setlocal (lua_State *L, const lua_Debug *ar, int n) {
 
 
 static void funcinfo (lua_Debug *ar, Closure *cl) {
-  if (noLuaClosure(cl)) {
+  if (!LuaClosure(cl)) {
     ar->source = "=[C]";
     ar->srclen = LL("=[C]");
     ar->linedefined = -1;
@@ -288,29 +288,31 @@ static int nextline (const Proto *p, int currentline, int pc) {
 
 
 static void collectvalidlines (lua_State *L, Closure *f) {
-  if (noLuaClosure(f)) {
+  if (!LuaClosure(f)) {
     setnilvalue(s2v(L->top.p));
     api_incr_top(L);
   }
   else {
-    int i;
-    TValue v;
     const Proto *p = f->l.p;
     int currentline = p->linedefined;
     Table *t = luaH_new(L);  /* new table to store active lines */
     sethvalue2s(L, L->top.p, t);  /* push it on stack */
     api_incr_top(L);
-    setbtvalue(&v);  /* boolean 'true' to be the value of all indices */
-    if (!p->is_vararg)  /* regular function? */
-      i = 0;  /* consider all instructions */
-    else {  /* vararg function */
-      lua_assert(GET_OPCODE(p->code[0]) == OP_VARARGPREP);
-      currentline = nextline(p, currentline, 0);
-      i = 1;  /* skip first instruction (OP_VARARGPREP) */
-    }
-    for (; i < p->sizelineinfo; i++) {  /* for each instruction */
-      currentline = nextline(p, currentline, i);  /* get its line */
-      luaH_setint(L, t, currentline, &v);  /* table[line] = true */
+    if (p->lineinfo != NULL) {  /* proto with debug information? */
+      int i;
+      TValue v;
+      setbtvalue(&v);  /* boolean 'true' to be the value of all indices */
+      if (!p->is_vararg)  /* regular function? */
+        i = 0;  /* consider all instructions */
+      else {  /* vararg function */
+        lua_assert(GET_OPCODE(p->code[0]) == OP_VARARGPREP);
+        currentline = nextline(p, currentline, 0);
+        i = 1;  /* skip first instruction (OP_VARARGPREP) */
+      }
+      for (; i < p->sizelineinfo; i++) {  /* for each instruction */
+        currentline = nextline(p, currentline, i);  /* get its line */
+        luaH_setint(L, t, currentline, &v);  /* table[line] = true */
+      }
     }
   }
 }
@@ -339,7 +341,7 @@ static int auxgetinfo (lua_State *L, const char *what, lua_Debug *ar,
       }
       case 'u': {
         ar->nups = (f == NULL) ? 0 : f->c.nupvalues;
-        if (noLuaClosure(f)) {
+        if (!LuaClosure(f)) {
           ar->isvararg = 1;
           ar->nparams = 0;
         }
@@ -417,40 +419,6 @@ LUA_API int lua_getinfo (lua_State *L, const char *what, lua_Debug *ar) {
 ** =======================================================
 */
 
-static const char *getobjname (const Proto *p, int lastpc, int reg,
-                               const char **name);
-
-
-/*
-** Find a "name" for the constant 'c'.
-*/
-static void kname (const Proto *p, int c, const char **name) {
-  TValue *kvalue = &p->k[c];
-  *name = (ttisstring(kvalue)) ? svalue(kvalue) : "?";
-}
-
-
-/*
-** Find a "name" for the register 'c'.
-*/
-static void rname (const Proto *p, int pc, int c, const char **name) {
-  const char *what = getobjname(p, pc, c, name); /* search for 'c' */
-  if (!(what && *what == 'c'))  /* did not find a constant name? */
-    *name = "?";
-}
-
-
-/*
-** Find a "name" for a 'C' value in an RK instruction.
-*/
-static void rkname (const Proto *p, int pc, Instruction i, const char **name) {
-  int c = GETARG_C(i);  /* key index */
-  if (GETARG_k(i))  /* is 'c' a constant? */
-    kname(p, c, name);
-  else  /* 'c' is a register */
-    rname(p, pc, c, name);
-}
-
 
 static int filterpc (int pc, int jmptarget) {
   if (pc < jmptarget)  /* is code conditional (inside a jump)? */
@@ -509,28 +477,29 @@ static int findsetreg (const Proto *p, int lastpc, int reg) {
 
 
 /*
-** Check whether table being indexed by instruction 'i' is the
-** environment '_ENV'
+** Find a "name" for the constant 'c'.
 */
-static const char *gxf (const Proto *p, int pc, Instruction i, int isup) {
-  int t = GETARG_B(i);  /* table index */
-  const char *name;  /* name of indexed variable */
-  if (isup)  /* is an upvalue? */
-    name = upvalname(p, t);
-  else
-    getobjname(p, pc, t, &name);
-  return (name && strcmp(name, LUA_ENV) == 0) ? "global" : "field";
+static const char *kname (const Proto *p, int index, const char **name) {
+  TValue *kvalue = &p->k[index];
+  if (ttisstring(kvalue)) {
+    *name = getstr(tsvalue(kvalue));
+    return "constant";
+  }
+  else {
+    *name = "?";
+    return NULL;
+  }
 }
 
 
-static const char *getobjname (const Proto *p, int lastpc, int reg,
-                               const char **name) {
-  int pc;
-  *name = luaF_getlocalname(p, reg + 1, lastpc);
+static const char *basicgetobjname (const Proto *p, int *ppc, int reg,
+                                    const char **name) {
+  int pc = *ppc;
+  *name = luaF_getlocalname(p, reg + 1, pc);
   if (*name)  /* is a local? */
     return "local";
   /* else try symbolic execution */
-  pc = findsetreg(p, lastpc, reg);
+  *ppc = pc = findsetreg(p, pc, reg);
   if (pc != -1) {  /* could find instruction? */
     Instruction i = p->code[pc];
     OpCode op = GET_OPCODE(i);
@@ -538,18 +507,80 @@ static const char *getobjname (const Proto *p, int lastpc, int reg,
       case OP_MOVE: {
         int b = GETARG_B(i);  /* move from 'b' to 'a' */
         if (b < GETARG_A(i))
-          return getobjname(p, pc, b, name);  /* get name for 'b' */
+          return basicgetobjname(p, ppc, b, name);  /* get name for 'b' */
         break;
       }
+      case OP_GETUPVAL: {
+        *name = upvalname(p, GETARG_B(i));
+        return "upvalue";
+      }
+      case OP_LOADK: return kname(p, GETARG_Bx(i), name);
+      case OP_LOADKX: return kname(p, GETARG_Ax(p->code[pc + 1]), name);
+      default: break;
+    }
+  }
+  return NULL;  /* could not find reasonable name */
+}
+
+
+/*
+** Find a "name" for the register 'c'.
+*/
+static void rname (const Proto *p, int pc, int c, const char **name) {
+  const char *what = basicgetobjname(p, &pc, c, name); /* search for 'c' */
+  if (!(what && *what == 'c'))  /* did not find a constant name? */
+    *name = "?";
+}
+
+
+/*
+** Find a "name" for a 'C' value in an RK instruction.
+*/
+static void rkname (const Proto *p, int pc, Instruction i, const char **name) {
+  int c = GETARG_C(i);  /* key index */
+  if (GETARG_k(i))  /* is 'c' a constant? */
+    kname(p, c, name);
+  else  /* 'c' is a register */
+    rname(p, pc, c, name);
+}
+
+
+/*
+** Check whether table being indexed by instruction 'i' is the
+** environment '_ENV'
+*/
+static const char *isEnv (const Proto *p, int pc, Instruction i, int isup) {
+  int t = GETARG_B(i);  /* table index */
+  const char *name;  /* name of indexed variable */
+  if (isup)  /* is 't' an upvalue? */
+    name = upvalname(p, t);
+  else  /* 't' is a register */
+    basicgetobjname(p, &pc, t, &name);
+  return (name && strcmp(name, LUA_ENV) == 0) ? "global" : "field";
+}
+
+
+/*
+** Extend 'basicgetobjname' to handle table accesses
+*/
+static const char *getobjname (const Proto *p, int lastpc, int reg,
+                               const char **name) {
+  const char *kind = basicgetobjname(p, &lastpc, reg, name);
+  if (kind != NULL)
+    return kind;
+  else if (lastpc != -1) {  /* could find instruction? */
+    Instruction i = p->code[lastpc];
+    OpCode op = GET_OPCODE(i);
+    switch (op) {
       case OP_GETTABUP: {
         int k = GETARG_C(i);  /* key index */
         kname(p, k, name);
-        return gxf(p, pc, i, 1);
+        return isEnv(p, lastpc, i, 1);
       }
       case OP_GETTABLE: {
         int k = GETARG_C(i);  /* key index */
-        rname(p, pc, k, name);
-        return gxf(p, pc, i, 0);
+        rname(p, lastpc, k, name);
+        return isEnv(p, lastpc, i, 0);
       }
       case OP_GETI: {
         *name = "integer index";
@@ -558,24 +589,10 @@ static const char *getobjname (const Proto *p, int lastpc, int reg,
       case OP_GETFIELD: {
         int k = GETARG_C(i);  /* key index */
         kname(p, k, name);
-        return gxf(p, pc, i, 0);
-      }
-      case OP_GETUPVAL: {
-        *name = upvalname(p, GETARG_B(i));
-        return "upvalue";
-      }
-      case OP_LOADK:
-      case OP_LOADKX: {
-        int b = (op == OP_LOADK) ? GETARG_Bx(i)
-                                 : GETARG_Ax(p->code[pc + 1]);
-        if (ttisstring(&p->k[b])) {
-          *name = svalue(&p->k[b]);
-          return "constant";
-        }
-        break;
+        return isEnv(p, lastpc, i, 0);
       }
       case OP_SELF: {
-        rkname(p, pc, i, name);
+        rkname(p, lastpc, i, name);
         return "method";
       }
       default: break;  /* go through to return NULL */
@@ -627,7 +644,7 @@ static const char *funcnamefromcode (lua_State *L, const Proto *p,
     default:
       return NULL;  /* cannot find a reasonable name */
   }
-  *name = getstr(G(L)->tmname[tm]) + 2;
+  *name = getshrstr(G(L)->tmname[tm]) + 2;
   return "metamethod";
 }
 
@@ -866,6 +883,28 @@ static int changedline (const Proto *p, int oldpc, int newpc) {
 
 
 /*
+** Traces Lua calls. If code is running the first instruction of a function,
+** and function is not vararg, and it is not coming from an yield,
+** calls 'luaD_hookcall'. (Vararg functions will call 'luaD_hookcall'
+** after adjusting its variable arguments; otherwise, they could call
+** a line/count hook before the call hook. Functions coming from
+** an yield already called 'luaD_hookcall' before yielding.)
+*/
+int luaG_tracecall (lua_State *L) {
+  CallInfo *ci = L->ci;
+  Proto *p = ci_func(ci)->p;
+  ci->u.l.trap = 1;  /* ensure hooks will be checked */
+  if (ci->u.l.savedpc == p->code) {  /* first instruction (not resuming)? */
+    if (p->is_vararg)
+      return 0;  /* hooks will start at VARARGPREP instruction */
+    else if (!(ci->callstatus & CIST_HOOKYIELD))  /* not yieded? */
+      luaD_hookcall(L, ci);  /* check 'call' hook */
+  }
+  return 1;  /* keep 'trap' on */
+}
+
+
+/*
 ** Traces the execution of a Lua function. Called before the execution
 ** of each opcode, when debug is on. 'L->oldpc' stores the last
 ** instruction traced, to detect line changes. When entering a new
@@ -888,12 +927,12 @@ int luaG_traceexec (lua_State *L, const Instruction *pc) {
   }
   pc++;  /* reference is always next instruction */
   ci->u.l.savedpc = pc;  /* save 'pc' */
-  counthook = (--L->hookcount == 0 && (mask & LUA_MASKCOUNT));
+  counthook = (mask & LUA_MASKCOUNT) && (--L->hookcount == 0);
   if (counthook)
     resethookcount(L);  /* reset count */
   else if (!(mask & LUA_MASKLINE))
     return 1;  /* no line hook and count != 0; nothing to be done now */
-  if (ci->callstatus & CIST_HOOKYIELD) {  /* called hook last time? */
+  if (ci->callstatus & CIST_HOOKYIELD) {  /* hook yielded last time? */
     ci->callstatus &= ~CIST_HOOKYIELD;  /* erase mark */
     return 1;  /* do not call hook again (VM yielded, so it did not move) */
   }
@@ -915,7 +954,6 @@ int luaG_traceexec (lua_State *L, const Instruction *pc) {
   if (L->status == LUA_YIELD) {  /* did hook yield? */
     if (counthook)
       L->hookcount = 1;  /* undo decrement to zero */
-    ci->u.l.savedpc--;  /* undo increment (resume will increment it again) */
     ci->callstatus |= CIST_HOOKYIELD;  /* mark that it yielded */
     luaD_throw(L, LUA_YIELD);
   }

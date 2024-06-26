@@ -542,7 +542,7 @@ const char *luaO_pushvfstring (lua_State *L, const char *fmt, va_list argp) {
   addstr2buff(&buff, fmt, strlen(fmt));  /* rest of 'fmt' */
   clearbuff(&buff);  /* empty buffer into the stack */
   lua_assert(buff.pushed == 1);
-  return svalue(s2v(L->top.p - 1));
+  return getstr(tsvalue(s2v(L->top.p - 1)));
 }
 
 

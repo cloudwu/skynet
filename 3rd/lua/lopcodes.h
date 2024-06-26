@@ -210,15 +210,15 @@ OP_LOADNIL,/*	A B	R[A], R[A+1], ..., R[A+B] := nil		*/
 OP_GETUPVAL,/*	A B	R[A] := UpValue[B]				*/
 OP_SETUPVAL,/*	A B	UpValue[B] := R[A]				*/
 
-OP_GETTABUP,/*	A B C	R[A] := UpValue[B][K[C]:string]			*/
+OP_GETTABUP,/*	A B C	R[A] := UpValue[B][K[C]:shortstring]		*/
 OP_GETTABLE,/*	A B C	R[A] := R[B][R[C]]				*/
 OP_GETI,/*	A B C	R[A] := R[B][C]					*/
-OP_GETFIELD,/*	A B C	R[A] := R[B][K[C]:string]			*/
+OP_GETFIELD,/*	A B C	R[A] := R[B][K[C]:shortstring]			*/
 
-OP_SETTABUP,/*	A B C	UpValue[A][K[B]:string] := RK(C)		*/
+OP_SETTABUP,/*	A B C	UpValue[A][K[B]:shortstring] := RK(C)		*/
 OP_SETTABLE,/*	A B C	R[A][R[B]] := RK(C)				*/
 OP_SETI,/*	A B C	R[A][B] := RK(C)				*/
-OP_SETFIELD,/*	A B C	R[A][K[B]:string] := RK(C)			*/
+OP_SETFIELD,/*	A B C	R[A][K[B]:shortstring] := RK(C)			*/
 
 OP_NEWTABLE,/*	A B C k	R[A] := {}					*/
 

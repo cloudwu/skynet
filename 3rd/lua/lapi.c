@@ -417,9 +417,9 @@ LUA_API const char *lua_tolstring (lua_State *L, int idx, size_t *len) {
     o = index2value(L, idx);  /* previous call may reallocate the stack */
   }
   if (len != NULL)
-    *len = vslen(o);
+    *len = tsslen(tsvalue(o));
   lua_unlock(L);
-  return svalue(o);
+  return getstr(tsvalue(o));
 }
 
 

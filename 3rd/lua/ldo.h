@@ -71,7 +71,6 @@ LUAI_FUNC int luaD_pretailcall (lua_State *L, CallInfo *ci, StkId func,
 LUAI_FUNC CallInfo *luaD_precall (lua_State *L, StkId func, int nResults);
 LUAI_FUNC void luaD_call (lua_State *L, StkId func, int nResults);
 LUAI_FUNC void luaD_callnoyield (lua_State *L, StkId func, int nResults);
-LUAI_FUNC StkId luaD_tryfuncTM (lua_State *L, StkId func);
 LUAI_FUNC int luaD_closeprotected (lua_State *L, ptrdiff_t level, int status);
 LUAI_FUNC int luaD_pcall (lua_State *L, Pfunc func, void *u,
                                         ptrdiff_t oldtop, ptrdiff_t ef);

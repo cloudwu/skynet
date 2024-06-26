@@ -181,7 +181,7 @@ struct CallInfo {
   union {
     struct {  /* only for Lua functions */
       const Instruction *savedpc;
-      volatile l_signalT trap;
+      volatile l_signalT trap;  /* function is tracing lines/counts */
       int nextraargs;  /* # of extra arguments in vararg functions */
     } l;
     struct {  /* only for C functions */
@@ -395,7 +395,6 @@ union GCUnion {
 LUAI_FUNC void luaE_setdebt (global_State *g, l_mem debt);
 LUAI_FUNC void luaE_freethread (lua_State *L, lua_State *L1);
 LUAI_FUNC CallInfo *luaE_extendCI (lua_State *L);
-LUAI_FUNC void luaE_freeCI (lua_State *L);
 LUAI_FUNC void luaE_shrinkCI (lua_State *L);
 LUAI_FUNC void luaE_checkcstack (lua_State *L);
 LUAI_FUNC void luaE_incCstack (lua_State *L);

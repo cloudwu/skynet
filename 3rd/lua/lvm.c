@@ -91,8 +91,10 @@ static int l_strton (const TValue *obj, TValue *result) {
   lua_assert(obj != result);
   if (!cvt2num(obj))  /* is object not a string? */
     return 0;
-  else
-    return (luaO_str2num(svalue(obj), result) == vslen(obj) + 1);
+  else {
+    TString *st = tsvalue(obj);
+    return (luaO_str2num(getstr(st), result) == tsslen(st) + 1);
+  }
 }
 
 
@@ -368,30 +370,32 @@ void luaV_finishset (lua_State *L, const TValue *t, TValue *key,
 
 
 /*
-** Compare two strings 'ls' x 'rs', returning an integer less-equal-
-** -greater than zero if 'ls' is less-equal-greater than 'rs'.
+** Compare two strings 'ts1' x 'ts2', returning an integer less-equal-
+** -greater than zero if 'ts1' is less-equal-greater than 'ts2'.
 ** The code is a little tricky because it allows '\0' in the strings
-** and it uses 'strcoll' (to respect locales) for each segments
-** of the strings.
+** and it uses 'strcoll' (to respect locales) for each segment
+** of the strings. Note that segments can compare equal but still
+** have different lengths.
 */
-static int l_strcmp (const TString *ls, const TString *rs) {
-  const char *l = getstr(ls);
-  size_t ll = tsslen(ls);
-  const char *r = getstr(rs);
-  size_t lr = tsslen(rs);
+static int l_strcmp (const TString *ts1, const TString *ts2) {
+  const char *s1 = getstr(ts1);
+  size_t rl1 = tsslen(ts1);  /* real length */
+  const char *s2 = getstr(ts2);
+  size_t rl2 = tsslen(ts2);
   for (;;) {  /* for each segment */
-    int temp = strcoll(l, r);
+    int temp = strcoll(s1, s2);
     if (temp != 0)  /* not equal? */
       return temp;  /* done */
     else {  /* strings are equal up to a '\0' */
-      size_t len = strlen(l);  /* index of first '\0' in both strings */
-      if (len == lr)  /* 'rs' is finished? */
-        return (len == ll) ? 0 : 1;  /* check 'ls' */
-      else if (len == ll)  /* 'ls' is finished? */
-        return -1;  /* 'ls' is less than 'rs' ('rs' is not finished) */
-      /* both strings longer than 'len'; go on comparing after the '\0' */
-      len++;
-      l += len; ll -= len; r += len; lr -= len;
+      size_t zl1 = strlen(s1);  /* index of first '\0' in 's1' */
+      size_t zl2 = strlen(s2);  /* index of first '\0' in 's2' */
+      if (zl2 == rl2)  /* 's2' is finished? */
+        return (zl1 == rl1) ? 0 : 1;  /* check 's1' */
+      else if (zl1 == rl1)  /* 's1' is finished? */
+        return -1;  /* 's1' is less than 's2' ('s2' is not finished) */
+      /* both strings longer than 'zl'; go on comparing after the '\0' */
+      zl1++; zl2++;
+      s1 += zl1; rl1 -= zl1; s2 += zl2; rl2 -= zl2;
     }
   }
 }
@@ -626,8 +630,9 @@ int luaV_equalobj (lua_State *L, const TValue *t1, const TValue *t2) {
 static void copy2buff (StkId top, int n, char *buff) {
   size_t tl = 0;  /* size already copied */
   do {
-    size_t l = vslen(s2v(top - n));  /* length of string being copied */
-    memcpy(buff + tl, svalue(s2v(top - n)), l * sizeof(char));
+    TString *st = tsvalue(s2v(top - n));
+    size_t l = tsslen(st);  /* length of string being copied */
+    memcpy(buff + tl, getstr(st), l * sizeof(char));
     tl += l;
   } while (--n > 0);
 }
@@ -653,12 +658,12 @@ void luaV_concat (lua_State *L, int total) {
     }
     else {
       /* at least two non-empty string values; get as many as possible */
-      size_t tl = vslen(s2v(top - 1));
+      size_t tl = tsslen(tsvalue(s2v(top - 1)));
       TString *ts;
       /* collect total length and number of strings */
       for (n = 1; n < total && tostring(L, s2v(top - n - 1)); n++) {
-        size_t l = vslen(s2v(top - n - 1));
-        if (l_unlikely(l >= (MAX_SIZE/sizeof(char)) - tl)) {
+        size_t l = tsslen(tsvalue(s2v(top - n - 1)));
+        if (l_unlikely(l >= MAX_SIZE - sizeof(TString) - tl)) {
           L->top.p = top - total;  /* pop strings to avoid wasting stack */
           luaG_runerror(L, "string length overflow");
         }
@@ -671,7 +676,7 @@ void luaV_concat (lua_State *L, int total) {
       }
       else {  /* long string; copy strings directly to final result */
         ts = luaS_createlngstrobj(L, tl);
-        copy2buff(top, n, getstr(ts));
+        copy2buff(top, n, getlngstr(ts));
       }
       setsvalue2s(L, top - n, ts);  /* create result */
     }
@@ -1157,18 +1162,11 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
  startfunc:
   trap = L->hookmask;
  returning:  /* trap already set */
-  cl = clLvalue(s2v(ci->func.p));
+  cl = ci_func(ci);
   k = cl->p->k;
   pc = ci->u.l.savedpc;
-  if (l_unlikely(trap)) {
-    if (pc == cl->p->code) {  /* first instruction (not resuming)? */
-      if (cl->p->is_vararg)
-        trap = 0;  /* hooks will start after VARARGPREP instruction */
-      else  /* check 'call' hook */
-        luaD_hookcall(L, ci);
-    }
-    ci->u.l.trap = 1;  /* assume trap is on, for now */
-  }
+  if (l_unlikely(trap))
+    trap = luaG_tracecall(L);
   base = ci->func.p + 1;
   /* main loop of interpreter */
   for (;;) {
@@ -1255,7 +1253,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         const TValue *slot;
         TValue *upval = cl->upvals[GETARG_B(i)]->v.p;
         TValue *rc = KC(i);
-        TString *key = tsvalue(rc);  /* key must be a string */
+        TString *key = tsvalue(rc);  /* key must be a short string */
         if (luaV_fastget(L, upval, key, slot, luaH_getshortstr)) {
           setobj2s(L, ra, slot);
         }
@@ -1298,7 +1296,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         const TValue *slot;
         TValue *rb = vRB(i);
         TValue *rc = KC(i);
-        TString *key = tsvalue(rc);  /* key must be a string */
+        TString *key = tsvalue(rc);  /* key must be a short string */
         if (luaV_fastget(L, rb, key, slot, luaH_getshortstr)) {
           setobj2s(L, ra, slot);
         }
@@ -1311,7 +1309,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         TValue *upval = cl->upvals[GETARG_A(i)]->v.p;
         TValue *rb = KB(i);
         TValue *rc = RKC(i);
-        TString *key = tsvalue(rb);  /* key must be a string */
+        TString *key = tsvalue(rb);  /* key must be a short string */
         if (luaV_fastset(L, upval, key, slot, luaH_getshortstr)) {
           luaV_finishfastset(L, upval, slot, rc);
         }
@@ -1354,7 +1352,7 @@ void luaV_execute (lua_State *L, CallInfo *ci) {
         const TValue *slot;
         TValue *rb = KB(i);
         TValue *rc = RKC(i);
-        TString *key = tsvalue(rb);  /* key must be a string */
+        TString *key = tsvalue(rb);  /* key must be a short string */
         if (luaV_fastset(L, s2v(ra), key, slot, luaH_getshortstr)) {
           luaV_finishfastset(L, s2v(ra), slot, rc);
         }

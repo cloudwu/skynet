@@ -25,15 +25,6 @@
 
 
 /*
-** LUA_IGMARK is a mark to ignore all before it when building the
-** luaopen_ function name.
-*/
-#if !defined (LUA_IGMARK)
-#define LUA_IGMARK		"-"
-#endif
-
-
-/*
 ** LUA_CSUBSEP is the character that replaces dots in submodule names
 ** when searching for a C loader.
 ** LUA_LSUBSEP is the character that replaces dots in submodule names
