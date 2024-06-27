@@ -9,11 +9,10 @@ gate = tonumber(gate)
 fd = tonumber(fd)
 
 local large_request = {}
-local inquery_name = {}
 
 local register_name_mt = { __index =
 	function(self, name)
-		local waitco = inquery_name[name]
+		local waitco = self.__inquery_name[name]
 		if waitco then
 			local co=coroutine.running()
 			table.insert(waitco, co)
@@ -21,12 +20,12 @@ local register_name_mt = { __index =
 			return rawget(self, name)
 		else
 			waitco = {}
-			inquery_name[name] = waitco
+			self.__inquery_name[name] = waitco
 			local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
 			if addr then
 				self[name] = addr
 			end
-			inquery_name[name] = nil
+			self.__inquery_name[name] = nil
 			for _, co in ipairs(waitco) do
 				skynet.wakeup(co)
 			end
@@ -36,7 +35,7 @@ local register_name_mt = { __index =
 }
 
 local function new_register_name()
-	return setmetatable({}, register_name_mt)
+	return setmetatable({ __inquery_name = {} }, register_name_mt)
 end
 
 local register_name = new_register_name()
