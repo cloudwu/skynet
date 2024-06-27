@@ -9,36 +9,43 @@ gate = tonumber(gate)
 fd = tonumber(fd)
 
 local large_request = {}
+local inquery_name = {}
+local register_name
 
 local register_name_mt = { __index =
 	function(self, name)
-		local waitco = self.__inquery_name[name]
+		local waitco = inquery_name[name]
 		if waitco then
-			local co=coroutine.running()
+			local co = coroutine.running()
 			table.insert(waitco, co)
 			skynet.wait(co)
-			return rawget(self, name)
+			return rawget(register_name, name)
 		else
 			waitco = {}
-			self.__inquery_name[name] = waitco
-			local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
-			if addr then
-				self[name] = addr
+			inquery_name[name] = waitco
+
+			while true do
+				local ctx = register_name
+				local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
+				if addr then
+					ctx[name] = addr
+				end
+				if ctx == register_name then
+					inquery_name[name] = nil
+					for _, co in ipairs(waitco) do
+						skynet.wakeup(co)
+					end
+					return addr
+				end
 			end
-			self.__inquery_name[name] = nil
-			for _, co in ipairs(waitco) do
-				skynet.wakeup(co)
-			end
-			return addr
 		end
 	end
 }
 
 local function new_register_name()
-	return setmetatable({ __inquery_name = {} }, register_name_mt)
+	register_name = setmetatable({}, register_name_mt)
 end
-
-local register_name = new_register_name()
+new_register_name()
 
 local tracetag
 
@@ -136,7 +143,7 @@ skynet.start(function()
 			socket.close_fd(fd)
 			skynet.exit()
 		elseif cmd == "namechange" then
-			register_name = new_register_name()
+			new_register_name()
 		else
 			skynet.error(string.format("Invalid command %s from %s", cmd, skynet.address(source)))
 		end
