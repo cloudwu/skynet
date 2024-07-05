@@ -24,20 +24,15 @@ local register_name_mt = { __index =
 			waitco = {}
 			inquery_name[name] = waitco
 
-			while true do
-				local ctx = register_name
-				local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
-				if addr then
-					ctx[name] = addr
-				end
-				if ctx == register_name then
-					inquery_name[name] = nil
-					for _, co in ipairs(waitco) do
-						skynet.wakeup(co)
-					end
-					return addr
-				end
+			local addr = skynet.call(clusterd, "lua", "queryname", name:sub(2))	-- name must be '@xxxx'
+			if addr then
+				register_name[name] = addr
 			end
+			inquery_name[name] = nil
+			for _, co in ipairs(waitco) do
+				skynet.wakeup(co)
+			end
+			return addr
 		end
 	end
 }
