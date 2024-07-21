@@ -131,7 +131,8 @@ skynet.start(function()
 		dispatch = dispatch_request,
 	}
 	-- fd can write, but don't read fd, the data package will forward from gate though client protocol.
-	skynet.call(gate, "lua", "forward", fd)
+	-- forward may fail, see https://github.com/cloudwu/skynet/issues/1958
+	pcall(skynet.call,gate, "lua", "forward", fd)
 
 	skynet.dispatch("lua", function(_,source, cmd, ...)
 		if cmd == "exit" then
