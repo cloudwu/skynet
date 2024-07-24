@@ -267,6 +267,15 @@ _ltls_context_write(lua_State* L) {
     return 1;
 }
 
+static int
+_lset_ext_host_name(lua_State* L) {
+    struct tls_context* tls_p = _check_context(L, 1);
+    size_t slen = 0;
+    char* host = (char*)lua_tolstring(L, 2, &slen);
+    int ret = SSL_set_tlsext_host_name(tls_p->ssl, host);
+    lua_pushinteger(L, ret);
+    return 1;
+}
 
 static int
 _lctx_gc(lua_State* L) {
@@ -378,6 +387,7 @@ lnew_tls(lua_State* L) {
             {"handshake", _ltls_context_handshake},
             {"read", _ltls_context_read},
             {"write", _ltls_context_write},
+            {"set_ext_host_name", _lset_ext_host_name},
             {NULL, NULL},
         };
         luaL_newlib(L, l);

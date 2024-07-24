@@ -6,7 +6,8 @@ local tlshelper = {}
 function tlshelper.init_requestfunc(fd, tls_ctx)
     local readfunc = socket.readfunc(fd)
     local writefunc = socket.writefunc(fd)
-    return function ()
+    return function (hostname)
+        tls_ctx:set_ext_host_name(hostname)
         local ds1 = tls_ctx:handshake()
         writefunc(ds1)
         while not tls_ctx:finished() do
