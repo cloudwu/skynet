@@ -57,6 +57,12 @@ struct socket_udp_address;
 int socket_server_udp(struct socket_server *, uintptr_t opaque, const char * addr, int port);
 // set default dest address, return 0 when success
 int socket_server_udp_connect(struct socket_server *, int id, const char * addr, int port);
+
+// create an udp client socket handle, and connect to server addr, return id when success
+int socket_server_udp_dial(struct socket_server *ss, uintptr_t opaque, const char* addr, int port);
+// create an udp server socket handle, and bind the host port, return id when success
+int socket_server_udp_listen(struct socket_server *ss, uintptr_t opaque, const char* addr, int port);
+
 // If the socket_udp_address is NULL, use last call socket_server_udp_connect address instead
 // You can also use socket_server_send 
 int socket_server_udp_send(struct socket_server *, const struct socket_udp_address *, struct socket_sendbuffer *buffer);

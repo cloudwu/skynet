@@ -180,6 +180,18 @@ skynet_socket_udp(struct skynet_context *ctx, const char * addr, int port) {
 	return socket_server_udp(SOCKET_SERVER, source, addr, port);
 }
 
+int
+skynet_socket_udp_dial(struct skynet_context *ctx, const char * addr, int port){
+	uint32_t source = skynet_context_handle(ctx);
+	return socket_server_udp_dial(SOCKET_SERVER, source, addr, port);
+}
+
+int
+skynet_socket_udp_listen(struct skynet_context *ctx, const char * addr, int port){
+	uint32_t source = skynet_context_handle(ctx);
+	return socket_server_udp_listen(SOCKET_SERVER, source, addr, port);
+}
+
 int 
 skynet_socket_udp_connect(struct skynet_context *ctx, int id, const char * addr, int port) {
 	return socket_server_udp_connect(SOCKET_SERVER, id, addr, port);

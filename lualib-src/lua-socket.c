@@ -676,6 +676,44 @@ ludp_connect(lua_State *L) {
 }
 
 static int
+ludp_dial(lua_State *L){
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	size_t sz = 0;
+	const char * addr = luaL_checklstring(L, 1, &sz);
+	char tmp[sz];
+	int port = 0;
+	const char * host =  address_port(L, tmp, addr, 2, &port);
+
+	int id = skynet_socket_udp_dial(ctx, host, port);
+	if (id < 0){
+		return luaL_error(L, "udp dial host failed");
+	}
+
+	lua_pushinteger(L, id);
+	return 1;
+}
+
+static int
+ludp_listen(lua_State *L){
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	size_t sz = 0;
+	const char * addr = luaL_checklstring(L, 1, &sz);
+	char tmp[sz];
+
+	int port = 0;
+	const char * host = address_port(L, tmp, addr, 2, &port);
+
+	int id = skynet_socket_udp_listen(ctx, host, port);
+	if (id < 0){
+		return luaL_error(L, "udp listen host failed");
+	}
+
+	lua_pushinteger(L, id);
+	return 1;
+}
+
+
+static int
 ludp_send(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
@@ -849,6 +887,8 @@ luaopen_skynet_socketdriver(lua_State *L) {
 		{ "nodelay", lnodelay },
 		{ "udp", ludp },
 		{ "udp_connect", ludp_connect },
+		{ "udp_dial", ludp_dial},
+		{ "udp_listen", ludp_listen},
 		{ "udp_send", ludp_send },
 		{ "udp_address", ludp_address },
 		{ "resolve", lresolve },
