@@ -104,7 +104,13 @@ local function console_main_loop(stdin, print, addr)
 				local cmdline = url:sub(2):gsub("/"," ")
 				docmd(cmdline, print, stdin)
 				break
+			elseif cmdline:sub(1,5) == "POST " then
+				-- http post
+				local code, url, method, header, body = httpd.read_request(sockethelper.readfunc(stdin, cmdline.. "\n"), 8192)
+				docmd(body, print, stdin)
+				break
 			end
+			
 			if cmdline ~= "" then
 				docmd(cmdline, print, stdin)
 			end
