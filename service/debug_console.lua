@@ -476,3 +476,12 @@ function COMMAND.profactive(flag)
 	local active = memory.profactive()
 	return "heap profilling is ".. (active and "active" or "deactive")
 end
+
+function COMMAND.getenv(name)
+	local value = skynet.getenv(name)
+	return {[name]=tostring(value)}
+end
+
+function COMMAND.setenv(name,value)
+	return skynet.setenv(name,value)
+end
