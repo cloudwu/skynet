@@ -172,6 +172,8 @@ function COMMAND.help()
 		dumpheap = "dumpheap : dump heap profilling",
 		killtask = "killtask address threadname : threadname listed by task",
 		dbgcmd = "run address debug command",
+		getenv = "getenv name : skynet.getenv(name)",
+		setenv = "setenv name value: skynet.setenv(name,value)",
 	}
 end
 
