@@ -1340,7 +1340,6 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 
 static int
 dial_udp_socket(struct socket_server *ss, struct request_dial_udp *request, struct socket_message *result){
-	//客户端创建udp连接, 合并add_udp_socket 和 set_udp_address两步
 	int id = request->id;
 	int protocol = request->address[0];
 
