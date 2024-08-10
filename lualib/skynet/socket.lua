@@ -471,6 +471,18 @@ function socket.udp_connect(id, addr, port, callback)
 	driver.udp_connect(id, addr, port)
 end
 
+function socket.udp_listen(addr, port, callback)
+	local id = driver.udp_listen(addr, port)
+	create_udp_object(id, callback)
+	return id
+end
+
+function socket.udp_dial(addr, port, callback)
+	local id = driver.udp_dial(addr, port)
+	create_udp_object(id, callback)
+	return id
+end
+
 socket.sendto = assert(driver.udp_send)
 socket.udp_address = assert(driver.udp_address)
 socket.netstat = assert(driver.info)

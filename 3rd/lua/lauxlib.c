@@ -1150,9 +1150,6 @@ init(void) {
 	CC.L = luaL_newstate();
 }
 
-
-void luaL_initcodecache(void);
-
 LUALIB_API void
 luaL_initcodecache(void) {
 	SPIN_INIT(&CC);
@@ -1295,8 +1292,6 @@ cache_clear(lua_State *L) {
 	clearcache();
 	return 0;
 }
-
-int luaopen_cache(lua_State *L);
 
 LUAMOD_API int luaopen_cache(lua_State *L) {
 	luaL_Reg l[] = {

@@ -190,6 +190,13 @@ struct request_udp {
 	uintptr_t opaque;
 };
 
+struct request_dial_udp {
+	int id;
+	int fd;
+	uintptr_t opaque;
+	uint8_t address[UDP_ADDRESS_SIZE];
+};
+
 /*
 	The first byte is TYPE
 	R Resume socket
@@ -204,6 +211,7 @@ struct request_udp {
 	P Send package (low)
 	A Send UDP package
 	C set udp address
+	N client dial to UDP host port
 	T Set opt
 	U Create UDP socket
  */
@@ -222,6 +230,7 @@ struct request_package {
 		struct request_setopt setopt;
 		struct request_udp udp;
 		struct request_setudp set_udp;
+		struct request_dial_udp dial_udp;
 	} u;
 	uint8_t dummy[256];
 };
@@ -1329,6 +1338,30 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 	return -1;
 }
 
+static int
+dial_udp_socket(struct socket_server *ss, struct request_dial_udp *request, struct socket_message *result){
+	int id = request->id;
+	int protocol = request->address[0];
+
+	struct socket *ns = new_fd(ss, id, request->fd, protocol, request->opaque, true);
+	if (ns == NULL){
+		close(request->fd);
+		ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
+		return -1;
+	}
+
+	if (protocol == PROTOCOL_UDP){
+		memcpy(ns->p.udp_address, request->address, 1 + 2 + 4);
+	} else {
+		memcpy(ns->p.udp_address, request->address, 1 + 2 + 16);
+	}
+
+	ATOM_STORE(&ns->type , SOCKET_TYPE_CONNECTED);
+
+	ATOM_FDEC(&ns->udpconnecting);
+	return -1;
+}
+
 static inline void
 inc_sending_ref(struct socket *s, int id) {
 	if (s->protocol != PROTOCOL_TCP)
@@ -1372,7 +1405,6 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	int type = header[0];
 	int len = header[1];
 	block_readpipe(fd, buffer, len);
-
 	// ctrl command only exist in local fd, so don't worry about endian.
 	switch (type) {
 	case 'R':
@@ -1409,6 +1441,8 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 	}
 	case 'C':
 		return set_udp_address(ss, (struct request_setudp *)buffer, result);
+	case 'N':
+		return dial_udp_socket(ss, (struct request_dial_udp *)buffer, result);
 	case 'T':
 		setopt_socket(ss, (struct request_setopt *)buffer);
 		return -1;
@@ -2113,6 +2147,92 @@ socket_server_udp(struct socket_server *ss, uintptr_t opaque, const char * addr,
 	request.u.udp.family = family;
 
 	send_request(ss, &request, 'U', sizeof(request.u.udp));	
+	return id;
+}
+
+int
+socket_server_udp_listen(struct socket_server *ss, uintptr_t opaque, const char* addr, int port){
+	int fd;
+	if (port == 0){
+		return -1;
+	}
+
+	int family;
+	// bind
+	fd = do_bind(addr, port, IPPROTO_UDP, &family);
+	if (fd < 0) {
+		return -1;
+	}
+
+	sp_nonblocking(fd);
+
+	int id = reserve_id(ss);
+	if (id < 0) {
+		close(fd);
+		return -1;
+	}
+	struct request_package request;
+	request.u.udp.id = id;
+	request.u.udp.fd = fd;
+	request.u.udp.opaque = opaque;
+	request.u.udp.family = family;
+
+	send_request(ss, &request, 'U', sizeof(request.u.udp));
+	return id;
+}
+
+int
+socket_server_udp_dial(struct socket_server *ss, uintptr_t opaque, const char* addr, int port){
+	int status;
+	struct addrinfo ai_hints;
+	struct addrinfo *ai_list = NULL;
+	char portstr[16];
+	sprintf(portstr, "%d", port);
+	memset( &ai_hints, 0, sizeof( ai_hints ) );
+	ai_hints.ai_family = AF_UNSPEC;
+	ai_hints.ai_socktype = SOCK_DGRAM;
+	ai_hints.ai_protocol = IPPROTO_UDP;
+
+
+	status = getaddrinfo(addr, portstr, &ai_hints, &ai_list );
+	if ( status != 0 ) {
+		return -1;
+	}
+
+	int protocol;
+
+	if (ai_list->ai_family == AF_INET) {
+		protocol = PROTOCOL_UDP;
+	} else if (ai_list->ai_family == AF_INET6) {
+		protocol = PROTOCOL_UDPv6;
+	} else {
+		freeaddrinfo( ai_list );
+		return -1;
+	}
+
+	int fd = socket(ai_list->ai_family, SOCK_DGRAM, 0);
+	if (fd < 0){
+		return -1;
+	}
+
+	sp_nonblocking(fd);
+	int id = reserve_id(ss);
+	if (id < 0){
+		close(fd);
+		return -1;
+	}
+
+	struct request_package request;
+	request.u.dial_udp.id = id;
+	request.u.dial_udp.fd = fd;
+	request.u.dial_udp.opaque = opaque;
+
+
+	int addrsz = gen_udp_address(protocol, (union sockaddr_all *)ai_list->ai_addr, request.u.dial_udp.address);
+
+	freeaddrinfo( ai_list );
+
+	send_request(ss, &request, 'N', sizeof(request.u.dial_udp) - sizeof(request.u.dial_udp.address) + addrsz);
 	return id;
 }
 

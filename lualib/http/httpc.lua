@@ -95,7 +95,7 @@ local function connect(host, timeout)
 		end)
 	end
 	if interface.init then
-		interface.init()
+		interface.init(host)
 	end
 	return fd, interface, host
 end
