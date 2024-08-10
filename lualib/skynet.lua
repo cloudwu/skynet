@@ -598,8 +598,12 @@ function skynet.killthread(thread)
 	return co
 end
 
+local self_address = nil
 function skynet.self()
-	return c.addresscommand "REG"
+	if not self_address then
+		self_address = c.addresscommand "REG"
+	end
+	return self_address
 end
 
 function skynet.localname(name)
