@@ -68,17 +68,17 @@ static void
 add_node(struct timer *T,struct timer_node *node) {
 	uint32_t time=node->expire;
 	uint32_t current_time=T->time;
-	
-	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {
+	uint32_t diff = time - current_time;
+	diff >>= TIME_NEAR_SHIFT;
+	if (diff == 0) {
 		link(&T->near[time&TIME_NEAR_MASK],node);
 	} else {
 		int i;
-		uint32_t mask=TIME_NEAR << TIME_LEVEL_SHIFT;
 		for (i=0;i<3;i++) {
-			if ((time|(mask-1))==(current_time|(mask-1))) {
+			diff >>= TIME_LEVEL_SHIFT;
+			if (diff == 0) {
 				break;
 			}
-			mask <<= TIME_LEVEL_SHIFT;
 		}
 
 		link(&T->t[i][((time>>(TIME_NEAR_SHIFT + i*TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK)],node);	
