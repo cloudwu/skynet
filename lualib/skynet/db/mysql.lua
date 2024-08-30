@@ -820,7 +820,7 @@ end
 
 local function _prepare_resp(self, sql)
     return function(sock)
-        return read_prepare_result(self, sock, sql)
+        return read_prepare_result(self, sock)
     end
 end
 
