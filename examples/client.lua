@@ -45,7 +45,7 @@ local function recv_package(last)
 	if r == "" then
 		error "Server closed"
 	end
-	return unpack_package(last .. r)
+	return recv_package(last .. r)
 end
 
 local session = 0
