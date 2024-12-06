@@ -435,7 +435,7 @@ function M.accept(socket_id, handle, protocol, addr, options)
     ws_obj.addr = addr
     local on_warning = handle and handle["warning"]
     if on_warning then
-        socket.warning(socket_id, function (id, sz)
+        pcall(socket.warning, socket_id, function(id, sz)
             on_warning(ws_obj, sz)
         end)
     end
