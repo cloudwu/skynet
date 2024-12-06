@@ -442,7 +442,9 @@ function M.accept(socket_id, handle, protocol, addr, options)
             on_warning(ws_obj, sz)
         end)
         if not isok then
-            _close_websocket(ws_obj)
+            if not _isws_closed(socket_id) then
+                _close_websocket(ws_obj)
+            end
             return false, "connect is closed " .. socket_id
         end
     end
