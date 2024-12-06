@@ -450,7 +450,7 @@ function M.accept(socket_id, handle, protocol, addr, options)
             if closed then
                 try_handle(ws_obj, "close")
             else
-                try_handle(ws_obj, "error")
+                try_handle(ws_obj, "error", err)
             end
         else
             -- error(err)
