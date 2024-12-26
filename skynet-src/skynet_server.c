@@ -52,7 +52,7 @@ struct skynet_context {
 	uint32_t handle;
 	int session_id;
 	ATOM_INT ref;
-	int message_count;
+	size_t message_count;
 	bool init;
 	bool endless;
 	bool profile;
@@ -574,7 +574,7 @@ cmd_stat(struct skynet_context * context, const char * param) {
 			strcpy(context->result, "0");
 		}
 	} else if (strcmp(param, "message") == 0) {
-		sprintf(context->result, "%d", context->message_count);
+		sprintf(context->result, "%zu", context->message_count);
 	} else {
 		context->result[0] = '\0';
 	}
