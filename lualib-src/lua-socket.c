@@ -58,7 +58,7 @@ static int
 lnewpool(lua_State *L, int sz) {
 	struct buffer_node * pool = lua_newuserdatauv(L, sizeof(struct buffer_node) * sz, 0);
 	int i;
-	for (i=0;i<sz;i++) {
+	for (i=0;i<sz-1;i++) {
 		pool[i].msg = NULL;
 		pool[i].sz = 0;
 		pool[i].next = &pool[i+1];
