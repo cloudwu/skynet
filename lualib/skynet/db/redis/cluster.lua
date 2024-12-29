@@ -121,8 +121,8 @@ function rediscluster:initialize_slots_cache()
 					self:set_node_name(slave_node)
 					table.insert(master_node.slaves,slave_node)
 				end
+				table.insert(self.nodes,master_node)
 				for slot=tonumber(result[1]),tonumber(result[2]) do
-					table.insert(self.nodes,master_node)
 					self.slots[slot] = master_node
 				end
 			end
