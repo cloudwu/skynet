@@ -114,7 +114,7 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz, int is_push) 
 		if (name == NULL) {
 			luaL_error(L, "name is not a string, it's a %s", lua_typename(L, lua_type(L, 1)));
 		} else {
-			luaL_error(L, "name is too long %s", name);
+			luaL_error(L, "name length is invalid, must be between 1 and 255 characters: %s", name);
 		}
 	}
 
