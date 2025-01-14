@@ -1,3 +1,18 @@
+v1.8.0 (2025-1-14)
+-----------
+* Update Lua to 5.4.7
+* service sessions can be rewind
+* Improve: udp (ipv6 support)
+* Improve: debug console
+* Improve: http
+* Improve: mongo driver
+* Improve: mysql driver
+* Bugfix: socketchannel
+* Bugfix: cluster
+* Bugfix: ssl
+* Bugfix: websocket
+* Bugfix: redis cluster driver
+
 v1.7.0 (2023-11-13)
 -----------
 * Update Lua to 5.4.6
