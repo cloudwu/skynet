@@ -852,6 +852,21 @@ local function _get_datetime(data, pos)
     return value, pos
 end
 
+local function _get_date(data, pos)
+    local len, year, month, day
+    local value
+    len, pos = _from_length_coded_bin(data, pos)
+    if len == 4 then
+        year, month, day, pos = string.unpack("<I2BB", data, pos)
+        value = strformat("%04d-%02d-%02d", year, month, day)
+    else
+        value = "1970-01-01"
+        --unsupported format
+        pos = pos + len
+    end
+    return value, pos
+end
+
 -- 字段类型参考 https://dev.mysql.com/doc/dev/mysql-server/8.0.12/binary__log__types_8h.html enum_field_types 枚举类型定义
 local _binary_parser = {
     [0x01] = _get_int1,
@@ -862,6 +877,7 @@ local _binary_parser = {
     [0x07] = _get_datetime,
     [0x08] = _get_int8,
     [0x09] = _get_int3,
+    [0x0a] = _get_date,
     [0x0c] = _get_datetime,
     [0x0f] = _from_length_coded_str,
     [0x10] = _from_length_coded_str,
