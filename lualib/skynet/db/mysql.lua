@@ -860,9 +860,8 @@ local function _get_date(data, pos)
         year, month, day, pos = string.unpack("<I2BB", data, pos)
         value = strformat("%04d-%02d-%02d", year, month, day)
     else
-        value = "1970-01-01"
         --unsupported format
-        pos = pos + len
+        error("_get_date()error,unsupported date format, len is " .. len)
     end
     return value, pos
 end
