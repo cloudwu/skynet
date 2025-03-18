@@ -170,7 +170,7 @@ skynet_context_new(const char * name, const char *param) {
 		}
 		return ret;
 	} else {
-		skynet_error(ctx, "FAILED launch %s", name);
+		skynet_error(ctx, "error: launch %s FAILED", name);
 		uint32_t handle = ctx->handle;
 		skynet_context_release(ctx);
 		skynet_handle_retire(handle);
@@ -324,7 +324,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		}
 		int overload = skynet_mq_overload(q);
 		if (overload) {
-			skynet_error(ctx, "May overload, message queue length = %d", overload);
+			skynet_error(ctx, "error: May overload, message queue length = %d", overload);
 		}
 
 		skynet_monitor_trigger(sm, msg.source , handle);
@@ -370,7 +370,7 @@ skynet_queryname(struct skynet_context * context, const char * name) {
 	case '.':
 		return skynet_handle_findname(name + 1);
 	}
-	skynet_error(context, "Don't support query global name %s",name);
+	skynet_error(context, "error: Don't support query global name %s",name);
 	return 0;
 }
 
@@ -413,7 +413,7 @@ cmd_reg(struct skynet_context * context, const char * param) {
 	} else if (param[0] == '.') {
 		return skynet_handle_namehandle(context->handle, param + 1);
 	} else {
-		skynet_error(context, "Can't register global name %s in C", param);
+		skynet_error(context, "error: Can't register global name %s in C", param);
 		return NULL;
 	}
 }
@@ -446,7 +446,7 @@ cmd_name(struct skynet_context * context, const char * param) {
 	if (name[0] == '.') {
 		return skynet_handle_namehandle(handle_id, name + 1);
 	} else {
-		skynet_error(context, "Can't set global name %s in C", name);
+		skynet_error(context, "error: Can't set global name %s in C", name);
 	}
 	return NULL;
 }
@@ -465,7 +465,7 @@ tohandle(struct skynet_context * context, const char * param) {
 	} else if (param[0] == '.') {
 		handle = skynet_handle_findname(param+1);
 	} else {
-		skynet_error(context, "Can't convert %s to handle",param);
+		skynet_error(context, "error: Can't convert %s to handle",param);
 	}
 
 	return handle;
@@ -700,7 +700,7 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 int
 skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
 	if ((sz & MESSAGE_TYPE_MASK) != sz) {
-		skynet_error(context, "The message to %x is too large", destination);
+		skynet_error(context, "error: The message to %x is too large", destination);
 		if (type & PTYPE_TAG_DONTCOPY) {
 			skynet_free(data);
 		}
@@ -714,7 +714,7 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 
 	if (destination == 0) {
 		if (data) {
-			skynet_error(context, "Destination address can't be 0");
+			skynet_error(context, "error: Destination address can't be 0");
 			skynet_free(data);
 			return -1;
 		}
@@ -761,7 +761,7 @@ skynet_sendname(struct skynet_context * context, uint32_t source, const char * a
 		}
 	} else {
 		if ((sz & MESSAGE_TYPE_MASK) != sz) {
-			skynet_error(context, "The message to %s is too large", addr);
+			skynet_error(context, "error: The message to %s is too large", addr);
 			if (type & PTYPE_TAG_DONTCOPY) {
 				skynet_free(data);
 			}

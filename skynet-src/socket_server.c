@@ -392,17 +392,17 @@ socket_server_create(uint64_t time) {
 	int fd[2];
 	poll_fd efd = sp_create();
 	if (sp_invalid(efd)) {
-		skynet_error(NULL, "socket-server: create event pool failed.");
+		skynet_error(NULL, "socket-server error: create event pool failed.");
 		return NULL;
 	}
 	if (pipe(fd)) {
 		sp_release(efd);
-		skynet_error(NULL, "socket-server: create socket pair failed.");
+		skynet_error(NULL, "socket-server error: create socket pair failed.");
 		return NULL;
 	}
 	if (sp_add(efd, fd[0], NULL)) {
 		// add recvctrl_fd to event poll
-		skynet_error(NULL, "socket-server: can't add server fd to event pool.");
+		skynet_error(NULL, "socket-server error: can't add server fd to event pool.");
 		close(fd[0]);
 		close(fd[1]);
 		sp_release(efd);
@@ -796,7 +796,7 @@ send_list_udp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 		union sockaddr_all sa;
 		socklen_t sasz = udp_socket_address(s, udp->udp_address, &sa);
 		if (sasz == 0) {
-			skynet_error(NULL, "socket-server : udp (%d) type mismatch.", s->id);
+			skynet_error(NULL, "socket-server : udp (%d) error: type mismatch.", s->id);
 			drop_udp(ss, s, list, tmp);
 			return -1;
 		}
@@ -1032,7 +1032,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		return -1;
 	}
 	if (type == SOCKET_TYPE_PLISTEN || type == SOCKET_TYPE_LISTEN) {
-		skynet_error(NULL, "socket-server: write to listen fd %d.", id);
+		skynet_error(NULL, "socket-server error: write to listen fd %d.", id);
 		so.free_func((void *)request->buffer);
 		return -1;
 	}
@@ -1048,7 +1048,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			socklen_t sasz = udp_socket_address(s, udp_address, &sa);
 			if (sasz == 0) {
 				// udp type mismatch, just drop it.
-				skynet_error(NULL, "socket-server: udp socket (%d) type mismatch.", id);
+				skynet_error(NULL, "socket-server: udp socket (%d) error: type mismatch.", id);
 				so.free_func((void *)request->buffer);
 				return -1;
 			}
@@ -1450,7 +1450,7 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 		add_udp_socket(ss, (struct request_udp *)buffer);
 		return -1;
 	default:
-		skynet_error(NULL, "socket-server: Unknown ctrl %c.",type);
+		skynet_error(NULL, "socket-server error: Unknown ctrl %c.",type);
 		return -1;
 	};
 
@@ -1729,7 +1729,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				ss->event_n = 0;
 				int err = errno;
 				if (err != EINTR) {
-					skynet_error(NULL, "socket-server: %s", strerror(err));
+					skynet_error(NULL, "socket-server error: %s", strerror(err));
 				}
 				continue;
 			}
@@ -1756,7 +1756,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			break;
 		}
 		case SOCKET_TYPE_INVALID:
-			skynet_error(NULL, "socket-server: invalid socket");
+			skynet_error(NULL, "socket-server error: invalid socket");
 			break;
 		default:
 			if (e->read) {
@@ -1840,7 +1840,7 @@ static int
 open_request(struct socket_server *ss, struct request_package *req, uintptr_t opaque, const char *addr, int port) {
 	int len = strlen(addr);
 	if (len + sizeof(req->u.open) >= 256) {
-		skynet_error(NULL, "socket-server : Invalid addr %s.",addr);
+		skynet_error(NULL, "socket-server error: Invalid addr %s.",addr);
 		return -1;
 	}
 	int id = reserve_id(ss);
@@ -1896,7 +1896,7 @@ socket_server_send(struct socket_server *ss, struct socket_sendbuffer *buf) {
 				union sockaddr_all sa;
 				socklen_t sasz = udp_socket_address(s, s->p.udp_address, &sa);
 				if (sasz == 0) {
-					skynet_error(NULL, "socket-server : set udp (%d) address first.", id);
+					skynet_error(NULL, "socket-server : set udp (%d) error: address first.", id);
 					socket_unlock(&l);
 					so.free_func((void *)buf->buffer);
 					return -1;
