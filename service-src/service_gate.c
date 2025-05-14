@@ -250,6 +250,7 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 			memset(c, 0, sizeof(*c));
 			c->id = -1;
 			_report(g, "%d close", message->id);
+			skynet_socket_close(ctx, message->id);
 		}
 		break;
 	}
