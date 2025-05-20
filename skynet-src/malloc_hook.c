@@ -323,14 +323,6 @@ dump_c_mem() {
 	skynet_error(NULL, "+total: %zdkb",total >> 10);
 }
 
-char *
-skynet_strdup(const char *str) {
-	size_t sz = strlen(str);
-	char * ret = skynet_malloc(sz+1);
-	memcpy(ret, str, sz+1);
-	return ret;
-}
-
 void *
 skynet_lalloc(void *ptr, size_t osize, size_t nsize) {
 	if (nsize == 0) {
@@ -375,3 +367,57 @@ skynet_debug_memory(const char *info) {
 	size_t mem = malloc_current_memory();
 	fprintf(stderr, "[:%08x] %s %p\n", handle, info, (void *)mem);
 }
+
+#ifndef HAVE_STRNDUP
+char*
+skynet_strndup(const char *str, size_t size) {
+	char *ret = skynet_malloc(size + 1);
+	memcpy(ret, str, size);
+	ret[size] = '\0';
+	return ret;
+}
+#endif
+
+#ifndef HAVE_STRDUP
+char *
+skynet_strdup(const char *str) {
+	return skynet_strndup(str, strlen(str));
+}
+#endif
+
+#ifndef HAVE_VASPRINTF
+#define DEFAULT_VASPRINTF_SIZE 256
+int
+skynet_vasprintf(char **strp, const char *fmt, va_list ap) {
+	char tmp[DEFAULT_VASPRINTF_SIZE];
+	va_list ap_copy;
+	va_copy(ap_copy, ap);
+	int len = vsnprintf(tmp, DEFAULT_VASPRINTF_SIZE, fmt, ap);
+	va_end(ap_copy);
+	if (len < 0) return len;
+	if (len < DEFAULT_VASPRINTF_SIZE) {
+		*strp = skynet_strndup(tmp, len);
+		if (*strp == NULL) return -1;
+		return len;
+	}
+	*strp = skynet_malloc(len + 1);
+	if (*strp == NULL) return -1;
+	len = vsnprintf(*strp, len + 1, fmt, ap);
+	if (len < 0) {
+		skynet_free(*strp);
+		*strp = NULL;
+	}
+	return len;
+}
+#endif
+
+#ifndef HAVE_ASPRINTF
+int
+skynet_asprintf(char **strp, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	const int len = skynet_vasprintf(strp, fmt, ap);
+	va_end(ap);
+	return len;
+}
+#endif
