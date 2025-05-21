@@ -1855,9 +1855,15 @@ open_request(struct socket_server *ss, struct request_package *req, uintptr_t op
 	return len;
 }
 
+static inline void
+request_init(struct request_package *req) {
+	memset(req, 0, sizeof(*req));
+}
+
 int
 socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	int len = open_request(ss, &request, opaque, addr, port);
 	if (len < 0)
 		return -1;
@@ -1920,7 +1926,8 @@ socket_server_send(struct socket_server *ss, struct socket_sendbuffer *buf) {
 
 			socket_unlock(&l);
 
-			struct request_package request = {0};
+			struct request_package request;
+			request_init(&request);
 			request.u.send.id = id;
 			request.u.send.sz = 0;
 			request.u.send.buffer = NULL;
@@ -1935,7 +1942,8 @@ socket_server_send(struct socket_server *ss, struct socket_sendbuffer *buf) {
 
 	inc_sending_ref(s, id);
 
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.send.id = id;
 	request.u.send.buffer = clone_buffer(buf, &request.u.send.sz);
 
@@ -1956,7 +1964,8 @@ socket_server_send_lowpriority(struct socket_server *ss, struct socket_sendbuffe
 
 	inc_sending_ref(s, id);
 
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.send.id = id;
 	request.u.send.buffer = clone_buffer(buf, &request.u.send.sz);
 
@@ -1966,13 +1975,15 @@ socket_server_send_lowpriority(struct socket_server *ss, struct socket_sendbuffe
 
 void
 socket_server_exit(struct socket_server *ss) {
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	send_request(ss, &request, 'X', 0);
 }
 
 void
 socket_server_close(struct socket_server *ss, uintptr_t opaque, int id) {
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.close.id = id;
 	request.u.close.shutdown = 0;
 	request.u.close.opaque = opaque;
@@ -1982,7 +1993,8 @@ socket_server_close(struct socket_server *ss, uintptr_t opaque, int id) {
 
 void
 socket_server_shutdown(struct socket_server *ss, uintptr_t opaque, int id) {
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.close.id = id;
 	request.u.close.shutdown = 1;
 	request.u.close.opaque = opaque;
@@ -2058,7 +2070,8 @@ socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * ad
 	if (fd < 0) {
 		return -1;
 	}
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	int id = reserve_id(ss);
 	if (id < 0) {
 		close(fd);
@@ -2073,7 +2086,8 @@ socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * ad
 
 int
 socket_server_bind(struct socket_server *ss, uintptr_t opaque, int fd) {
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	int id = reserve_id(ss);
 	if (id < 0)
 		return -1;
@@ -2086,7 +2100,8 @@ socket_server_bind(struct socket_server *ss, uintptr_t opaque, int fd) {
 
 void
 socket_server_start(struct socket_server *ss, uintptr_t opaque, int id) {
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.resumepause.id = id;
 	request.u.resumepause.opaque = opaque;
 	send_request(ss, &request, 'R', sizeof(request.u.resumepause));
@@ -2094,7 +2109,8 @@ socket_server_start(struct socket_server *ss, uintptr_t opaque, int id) {
 
 void
 socket_server_pause(struct socket_server *ss, uintptr_t opaque, int id) {
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.resumepause.id = id;
 	request.u.resumepause.opaque = opaque;
 	send_request(ss, &request, 'S', sizeof(request.u.resumepause));
@@ -2102,7 +2118,8 @@ socket_server_pause(struct socket_server *ss, uintptr_t opaque, int id) {
 
 void
 socket_server_nodelay(struct socket_server *ss, int id) {
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.setopt.id = id;
 	request.u.setopt.what = TCP_NODELAY;
 	request.u.setopt.value = 1;
@@ -2140,7 +2157,8 @@ socket_server_udp(struct socket_server *ss, uintptr_t opaque, const char * addr,
 		close(fd);
 		return -1;
 	}
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.udp.id = id;
 	request.u.udp.fd = fd;
 	request.u.udp.opaque = opaque;
@@ -2171,7 +2189,8 @@ socket_server_udp_listen(struct socket_server *ss, uintptr_t opaque, const char*
 		close(fd);
 		return -1;
 	}
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.udp.id = id;
 	request.u.udp.fd = fd;
 	request.u.udp.opaque = opaque;
@@ -2222,7 +2241,8 @@ socket_server_udp_dial(struct socket_server *ss, uintptr_t opaque, const char* a
 		return -1;
 	}
 
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.dial_udp.id = id;
 	request.u.dial_udp.fd = fd;
 	request.u.dial_udp.opaque = opaque;
@@ -2288,7 +2308,8 @@ socket_server_udp_send(struct socket_server *ss, const struct socket_udp_address
 		// let socket thread try again, udp doesn't care the order
 	}
 
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.send_udp.send.id = id;
 	request.u.send_udp.send.buffer = clone_buffer(buf, &request.u.send_udp.send.sz);
 
@@ -2328,7 +2349,8 @@ socket_server_udp_connect(struct socket_server *ss, int id, const char * addr, i
 	if ( status != 0 ) {
 		return -1;
 	}
-	struct request_package request = {0};
+	struct request_package request;
+	request_init(&request);
 	request.u.set_udp.id = id;
 	int protocol;
 
