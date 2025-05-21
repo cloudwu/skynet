@@ -9,6 +9,8 @@
 #include "skynet.h"
 #include "atomic.h"
 
+#define DEFAULT_VASPRINTF_SIZE 256
+
 // turn on MEMORY_CHECK can do more memory check, such as double free
 // #define MEMORY_CHECK
 
@@ -326,9 +328,48 @@ dump_c_mem() {
 char *
 skynet_strdup(const char *str) {
 	size_t sz = strlen(str);
-	char * ret = skynet_malloc(sz+1);
-	memcpy(ret, str, sz+1);
+	return skynet_strndup(str, sz);
+}
+
+char *
+skynet_strndup(const char *str, size_t size) {
+	char * ret = skynet_malloc(size+1);
+	if (ret == NULL) return NULL;
+	memcpy(ret, str, size);
+	ret[size] = '\0';
 	return ret;
+}
+
+int
+skynet_asprintf(char **strp, const char *fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+	const int len = skynet_vasprintf(strp, fmt, ap);
+	va_end(ap);
+	return len;
+}
+
+int
+skynet_vasprintf(char **strp, const char *fmt, va_list ap) {
+	char tmp[DEFAULT_VASPRINTF_SIZE];
+	va_list ap_copy;
+	va_copy(ap_copy, ap);
+	int len = vsnprintf(tmp, DEFAULT_VASPRINTF_SIZE, fmt, ap);
+	va_end(ap_copy);
+	if (len < 0) return len;
+	if (len < DEFAULT_VASPRINTF_SIZE) {
+		*strp = skynet_strndup(tmp, len);
+		if (*strp == NULL) return -1;
+		return len;
+	}
+	*strp = skynet_malloc(len + 1);
+	if (*strp == NULL) return -1;
+	len = vsnprintf(*strp, len + 1, fmt, ap);
+	if (len < 0) {
+		skynet_free(*strp);
+		*strp = NULL;
+	}
+	return len;
 }
 
 void *

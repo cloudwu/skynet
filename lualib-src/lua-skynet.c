@@ -207,7 +207,7 @@ lintcommand(lua_State *L) {
 
 	result = skynet_command(context, cmd, parm);
 	if (result) {
-		char *endptr = NULL; 
+		char *endptr = NULL;
 		lua_Integer r = strtoll(result, &endptr, 0);
 		if (endptr == NULL || *endptr != '\0') {
 			// may be real number
@@ -340,8 +340,9 @@ lerror(lua_State *L) {
 	int n = lua_gettop(L);
 	if (n <= 1) {
 		lua_settop(L, 1);
-		const char * s = luaL_tolstring(L, 1, NULL);
-		skynet_error(context, "%s", s);
+		size_t len;
+		const char *s = luaL_tolstring(L, 1, &len);
+		skynet_error(context, "%*s", (int)len, s);
 		return 0;
 	}
 	luaL_Buffer b;
@@ -355,7 +356,9 @@ lerror(lua_State *L) {
 		}
 	}
 	luaL_pushresult(&b);
-	skynet_error(context, "%s", lua_tostring(L, -1));
+	size_t len;
+	const char *s = luaL_tolstring(L, -1, &len);
+	skynet_error(context, "%*s", (int)len, s);
 	return 0;
 }
 
@@ -470,13 +473,13 @@ ltrace(lua_State *L) {
 			skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d", tag, get_time(), user, si[0].source, si[0].line);
 			break;
 		case 2:
-			skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d %s:%d", tag, get_time(), user, 
+			skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d %s:%d", tag, get_time(), user,
 				si[0].source, si[0].line,
 				si[1].source, si[1].line
 				);
 			break;
 		case 3:
-			skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d %s:%d %s:%d", tag, get_time(), user, 
+			skynet_error(context, "<TRACE %s> %" PRId64 " %s : %s:%d %s:%d %s:%d", tag, get_time(), user,
 				si[0].source, si[0].line,
 				si[1].source, si[1].line,
 				si[2].source, si[2].line
