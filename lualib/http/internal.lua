@@ -186,7 +186,7 @@ function M.request(interface, method, host, url, recvheader, header, content)
 
 	if content then
 		local data
-		if header["transfer-encoding"] == "chunked" then
+		if header and header["transfer-encoding"] == "chunked" then
 			data = string.format("%s %s HTTP/1.1\r\n%s\r\n", method, url, header_content)
 		else
 			data = string.format("%s %s HTTP/1.1\r\n%sContent-length:%d\r\n\r\n", method, url, header_content, #content)
