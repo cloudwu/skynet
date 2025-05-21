@@ -323,14 +323,6 @@ dump_c_mem() {
 	skynet_error(NULL, "+total: %zdkb",total >> 10);
 }
 
-char *
-skynet_strdup(const char *str) {
-	size_t sz = strlen(str);
-	char * ret = skynet_malloc(sz+1);
-	memcpy(ret, str, sz+1);
-	return ret;
-}
-
 void *
 skynet_lalloc(void *ptr, size_t osize, size_t nsize) {
 	if (nsize == 0) {

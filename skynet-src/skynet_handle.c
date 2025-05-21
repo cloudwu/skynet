@@ -1,6 +1,7 @@
 #include "skynet.h"
 
 #include "skynet_handle.h"
+#include "skynet_imp.h"
 #include "skynet_server.h"
 #include "rwlock.h"
 
@@ -23,7 +24,7 @@ struct handle_storage {
 	uint32_t handle_index;
 	int slot_size;
 	struct skynet_context ** slot;
-	
+
 	int name_cap;
 	int name_count;
 	struct handle_name *name;
@@ -36,7 +37,7 @@ skynet_handle_register(struct skynet_context *ctx) {
 	struct handle_storage *s = H;
 
 	rwlock_wlock(&s->lock);
-	
+
 	for (;;) {
 		int i;
 		uint32_t handle = s->handle_index;
@@ -111,7 +112,7 @@ skynet_handle_retire(uint32_t handle) {
 	return ret;
 }
 
-void 
+void
 skynet_handle_retireall() {
 	struct handle_storage *s = H;
 	for (;;) {
@@ -135,7 +136,7 @@ skynet_handle_retireall() {
 	}
 }
 
-struct skynet_context * 
+struct skynet_context *
 skynet_handle_grab(uint32_t handle) {
 	struct handle_storage *s = H;
 	struct skynet_context * result = NULL;
@@ -154,7 +155,7 @@ skynet_handle_grab(uint32_t handle) {
 	return result;
 }
 
-uint32_t 
+uint32_t
 skynet_handle_findname(const char * name) {
 	struct handle_storage *s = H;
 
@@ -234,7 +235,7 @@ _insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
 	return result;
 }
 
-const char * 
+const char *
 skynet_handle_namehandle(uint32_t handle, const char *name) {
 	rwlock_wlock(&H->lock);
 
@@ -245,7 +246,7 @@ skynet_handle_namehandle(uint32_t handle, const char *name) {
 	return ret;
 }
 
-void 
+void
 skynet_handle_init(int harbor) {
 	assert(H==NULL);
 	struct handle_storage * s = skynet_malloc(sizeof(*H));
@@ -265,4 +266,3 @@ skynet_handle_init(int harbor) {
 
 	// Don't need to free H
 }
-
