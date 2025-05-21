@@ -1,7 +1,6 @@
 #ifndef skynet_malloc_h
 #define skynet_malloc_h
 
-#include <stdarg.h>
 #include <stddef.h>
 
 #define skynet_malloc malloc
@@ -20,10 +19,5 @@ void * skynet_lalloc(void *ptr, size_t osize, size_t nsize);	// use for lua
 void * skynet_memalign(size_t alignment, size_t size);
 void * skynet_aligned_alloc(size_t alignment, size_t size);
 int skynet_posix_memalign(void **memptr, size_t alignment, size_t size);
-
-char * skynet_strdup(const char *str);
-char * skynet_strndup(const char *str, size_t size);
-int skynet_asprintf(char **strp, const char *fmt, ... );
-int skynet_vasprintf(char **strp, const char *fmt, va_list arg);
 
 #endif

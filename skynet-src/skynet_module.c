@@ -1,5 +1,6 @@
 #include "skynet.h"
 
+#include "skynet_imp.h"
 #include "skynet_module.h"
 #include "spinlock.h"
 
@@ -62,7 +63,7 @@ _try_open(struct modules *m, const char * name) {
 	return dl;
 }
 
-static struct skynet_module * 
+static struct skynet_module *
 _query(const char * name) {
 	int i;
 	for (i=0;i<M->count;i++) {
@@ -99,7 +100,7 @@ open_sym(struct skynet_module *mod) {
 	return mod->init == NULL;
 }
 
-struct skynet_module * 
+struct skynet_module *
 skynet_module_query(const char * name) {
 	struct skynet_module * result = _query(name);
 	if (result)
@@ -129,7 +130,7 @@ skynet_module_query(const char * name) {
 	return result;
 }
 
-void * 
+void *
 skynet_module_instance_create(struct skynet_module *m) {
 	if (m->create) {
 		return m->create();
@@ -143,7 +144,7 @@ skynet_module_instance_init(struct skynet_module *m, void * inst, struct skynet_
 	return m->init(inst, ctx, parm);
 }
 
-void 
+void
 skynet_module_instance_release(struct skynet_module *m, void *inst) {
 	if (m->release) {
 		m->release(inst);
@@ -157,7 +158,7 @@ skynet_module_instance_signal(struct skynet_module *m, void *inst, int signal) {
 	}
 }
 
-void 
+void
 skynet_module_init(const char *path) {
 	struct modules *m = skynet_malloc(sizeof(*m));
 	m->count = 0;
