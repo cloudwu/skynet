@@ -94,10 +94,6 @@ void luaD_seterrorobj (lua_State *L, int errcode, StkId oldtop) {
       setsvalue2s(L, oldtop, G(L)->memerrmsg); /* reuse preregistered msg. */
       break;
     }
-    case LUA_ERRERR: {
-      setsvalue2s(L, oldtop, luaS_newliteral(L, "error in error handling"));
-      break;
-    }
     case LUA_OK: {  /* special case only for closing upvalues */
       setnilvalue(s2v(oldtop));  /* no error message */
       break;
@@ -120,6 +116,7 @@ l_noret luaD_throw (lua_State *L, int errcode) {
   else {  /* thread has no error handler */
     global_State *g = G(L);
     errcode = luaE_resetthread(L, errcode);  /* close all upvalues */
+    L->status = errcode;
     if (g->mainthread->errorJmp) {  /* main thread has a handler? */
       setobjs2s(L, g->mainthread->top.p++, L->top.p - 1);  /* copy error obj. */
       luaD_throw(g->mainthread, errcode);  /* re-throw in main thread */
@@ -198,6 +195,16 @@ static void correctstack (lua_State *L) {
 /* some space for error handling */
 #define ERRORSTACKSIZE	(LUAI_MAXSTACK + 200)
 
+
+/* raise an error while running the message handler */
+l_noret luaD_errerr (lua_State *L) {
+  TString *msg = luaS_newliteral(L, "error in error handling");
+  setsvalue2s(L, L->top.p, msg);
+  L->top.p++;  /* assume EXTRA_STACK */
+  luaD_throw(L, LUA_ERRERR);
+}
+
+
 /*
 ** Reallocate the stack to a new size, correcting all pointers into it.
 ** In ISO C, any pointer use after the pointer has been deallocated is
@@ -247,7 +254,7 @@ int luaD_growstack (lua_State *L, int n, int raiseerror) {
        a stack error; cannot grow further than that. */
     lua_assert(stacksize(L) == ERRORSTACKSIZE);
     if (raiseerror)
-      luaD_throw(L, LUA_ERRERR);  /* error inside message handler */
+      luaD_errerr(L);  /* error inside message handler */
     return 0;  /* if not 'raiseerror', just signal it */
   }
   else if (n < LUAI_MAXSTACK) {  /* avoids arithmetic overflows */
