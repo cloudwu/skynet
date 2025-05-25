@@ -243,7 +243,7 @@ function auth_method:auth_scram_sha1(username,password)
 	local salt = parsed_t['s']
 	local rnonce = parsed_t['r']
 
-	if not string.sub(rnonce, 1, 12) == nonce then
+	if string.sub(rnonce, 1, 12) ~= nonce then
 		skynet.error("Server returned an invalid nonce.")
 		return false
 	end
