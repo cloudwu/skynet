@@ -59,6 +59,8 @@ int luaS_eqshrstr (TString *a, TString *b) {
 void luaS_share (TString *ts) {
   if (ts == NULL || isshared(ts))
     return;
+  if (ts->tt == LUA_VLNGSTR)
+    luaS_hashlongstr(ts);
   makeshared(ts);
   ts->id = ATOM_FDEC(&STRID)-1;
 }
