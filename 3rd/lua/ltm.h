@@ -48,10 +48,10 @@ typedef enum {
 /*
 ** Mask with 1 in all fast-access methods. A 1 in any of these bits
 ** in the flag of a (meta)table means the metatable does not have the
-** corresponding metamethod field. (Bit 7 of the flag is used for
-** 'isrealasize'.)
+** corresponding metamethod field. (Bit 6 of the flag indicates that
+** the table is using the dummy node; bit 7 is used for 'isrealasize'.)
 */
-#define maskflags	(~(~0u << (TM_EQ + 1)))
+#define maskflags	cast_byte(~(~0u << (TM_EQ + 1)))
 
 
 /*
@@ -60,11 +60,12 @@ typedef enum {
 */
 #define notm(tm)	ttisnil(tm)
 
+#define checknoTM(mt,e)	((mt) == NULL || (mt)->flags & (1u<<(e)))
 
-#define gfasttm(g,et,e) ((et) == NULL ? NULL : \
-  ((et)->flags & (1u<<(e))) ? NULL : luaT_gettm(et, e, (g)->tmname[e]))
+#define gfasttm(g,mt,e)  \
+  (checknoTM(mt, e) ? NULL : luaT_gettm(mt, e, (g)->tmname[e]))
 
-#define fasttm(l,et,e)	gfasttm(G(l), et, e)
+#define fasttm(l,mt,e)	gfasttm(G(l), mt, e)
 
 #define ttypename(x)	luaT_typenames_[(x) + 1]
 
@@ -80,8 +81,8 @@ LUAI_FUNC void luaT_init (lua_State *L);
 
 LUAI_FUNC void luaT_callTM (lua_State *L, const TValue *f, const TValue *p1,
                             const TValue *p2, const TValue *p3);
-LUAI_FUNC void luaT_callTMres (lua_State *L, const TValue *f,
-                            const TValue *p1, const TValue *p2, StkId p3);
+LUAI_FUNC lu_byte luaT_callTMres (lua_State *L, const TValue *f,
+                               const TValue *p1, const TValue *p2, StkId p3);
 LUAI_FUNC void luaT_trybinTM (lua_State *L, const TValue *p1, const TValue *p2,
                               StkId res, TMS event);
 LUAI_FUNC void luaT_tryconcatTM (lua_State *L);

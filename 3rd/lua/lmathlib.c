@@ -20,6 +20,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "llimits.h"
 
 
 #undef PI
@@ -105,7 +106,7 @@ static int math_floor (lua_State *L) {
 
 static int math_ceil (lua_State *L) {
   if (lua_isinteger(L, 1))
-    lua_settop(L, 1);  /* integer is its own ceil */
+    lua_settop(L, 1);  /* integer is its own ceiling */
   else {
     lua_Number d = l_mathop(ceil)(luaL_checknumber(L, 1));
     pushnumint(L, d);
@@ -366,25 +367,17 @@ static lua_Number I2d (Rand64 x) {
 
 #else	/* no 'Rand64'   }{ */
 
-/* get an integer with at least 32 bits */
-#if LUAI_IS32INT
-typedef unsigned int lu_int32;
-#else
-typedef unsigned long lu_int32;
-#endif
-
-
 /*
 ** Use two 32-bit integers to represent a 64-bit quantity.
 */
 typedef struct Rand64 {
-  lu_int32 h;  /* higher half */
-  lu_int32 l;  /* lower half */
+  l_uint32 h;  /* higher half */
+  l_uint32 l;  /* lower half */
 } Rand64;
 
 
 /*
-** If 'lu_int32' has more than 32 bits, the extra bits do not interfere
+** If 'l_uint32' has more than 32 bits, the extra bits do not interfere
 ** with the 32 initial bits, except in a right shift and comparisons.
 ** Moreover, the final result has to discard the extra bits.
 */
@@ -398,7 +391,7 @@ typedef struct Rand64 {
 */
 
 /* build a new Rand64 value */
-static Rand64 packI (lu_int32 h, lu_int32 l) {
+static Rand64 packI (l_uint32 h, l_uint32 l) {
   Rand64 result;
   result.h = h;
   result.l = l;
@@ -471,7 +464,7 @@ static Rand64 nextrand (Rand64 *state) {
 */
 
 /* an unsigned 1 with proper type */
-#define UONE		((lu_int32)1)
+#define UONE		((l_uint32)1)
 
 
 #if FIGS <= 32
@@ -522,7 +515,7 @@ static lua_Unsigned I2UInt (Rand64 x) {
 
 /* convert a 'lua_Unsigned' to a 'Rand64' */
 static Rand64 Int2I (lua_Unsigned n) {
-  return packI((lu_int32)((n >> 31) >> 1), (lu_int32)n);
+  return packI((l_uint32)((n >> 31) >> 1), (l_uint32)n);
 }
 
 #endif  /* } */
@@ -540,7 +533,7 @@ typedef struct {
 ** Project the random integer 'ran' into the interval [0, n].
 ** Because 'ran' has 2^B possible values, the projection can only be
 ** uniform when the size of the interval is a power of 2 (exact
-** division). Otherwise, to get a uniform projection into [0, n], we
+** division). So, to get a uniform projection into [0, n], we
 ** first compute 'lim', the smallest Mersenne number not smaller than
 ** 'n'. We then project 'ran' into the interval [0, lim].  If the result
 ** is inside [0, n], we are done. Otherwise, we try with another 'ran',
@@ -548,26 +541,14 @@ typedef struct {
 */
 static lua_Unsigned project (lua_Unsigned ran, lua_Unsigned n,
                              RanState *state) {
-  if ((n & (n + 1)) == 0)  /* is 'n + 1' a power of 2? */
-    return ran & n;  /* no bias */
-  else {
-    lua_Unsigned lim = n;
-    /* compute the smallest (2^b - 1) not smaller than 'n' */
-    lim |= (lim >> 1);
-    lim |= (lim >> 2);
-    lim |= (lim >> 4);
-    lim |= (lim >> 8);
-    lim |= (lim >> 16);
-#if (LUA_MAXUNSIGNED >> 31) >= 3
-    lim |= (lim >> 32);  /* integer type has more than 32 bits */
-#endif
-    lua_assert((lim & (lim + 1)) == 0  /* 'lim + 1' is a power of 2, */
-      && lim >= n  /* not smaller than 'n', */
-      && (lim >> 1) < n);  /* and it is the smallest one */
-    while ((ran &= lim) > n)  /* project 'ran' into [0..lim] */
-      ran = I2UInt(nextrand(state->s));  /* not inside [0..n]? try again */
-    return ran;
-  }
+  lua_Unsigned lim = n;  /* to compute the Mersenne number */
+  int sh;  /* how much to spread bits to the right in 'lim' */
+  /* spread '1' bits in 'lim' until it becomes a Mersenne number */
+  for (sh = 1; (lim & (lim + 1)) != 0; sh *= 2)
+    lim |= (lim >> sh);  /* spread '1's to the right */
+  while ((ran &= lim) > n)  /* project 'ran' into [0..lim] and test */
+    ran = I2UInt(nextrand(state->s));  /* not inside [0..n]? try again */
+  return ran;
 }
 
 
@@ -585,7 +566,7 @@ static int math_random (lua_State *L) {
       low = 1;
       up = luaL_checkinteger(L, 1);
       if (up == 0) {  /* single 0 as argument? */
-        lua_pushinteger(L, I2UInt(rv));  /* full random integer */
+        lua_pushinteger(L, l_castU2S(I2UInt(rv)));  /* full random integer */
         return 1;
       }
       break;
@@ -600,8 +581,8 @@ static int math_random (lua_State *L) {
   /* random integer in the interval [low, up] */
   luaL_argcheck(L, low <= up, 1, "interval is empty");
   /* project random integer into the interval [0, up - low] */
-  p = project(I2UInt(rv), (lua_Unsigned)up - (lua_Unsigned)low, state);
-  lua_pushinteger(L, p + (lua_Unsigned)low);
+  p = project(I2UInt(rv), l_castS2U(up) - l_castS2U(low), state);
+  lua_pushinteger(L, l_castU2S(p + l_castS2U(low)));
   return 1;
 }
 
@@ -615,33 +596,23 @@ static void setseed (lua_State *L, Rand64 *state,
   state[3] = Int2I(0);
   for (i = 0; i < 16; i++)
     nextrand(state);  /* discard initial values to "spread" seed */
-  lua_pushinteger(L, n1);
-  lua_pushinteger(L, n2);
-}
-
-
-/*
-** Set a "random" seed. To get some randomness, use the current time
-** and the address of 'L' (in case the machine does address space layout
-** randomization).
-*/
-static void randseed (lua_State *L, RanState *state) {
-  lua_Unsigned seed1 = (lua_Unsigned)time(NULL);
-  lua_Unsigned seed2 = (lua_Unsigned)(size_t)L;
-  setseed(L, state->s, seed1, seed2);
+  lua_pushinteger(L, l_castU2S(n1));
+  lua_pushinteger(L, l_castU2S(n2));
 }
 
 
 static int math_randomseed (lua_State *L) {
   RanState *state = (RanState *)lua_touserdata(L, lua_upvalueindex(1));
+  lua_Unsigned n1, n2;
   if (lua_isnone(L, 1)) {
-    randseed(L, state);
+    n1 = luaL_makeseed(L);  /* "random" seed */
+    n2 = I2UInt(nextrand(state->s));  /* in case seed is not that random... */
   }
   else {
-    lua_Integer n1 = luaL_checkinteger(L, 1);
-    lua_Integer n2 = luaL_optinteger(L, 2, 0);
-    setseed(L, state->s, n1, n2);
+    n1 = l_castS2U(luaL_checkinteger(L, 1));
+    n2 = l_castS2U(luaL_optinteger(L, 2, 0));
   }
+  setseed(L, state->s, n1, n2);
   return 2;  /* return seeds */
 }
 
@@ -658,7 +629,7 @@ static const luaL_Reg randfuncs[] = {
 */
 static void setrandfunc (lua_State *L) {
   RanState *state = (RanState *)lua_newuserdatauv(L, sizeof(RanState), 0);
-  randseed(L, state);  /* initialize with a "random" seed */
+  setseed(L, state->s, luaL_makeseed(L), 0);  /* initialize with random seed */
   lua_pop(L, 2);  /* remove pushed seeds */
   luaL_setfuncs(L, randfuncs, 1);
 }

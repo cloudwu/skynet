@@ -22,6 +22,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "llimits.h"
 
 
 /*
@@ -58,11 +59,8 @@ static const char *const CLIBS = "_CLIBS";
 #define setprogdir(L)           ((void)0)
 
 
-/*
-** Special type equivalent to '(void*)' for functions in gcc
-** (to suppress warnings when converting function pointers)
-*/
-typedef void (*voidf)(void);
+/* cast void* to a Lua function */
+#define cast_Lfunc(p)	cast(lua_CFunction, cast_func(p))
 
 
 /*
@@ -95,25 +93,12 @@ static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym);
 #if defined(LUA_USE_DLOPEN)	/* { */
 /*
 ** {========================================================================
-** This is an implementation of loadlib based on the dlfcn interface.
-** The dlfcn interface is available in Linux, SunOS, Solaris, IRIX, FreeBSD,
-** NetBSD, AIX 4.2, HPUX 11, and  probably most other Unix flavors, at least
-** as an emulation layer on top of native functions.
+** This is an implementation of loadlib based on the dlfcn interface,
+** which is available in all POSIX systems.
 ** =========================================================================
 */
 
 #include <dlfcn.h>
-
-/*
-** Macro to convert pointer-to-void* to pointer-to-function. This cast
-** is undefined according to ISO C, but POSIX assumes that it works.
-** (The '__extension__' in gnu compilers is only to avoid warnings.)
-*/
-#if defined(__GNUC__)
-#define cast_func(p) (__extension__ (lua_CFunction)(p))
-#else
-#define cast_func(p) ((lua_CFunction)(p))
-#endif
 
 
 static void lsys_unloadlib (void *lib) {
@@ -130,7 +115,7 @@ static void *lsys_load (lua_State *L, const char *path, int seeglb) {
 
 
 static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym) {
-  lua_CFunction f = cast_func(dlsym(lib, sym));
+  lua_CFunction f = cast_Lfunc(dlsym(lib, sym));
   if (l_unlikely(f == NULL))
     lua_pushstring(L, dlerror());
   return f;
@@ -206,7 +191,7 @@ static void *lsys_load (lua_State *L, const char *path, int seeglb) {
 
 
 static lua_CFunction lsys_sym (lua_State *L, void *lib, const char *sym) {
-  lua_CFunction f = (lua_CFunction)(voidf)GetProcAddress((HMODULE)lib, sym);
+  lua_CFunction f = cast_Lfunc(GetProcAddress((HMODULE)lib, sym));
   if (f == NULL) pusherror(L);
   return f;
 }
@@ -283,7 +268,8 @@ static int noenv (lua_State *L) {
 
 
 /*
-** Set a path
+** Set a path. (If using the default path, assume it is a string
+** literal in C and create it as an external string.)
 */
 static void setpath (lua_State *L, const char *fieldname,
                                    const char *envname,
@@ -294,7 +280,7 @@ static void setpath (lua_State *L, const char *fieldname,
   if (path == NULL)  /* no versioned environment variable? */
     path = getenv(envname);  /* try unversioned name */
   if (path == NULL || noenv(L))  /* no environment variable? */
-    lua_pushstring(L, dft);  /* use default */
+    lua_pushexternalstring(L, dft, strlen(dft), NULL, NULL);  /* use default */
   else if ((dftmark = strstr(path, LUA_PATH_SEP LUA_PATH_SEP)) == NULL)
     lua_pushstring(L, path);  /* nothing to change */
   else {  /* path contains a ";;": insert default path in its place */
@@ -302,13 +288,13 @@ static void setpath (lua_State *L, const char *fieldname,
     luaL_Buffer b;
     luaL_buffinit(L, &b);
     if (path < dftmark) {  /* is there a prefix before ';;'? */
-      luaL_addlstring(&b, path, dftmark - path);  /* add it */
+      luaL_addlstring(&b, path, ct_diff2sz(dftmark - path));  /* add it */
       luaL_addchar(&b, *LUA_PATH_SEP);
     }
     luaL_addstring(&b, dft);  /* add default */
     if (dftmark < path + len - 2) {  /* is there a suffix after ';;'? */
       luaL_addchar(&b, *LUA_PATH_SEP);
-      luaL_addlstring(&b, dftmark + 2, (path + len - 2) - dftmark);
+      luaL_addlstring(&b, dftmark + 2, ct_diff2sz((path + len - 2) - dftmark));
     }
     luaL_pushresult(&b);
   }
@@ -557,7 +543,7 @@ static int loadfunc (lua_State *L, const char *filename, const char *modname) {
   mark = strchr(modname, *LUA_IGMARK);
   if (mark) {
     int stat;
-    openfunc = lua_pushlstring(L, modname, mark - modname);
+    openfunc = lua_pushlstring(L, modname, ct_diff2sz(mark - modname));
     openfunc = lua_pushfstring(L, LUA_POF"%s", openfunc);
     stat = lookforfunc(L, filename, openfunc);
     if (stat != ERRFUNC) return stat;
@@ -582,7 +568,7 @@ static int searcher_Croot (lua_State *L) {
   const char *p = strchr(name, '.');
   int stat;
   if (p == NULL) return 0;  /* is root */
-  lua_pushlstring(L, name, p - name);
+  lua_pushlstring(L, name, ct_diff2sz(p - name));
   filename = findfile(L, lua_tostring(L, -1), "cpath", LUA_CSUBSEP);
   if (filename == NULL) return 1;  /* root not found */
   if ((stat = loadfunc(L, filename, name)) != 0) {
@@ -620,12 +606,12 @@ static void findloader (lua_State *L, const char *name) {
                  != LUA_TTABLE))
     luaL_error(L, "'package.searchers' must be a table");
   luaL_buffinit(L, &msg);
+  luaL_addstring(&msg, "\n\t");  /* error-message prefix for first message */
   /*  iterate over available searchers to find a loader */
   for (i = 1; ; i++) {
-    luaL_addstring(&msg, "\n\t");  /* error-message prefix */
     if (l_unlikely(lua_rawgeti(L, 3, i) == LUA_TNIL)) {  /* no more searchers? */
       lua_pop(L, 1);  /* remove nil */
-      luaL_buffsub(&msg, 2);  /* remove prefix */
+      luaL_buffsub(&msg, 2);  /* remove last prefix */
       luaL_pushresult(&msg);  /* create error message */
       luaL_error(L, "module '%s' not found:%s", name, lua_tostring(L, -1));
     }
@@ -636,11 +622,10 @@ static void findloader (lua_State *L, const char *name) {
     else if (lua_isstring(L, -2)) {  /* searcher returned error message? */
       lua_pop(L, 1);  /* remove extra return */
       luaL_addvalue(&msg);  /* concatenate error message */
+      luaL_addstring(&msg, "\n\t");  /* prefix for next message */
     }
-    else {  /* no error message */
+    else  /* no error message */
       lua_pop(L, 2);  /* remove both returns */
-      luaL_buffsub(&msg, 2);  /* remove prefix */
-    }
   }
 }
 

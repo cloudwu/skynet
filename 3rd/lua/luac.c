@@ -18,6 +18,7 @@
 #include "lua.h"
 #include "lauxlib.h"
 
+#include "lapi.h"
 #include "ldebug.h"
 #include "lobject.h"
 #include "lopcodes.h"
@@ -679,7 +680,7 @@ static void PrintHeader(const Proto* f)
 	f->linedefined,f->lastlinedefined,
 	S(f->sizecode),VOID(f));
  printf("%d%s param%s, %d slot%s, %d upvalue%s, ",
-	(int)(f->numparams),f->is_vararg?"+":"",SS(f->numparams),
+	(int)(f->numparams),(f->flag & PF_ISVARARG)?"+":"",SS(f->numparams),
 	S(f->maxstacksize),S(f->sizeupvalues));
  printf("%d local%s, %d constant%s, %d function%s\n",
 	S(f->sizelocvars),S(f->sizek),S(f->sizep));
