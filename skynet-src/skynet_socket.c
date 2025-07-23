@@ -174,6 +174,11 @@ skynet_socket_nodelay(struct skynet_context *ctx, int id) {
 	socket_server_nodelay(SOCKET_SERVER, id);
 }
 
+void
+skynet_socket_keepalive(struct skynet_context *ctx, int id, int idle, int interval, int count) {
+	socket_server_keepalive(SOCKET_SERVER, id, idle, interval, count);
+}
+
 int 
 skynet_socket_udp(struct skynet_context *ctx, const char * addr, int port) {
 	uint32_t source = skynet_context_handle(ctx);

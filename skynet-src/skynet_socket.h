@@ -37,6 +37,7 @@ void skynet_socket_shutdown(struct skynet_context *ctx, int id);
 void skynet_socket_start(struct skynet_context *ctx, int id);
 void skynet_socket_pause(struct skynet_context *ctx, int id);
 void skynet_socket_nodelay(struct skynet_context *ctx, int id);
+void skynet_socket_keepalive(struct skynet_context *ctx, int id, int idle, int interval, int count);
 
 int skynet_socket_udp(struct skynet_context *ctx, const char * addr, int port);
 int skynet_socket_udp_connect(struct skynet_context *ctx, int id, const char * addr, int port);

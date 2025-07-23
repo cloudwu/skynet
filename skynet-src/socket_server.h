@@ -49,6 +49,7 @@ int socket_server_bind(struct socket_server *, uintptr_t opaque, int fd);
 
 // for tcp
 void socket_server_nodelay(struct socket_server *, int id);
+void socket_server_keepalive(struct socket_server *, int id, int idle, int interval, int count);
 
 struct socket_udp_address;
 

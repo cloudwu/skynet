@@ -21,6 +21,9 @@
 #include "skynet_socket.h"
 
 #define BACKLOG 32
+#define KEEPIDLE 15
+#define KEEPINTVL 15
+#define KEEPCNT 9
 // 2 ** 12 == 4096
 #define LARGE_PAGE_NODE 12
 #define POOL_SIZE_WARNING 32
@@ -636,6 +639,22 @@ lnodelay(lua_State *L) {
 }
 
 static int
+lkeepalive(lua_State *L) {
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	int id = luaL_checkinteger(L, 1);
+	// Idle is the time(second) that the connection must be idle before
+	// the first keep-alive probe is sent.
+	int idle = luaL_optinteger(L, 2, KEEPIDLE);
+	// Interval is the time(second) between keep-alive probes.
+	int interval = luaL_optinteger(L, 3, KEEPINTVL);
+	// Count is the maximum number of keep-alive probes that
+	// can go unanswered before dropping a connection.
+	int count = luaL_optinteger(L, 4, KEEPCNT);
+	skynet_socket_keepalive(ctx, id, idle, interval, count);
+	return 0;
+}
+
+static int
 ludp(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	size_t sz = 0;
@@ -885,6 +904,7 @@ luaopen_skynet_socketdriver(lua_State *L) {
 		{ "start", lstart },
 		{ "pause", lpause },
 		{ "nodelay", lnodelay },
+		{ "keepalive", lkeepalive },
 		{ "udp", ludp },
 		{ "udp_connect", ludp_connect },
 		{ "udp_dial", ludp_dial},

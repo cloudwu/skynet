@@ -2127,6 +2127,21 @@ socket_server_nodelay(struct socket_server *ss, int id) {
 }
 
 void
+socket_server_keepalive(struct socket_server *ss, int id, int idle, int interval, int count) {
+	struct request_package request;
+	request.u.setopt.id = id;
+	request.u.setopt.what = TCP_KEEPIDLE;
+	request.u.setopt.value = idle;
+	send_request(ss, &request, 'T', sizeof(request.u.setopt));
+	request.u.setopt.what = TCP_KEEPINTVL;
+	request.u.setopt.value = interval;
+	send_request(ss, &request, 'T', sizeof(request.u.setopt));
+	request.u.setopt.what = TCP_KEEPCNT;
+	request.u.setopt.value = count;
+	send_request(ss, &request, 'T', sizeof(request.u.setopt));
+}
+
+void
 socket_server_userobject(struct socket_server *ss, struct socket_object_interface *soi) {
 	ss->soi = *soi;
 }

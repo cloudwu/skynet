@@ -1,10 +1,12 @@
 local skynet = require "skynet"
 local socket = require "skynet.socket"
+local driver = require "skynet.socketdriver"
 
 local mode , id = ...
 
 local function echo(id)
 	socket.start(id)
+	driver.keepalive(id)
 	socket.write(id, "Hello Skynet\n")
 
 	while true do
