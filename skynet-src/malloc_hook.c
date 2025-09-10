@@ -1,13 +1,14 @@
-#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
-#include <lua.h>
 #include <stdio.h>
 
-#include "malloc_hook.h"
+#include <lauxlib.h>
+
 #include "skynet.h"
 #include "atomic.h"
+
+#include "malloc_hook.h"
 
 // turn on MEMORY_CHECK can do more memory check, such as double free
 // #define MEMORY_CHECK
@@ -15,13 +16,12 @@
 #define MEMORY_ALLOCTAG 0x20140605
 #define MEMORY_FREETAG 0x0badf00d
 
-static ATOM_SIZET _used_memory = 0;
-static ATOM_SIZET _memory_block = 0;
-
 struct mem_data {
-	ATOM_ULONG handle;
-	ATOM_SIZET allocated;
+    alignas(CACHE_LINE_SIZE)
+	ATOM_ULONG     handle;
+    AtomicMemInfo  info;
 };
+_Static_assert(sizeof(struct mem_data) % CACHE_LINE_SIZE == 0, "mem_data must be cache-line aligned");
 
 struct mem_cookie {
 	size_t size;
@@ -36,7 +36,14 @@ struct mem_cookie {
 #define PREFIX_SIZE sizeof(struct mem_cookie)
 
 static struct mem_data mem_stats[SLOT_SIZE];
+_Static_assert(alignof(mem_stats) % CACHE_LINE_SIZE == 0, "mem_stats must be cache-line aligned");
 
+static struct mem_data *
+get_mem_stat(uint32_t handle) {
+	int h = (int)(handle & (SLOT_SIZE - 1));
+	struct mem_data *data = &mem_stats[h];
+	return data;
+}
 
 #ifndef NOUSE_JEMALLOC
 
@@ -46,45 +53,19 @@ static struct mem_data mem_stats[SLOT_SIZE];
 #define raw_realloc je_realloc
 #define raw_free je_free
 
-static ATOM_SIZET *
-get_allocated_field(uint32_t handle) {
-	int h = (int)(handle & (SLOT_SIZE - 1));
-	struct mem_data *data = &mem_stats[h];
-	uint32_t old_handle = data->handle;
-	ssize_t old_alloc = (ssize_t)data->allocated;
-	if(old_handle == 0 || old_alloc <= 0) {
-		// data->allocated may less than zero, because it may not count at start.
-		if(!ATOM_CAS_ULONG(&data->handle, old_handle, handle)) {
-			return 0;
-		}
-		if (old_alloc < 0) {
-			ATOM_CAS_SIZET(&data->allocated, (size_t)old_alloc, 0);
-		}
-	}
-	if(data->handle != handle) {
-		return 0;
-	}
-	return &data->allocated;
-}
-
 inline static void
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
-	ATOM_FADD(&_used_memory, __n);
-	ATOM_FINC(&_memory_block);
-	ATOM_SIZET * allocated = get_allocated_field(handle);
-	if(allocated) {
-		ATOM_FADD(allocated, __n);
-	}
+	struct mem_data *data = get_mem_stat(handle);
+    // 当两个不同的 handle 被哈希到同一个槽位时, 新的服务会覆盖旧服务的数据
+    // 这种情况在实际运行中非常罕见, 因为同时存在的服务数量很难超过 65536
+    ATOM_STORE(&data->handle, handle);
+	atomic_meminfo_alloc(&data->info, __n);
 }
 
 inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
-	ATOM_FSUB(&_used_memory, __n);
-	ATOM_FDEC(&_memory_block);
-	ATOM_SIZET * allocated = get_allocated_field(handle);
-	if(allocated) {
-		ATOM_FSUB(allocated, __n);
-	}
+	struct mem_data *data = get_mem_stat(handle);
+	atomic_meminfo_free(&data->info, __n);
 }
 
 inline static void*
@@ -92,6 +73,7 @@ fill_prefix(char* ptr, size_t sz, uint32_t cookie_size) {
 	uint32_t handle = skynet_current_handle();
 	struct mem_cookie *p = (struct mem_cookie *)ptr;
 	char * ret = ptr + cookie_size;
+	sz += cookie_size;
 	p->size = sz;
 	p->handle = handle;
 #ifdef MEMORY_CHECK
@@ -300,27 +282,55 @@ mallctl_cmd(const char* name) {
 
 size_t
 malloc_used_memory(void) {
-	return ATOM_LOAD(&_used_memory);
+	MemInfo total = {};
+	for(int i = 0; i < SLOT_SIZE; i++) {
+		struct mem_data* data = &mem_stats[i];
+		const uint32_t handle = ATOM_LOAD(&data->handle);
+		if (handle != 0) {
+			atomic_meminfo_merge(&total, &data->info);
+		}
+	}
+	return total.alloc - total.free;
 }
 
 size_t
 malloc_memory_block(void) {
-	return ATOM_LOAD(&_memory_block);
+	MemInfo total = {};
+	for(int i = 0; i < SLOT_SIZE; i++) {
+		struct mem_data* data = &mem_stats[i];
+		const uint32_t handle = ATOM_LOAD(&data->handle);
+		if (handle != 0) {
+			atomic_meminfo_merge(&total, &data->info);
+		}
+	}
+	return total.alloc_count - total.free_count;
 }
 
 void
 dump_c_mem() {
-	int i;
-	size_t total = 0;
 	skynet_error(NULL, "dump all service mem:");
-	for(i=0; i<SLOT_SIZE; i++) {
+	MemInfo total = {};
+	for(int i = 0; i < SLOT_SIZE; i++) {
 		struct mem_data* data = &mem_stats[i];
-		if(data->handle != 0 && data->allocated != 0) {
-			total += data->allocated;
-			skynet_error(NULL, ":%08x -> %zdkb %db", data->handle, data->allocated >> 10, (int)(data->allocated % 1024));
+		const uint32_t handle = ATOM_LOAD(&data->handle);
+		if (handle != 0) {
+			MemInfo info = {};
+			atomic_meminfo_merge(&info, &data->info);
+			meminfo_merge(&total, &info);
+			const size_t using = info.alloc - info.free;
+			skynet_error(NULL, ":%08x -> %zukb %zub", handle, using >> 10, using);
 		}
 	}
-	skynet_error(NULL, "+total: %zdkb",total >> 10);
+	const size_t using = total.alloc - total.free;
+	skynet_error(NULL, "+total: %zukb", using >> 10);
+}
+
+char *
+skynet_strdup(const char *str) {
+	size_t sz = strlen(str);
+	char * ret = skynet_malloc(sz+1);
+	memcpy(ret, str, sz+1);
+	return ret;
 }
 
 void *
@@ -339,9 +349,12 @@ dump_mem_lua(lua_State *L) {
 	lua_newtable(L);
 	for(i=0; i<SLOT_SIZE; i++) {
 		struct mem_data* data = &mem_stats[i];
-		if(data->handle != 0 && data->allocated != 0) {
-			lua_pushinteger(L, data->allocated);
-			lua_rawseti(L, -2, (lua_Integer)data->handle);
+		const uint32_t handle = ATOM_LOAD(&data->handle);
+		if (handle != 0) {
+			MemInfo info = {};
+			atomic_meminfo_merge(&info, &data->info);
+			lua_pushinteger(L, info.alloc - info.free);
+			lua_rawseti(L, -2, handle);
 		}
 	}
 	return 1;
@@ -350,14 +363,13 @@ dump_mem_lua(lua_State *L) {
 size_t
 malloc_current_memory(void) {
 	uint32_t handle = skynet_current_handle();
-	int i;
-	for(i=0; i<SLOT_SIZE; i++) {
-		struct mem_data* data = &mem_stats[i];
-		if(data->handle == (uint32_t)handle && data->allocated != 0) {
-			return (size_t) data->allocated;
-		}
+	struct mem_data *data = get_mem_stat(handle);
+	if (ATOM_LOAD(&data->handle) != handle) {
+		return 0;
 	}
-	return 0;
+	MemInfo info = {};
+	atomic_meminfo_merge(&info, &data->info);
+	return info.alloc - info.free;
 }
 
 void
