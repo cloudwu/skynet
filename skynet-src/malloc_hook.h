@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <lua.h>
 
+#include "mem_info.h"
+
 extern size_t malloc_used_memory(void);
 extern size_t malloc_memory_block(void);
 extern void   memory_info_dump(const char *opts);
@@ -17,4 +19,3 @@ extern int    dump_mem_lua(lua_State *L);
 extern size_t malloc_current_memory(void);
 
 #endif /* SKYNET_MALLOC_HOOK_H */
-
