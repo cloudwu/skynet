@@ -2,8 +2,6 @@
 
 #include "mem_info.h"
 
-#define SPMC_STEP_LG 4  // 内存变化超过当前内存 2^-x = 6.25% 时才更新数据
-
 void
 meminfo_init(MemInfo *info) {
     memset(info, 0, sizeof(*info));
