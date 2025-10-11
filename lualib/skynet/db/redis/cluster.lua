@@ -167,9 +167,8 @@ end
 --
 -- For commands we want to explicitly bad as they don't make sense
 -- in the context of cluster, nil is returned.
-function rediscluster:get_key_from_command(argv)
-	local cmd,key = table.unpack(argv)
-	cmd = string.lower(cmd)
+function rediscluster:get_key_from_command(cmd, argv)
+	local key = argv[2] -- argv[1] is cmd
 	if cmd == "info" or
 		cmd == "multi" or
 		cmd == "exec" or
@@ -314,8 +313,8 @@ end
 -- Dispatch commands.
 function rediscluster:call(...)
 	local argv = table.pack(...)
-	local cmd = argv[1]
-	local key = self:get_key_from_command(argv)
+	local cmd = string.lower(argv[1])
+	local key = self:get_key_from_command(cmd, argv)
 	if not key then
 		error("No way to dispatch this command to Redis Cluster: " .. tostring(argv[1]))
 	end
