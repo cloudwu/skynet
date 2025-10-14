@@ -231,7 +231,7 @@ start(int thread) {
 }
 
 static void
-bootstrap(struct skynet_context * logger, const char * cmdline) {
+bootstrap(uint32_t logger_handle, const char * cmdline) {
 	int sz = strlen(cmdline);
 	char name[sz+1];
 	char args[sz+1];
@@ -248,8 +248,12 @@ bootstrap(struct skynet_context * logger, const char * cmdline) {
 	}
 	const uint32_t handle = skynet_context_new(name, args);
 	if (handle == 0) {
-		skynet_error(NULL, "Bootstrap error : %s\n", cmdline);
-		skynet_context_dispatchall(logger);
+		struct skynet_context *logger = skynet_handle_grab(logger_handle);
+		if (logger != NULL) {
+			skynet_error(NULL, "Bootstrap error : %s\n", cmdline);
+			skynet_context_dispatchall(logger);
+			skynet_context_release(logger);
+		}
 		exit(1);
 	}
 }
@@ -276,23 +280,15 @@ skynet_start(struct skynet_config * config) {
 	skynet_socket_init();
 	skynet_profile_enable(config->profile);
 
-	const uint32_t handle = skynet_context_new(config->logservice, config->logger);
-	if (handle == 0) {
+	const uint32_t logger_handle = skynet_context_new(config->logservice, config->logger);
+	if (logger_handle == 0) {
 		fprintf(stderr, "Can't launch %s service\n", config->logservice);
 		exit(1);
 	}
 
-	struct skynet_context *ctx = skynet_handle_grab(handle);
-	if (ctx == NULL) {
-		fprintf(stderr, "logservice %s exit before start\n", config->logservice);
-		exit(1);
-	}
+	skynet_handle_namehandle(logger_handle, "logger");
 
-	skynet_handle_namehandle(handle, "logger");
-
-	bootstrap(ctx, config->bootstrap);
-
-	skynet_context_release(ctx);
+	bootstrap(logger_handle, config->bootstrap);
 
 	start(config->thread);
 
