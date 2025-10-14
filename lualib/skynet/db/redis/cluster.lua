@@ -344,15 +344,24 @@ function rediscluster:call(...)
 		else
 			conn = self:get_connection_by_slot(slot)
 		end
-		local result = {pcall(function ()
-			-- TODO: use pipelining to send asking and save a rtt.
-			if asking then
-				conn:asking()
-			end
+
+		local result
+		if asking then
+			-- use pipeline
+			-- ensure ASKING and command execute sequentially and consecutively
+			-- save one RTT
+			local cmd_list = {
+				{ "asking" },
+				{ ... },
+			}
 			asking = false
+			local func = conn["pipeline"]
+			result = { pcall(func, conn, cmd_list) }
+		else
 			local func = conn[cmd]
-			return func(conn,table.unpack(argv,2))
-		end)}
+			result = { pcall(func, conn, table.unpack(argv, 2)) }
+		end
+
 		local ok = result[1]
 		if not ok then
 			err = table.unpack(result,2)
