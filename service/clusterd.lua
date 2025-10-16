@@ -67,9 +67,9 @@ local function open_channel(t, key)
 			-- no sender or closed, always succ
 			succ = true
 		else
-			-- trun off the sender
+			-- turn off the sender
 			succ, err = pcall(skynet.call, c, "lua", "changenode", false)
-                        if succ then --trun off failed, wait next index todo turn off
+                        if succ then --turn off failed, wait next index todo turn off
                                 node_sender_closed[key] = true
                         end
 		end
@@ -118,7 +118,7 @@ local function loadconfig(tmp)
 			end
 			local ct = connecting[name]
 			if ct and ct.namequery and not config.nowaiting then
-				skynet.error(string.format("Cluster node [%s] resloved : %s", name, address))
+				skynet.error(string.format("Cluster node [%s] resolved : %s", name, address))
 				skynet.wakeup(ct.namequery)
 			end
 		end
