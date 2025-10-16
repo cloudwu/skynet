@@ -265,7 +265,7 @@ unpackreq_number(lua_State *L, const uint8_t * buf, int sz) {
 	return_buffer(L, (const char *)buf+9, sz-9);
 	if (session == 0) {
 		lua_pushnil(L);
-		lua_pushboolean(L,1);	// is_push, no reponse
+		lua_pushboolean(L,1);	// is_push, no response
 		return 6;
 	}
 
@@ -326,7 +326,7 @@ unpackreq_string(lua_State *L, const uint8_t * buf, int sz) {
 	return_buffer(L, (const char *)buf+2+namesz+4, sz - namesz - 6);
 	if (session == 0) {
 		lua_pushnil(L);
-		lua_pushboolean(L,1);	// is_push, no reponse
+		lua_pushboolean(L,1);	// is_push, no response
 		return 6;
 	}
 

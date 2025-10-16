@@ -8,7 +8,7 @@ local function timeout_check(ti)
 	end
 	skynet.sleep(ti)	-- sleep 10 sec
 	for k,v in pairs(list) do
-		skynet.error("timout",ti,k,v)
+		skynet.error("timeout",ti,k,v)
 	end
 end
 
