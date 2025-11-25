@@ -11,3 +11,8 @@
 *.dSYM
 .DS_Store
 .vscode
+3rd/lua/lua.exe
+3rd/lua/luac.exe
+3rd/lua/lua54.dll
+skynet.exe
+*.dll
