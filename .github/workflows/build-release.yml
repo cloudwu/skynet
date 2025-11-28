@@ -1,0 +1,172 @@
+name: Build and Release Skynet
+
+on:
+  push:
+    branches: [ master ]
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: ubuntu-latest
+            container: debian:13
+            target: mingw
+            artifact: skynet-windows.zip
+          - platform: linux
+            os: ubuntu-latest
+            container: debian:13
+            target: linux
+            artifact: skynet-linux.zip
+          - platform: macosx
+            os: macos-latest
+            target: macosx
+            artifact: skynet-macosx.zip
+          - platform: freebsd
+            os: ubuntu-latest
+            container: debian:13
+            target: freebsd
+            artifact: skynet-freebsd.zip
+
+    container: ${{ matrix.container }}
+
+    steps:
+    - name: Install dependencies (Debian - Windows/Linux)
+      if: matrix.container == 'debian:13'
+      run: |
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          build-essential \
+          make \
+          pkg-config \
+          mingw-w64 \
+          mingw-w64-tools \
+          mingw-w64-i686-dev \
+          mingw-w64-x86-64-dev \
+          autoconf \
+          automake \
+          libtool \
+          git \
+          zip \
+          ca-certificates \
+          curl \
+          libreadline-dev \
+          libedit-dev \
+          rsync
+
+    - name: Install dependencies (macOS)
+      if: matrix.platform == 'macosx'
+      run: |
+        # macOS usually has most build tools pre-installed
+        # Install any additional dependencies if needed
+        brew install autoconf automake libtool || true
+
+    - name: Install dependencies (FreeBSD)
+      if: matrix.platform == 'freebsd'
+      run: |
+        # FreeBSD build using standard build tools (cross-compilation compatible)
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          build-essential \
+          make \
+          pkg-config \
+          autoconf \
+          automake \
+          libtool \
+          git \
+          zip \
+          ca-certificates \
+          curl \
+          libreadline-dev \
+          libedit-dev \
+          rsync
+
+    - name: Update CA certificates (Debian containers)
+      if: matrix.container == 'debian:13'
+      run: |
+        update-ca-certificates
+
+    - name: Configure Git SSL (Debian containers)
+      if: matrix.container == 'debian:13'
+      run: |
+        git config --global http.sslverify true
+        git config --global http.sslcainfo /etc/ssl/certs/ca-certificates.crt
+
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
+    - name: Build ${{ matrix.platform }}
+      run: |
+        make cleanall
+        make ${{ matrix.target }}
+
+    - name: Prepare build files
+      run: |
+        mkdir -p build-output
+        # Copy all files except .git and .github with ignore-errors flag
+    - name: Clean and recreate directory
+      run: |
+        rm -rf build-output/
+        mkdir -p build-output/
+
+    - name: Sync files to build-output excluding specific directories
+      run: |
+        rsync -av --ignore-errors --exclude='.git*' --exclude='.github' --exclude='build-output' . build-output/
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact }}
+        path: build-output/
+        retention-days: 30
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Prepare release assets
+      run: |
+        mkdir -p release-assets
+        # Copy zip files from artifact directories to release assets
+        for artifact in skynet-windows.zip skynet-linux.zip skynet-macosx.zip skynet-freebsd.zip; do
+          if [ -d "artifacts/${artifact}" ]; then
+            # The artifacts are already organized, just copy them
+            cp -r "artifacts/${artifact}/"* "release-assets/" 2>/dev/null || true
+            # Or if we want to create new zip files with consistent naming
+            platform=$(echo ${artifact} | sed 's/skynet-\(.*\)\.zip/\1/')
+            cd "artifacts/${artifact}"
+            zip -r "../../release-assets/skynet-${platform}.zip" .
+            cd ../..
+          fi
+        done
+        ls -la release-assets/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release-assets/*.zip
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
