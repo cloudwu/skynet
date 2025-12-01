@@ -271,7 +271,7 @@ function rediscluster:get_random_connection()
 				-- If the connection is not good close it ASAP in order
 				-- to avoid waiting for the GC finalizer. File
 				-- descriptors are a rare resource.
-				self.connetions[node.name] = nil
+				self.connections[node.name] = nil
 				conn:disconnect()
 			end
 		end)
