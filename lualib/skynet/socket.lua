@@ -1,9 +1,22 @@
 local driver = require "skynet.socketdriver"
 local skynet = require "skynet"
 local skynet_core = require "skynet.core"
+local dns = require "skynet.dns"
 local assert = assert
 
 local BUFFER_LIMIT = 128 * 1024
+
+local function resolve_address(addr)
+	if not addr or addr == "" then
+		return addr
+	end
+	local ip, ips = dns.resolve(addr)
+	if not ip then
+		error(string.format("Failed to resolve hostname: %s, err:%s", addr, ips))
+	end
+	return ip
+end
+
 local socket = {}	-- api
 local socket_pool = setmetatable( -- store all socket object
 	{},
@@ -241,7 +254,8 @@ local function connect(id, func)
 end
 
 function socket.open(addr, port)
-	local id = driver.connect(addr,port)
+	local resolved_addr = resolve_address(addr)
+	local id = driver.connect(resolved_addr, port)
 	return connect(id)
 end
 
@@ -411,7 +425,8 @@ function socket.listen(host, port, backlog)
 		host, port = string.match(host, "([^:]+):(.+)$")
 		port = tonumber(port)
 	end
-	local id = driver.listen(host, port, backlog)
+	local resolved_host = resolve_address(host)
+	local id = driver.listen(resolved_host, port, backlog)
 	local s = {
 		id = id,
 		connected = false,
@@ -453,7 +468,8 @@ local function create_udp_object(id, cb)
 end
 
 function socket.udp(callback, host, port)
-	local id = driver.udp(host, port)
+	local resolved_host = host and resolve_address(host) or nil
+	local id = driver.udp(resolved_host, port)
 	create_udp_object(id, callback)
 	return id
 end
@@ -468,17 +484,20 @@ function socket.udp_connect(id, addr, port, callback)
 	else
 		create_udp_object(id, callback)
 	end
-	driver.udp_connect(id, addr, port)
+	local resolved_addr = resolve_address(addr)
+	driver.udp_connect(id, resolved_addr, port)
 end
 
 function socket.udp_listen(addr, port, callback)
-	local id = driver.udp_listen(addr, port)
+	local resolved_addr = resolve_address(addr)
+	local id = driver.udp_listen(resolved_addr, port)
 	create_udp_object(id, callback)
 	return id
 end
 
 function socket.udp_dial(addr, port, callback)
-	local id = driver.udp_dial(addr, port)
+	local resolved_addr = resolve_address(addr)
+	local id = driver.udp_dial(resolved_addr, port)
 	create_udp_object(id, callback)
 	return id
 end
