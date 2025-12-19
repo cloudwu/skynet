@@ -1,21 +1,29 @@
 local driver = require "skynet.socketdriver"
 local skynet = require "skynet"
 local skynet_core = require "skynet.core"
-local dns = require "skynet.dns"
 local assert = assert
 
 local BUFFER_LIMIT = 128 * 1024
+
+-- Lazy-loaded DNS module to avoid circular dependency
+local dns_module
 
 local function resolve_address(addr)
 	if not addr or addr == "" then
 		return addr
 	end
-	local ip, ips = dns.resolve(addr)
+
+	if not dns_module then
+		dns_module = require "skynet.dns"
+	end
+
+	local ip, ips = dns_module.resolve(addr)
 	if not ip then
-		error(string.format("Failed to resolve hostname: %s, err:%s", addr, ips))
+		error(string.format("Failed to resolve hostname: %s", addr))
 	end
 	return ip
 end
+
 
 local socket = {}	-- api
 local socket_pool = setmetatable( -- store all socket object
@@ -468,7 +476,7 @@ local function create_udp_object(id, cb)
 end
 
 function socket.udp(callback, host, port)
-	local resolved_host = host and resolve_address(host) or nil
+	local resolved_host = resolve_address(host)
 	local id = driver.udp(resolved_host, port)
 	create_udp_object(id, callback)
 	return id

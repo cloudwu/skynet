@@ -106,6 +106,18 @@ local function guess_name_type(name)
 	return "hostname"
 end
 
+local function is_valid_ip_address(addr)
+	if not addr or addr == "" then
+		return false
+	end
+
+	local ntype = guess_name_type(addr)
+	if ntype == "hostname" then
+		return false
+	end
+	return true
+end
+
 -- http://man7.org/linux/man-pages/man5/hosts.5.html
 local function parse_hosts()
 	if not dns.DEFAULT_HOSTS then
@@ -142,7 +154,7 @@ local function parse_hosts()
 			end
 			table.insert(rt[family], ip)
 		end
-		
+
 		::continue::
 	end
 	return rts
@@ -163,7 +175,12 @@ local function parse_resolv_conf()
 	for line in f:lines() do
 		server = line:match("^%s*nameserver%s+([^#;%s]+)")
 		if server then
-			break
+			if is_valid_ip_address(server) then
+				break
+			else
+				skynet.error(string.format("Invalid nameserver address in resolv.conf: %s (must be IP address)", server))
+				server = nil
+			end
 		end
 	end
 	f:close()
@@ -415,6 +432,10 @@ local function touch_server()
 end
 
 function dns.server(server, port)
+	if not is_valid_ip_address(server) then
+		error(string.format("Invalid DNS server address: %s (must be IP address, not hostname)", server))
+	end
+
 	dns_server.address = server
 	dns_server.port = port or 53
 end
