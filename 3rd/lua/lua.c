@@ -303,7 +303,8 @@ static int collectargs (char **argv, int *first) {
       case '-':  /* '--' */
         if (argv[i][2] != '\0')  /* extra characters after '--'? */
           return has_error;  /* invalid option */
-        *first = i + 1;
+        /* if there is a script name, it comes after '--' */
+        *first = (argv[i + 1] != NULL) ? i + 1 : 0;
         return args;
       case '\0':  /* '-' */
         return args;  /* script "name" is '-' */
@@ -348,6 +349,7 @@ static int collectargs (char **argv, int *first) {
 */
 static int runargs (lua_State *L, char **argv, int n) {
   int i;
+  lua_warning(L, "@off", 0);  /* by default, Lua stand-alone has warnings off */
   for (i = 1; i < n; i++) {
     int option = argv[i][1];
     lua_assert(argv[i][0] == '-');  /* already checked */
@@ -437,13 +439,24 @@ static int handle_luainit (lua_State *L) {
 **   the standard input.
 ** * lua_saveline defines how to "save" a read line in a "history".
 ** * lua_freeline defines how to free a line read by lua_readline.
-**
-** If lua_readline is defined, all of them should be defined.
 */
 
 #if !defined(lua_readline)	/* { */
+/* Otherwise, all previously listed functions should be defined. */
 
-/* Code to use the readline library, either statically or dynamically linked */
+#if defined(LUA_USE_READLINE)	/* { */
+/* Lua will be linked with '-lreadline' */
+
+#include <readline/readline.h>
+#include <readline/history.h>
+
+#define lua_initreadline(L)	((void)L, rl_readline_name="lua")
+#define lua_readline(buff,prompt)	((void)buff, readline(prompt))
+#define lua_saveline(line)	add_history(line)
+#define lua_freeline(line)	free(line)
+
+#else		/* }{ */
+/* use dynamically loaded readline (or nothing) */
 
 /* pointer to 'readline' function (if any) */
 typedef char *(*l_readlineT) (const char *prompt);
@@ -479,22 +492,9 @@ static void lua_freeline (char *line) {
 }
 
 
-#if defined(LUA_USE_READLINE)	/* { */
-
-/* assume Lua will be linked with '-lreadline' */
-#include <readline/readline.h>
-#include <readline/history.h>
-
-static void lua_initreadline(lua_State *L) {
-  UNUSED(L);
-  rl_readline_name = "lua";
-  l_readline = cast(l_readlineT, readline);
-  l_addhist = cast(l_addhistT, add_history);
-}
-
-#elif defined(LUA_USE_DLOPEN) && defined(LUA_READLINELIB)	/* }{ */
-
+#if defined(LUA_USE_DLOPEN) && defined(LUA_READLINELIB)		/* { */
 /* try to load 'readline' dynamically */
+
 #include <dlfcn.h>
 
 static void lua_initreadline (lua_State *L) {
@@ -507,15 +507,20 @@ static void lua_initreadline (lua_State *L) {
       *name = "lua";
     l_readline = cast(l_readlineT, cast_func(dlsym(lib, "readline")));
     l_addhist = cast(l_addhistT, cast_func(dlsym(lib, "add_history")));
+    if (l_readline == NULL)
+      lua_warning(L, "unable to load 'readline'", 0);
   }
 }
 
-#else	/* }{ */
+#else		/* }{ */
+/* no dlopen or LUA_READLINELIB undefined */
 
-/* no readline; leave function pointers as NULL */
-#define lua_initreadline(L)	cast(void, L)
+/* Leave pointers with NULL */
+#define lua_initreadline(L)	((void)L)
 
-#endif	/* } */
+#endif		/* } */
+
+#endif				/* } */
 
 #endif				/* } */
 
@@ -721,7 +726,7 @@ static int pmain (lua_State *L) {
     if (handle_luainit(L) != LUA_OK)  /* run LUA_INIT */
       return 0;  /* error running LUA_INIT */
   }
-  if (!runargs(L, argv, optlim))  /* execute arguments -e and -l */
+  if (!runargs(L, argv, optlim))  /* execute arguments -e, -l, and -W */
     return 0;  /* something failed */
   if (script > 0) {  /* execute main script (if there is one) */
     if (handle_script(L, argv + script) != LUA_OK)

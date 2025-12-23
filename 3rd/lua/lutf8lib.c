@@ -10,7 +10,6 @@
 #include "lprefix.h"
 
 
-#include <assert.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,7 +46,7 @@ static lua_Integer u_posrelat (lua_Integer pos, size_t len) {
 ** Decode one UTF-8 sequence, returning NULL if byte sequence is
 ** invalid.  The array 'limits' stores the minimum value for each
 ** sequence length, to check for overlong representations. Its first
-** entry forces an error for non-ascii bytes with no continuation
+** entry forces an error for non-ASCII bytes with no continuation
 ** bytes (count == 0).
 */
 static const char *utf8_decode (const char *s, l_uint32 *val, int strict) {
@@ -55,7 +54,7 @@ static const char *utf8_decode (const char *s, l_uint32 *val, int strict) {
         {~(l_uint32)0, 0x80, 0x800, 0x10000u, 0x200000u, 0x4000000u};
   unsigned int c = (unsigned char)s[0];
   l_uint32 res = 0;  /* final result */
-  if (c < 0x80)  /* ascii? */
+  if (c < 0x80)  /* ASCII? */
     res = c;
   else {
     int count = 0;  /* to count number of continuation bytes */
@@ -215,9 +214,10 @@ static int byteoffset (lua_State *L) {
   }
   lua_pushinteger(L, posi + 1);  /* initial position */
   if ((s[posi] & 0x80) != 0) {  /* multi-byte character? */
-    do {
-      posi++;
-    } while (iscontp(s + posi + 1));  /* skip to final byte */
+    if (iscont(s[posi]))
+      return luaL_error(L, "initial position is a continuation byte");
+    while (iscontp(s + posi + 1))
+      posi++;  /* skip to last continuation byte */
   }
   /* else one-byte character: final position is the initial one */
   lua_pushinteger(L, posi + 1);  /* 'posi' now is the final position */

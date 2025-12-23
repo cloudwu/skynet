@@ -156,7 +156,7 @@ static Node *hashint (const Table *t, lua_Integer i) {
 ** The main computation should be just
 **     n = frexp(n, &i); return (n * INT_MAX) + i
 ** but there are some numerical subtleties.
-** In a two-complement representation, INT_MAX does not has an exact
+** In a two-complement representation, INT_MAX may not have an exact
 ** representation as a float, but INT_MIN does; because the absolute
 ** value of 'frexp' is smaller than 1 (unless 'n' is inf/NaN), the
 ** absolute value of the product 'frexp * -INT_MIN' is smaller or equal
@@ -234,43 +234,54 @@ l_sinline Node *mainpositionfromnode (const Table *t, Node *nd) {
 ** Check whether key 'k1' is equal to the key in node 'n2'. This
 ** equality is raw, so there are no metamethods. Floats with integer
 ** values have been normalized, so integers cannot be equal to
-** floats. It is assumed that 'eqshrstr' is simply pointer equality, so
-** that short strings are handled in the default case.
-** A true 'deadok' means to accept dead keys as equal to their original
-** values. All dead keys are compared in the default case, by pointer
-** identity. (Only collectable objects can produce dead keys.) Note that
-** dead long strings are also compared by identity.
-** Once a key is dead, its corresponding value may be collected, and
-** then another value can be created with the same address. If this
-** other value is given to 'next', 'equalkey' will signal a false
-** positive. In a regular traversal, this situation should never happen,
-** as all keys given to 'next' came from the table itself, and therefore
-** could not have been collected. Outside a regular traversal, we
-** have garbage in, garbage out. What is relevant is that this false
-** positive does not break anything.  (In particular, 'next' will return
-** some other valid item on the table or nil.)
+** floats. It is assumed that 'eqshrstr' is simply pointer equality,
+** so that short strings are handled in the default case.  The flag
+** 'deadok' means to accept dead keys as equal to their original values.
+** (Only collectable objects can produce dead keys.) Note that dead
+** long strings are also compared by identity.  Once a key is dead,
+** its corresponding value may be collected, and then another value
+** can be created with the same address. If this other value is given
+** to 'next', 'equalkey' will signal a false positive. In a regular
+** traversal, this situation should never happen, as all keys given to
+** 'next' came from the table itself, and therefore could not have been
+** collected. Outside a regular traversal, we have garbage in, garbage
+** out. What is relevant is that this false positive does not break
+** anything.  (In particular, 'next' will return some other valid item
+** on the table or nil.)
 */
 static int equalkey (const TValue *k1, const Node *n2, int deadok) {
-  if ((rawtt(k1) != keytt(n2)) &&  /* not the same variants? */
-       !(deadok && keyisdead(n2) && iscollectable(k1)))
-   return 0;  /* cannot be same key */
-  switch (keytt(n2)) {
-    case LUA_VNIL: case LUA_VFALSE: case LUA_VTRUE:
-      return 1;
-    case LUA_VNUMINT:
-      return (ivalue(k1) == keyival(n2));
-    case LUA_VNUMFLT:
-      return luai_numeq(fltvalue(k1), fltvalueraw(keyval(n2)));
-    case LUA_VLIGHTUSERDATA:
-      return pvalue(k1) == pvalueraw(keyval(n2));
-    case LUA_VLCF:
-      return fvalue(k1) == fvalueraw(keyval(n2));
-    case ctb(LUA_VLNGSTR):
-      return luaS_eqlngstr(tsvalue(k1), keystrval(n2));
-    case ctb(LUA_VSHRSTR):
-      return eqshrstr(tsvalue(k1), keystrval(n2));
-    default:
+  if (rawtt(k1) != keytt(n2)) {  /* not the same variants? */
+    if (keyisshrstr(n2) && ttislngstring(k1)) {
+      /* an external string can be equal to a short-string key */
+      return luaS_eqstr(tsvalue(k1), keystrval(n2));
+    }
+    else if (deadok && keyisdead(n2) && iscollectable(k1)) {
+      /* a collectable value can be equal to a dead key */
       return gcvalue(k1) == gcvalueraw(keyval(n2));
+   }
+   else
+     return 0;  /* otherwise, different variants cannot be equal */
+  }
+  else {  /* equal variants */
+    switch (keytt(n2)) {
+      case LUA_VNIL: case LUA_VFALSE: case LUA_VTRUE:
+        return 1;
+      case LUA_VNUMINT:
+        return (ivalue(k1) == keyival(n2));
+      case LUA_VNUMFLT:
+        return luai_numeq(fltvalue(k1), fltvalueraw(keyval(n2)));
+      case LUA_VLIGHTUSERDATA:
+        return pvalue(k1) == pvalueraw(keyval(n2));
+      case LUA_VLCF:
+        return fvalue(k1) == fvalueraw(keyval(n2));
+      case ctb(LUA_VLNGSTR):
+        return luaS_eqstr(tsvalue(k1), keystrval(n2));
+      case ctb(LUA_VSHRSTR):
+        /* short strings can be from other VM */
+        return eqshrstr(tsvalue(k1), keystrval(n2));
+      default:
+        return gcvalue(k1) == gcvalueraw(keyval(n2));
+    }
   }
 }
 
@@ -1164,6 +1175,14 @@ void luaH_finishset (lua_State *L, Table *t, const TValue *key,
       else if (l_unlikely(luai_numisnan(f)))
         luaG_runerror(L, "table index is NaN");
     }
+    else if (isextstr(key)) {  /* external string? */
+      /* If string is short, must internalize it to be used as table key */
+      TString *ts = luaS_normstr(L, tsvalue(key));
+      setsvalue2s(L, L->top.p++, ts);  /* anchor 'ts' (EXTRA_STACK) */
+      luaH_newkey(L, t, s2v(L->top.p - 1), value);
+      L->top.p--;
+      return;
+    }
     luaH_newkey(L, t, key, value);
   }
   else if (hres > 0) {  /* regular Node? */
@@ -1210,24 +1229,36 @@ void luaH_setint (lua_State *L, Table *t, lua_Integer key, TValue *value) {
 
 /*
 ** Try to find a boundary in the hash part of table 't'. From the
-** caller, we know that 'j' is zero or present and that 'j + 1' is
-** present. We want to find a larger key that is absent from the
-** table, so that we can do a binary search between the two keys to
-** find a boundary. We keep doubling 'j' until we get an absent index.
-** If the doubling would overflow, we try LUA_MAXINTEGER. If it is
-** absent, we are ready for the binary search. ('j', being max integer,
-** is larger or equal to 'i', but it cannot be equal because it is
-** absent while 'i' is present; so 'j > i'.) Otherwise, 'j' is a
-** boundary. ('j + 1' cannot be a present integer key because it is
-** not a valid integer in Lua.)
+** caller, we know that 'asize + 1' is present. We want to find a larger
+** key that is absent from the table, so that we can do a binary search
+** between the two keys to find a boundary. We keep doubling 'j' until
+** we get an absent index.  If the doubling would overflow, we try
+** LUA_MAXINTEGER. If it is absent, we are ready for the binary search.
+** ('j', being max integer, is larger or equal to 'i', but it cannot be
+** equal because it is absent while 'i' is present.) Otherwise, 'j' is a
+** boundary. ('j + 1' cannot be a present integer key because it is not
+** a valid integer in Lua.)
+** About 'rnd': If we used a fixed algorithm, a bad actor could fill
+** a table with only the keys that would be probed, in such a way that
+** a small table could result in a huge length. To avoid that, we use
+** the state's seed as a source of randomness. For the first probe,
+** we "randomly double" 'i' by adding to it a random number roughly its
+** width.
 */
-static lua_Unsigned hash_search (Table *t, lua_Unsigned j) {
-  lua_Unsigned i;
-  if (j == 0) j++;  /* the caller ensures 'j + 1' is present */
-  do {
+static lua_Unsigned hash_search (lua_State *L, Table *t, unsigned asize) {
+  lua_Unsigned i = asize + 1;  /* caller ensures t[i] is present */
+  unsigned rnd = G(L)->seed;
+  int n = (asize > 0) ? luaO_ceillog2(asize) : 0;  /* width of 'asize' */
+  unsigned mask = (1u << n) - 1;  /* 11...111 with the width of 'asize' */
+  unsigned incr = (rnd & mask) + 1;  /* first increment (at least 1) */
+  lua_Unsigned j = (incr <= l_castS2U(LUA_MAXINTEGER) - i) ? i + incr : i + 1;
+  rnd >>= n;  /* used 'n' bits from 'rnd' */
+  while (!hashkeyisempty(t, j)) {  /* repeat until an absent t[j] */
     i = j;  /* 'i' is a present index */
-    if (j <= l_castS2U(LUA_MAXINTEGER) / 2)
-      j *= 2;
+    if (j <= l_castS2U(LUA_MAXINTEGER)/2 - 1) {
+      j = j*2 + (rnd & 1);  /* try again with 2j or 2j+1 */
+      rnd >>= 1;
+    }
     else {
       j = LUA_MAXINTEGER;
       if (hashkeyisempty(t, j))  /* t[j] not present? */
@@ -1235,7 +1266,7 @@ static lua_Unsigned hash_search (Table *t, lua_Unsigned j) {
       else  /* weird case */
         return j;  /* well, max integer is a boundary... */
     }
-  } while (!hashkeyisempty(t, j));  /* repeat until an absent t[j] */
+  }
   /* i < j  &&  t[i] present  &&  t[j] absent */
   while (j - i > 1u) {  /* do a binary search between them */
     lua_Unsigned m = (i + j) / 2;
@@ -1276,7 +1307,7 @@ static lua_Unsigned newhint (Table *t, unsigned hint) {
 ** If there is no array part, or its last element is non empty, the
 ** border may be in the hash part.
 */
-lua_Unsigned luaH_getn (Table *t) {
+lua_Unsigned luaH_getn (lua_State *L, Table *t) {
   unsigned asize = t->asize;
   if (asize > 0) {  /* is there an array part? */
     const unsigned maxvicinity = 4;
@@ -1317,7 +1348,7 @@ lua_Unsigned luaH_getn (Table *t) {
   if (isdummy(t) || hashkeyisempty(t, asize + 1))
     return asize;  /* 'asize + 1' is empty */
   else  /* 'asize + 1' is also non empty */
-    return hash_search(t, asize);
+    return hash_search(L, t, asize);
 }
 
 

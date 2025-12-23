@@ -85,7 +85,7 @@ typedef struct CallInfo CallInfo;
 ** they must be visited again at the end of the cycle), but they are
 ** marked black because assignments to them must activate barriers (to
 ** move them back to TOUCHED1).
-** - Open upvales are kept gray to avoid barriers, but they stay out
+** - Open upvalues are kept gray to avoid barriers, but they stay out
 ** of gray lists. (They don't even have a 'gclist' field.)
 */
 
@@ -232,7 +232,7 @@ struct CallInfo {
 /* call is running a C function (still in first 16 bits) */
 #define CIST_C		(1u << (CIST_RECST + 3))
 /* call is on a fresh "luaV_execute" frame */
-#define CIST_FRESH	cast(l_uint32, CIST_C << 1)
+#define CIST_FRESH	(cast(l_uint32, CIST_C) << 1)
 /* function is closing tbc variables */
 #define CIST_CLSRET	(CIST_FRESH << 1)
 /* function has tbc variables to close */
@@ -249,10 +249,6 @@ struct CallInfo {
 #define CIST_HOOKYIELD	(CIST_TAIL << 1)
 /* function "called" a finalizer */
 #define CIST_FIN	(CIST_HOOKYIELD << 1)
-#if defined(LUA_COMPAT_LT_LE)
-/* using __lt for __le */
-#define CIST_LEQ	(CIST_FIN << 1)
-#endif
 
 
 #define get_nresults(cs)  (cast_int((cs) & CIST_NRESULTS) - 1)
@@ -430,9 +426,9 @@ union GCUnion {
 
 /*
 ** macro to convert a Lua object into a GCObject
-** (The access to 'tt' tries to ensure that 'v' is actually a Lua object.)
 */
-#define obj2gco(v)	check_exp((v)->tt >= LUA_TSTRING, &(cast_u(v)->gc))
+#define obj2gco(v)  \
+	check_exp(novariant((v)->tt) >= LUA_TSTRING, &(cast_u(v)->gc))
 
 
 /* actual number of total memory allocated */

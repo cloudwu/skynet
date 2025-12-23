@@ -37,10 +37,10 @@
 
 /*
 ** Pseudo-indices
-** (-LUAI_MAXSTACK is the minimum valid index; we keep some free empty
-** space after that to help overflow detection)
+** (The stack size is limited to INT_MAX/2; we keep some free empty
+** space after that to help overflow detection.)
 */
-#define LUA_REGISTRYINDEX	(-LUAI_MAXSTACK - 1000)
+#define LUA_REGISTRYINDEX	(-(INT_MAX/2 + 1000))
 #define lua_upvalueindex(i)	(LUA_REGISTRYINDEX - (i))
 
 
@@ -436,13 +436,6 @@ LUA_API void (lua_closeslot) (lua_State *L, int idx);
 ** compatibility macros
 ** ===============================================================
 */
-#if defined(LUA_COMPAT_APIINTCASTS)
-
-#define lua_pushunsigned(L,n)	lua_pushinteger(L, (lua_Integer)(n))
-#define lua_tounsignedx(L,i,is)	((lua_Unsigned)lua_tointegerx(L,i,is))
-#define lua_tounsigned(L,i)	lua_tounsignedx(L,(i),NULL)
-
-#endif
 
 #define lua_newuserdata(L,s)	lua_newuserdatauv(L,s,1)
 #define lua_getuservalue(L,idx)	lua_getiuservalue(L,idx,1)

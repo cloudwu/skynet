@@ -53,8 +53,8 @@ LUAI_DDEF const lu_byte luaP_opmodes[NUM_OPCODES] = {
  ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_BANDK */
  ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_BORK */
  ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_BXORK */
- ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_SHRI */
  ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_SHLI */
+ ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_SHRI */
  ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_ADD */
  ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_SUB */
  ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_MUL */
@@ -102,6 +102,8 @@ LUAI_DDEF const lu_byte luaP_opmodes[NUM_OPCODES] = {
  ,opmode(0, 0, 1, 0, 0, ivABC)		/* OP_SETLIST */
  ,opmode(0, 0, 0, 0, 1, iABx)		/* OP_CLOSURE */
  ,opmode(0, 1, 0, 0, 1, iABC)		/* OP_VARARG */
+ ,opmode(0, 0, 0, 0, 1, iABC)		/* OP_GETVARG */
+ ,opmode(0, 0, 0, 0, 0, iABx)		/* OP_ERRNNIL */
  ,opmode(0, 0, 1, 0, 1, iABC)		/* OP_VARARGPREP */
  ,opmode(0, 0, 0, 0, 0, iAx)		/* OP_EXTRAARG */
 };

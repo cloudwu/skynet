@@ -742,7 +742,7 @@ typedef struct LoadF {
 
 static const char *getF (lua_State *L, void *ud, size_t *size) {
   LoadF *lf = (LoadF *)ud;
-  (void)L;  /* not used */
+  UNUSED(L);
   if (lf->n > 0) {  /* are there pre-read characters to be read? */
     *size = lf->n;  /* return them (chars already in buffer) */
     lf->n = 0;  /* no more pre-read characters */
@@ -856,7 +856,7 @@ typedef struct LoadS {
 
 static const char *getS (lua_State *L, void *ud, size_t *size) {
   LoadS *ls = (LoadS *)ud;
-  (void)L;  /* not used */
+  UNUSED(L);
   if (ls->size == 0) return NULL;
   *size = ls->size;
   ls->size = 0;
@@ -1046,8 +1046,8 @@ LUALIB_API const char *luaL_gsub (lua_State *L, const char *s,
 }
 
 
-static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
-  (void)ud; (void)osize;  /* not used */
+void *luaL_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
+  UNUSED(ud); UNUSED(osize);
   if (nsize == 0) {
     free(ptr);
     return NULL;
@@ -1172,16 +1172,20 @@ static unsigned int luai_makeseed (void) {
 
 
 LUALIB_API unsigned int luaL_makeseed (lua_State *L) {
-  (void)L;  /* unused */
+  UNUSED(L);
   return luai_makeseed();
 }
 
 
-LUALIB_API lua_State *luaL_newstate (void) {
-  lua_State *L = lua_newstate(l_alloc, NULL, luai_makeseed());
+/*
+** Use the name with parentheses so that headers can redefine it
+** as a macro.
+*/
+LUALIB_API lua_State *(luaL_newstate) (void) {
+  lua_State *L = lua_newstate(luaL_alloc, NULL, luaL_makeseed(NULL));
   if (l_likely(L)) {
     lua_atpanic(L, &panic);
-    lua_setwarnf(L, warnfoff, L);  /* default is warnings off */
+    lua_setwarnf(L, warnfon, L);
   }
   return L;
 }
@@ -1210,7 +1214,7 @@ static struct codecache CC;
 
 static lua_State *
 newState(lua_State *fromL) {
-  lua_State *L = lua_newstate(l_alloc, NULL, G(fromL)->seed);
+  lua_State *L = lua_newstate(luaL_alloc, NULL, G(fromL)->seed);
   return L;
 }
 

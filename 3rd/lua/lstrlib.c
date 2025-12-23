@@ -132,27 +132,31 @@ static int str_upper (lua_State *L) {
 }
 
 
+/*
+** MAX_SIZE is limited both by size_t and lua_Integer.
+** When x <= MAX_SIZE, x can be safely cast to size_t or lua_Integer.
+*/
 static int str_rep (lua_State *L) {
-  size_t l, lsep;
-  const char *s = luaL_checklstring(L, 1, &l);
+  size_t len, lsep;
+  const char *s = luaL_checklstring(L, 1, &len);
   lua_Integer n = luaL_checkinteger(L, 2);
   const char *sep = luaL_optlstring(L, 3, "", &lsep);
   if (n <= 0)
     lua_pushliteral(L, "");
-  else if (l_unlikely(l + lsep < l || l + lsep > MAX_SIZE / cast_sizet(n)))
+  else if (l_unlikely(len > MAX_SIZE - lsep ||
+               cast_st2S(len + lsep) > cast_st2S(MAX_SIZE) / n))
     return luaL_error(L, "resulting string too large");
   else {
-    size_t totallen = ((size_t)n * (l + lsep)) - lsep;
+    size_t totallen = (cast_sizet(n) * (len + lsep)) - lsep;
     luaL_Buffer b;
     char *p = luaL_buffinitsize(L, &b, totallen);
     while (n-- > 1) {  /* first n-1 copies (followed by separator) */
-      memcpy(p, s, l * sizeof(char)); p += l;
+      memcpy(p, s, len * sizeof(char)); p += len;
       if (lsep > 0) {  /* empty 'memcpy' is not that cheap */
-        memcpy(p, sep, lsep * sizeof(char));
-        p += lsep;
+        memcpy(p, sep, lsep * sizeof(char)); p += lsep;
       }
     }
-    memcpy(p, s, l * sizeof(char));  /* last copy (not followed by separator) */
+    memcpy(p, s, len * sizeof(char));  /* last copy without separator */
     luaL_pushresultsize(&b, totallen);
   }
   return 1;
@@ -265,11 +269,18 @@ static int tonum (lua_State *L, int arg) {
 }
 
 
-static void trymt (lua_State *L, const char *mtname) {
+/*
+** To be here, either the first operand was a string or the first
+** operand didn't have a corresponding metamethod. (Otherwise, that
+** other metamethod would have been called.) So, if this metamethod
+** doesn't work, the only other option would be for the second
+** operand to have a different metamethod.
+*/
+static void trymt (lua_State *L, const char *mtkey, const char *opname) {
   lua_settop(L, 2);  /* back to the original arguments */
   if (l_unlikely(lua_type(L, 2) == LUA_TSTRING ||
-                 !luaL_getmetafield(L, 2, mtname)))
-    luaL_error(L, "attempt to %s a '%s' with a '%s'", mtname + 2,
+                 !luaL_getmetafield(L, 2, mtkey)))
+    luaL_error(L, "attempt to %s a '%s' with a '%s'", opname,
                   luaL_typename(L, -2), luaL_typename(L, -1));
   lua_insert(L, -3);  /* put metamethod before arguments */
   lua_call(L, 2, 1);  /* call metamethod */
@@ -280,7 +291,7 @@ static int arith (lua_State *L, int op, const char *mtname) {
   if (tonum(L, 1) && tonum(L, 2))
     lua_arith(L, op);  /* result will be on the top */
   else
-    trymt(L, mtname);
+    trymt(L, mtname, mtname + 2);
   return 1;
 }
 
@@ -1811,8 +1822,8 @@ static int str_unpack (lua_State *L) {
         lua_Unsigned len = (lua_Unsigned)unpackint(L, data + pos,
                                           h.islittle, cast_int(size), 0);
         luaL_argcheck(L, len <= ld - pos - size, 2, "data string too short");
-        lua_pushlstring(L, data + pos + size, len);
-        pos += len;  /* skip string */
+        lua_pushlstring(L, data + pos + size, cast_sizet(len));
+        pos += cast_sizet(len);  /* skip string */
         break;
       }
       case Kzstr: {

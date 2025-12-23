@@ -59,7 +59,7 @@
 
 
 /*
-** When Posix DLL ('LUA_USE_DLOPEN') is enabled, the Lua stand-alone
+** When POSIX DLL ('LUA_USE_DLOPEN') is enabled, the Lua stand-alone
 ** application will try to dynamically link a 'readline' facility
 ** for its REPL.  In that case, LUA_READLINELIB is the name of the
 ** library it will look for those facilities.  If lua.c cannot open
@@ -76,7 +76,7 @@
 
 #if defined(LUA_USE_MACOSX)
 #define LUA_USE_POSIX
-#define LUA_USE_DLOPEN		/* MacOS does not need -ldl */
+#define LUA_USE_DLOPEN		/* macOS does not need -ldl */
 #define LUA_READLINELIB		"libedit.dylib"
 #endif
 
@@ -88,7 +88,7 @@
 
 
 #if defined(LUA_USE_C89) && defined(LUA_USE_POSIX)
-#error "Posix is not compatible with C89"
+#error "POSIX is not compatible with C89"
 #endif
 
 
@@ -138,7 +138,7 @@
 /*
 @@ LUA_32BITS enables Lua with 32-bit integers and 32-bit floats.
 */
-#define LUA_32BITS	0
+/* #define LUA_32BITS */
 
 
 /*
@@ -153,7 +153,7 @@
 #endif
 
 
-#if LUA_32BITS		/* { */
+#if defined(LUA_32BITS)	/* { */
 /*
 ** 32-bit integers and 'float'
 */
@@ -319,32 +319,13 @@
 ** More often than not the libs go together with the core.
 */
 #define LUALIB_API	LUA_API
+
+#if defined(__cplusplus)
+/* Lua uses the "C name" when calling open functions */
+#define LUAMOD_API	extern "C"
+#else
 #define LUAMOD_API	LUA_API
-
-
-/*
-@@ LUAI_FUNC is a mark for all extern functions that are not to be
-** exported to outside modules.
-@@ LUAI_DDEF and LUAI_DDEC are marks for all extern (const) variables,
-** none of which to be exported to outside modules (LUAI_DDEF for
-** definitions and LUAI_DDEC for declarations).
-** CHANGE them if you need to mark them in some special way. Elf/gcc
-** (versions 3.2 and later) mark them as "hidden" to optimize access
-** when Lua is compiled as a shared library. Not all elf targets support
-** this attribute. Unfortunately, gcc does not offer a way to check
-** whether the target offers that support, and those without support
-** give a warning about it. To avoid these warnings, change to the
-** default definition.
-*/
-#if defined(__GNUC__) && ((__GNUC__*100 + __GNUC_MINOR__) >= 302) && \
-    defined(__ELF__)		/* { */
-#define LUAI_FUNC	__attribute__((visibility("internal"))) extern
-#else				/* }{ */
-#define LUAI_FUNC	extern
-#endif				/* } */
-
-#define LUAI_DDEC(dec)	LUAI_FUNC dec
-#define LUAI_DDEF	/* empty */
+#endif
 
 /* }================================================================== */
 
@@ -362,35 +343,12 @@
 
 
 /*
-@@ LUA_COMPAT_5_3 controls other macros for compatibility with Lua 5.3.
-** You can define it to get all options, or change specific options
-** to fit your specific needs.
-*/
-#if defined(LUA_COMPAT_5_3)	/* { */
-
-/*
 @@ LUA_COMPAT_MATHLIB controls the presence of several deprecated
 ** functions in the mathematical library.
 ** (These functions were already officially removed in 5.3;
 ** nevertheless they are still available here.)
 */
-#define LUA_COMPAT_MATHLIB
-
-/*
-@@ LUA_COMPAT_APIINTCASTS controls the presence of macros for
-** manipulating other integer types (lua_pushunsigned, lua_tounsigned,
-** luaL_checkint, luaL_checklong, etc.)
-** (These macros were also officially removed in 5.3, but they are still
-** available here.)
-*/
-#define LUA_COMPAT_APIINTCASTS
-
-
-/*
-@@ LUA_COMPAT_LT_LE controls the emulation of the '__le' metamethod
-** using '__lt'.
-*/
-#define LUA_COMPAT_LT_LE
+/* #define LUA_COMPAT_MATHLIB */
 
 
 /*
@@ -406,8 +364,6 @@
 
 #define lua_equal(L,idx1,idx2)		lua_compare(L,(idx1),(idx2),LUA_OPEQ)
 #define lua_lessthan(L,idx1,idx2)	lua_compare(L,(idx1),(idx2),LUA_OPLT)
-
-#endif				/* } */
 
 /* }================================================================== */
 
@@ -440,24 +396,9 @@
 */
 
 
-/* The following definitions are good for most cases here */
+/* The following definition is good for most cases here */
 
 #define l_floor(x)		(l_mathop(floor)(x))
-
-
-/*
-@@ lua_numbertointeger converts a float number with an integral value
-** to an integer, or returns 0 if float is not within the range of
-** a lua_Integer.  (The range comparisons are tricky because of
-** rounding. The tests here assume a two-complement representation,
-** where MININTEGER always has an exact representation as a float;
-** MAXINTEGER may not have one, and therefore its conversion to float
-** may have an ill-defined value.)
-*/
-#define lua_numbertointeger(n,p) \
-  ((n) >= (LUA_NUMBER)(LUA_MININTEGER) && \
-   (n) < -(LUA_NUMBER)(LUA_MININTEGER) && \
-      (*(p) = (LUA_INTEGER)(n), 1))
 
 
 /* now the variable definitions */
@@ -719,13 +660,6 @@
 #endif
 
 
-#if defined(LUA_CORE) || defined(LUA_LIB)
-/* shorter names for Lua's own use */
-#define l_likely(x)	luai_likely(x)
-#define l_unlikely(x)	luai_unlikely(x)
-#endif
-
-
 
 /* }================================================================== */
 
@@ -762,20 +696,6 @@
 ** Lua).
 ** =====================================================================
 */
-
-/*
-@@ LUAI_MAXSTACK limits the size of the Lua stack.
-** CHANGE it if you need a different limit. This limit is arbitrary;
-** its only purpose is to stop Lua from consuming unlimited stack
-** space and to reserve some numbers for pseudo-indices.
-** (It must fit into max(int)/2.)
-*/
-#if 1000000 < (INT_MAX / 2)
-#define LUAI_MAXSTACK		1000000
-#else
-#define LUAI_MAXSTACK		(INT_MAX / 2u)
-#endif
-
 
 /*
 @@ LUA_EXTRASPACE defines the size of a raw memory area associated with
@@ -818,8 +738,6 @@
 ** Local configuration. You can use this space to add your redefinitions
 ** without modifying the main part of the file.
 */
-
-
 
 
 

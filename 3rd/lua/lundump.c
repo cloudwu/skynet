@@ -109,7 +109,7 @@ static lua_Unsigned loadVarint (LoadState *S, lua_Unsigned limit) {
 
 
 static size_t loadSize (LoadState *S) {
-  return loadVarint(S, MAX_SIZE);
+  return cast_sizet(loadVarint(S, MAX_SIZE));
 }
 
 
@@ -147,20 +147,20 @@ static void loadString (LoadState *S, Proto *p, TString **sl) {
   TString *ts;
   TValue sv;
   size_t size = loadSize(S);
-  if (size == 0) {  /* no string? */
-    lua_assert(*sl == NULL);  /* must be prefilled */
-    return;
-  }
-  else if (size == 1) {  /* previously saved string? */
+  if (size == 0) {  /* previously saved string? */
     lua_Unsigned idx = loadVarint(S, LUA_MAXUNSIGNED);  /* get its index */
     TValue stv;
+    if (idx == 0) {  /* no string? */
+      lua_assert(*sl == NULL);  /* must be prefilled */
+      return;
+    }
     if (novariant(luaH_getint(S->h, l_castU2S(idx), &stv)) != LUA_TSTRING)
       error(S, "invalid string index");
     *sl = ts = tsvalue(&stv);  /* get its value */
     luaC_objbarrier(L, p, ts);
     return;  /* do not save it again */
   }
-  else if ((size -= 2) <= LUAI_MAXSHORTLEN) {  /* short string? */
+  else if ((size -= 1) <= LUAI_MAXSHORTLEN) {  /* short string? */
     char buff[LUAI_MAXSHORTLEN + 1];  /* extra space for '\0' */
     loadVector(S, buff, size + 1);  /* load string into buffer */
     *sl = ts = luaS_newlstr(L, buff, size);  /* create string */
@@ -327,7 +327,8 @@ static void loadFunction (LoadState *S, Proto *f) {
   f->linedefined = loadInt(S);
   f->lastlinedefined = loadInt(S);
   f->numparams = loadByte(S);
-  f->flag = loadByte(S) & PF_ISVARARG;  /* get only the meaningful flags */
+  /* get only the meaningful flags */
+  f->flag = cast_byte(loadByte(S) & ~PF_FIXED);
   if (S->fixed)
     f->flag |= PF_FIXED;  /* signal that code is fixed */
   f->maxstacksize = loadByte(S);

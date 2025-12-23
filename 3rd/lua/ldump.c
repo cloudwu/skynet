@@ -132,27 +132,31 @@ static void dumpInteger (DumpState *D, lua_Integer x) {
 
 
 /*
-** Dump a String. First dump its "size": size==0 means NULL;
-** size==1 is followed by an index and means "reuse saved string with
-** that index"; size>=2 is followed by the string contents with real
-** size==size-2 and means that string, which will be saved with
-** the next available index.
+** Dump a String. First dump its "size":
+** size==0 is followed by an index and means "reuse saved string with
+** that index"; index==0 means NULL.
+** size>=1 is followed by the string contents with real size==size-1 and
+** means that string, which will be saved with the next available index.
+** The real size does not include the ending '\0' (which is not dumped),
+** so adding 1 to it cannot overflow a size_t.
 */
 static void dumpString (DumpState *D, TString *ts) {
-  if (ts == NULL)
-    dumpSize(D, 0);
+  if (ts == NULL) {
+    dumpVarint(D, 0);  /* will "reuse" NULL */
+    dumpVarint(D, 0);  /* special index for NULL */
+  }
   else {
     TValue idx;
     int tag = luaH_getstr(D->h, ts, &idx);
     if (!tagisempty(tag)) {  /* string already saved? */
-      dumpVarint(D, 1);  /* reuse a saved string */
+      dumpVarint(D, 0);  /* reuse a saved string */
       dumpVarint(D, l_castS2U(ivalue(&idx)));  /* index of saved string */
     }
     else {  /* must write and save the string */
       TValue key, value;  /* to save the string in the hash */
       size_t size;
       const char *s = getlstr(ts, size);
-      dumpSize(D, size + 2);
+      dumpSize(D, size + 1);
       dumpVector(D, s, size + 1);  /* include ending '\0' */
       D->nstr++;  /* one more saved string */
       setsvalue(D->L, &key, ts);  /* the string is the key */

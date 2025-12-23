@@ -440,7 +440,13 @@ LUA_API lua_Unsigned lua_rawlen (lua_State *L, int idx) {
     case LUA_VSHRSTR: return cast(lua_Unsigned, tsvalue(o)->shrlen);
     case LUA_VLNGSTR: return cast(lua_Unsigned, tsvalue(o)->u.lnglen);
     case LUA_VUSERDATA: return cast(lua_Unsigned, uvalue(o)->len);
-    case LUA_VTABLE: return luaH_getn(hvalue(o));
+    case LUA_VTABLE: {
+      lua_Unsigned res;
+      lua_lock(L);
+      res = luaH_getn(L, hvalue(o));
+      lua_unlock(L);
+      return res;
+    }
     default: return 0;
   }
 }
@@ -478,7 +484,7 @@ LUA_API lua_State *lua_tothread (lua_State *L, int idx) {
 
 /*
 ** Returns a pointer to the internal representation of an object.
-** Note that ANSI C does not allow the conversion of a pointer to
+** Note that ISO C does not allow the conversion of a pointer to
 ** function to a 'void*', so the conversion here goes through
 ** a 'size_t'. (As the returned pointer is only informative, this
 ** conversion should not be a problem.)
@@ -679,7 +685,7 @@ static int auxgetstr (lua_State *L, const TValue *t, const char *k) {
 
 /*
 ** The following function assumes that the registry cannot be a weak
-** table, so that en mergency collection while using the global table
+** table; so, an emergency collection while using the global table
 ** cannot collect it.
 */
 static void getGlobalTable (lua_State *L, TValue *gt) {

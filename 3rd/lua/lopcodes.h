@@ -224,8 +224,8 @@ enum OpMode {iABC, ivABC, iABx, iAsBx, iAx, isJ};
 
 
 /*
-** Grep "ORDER OP" if you change these enums. Opcodes marked with a (*)
-** has extra descriptions in the notes after the enumeration.
+** Grep "ORDER OP" if you change this enum.
+** See "Notes" below for more information about some instructions.
 */
 
 typedef enum {
@@ -238,7 +238,7 @@ OP_LOADF,/*	A sBx	R[A] := (lua_Number)sBx				*/
 OP_LOADK,/*	A Bx	R[A] := K[Bx]					*/
 OP_LOADKX,/*	A	R[A] := K[extra arg]				*/
 OP_LOADFALSE,/*	A	R[A] := false					*/
-OP_LFALSESKIP,/*A	R[A] := false; pc++	(*)			*/
+OP_LFALSESKIP,/*A	R[A] := false; pc++				*/
 OP_LOADTRUE,/*	A	R[A] := true					*/
 OP_LOADNIL,/*	A B	R[A], R[A+1], ..., R[A+B] := nil		*/
 OP_GETUPVAL,/*	A B	R[A] := UpValue[B]				*/
@@ -272,8 +272,8 @@ OP_BANDK,/*	A B C	R[A] := R[B] & K[C]:integer			*/
 OP_BORK,/*	A B C	R[A] := R[B] | K[C]:integer			*/
 OP_BXORK,/*	A B C	R[A] := R[B] ~ K[C]:integer			*/
 
-OP_SHRI,/*	A B sC	R[A] := R[B] >> sC				*/
 OP_SHLI,/*	A B sC	R[A] := sC << R[B]				*/
+OP_SHRI,/*	A B sC	R[A] := R[B] >> sC				*/
 
 OP_ADD,/*	A B C	R[A] := R[B] + R[C]				*/
 OP_SUB,/*	A B C	R[A] := R[B] - R[C]				*/
@@ -289,7 +289,7 @@ OP_BXOR,/*	A B C	R[A] := R[B] ~ R[C]				*/
 OP_SHL,/*	A B C	R[A] := R[B] << R[C]				*/
 OP_SHR,/*	A B C	R[A] := R[B] >> R[C]				*/
 
-OP_MMBIN,/*	A B C	call C metamethod over R[A] and R[B]	(*)	*/
+OP_MMBIN,/*	A B C	call C metamethod over R[A] and R[B]		*/
 OP_MMBINI,/*	A sB C k	call C metamethod over R[A] and sB	*/
 OP_MMBINK,/*	A B C k		call C metamethod over R[A] and K[B]	*/
 
@@ -315,12 +315,12 @@ OP_GTI,/*	A sB k	if ((R[A] > sB) ~= k) then pc++			*/
 OP_GEI,/*	A sB k	if ((R[A] >= sB) ~= k) then pc++		*/
 
 OP_TEST,/*	A k	if (not R[A] == k) then pc++			*/
-OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) */
+OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B]  */
 
 OP_CALL,/*	A B C	R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1]) */
 OP_TAILCALL,/*	A B C k	return R[A](R[A+1], ... ,R[A+B-1])		*/
 
-OP_RETURN,/*	A B C k	return R[A], ... ,R[A+B-2]	(see note)	*/
+OP_RETURN,/*	A B C k	return R[A], ... ,R[A+B-2]			*/
 OP_RETURN0,/*		return						*/
 OP_RETURN1,/*	A	return R[A]					*/
 
@@ -336,9 +336,13 @@ OP_SETLIST,/*	A vB vC k	R[A][vC+i] := R[A+i], 1 <= i <= vB	*/
 
 OP_CLOSURE,/*	A Bx	R[A] := closure(KPROTO[Bx])			*/
 
-OP_VARARG,/*	A C	R[A], R[A+1], ..., R[A+C-2] = vararg		*/
+OP_VARARG,/*	A B C k	R[A], ..., R[A+C-2] = varargs  			*/
 
-OP_VARARGPREP,/*A	(adjust vararg parameters)			*/
+OP_GETVARG, /* A B C	R[A] := R[B][R[C]], R[B] is vararg parameter    */
+
+OP_ERRNNIL,/*	A Bx	raise error if R[A] ~= nil (K[Bx - 1] is global name)*/
+
+OP_VARARGPREP,/* 	(adjust varargs)				*/
 
 OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
 } OpCode;
@@ -367,7 +371,8 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
   OP_RETURN*, OP_SETLIST) may use 'top'.
 
   (*) In OP_VARARG, if (C == 0) then use actual number of varargs and
-  set top (like in OP_CALL with C == 0).
+  set top (like in OP_CALL with C == 0). 'k' means function has a
+  vararg table, which is in R[B].
 
   (*) In OP_RETURN, if (B == 0) then return up to 'top'.
 
@@ -382,18 +387,23 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
   power of 2) plus 1, or zero for size zero. If not k, the array size
   is vC. Otherwise, the array size is EXTRAARG _ vC.
 
+  (*) In OP_ERRNNIL, (Bx == 0) means index of global name doesn't
+  fit in Bx. (So, that name is not available for the error message.)
+
   (*) For comparisons, k specifies what condition the test should accept
   (true or false).
 
   (*) In OP_MMBINI/OP_MMBINK, k means the arguments were flipped
-   (the constant is the first operand).
+  (the constant is the first operand).
 
-  (*) All 'skips' (pc++) assume that next instruction is a jump.
+  (*) All comparison and test instructions assume that the instruction
+  being skipped (pc++) is a jump.
 
   (*) In instructions OP_RETURN/OP_TAILCALL, 'k' specifies that the
   function builds upvalues, which may need to be closed. C > 0 means
-  the function is vararg, so that its 'func' must be corrected before
-  returning; in this case, (C - 1) is its number of fixed parameters.
+  the function has hidden vararg arguments, so that its 'func' must be
+  corrected before returning; in this case, (C - 1) is its number of
+  fixed parameters.
 
   (*) In comparisons with an immediate operand, C signals whether the
   original operand was a float. (It must be corrected in case of

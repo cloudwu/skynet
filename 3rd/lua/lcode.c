@@ -45,6 +45,7 @@ l_noret luaK_semerror (LexState *ls, const char *fmt, ...) {
   va_list argp;
   pushvfstring(ls->L, argp, fmt, msg);
   ls->t.token = 0;  /* remove "near <token>" from final message */
+  ls->linenumber = ls->lastline;  /* back to line of last used token */
   luaX_syntaxerror(ls, msg);
 }
 
@@ -565,20 +566,20 @@ static int k2proto (FuncState *fs, TValue *key, TValue *v) {
   TValue val;
   Proto *f = fs->f;
   int tag = luaH_get(fs->kcache, key, &val);  /* query scanner table */
-  int k;
   if (!tagisempty(tag)) {  /* is there an index there? */
-    k = cast_int(ivalue(&val));
+    int k = cast_int(ivalue(&val));
     /* collisions can happen only for float keys */
     lua_assert(ttisfloat(key) || luaV_rawequalobj(&f->k[k], v));
     return k;  /* reuse index */
   }
-  /* constant not found; create a new entry */
-  k = addk(fs, f, v);
-  /* cache it for reuse; numerical value does not need GC barrier;
-     table is not a metatable, so it does not need to invalidate cache */
-  setivalue(&val, k);
-  luaH_set(fs->ls->L, fs->kcache, key, &val);
-  return k;
+  else {  /* constant not found; create a new entry */
+    int k = addk(fs, f, v);
+    /* cache it for reuse; numerical value does not need GC barrier;
+       table is not a metatable, so it does not need to invalidate cache */
+    setivalue(&val, k);
+    luaH_set(fs->ls->L, fs->kcache, key, &val);
+    return k;
+  }
 }
 
 
@@ -604,13 +605,14 @@ static int luaK_intK (FuncState *fs, lua_Integer n) {
 /*
 ** Add a float to list of constants and return its index. Floats
 ** with integral values need a different key, to avoid collision
-** with actual integers. To that, we add to the number its smaller
+** with actual integers. To that end, we add to the number its smaller
 ** power-of-two fraction that is still significant in its scale.
-** For doubles, that would be 1/2^52.
+** (For doubles, the fraction would be 2^-52).
 ** This method is not bulletproof: different numbers may generate the
 ** same key (e.g., very large numbers will overflow to 'inf') and for
-** floats larger than 2^53 the result is still an integer. At worst,
-** this only wastes an entry with a duplicate.
+** floats larger than 2^53 the result is still an integer. For those
+** cases, just generate a new entry. At worst, this only wastes an entry
+** with a duplicate.
 */
 static int luaK_numberK (FuncState *fs, lua_Number r) {
   TValue o, kv;
@@ -625,7 +627,7 @@ static int luaK_numberK (FuncState *fs, lua_Number r) {
     const lua_Number k =  r * (1 + q);  /* key */
     lua_Integer ik;
     setfltvalue(&kv, k);  /* key as a TValue */
-    if (!luaV_flttointeger(k, &ik, F2Ieq)) {  /* not an integral value? */
+    if (!luaV_flttointeger(k, &ik, F2Ieq)) {  /* not an integer value? */
       int n = k2proto(fs, &kv, &o);  /* use key */
       if (luaV_rawequalobj(&fs->f->k[n], &o))  /* correct value? */
         return n;
@@ -701,6 +703,22 @@ static void luaK_float (FuncState *fs, int reg, lua_Number f) {
     codeAsBx(fs, OP_LOADF, reg, cast_int(fi));
   else
     luaK_codek(fs, reg, luaK_numberK(fs, f));
+}
+
+
+/*
+** Get the value of 'var' in a register and generate an opcode to check
+** whether that register is nil. 'k' is the index of the variable name
+** in the list of constants. If its value cannot be encoded in Bx, a 0
+** will use '?' for the name.
+*/
+void luaK_codecheckglobal (FuncState *fs, expdesc *var, int k, int line) {
+  luaK_exp2anyreg(fs, var);
+  luaK_fixline(fs, line);
+  k = (k >= MAXARG_Bx) ? 0 : k + 1;
+  luaK_codeABx(fs, OP_ERRNNIL, var->u.info, k);
+  luaK_fixline(fs, line);
+  freeexp(fs, var);
 }
 
 
@@ -784,6 +802,15 @@ void luaK_setoneret (FuncState *fs, expdesc *e) {
   }
 }
 
+/*
+** Change a vararg parameter into a regular local variable
+*/
+void luaK_vapar2local (FuncState *fs, expdesc *var) {
+  needvatab(fs->f);  /* function will need a vararg table */
+  /* now a vararg parameter is equivalent to a regular local variable */
+  var->k = VLOCAL;
+}
+
 
 /*
 ** Ensure that expression 'e' is not a variable (nor a <const>).
@@ -795,6 +822,9 @@ void luaK_dischargevars (FuncState *fs, expdesc *e) {
       const2exp(const2val(fs, e), e);
       break;
     }
+    case VVARGVAR: {
+      luaK_vapar2local(fs, e);  /* turn it into a local variable */
+    }  /* FALLTHROUGH */
     case VLOCAL: {  /* already in a register */
       int temp = e->u.var.ridx;
       e->u.info = temp;  /* (can't do a direct assignment; values overlap) */
@@ -826,6 +856,12 @@ void luaK_dischargevars (FuncState *fs, expdesc *e) {
     case VINDEXED: {
       freeregs(fs, e->u.ind.t, e->u.ind.idx);
       e->u.info = luaK_codeABC(fs, OP_GETTABLE, 0, e->u.ind.t, e->u.ind.idx);
+      e->k = VRELOC;
+      break;
+    }
+    case VVARGIND: {
+      freeregs(fs, e->u.ind.t, e->u.ind.idx);
+      e->u.info = luaK_codeABC(fs, OP_GETVARG, 0, e->u.ind.t, e->u.ind.idx);
       e->k = VRELOC;
       break;
     }
@@ -991,11 +1027,11 @@ int luaK_exp2anyreg (FuncState *fs, expdesc *e) {
 
 
 /*
-** Ensures final expression result is either in a register
-** or in an upvalue.
+** Ensures final expression result is either in a register,
+** in an upvalue, or it is the vararg parameter.
 */
 void luaK_exp2anyregup (FuncState *fs, expdesc *e) {
-  if (e->k != VUPVAL || hasjumps(e))
+  if ((e->k != VUPVAL && e->k != VVARGVAR) || hasjumps(e))
     luaK_exp2anyreg(fs, e);
 }
 
@@ -1090,6 +1126,10 @@ void luaK_storevar (FuncState *fs, expdesc *var, expdesc *ex) {
       codeABRK(fs, OP_SETFIELD, var->u.ind.t, var->u.ind.idx, ex);
       break;
     }
+    case VVARGIND: {
+      needvatab(fs->f);  /* function will need a vararg table */
+      /* now, assignment is to a regular table */
+    }  /* FALLTHROUGH */
     case VINDEXED: {
       codeABRK(fs, OP_SETTABLE, var->u.ind.t, var->u.ind.idx, ex);
       break;
@@ -1162,7 +1202,7 @@ void luaK_goiftrue (FuncState *fs, expdesc *e) {
 /*
 ** Emit code to go through if 'e' is false, jump otherwise.
 */
-void luaK_goiffalse (FuncState *fs, expdesc *e) {
+static void luaK_goiffalse (FuncState *fs, expdesc *e) {
   int pc;  /* pc of new jump */
   luaK_dischargevars(fs, e);
   switch (e->k) {
@@ -1223,7 +1263,7 @@ static void codenot (FuncState *fs, expdesc *e) {
 ** Check whether expression 'e' is a short literal string
 */
 static int isKstr (FuncState *fs, expdesc *e) {
-  return (e->k == VK && !hasjumps(e) && e->u.info <= MAXARG_B &&
+  return (e->k == VK && !hasjumps(e) && e->u.info <= MAXINDEXRK &&
           ttisshrstring(&fs->f->k[e->u.info]));
 }
 
@@ -1301,6 +1341,13 @@ void luaK_self (FuncState *fs, expdesc *e, expdesc *key) {
 }
 
 
+/* auxiliary function to define indexing expressions */
+static void fillidxk (expdesc *t, int idx, expkind k) {
+  t->u.ind.idx = cast_byte(idx);
+  t->k = k;
+}
+
+
 /*
 ** Create expression 't[k]'. 't' must have its final result already in a
 ** register or upvalue. Upvalues can only be indexed by literal strings.
@@ -1312,31 +1359,32 @@ void luaK_indexed (FuncState *fs, expdesc *t, expdesc *k) {
   if (k->k == VKSTR)
     keystr = str2K(fs, k);
   lua_assert(!hasjumps(t) &&
-             (t->k == VLOCAL || t->k == VNONRELOC || t->k == VUPVAL));
+             (t->k == VLOCAL || t->k == VVARGVAR ||
+              t->k == VNONRELOC || t->k == VUPVAL));
   if (t->k == VUPVAL && !isKstr(fs, k))  /* upvalue indexed by non 'Kstr'? */
     luaK_exp2anyreg(fs, t);  /* put it in a register */
   if (t->k == VUPVAL) {
     lu_byte temp = cast_byte(t->u.info);  /* upvalue index */
     t->u.ind.t = temp;  /* (can't do a direct assignment; values overlap) */
     lua_assert(isKstr(fs, k));
-    t->u.ind.idx = cast_short(k->u.info);  /* literal short string */
-    t->k = VINDEXUP;
+    fillidxk(t, k->u.info, VINDEXUP);  /* literal short string */
+  }
+  else if (t->k == VVARGVAR) {  /* indexing the vararg parameter? */
+    int kreg = luaK_exp2anyreg(fs, k);  /* put key in some register */
+    lu_byte vreg = cast_byte(t->u.var.ridx);  /* register with vararg param. */
+    lua_assert(vreg == fs->f->numparams);
+    t->u.ind.t = vreg;  /* (avoid a direct assignment; values may overlap) */
+    fillidxk(t, kreg, VVARGIND);  /* 't' represents 'vararg[k]' */
   }
   else {
     /* register index of the table */
     t->u.ind.t = cast_byte((t->k == VLOCAL) ? t->u.var.ridx: t->u.info);
-    if (isKstr(fs, k)) {
-      t->u.ind.idx = cast_short(k->u.info);  /* literal short string */
-      t->k = VINDEXSTR;
-    }
-    else if (isCint(k)) {  /* int. constant in proper range? */
-      t->u.ind.idx = cast_short(k->u.ival);
-      t->k = VINDEXI;
-    }
-    else {
-      t->u.ind.idx = cast_short(luaK_exp2anyreg(fs, k));  /* register */
-      t->k = VINDEXED;
-    }
+    if (isKstr(fs, k))
+      fillidxk(t, k->u.info, VINDEXSTR);  /* literal short string */
+    else if (isCint(k))  /* int. constant in proper range? */
+      fillidxk(t, cast_int(k->u.ival), VINDEXI);
+    else
+      fillidxk(t, luaK_exp2anyreg(fs, k), VINDEXED);  /* register */
   }
   t->u.ind.keystr = keystr;  /* string index in 'k' */
   t->u.ind.ro = 0;  /* by default, not read-only */
@@ -1881,6 +1929,8 @@ static int finaltarget (Instruction *code, int i) {
 void luaK_finish (FuncState *fs) {
   int i;
   Proto *p = fs->f;
+  if (p->flag & PF_VATAB)  /* will it use a vararg table? */
+    p->flag &= cast_byte(~PF_VAHID);  /* then it will not use hidden args. */
   for (i = 0; i < fs->pc; i++) {
     Instruction *pc = &p->code[i];
     /* avoid "not used" warnings when assert is off (for 'onelua.c') */
@@ -1888,7 +1938,7 @@ void luaK_finish (FuncState *fs) {
     lua_assert(i == 0 || luaP_isOT(*(pc - 1)) == luaP_isIT(*pc));
     switch (GET_OPCODE(*pc)) {
       case OP_RETURN0: case OP_RETURN1: {
-        if (!(fs->needclose || (p->flag & PF_ISVARARG)))
+        if (!(fs->needclose || (p->flag & PF_VAHID)))
           break;  /* no extra work */
         /* else use OP_RETURN to do the extra work */
         SET_OPCODE(*pc, OP_RETURN);
@@ -1896,13 +1946,23 @@ void luaK_finish (FuncState *fs) {
       case OP_RETURN: case OP_TAILCALL: {
         if (fs->needclose)
           SETARG_k(*pc, 1);  /* signal that it needs to close */
-        if (p->flag & PF_ISVARARG)
-          SETARG_C(*pc, p->numparams + 1);  /* signal that it is vararg */
+        if (p->flag & PF_VAHID)  /* does it use hidden arguments? */
+          SETARG_C(*pc, p->numparams + 1);  /* signal that */
         break;
       }
-      case OP_JMP: {
+      case OP_GETVARG: {
+        if (p->flag & PF_VATAB)  /* function has a vararg table? */
+          SET_OPCODE(*pc, OP_GETTABLE);  /* must get vararg there */
+        break;
+      }
+      case OP_VARARG: {
+        if (p->flag & PF_VATAB)  /* function has a vararg table? */
+          SETARG_k(*pc, 1);  /* must get vararg there */
+        break;
+      }
+      case OP_JMP: {  /* to optimize jumps to jumps */
         int target = finaltarget(p->code, i);
-        fixjump(fs, i, target);
+        fixjump(fs, i, target);  /* jump directly to final target */
         break;
       }
       default: break;

@@ -37,6 +37,8 @@ typedef enum {
                  info = result register */
   VLOCAL,  /* local variable; var.ridx = register index;
               var.vidx = relative index in 'actvar.arr'  */
+  VVARGVAR,  /* vararg parameter; var.ridx = register index;
+              var.vidx = relative index in 'actvar.arr'  */
   VGLOBAL,  /* global variable;
                info = relative index in 'actvar.arr' (or -1 for
                       implicit declaration) */
@@ -49,6 +51,8 @@ typedef enum {
                 ind.ro = true if it represents a read-only global;
                 ind.keystr = if key is a string, index in 'k' of that string;
                              -1 if key is not a string */
+  VVARGIND,  /* indexed vararg parameter;
+                ind.* as in VINDEXED */
   VINDEXUP,  /* indexed upvalue;
                 ind.idx = key's K index;
                 ind.* as in VINDEXED */
@@ -97,10 +101,11 @@ typedef struct expdesc {
 /* kinds of variables */
 #define VDKREG		0   /* regular local */
 #define RDKCONST	1   /* local constant */
-#define RDKTOCLOSE	2   /* to-be-closed */
-#define RDKCTC		3   /* local compile-time constant */
-#define GDKREG		4   /* regular global */
-#define GDKCONST	5   /* global constant */
+#define RDKVAVAR	2   /* vararg parameter */
+#define RDKTOCLOSE	3   /* to-be-closed */
+#define RDKCTC		4   /* local compile-time constant */
+#define GDKREG		5   /* regular global */
+#define GDKCONST	6   /* global constant */
 
 /* variables that live in registers */
 #define varinreg(v)	((v)->vd.kind <= RDKTOCLOSE)

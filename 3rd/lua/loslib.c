@@ -34,7 +34,7 @@
 #if defined(LUA_USE_WINDOWS)
 #define LUA_STRFTIMEOPTIONS  "aAbBcdHIjmMpSUwWxXyYzZ%" \
     "||" "#c#x#d#H#I#j#m#M#S#U#w#W#y#Y"  /* two-char options */
-#elif defined(LUA_USE_C89)  /* ANSI C 89 (only 1-char options) */
+#elif defined(LUA_USE_C89)  /* C89 (only 1-char options) */
 #define LUA_STRFTIMEOPTIONS  "aAbBcdHIjmMpSUwWxXyYZ%"
 #else  /* C99 specification */
 #define LUA_STRFTIMEOPTIONS  "aAbBcCdDeFgGhHIjmMnprRStTuUVwWxXyYzZ%" \

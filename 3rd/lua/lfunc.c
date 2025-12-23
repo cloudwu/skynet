@@ -197,8 +197,7 @@ void luaF_unlinkupval (UpVal *uv) {
 */
 void luaF_closeupval (lua_State *L, StkId level) {
   UpVal *uv;
-  StkId upl;  /* stack index pointed by 'uv' */
-  while ((uv = L->openupval) != NULL && (upl = uplevel(uv)) >= level) {
+  while ((uv = L->openupval) != NULL && uplevel(uv) >= level) {
     TValue *slot = &uv->u.value;  /* new position for value */
     lua_assert(uplevel(uv) < L->top.p);
     luaF_unlinkupval(uv);  /* remove upvalue from 'openupval' list */

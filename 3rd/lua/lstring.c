@@ -41,19 +41,19 @@ static ATOM_SIZET STRID = 0;
 
 
 /*
-** equality for long strings
+** generic equality for strings
 */
-int luaS_eqlngstr (TString *a, TString *b) {
-  size_t len = a->u.lnglen;
-  lua_assert(a->tt == LUA_VLNGSTR && b->tt == LUA_VLNGSTR);
-  return (a == b) ||  /* same instance or... */
-    ((len == b->u.lnglen) &&  /* equal length and ... */
-     (memcmp(getlngstr(a), getlngstr(b), len) == 0));  /* equal contents */
+int luaS_eqstr (TString *a, TString *b) {
+  size_t len1, len2;
+  const char *s1 = getlstr(a, len1);
+  const char *s2 = getlstr(b, len2);
+  return ((len1 == len2) &&  /* equal length and ... */
+          (memcmp(s1, s2, len1) == 0));  /* equal contents */
 }
 
 int luaS_eqshrstr (TString *a, TString *b) {
   int r;
-  lu_byte len = a->shrlen;
+  ls_byte len = a->shrlen;
   r = len == b->shrlen && (memcmp(getshrstr(a), getshrstr(b), len) == 0);
   if (r) {
     if (a->id < b->id) {
@@ -74,7 +74,7 @@ void luaS_share (TString *ts) {
   ts->id = ATOM_FDEC(&STRID)-1;
 }
 
-unsigned luaS_hash (const char *str, size_t l, unsigned seed) {
+static unsigned luaS_hash (const char *str, size_t l, unsigned seed) {
   unsigned int h = seed ^ cast_uint(l);
   for (; l > 0; l--)
     h ^= ((h<<5) + (h>>2) + cast_byte(str[l - 1]));
@@ -340,28 +340,9 @@ static void f_newext (lua_State *L, void *ud) {
 }
 
 
-static void f_pintern (lua_State *L, void *ud) {
-  struct NewExt *ne = cast(struct NewExt *, ud);
-  ne->ts = internshrstr(L, ne->s, ne->len);
-}
-
-
 TString *luaS_newextlstr (lua_State *L,
 	          const char *s, size_t len, lua_Alloc falloc, void *ud) {
   struct NewExt ne;
-  if (len <= LUAI_MAXSHORTLEN) {  /* short string? */
-    ne.s = s; ne.len = len;
-    if (!falloc)
-      f_pintern(L, &ne);  /* just internalize string */
-    else {
-      TStatus status = luaD_rawrunprotected(L, f_pintern, &ne);
-      (*falloc)(ud, cast_voidp(s), len + 1, 0);  /* free external string */
-      if (status != LUA_OK)  /* memory error? */
-        luaM_error(L);  /* re-raise memory error */
-    }
-    return ne.ts;
-  }
-  /* "normal" case: long strings */
   if (!falloc) {
     ne.kind = LSTRFIX;
     f_newext(L, &ne);  /* just create header */
@@ -381,4 +362,17 @@ TString *luaS_newextlstr (lua_State *L,
   return ne.ts;
 }
 
+
+/*
+** Normalize an external string: If it is short, internalize it.
+*/
+TString *luaS_normstr (lua_State *L, TString *ts) {
+  size_t len = ts->u.lnglen;
+  if (len > LUAI_MAXSHORTLEN)
+    return ts;  /* long string; keep the original */
+  else {
+    const char *str = getlngstr(ts);
+    return internshrstr(L, str, len);
+  }
+}
 

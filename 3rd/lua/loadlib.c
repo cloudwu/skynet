@@ -307,6 +307,16 @@ static void setpath (lua_State *L, const char *fieldname,
 
 
 /*
+** External strings created by DLLs may need the DLL code to be
+** deallocated. This implies that a DLL can only be unloaded after all
+** its strings were deallocated. To ensure that, we create a 'library
+** string' to represent each DLL, and when this string is deallocated
+** it closes its corresponding DLL.
+** (The string itself is irrelevant; its userdata is the DLL pointer.)
+*/
+
+
+/*
 ** return registry.CLIBS[path]
 */
 static void *checkclib (lua_State *L, const char *path) {
@@ -320,33 +330,40 @@ static void *checkclib (lua_State *L, const char *path) {
 
 
 /*
-** registry.CLIBS[path] = plib        -- for queries
-** registry.CLIBS[#CLIBS + 1] = plib  -- also keep a list of all libraries
+** Deallocate function for library strings.
+** Unload the DLL associated with the string being deallocated.
 */
-static void addtoclib (lua_State *L, const char *path, void *plib) {
-  lua_getfield(L, LUA_REGISTRYINDEX, CLIBS);
-  lua_pushlightuserdata(L, plib);
-  lua_pushvalue(L, -1);
-  lua_setfield(L, -3, path);  /* CLIBS[path] = plib */
-  lua_rawseti(L, -2, luaL_len(L, -2) + 1);  /* CLIBS[#CLIBS + 1] = plib */
-  lua_pop(L, 1);  /* pop CLIBS table */
+static void *freelib (void *ud, void *ptr, size_t osize, size_t nsize) {
+  /* string itself is irrelevant and static */
+  (void)ptr; (void)osize; (void)nsize;
+  lsys_unloadlib(ud);  /* unload library represented by the string */
+  return NULL;
 }
 
 
 /*
-** __gc tag method for CLIBS table: calls 'lsys_unloadlib' for all lib
-** handles in list CLIBS
+** Create a library string that, when deallocated, will unload 'plib'
 */
-static int gctm (lua_State *L) {
-  lua_Integer n = luaL_len(L, 1);
-  for (; n >= 1; n--) {  /* for each handle, in reverse order */
-    lua_rawgeti(L, 1, n);  /* get handle CLIBS[n] */
-    lsys_unloadlib(lua_touserdata(L, -1));
-    lua_pop(L, 1);  /* pop handle */
-  }
-  return 0;
+static void createlibstr (lua_State *L, void *plib) {
+  /* common content for all library strings */
+  static const char dummy[] = "01234567890";
+  lua_pushexternalstring(L, dummy, sizeof(dummy) - 1, freelib, plib);
 }
 
+
+/*
+** registry.CLIBS[path] = plib          -- for queries.
+** Also create a reference to strlib, so that the library string will
+** only be collected when registry.CLIBS is collected.
+*/
+static void addtoclib (lua_State *L, const char *path, void *plib) {
+  lua_getfield(L, LUA_REGISTRYINDEX, CLIBS);
+  lua_pushlightuserdata(L, plib);
+  lua_setfield(L, -2, path);  /* CLIBS[path] = plib */
+  createlibstr(L, plib);
+  luaL_ref(L, -2);  /* keep library string in CLIBS */
+  lua_pop(L, 1);  /* pop CLIBS table */
+}
 
 
 /* error codes for 'lookforfunc' */
@@ -361,8 +378,8 @@ static int gctm (lua_State *L) {
 ** Then, if 'sym' is '*', return true (as library has been loaded).
 ** Otherwise, look for symbol 'sym' in the library and push a
 ** C function with that symbol.
-** Return 0 and 'true' or a function in the stack; in case of
-** errors, return an error code and an error message in the stack.
+** Return 0 with 'true' or a function in the stack; in case of
+** errors, return an error code with an error message in the stack.
 */
 static int lookforfunc (lua_State *L, const char *path, const char *sym) {
   void *reg = checkclib(L, path);  /* check loaded C libraries */
@@ -704,21 +721,9 @@ static void createsearcherstable (lua_State *L) {
 }
 
 
-/*
-** create table CLIBS to keep track of loaded C libraries,
-** setting a finalizer to close all libraries when closing state.
-*/
-static void createclibstable (lua_State *L) {
-  luaL_getsubtable(L, LUA_REGISTRYINDEX, CLIBS);  /* create CLIBS table */
-  lua_createtable(L, 0, 1);  /* create metatable for CLIBS */
-  lua_pushcfunction(L, gctm);
-  lua_setfield(L, -2, "__gc");  /* set finalizer for CLIBS table */
-  lua_setmetatable(L, -2);
-}
-
-
 LUAMOD_API int luaopen_package (lua_State *L) {
-  createclibstable(L);
+  luaL_getsubtable(L, LUA_REGISTRYINDEX, CLIBS);  /* create CLIBS table */
+  lua_pop(L, 1);  /* will not use it now */
   luaL_newlib(L, pk_funcs);  /* create 'package' table */
   createsearcherstable(L);
   /* set paths */

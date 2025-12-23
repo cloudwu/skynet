@@ -594,10 +594,10 @@ static void traversestrongtable (global_State *g, Table *h) {
 */
 static int getmode (global_State *g, Table *h) {
   const TValue *mode = gfasttm(g, h->metatable, TM_MODE);
-  if (mode == NULL || !ttisshrstring(mode))
-    return 0;  /* ignore non-(short)string modes */
+  if (mode == NULL || !ttisstring(mode))
+    return 0;  /* ignore non-string modes */
   else {
-    const char *smode = getshrstr(tsvalue(mode));
+    const char *smode = getstr(tsvalue(mode));
     const char *weakkey = strchr(smode, 'k');
     const char *weakvalue = strchr(smode, 'v');
     return ((weakkey != NULL) << 1) | (weakvalue != NULL);
@@ -624,7 +624,7 @@ static l_mem traversetable (global_State *g, Table *h) {
         linkgclist(h, g->allweak);  /* must clear collected entries */
       break;
   }
-  return 1 + 2*sizenode(h) + h->asize;
+  return cast(l_mem, 1 + 2*sizenode(h) + h->asize);
 }
 
 
@@ -1299,7 +1299,7 @@ static void finishgencycle (lua_State *L, global_State *g) {
   correctgraylists(g);
   checkSizes(L, g);
   g->gcstate = GCSpropagate;  /* skip restart */
-  if (!g->gcemergency)
+  if (!g->gcemergency && luaD_checkminstack(L))
     callallpendingfinalizers(L);
 }
 
@@ -1673,12 +1673,13 @@ static l_mem singlestep (lua_State *L, int fast) {
       break;
     }
     case GCScallfin: {  /* call finalizers */
-      if (g->tobefnz && !g->gcemergency) {
+      if (g->tobefnz && !g->gcemergency && luaD_checkminstack(L)) {
         g->gcstopem = 0;  /* ok collections during finalizers */
         GCTM(L);  /* call one finalizer */
         stepresult = CWUFIN;
       }
-      else {  /* emergency mode or no more finalizers */
+      else {  /* no more finalizers or emergency mode or no enough stack
+                 to run finalizers */
         g->gcstate = GCSpause;  /* finish collection */
         stepresult = step2pause;
       }
