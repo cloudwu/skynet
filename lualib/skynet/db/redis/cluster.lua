@@ -167,9 +167,8 @@ end
 --
 -- For commands we want to explicitly bad as they don't make sense
 -- in the context of cluster, nil is returned.
-function rediscluster:get_key_from_command(argv)
-	local cmd,key = table.unpack(argv)
-	cmd = string.lower(cmd)
+function rediscluster:get_key_from_command(cmd, argv)
+	local key = argv[2] -- argv[1] is cmd
 	if cmd == "info" or
 		cmd == "multi" or
 		cmd == "exec" or
@@ -272,7 +271,7 @@ function rediscluster:get_random_connection()
 				-- If the connection is not good close it ASAP in order
 				-- to avoid waiting for the GC finalizer. File
 				-- descriptors are a rare resource.
-				self.connetions[node.name] = nil
+				self.connections[node.name] = nil
 				conn:disconnect()
 			end
 		end)
@@ -314,8 +313,8 @@ end
 -- Dispatch commands.
 function rediscluster:call(...)
 	local argv = table.pack(...)
-	local cmd = argv[1]
-	local key = self:get_key_from_command(argv)
+	local cmd = string.lower(argv[1])
+	local key = self:get_key_from_command(cmd, argv)
 	if not key then
 		error("No way to dispatch this command to Redis Cluster: " .. tostring(argv[1]))
 	end
@@ -345,15 +344,24 @@ function rediscluster:call(...)
 		else
 			conn = self:get_connection_by_slot(slot)
 		end
-		local result = {pcall(function ()
-			-- TODO: use pipelining to send asking and save a rtt.
-			if asking then
-				conn:asking()
-			end
+
+		local result
+		if asking then
+			-- use pipeline
+			-- ensure ASKING and command execute sequentially and consecutively
+			-- save one RTT
+			local cmd_list = {
+				{ "asking" },
+				{ ... },
+			}
 			asking = false
+			local func = conn["pipeline"]
+			result = { pcall(func, conn, cmd_list) }
+		else
 			local func = conn[cmd]
-			return func(conn,table.unpack(argv,2))
-		end)}
+			result = { pcall(func, conn, table.unpack(argv, 2)) }
+		end
+
 		local ok = result[1]
 		if not ok then
 			err = table.unpack(result,2)

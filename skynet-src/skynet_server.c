@@ -70,7 +70,7 @@ struct skynet_node {
 
 static struct skynet_node G_NODE;
 
-int 
+int
 skynet_context_total() {
 	return ATOM_LOAD(&G_NODE.total);
 }
@@ -85,7 +85,7 @@ context_dec() {
 	ATOM_FDEC(&G_NODE.total);
 }
 
-uint32_t 
+uint32_t
 skynet_current_handle(void) {
 	if (G_NODE.init) {
 		void * handle = pthread_getspecific(G_NODE.handle_key);
@@ -121,22 +121,22 @@ drop_message(struct skynet_message *msg, void *ud) {
 	skynet_send(NULL, source, msg->source, PTYPE_ERROR, msg->session, NULL, 0);
 }
 
-struct skynet_context * 
+uint32_t
 skynet_context_new(const char * name, const char *param) {
 	struct skynet_module * mod = skynet_module_query(name);
 
 	if (mod == NULL)
-		return NULL;
+		return 0;
 
 	void *inst = skynet_module_instance_create(mod);
 	if (inst == NULL)
-		return NULL;
+		return 0;
 	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
 	CHECKCALLING_INIT(ctx)
 
 	ctx->mod = mod;
 	ctx->instance = inst;
-	ATOM_INIT(&ctx->ref , 2);
+	ATOM_INIT(&ctx->ref , 2); // skynet_handle_register + skynet_module_instance_init
 	ctx->cb = NULL;
 	ctx->cb_ud = NULL;
 	ctx->session_id = 0;
@@ -150,9 +150,10 @@ skynet_context_new(const char * name, const char *param) {
 	ctx->message_count = 0;
 	ctx->profile = G_NODE.profile;
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
-	ctx->handle = 0;	
-	ctx->handle = skynet_handle_register(ctx);
-	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
+	ctx->handle = 0;
+	const uint32_t handle = skynet_handle_register(ctx);
+	ctx->handle = handle;
+	struct message_queue * queue = ctx->queue = skynet_mq_create(handle);
 	// init function maybe use ctx->handle, so it must init at last
 	context_inc();
 
@@ -160,15 +161,11 @@ skynet_context_new(const char * name, const char *param) {
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
 	CHECKCALLING_END(ctx)
 	if (r == 0) {
-		struct skynet_context * ret = skynet_context_release(ctx);
-		if (ret) {
-			ctx->init = true;
-		}
+		ctx->init = true;
 		skynet_globalmq_push(queue);
-		if (ret) {
-			skynet_error(ret, "LAUNCH %s %s", name, param ? param : "");
-		}
-		return ret;
+		skynet_error(ctx, "LAUNCH %s %s", name, param ? param : "");
+		skynet_context_release(ctx);
+		return handle;
 	} else {
 		skynet_error(ctx, "error: launch %s FAILED", name);
 		uint32_t handle = ctx->handle;
@@ -176,7 +173,7 @@ skynet_context_new(const char * name, const char *param) {
 		skynet_handle_retire(handle);
 		struct drop_t d = { handle };
 		skynet_mq_release(queue, drop_message, &d);
-		return NULL;
+		return 0;
 	}
 }
 
@@ -191,7 +188,7 @@ skynet_context_newsession(struct skynet_context *ctx) {
 	return session;
 }
 
-void 
+void
 skynet_context_grab(struct skynet_context *ctx) {
 	ATOM_FINC(&ctx->ref);
 }
@@ -204,7 +201,7 @@ skynet_context_reserve(struct skynet_context *ctx) {
 	context_dec();
 }
 
-static void 
+static void
 delete_context(struct skynet_context *ctx) {
 	FILE *f = (FILE *)ATOM_LOAD(&ctx->logfile);
 	if (f) {
@@ -217,13 +214,11 @@ delete_context(struct skynet_context *ctx) {
 	context_dec();
 }
 
-struct skynet_context * 
+void
 skynet_context_release(struct skynet_context *ctx) {
 	if (ATOM_FDEC(&ctx->ref) == 1) {
 		delete_context(ctx);
-		return NULL;
 	}
-	return ctx;
 }
 
 int
@@ -238,7 +233,7 @@ skynet_context_push(uint32_t handle, struct skynet_message *message) {
 	return 0;
 }
 
-void 
+void
 skynet_context_endless(uint32_t handle) {
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
@@ -248,7 +243,7 @@ skynet_context_endless(uint32_t handle) {
 	skynet_context_release(ctx);
 }
 
-int 
+int
 skynet_isremote(struct skynet_context * ctx, uint32_t handle, int * harbor) {
 	int ret = skynet_harbor_message_isremote(handle);
 	if (harbor) {
@@ -284,7 +279,7 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	CHECKCALLING_END(ctx)
 }
 
-void 
+void
 skynet_context_dispatchall(struct skynet_context * ctx) {
 	// for skynet_error
 	struct skynet_message msg;
@@ -294,7 +289,7 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 	}
 }
 
-struct message_queue * 
+struct message_queue *
 skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
 	if (q == NULL) {
 		q = skynet_globalmq_pop();
@@ -345,7 +340,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		// Else (global mq is empty or block, don't push q back, and return q again (for next dispatch)
 		skynet_globalmq_push(q);
 		q = nq;
-	} 
+	}
 	skynet_context_release(ctx);
 
 	return q;
@@ -362,7 +357,7 @@ copy_name(char name[GLOBALNAME_LENGTH], const char * addr) {
 	}
 }
 
-uint32_t 
+uint32_t
 skynet_queryname(struct skynet_context * context, const char * name) {
 	switch(name[0]) {
 	case ':':
@@ -488,11 +483,11 @@ cmd_launch(struct skynet_context * context, const char * param) {
 	char * args = tmp;
 	char * mod = strsep(&args, " \t\r\n");
 	args = strsep(&args, "\r\n");
-	struct skynet_context * inst = skynet_context_new(mod,args);
-	if (inst == NULL) {
+	const uint32_t handle = skynet_context_new(mod,args);
+	if (handle == 0) {
 		return NULL;
 	} else {
-		id_to_hex(context->result, inst->handle);
+		id_to_hex(context->result, handle);
 		return context->result;
 	}
 }
@@ -515,7 +510,7 @@ cmd_setenv(struct skynet_context * context, const char * param) {
 
 	key[i] = '\0';
 	param += i+1;
-	
+
 	skynet_setenv(key,param);
 	return NULL;
 }
@@ -663,7 +658,7 @@ static struct command_func cmd_funcs[] = {
 	{ NULL, NULL },
 };
 
-const char * 
+const char *
 skynet_command(struct skynet_context * context, const char * cmd , const char * param) {
 	struct command_func * method = &cmd_funcs[0];
 	while(method->name) {
@@ -783,12 +778,12 @@ skynet_sendname(struct skynet_context * context, uint32_t source, const char * a
 	return skynet_send(context, source, des, type, session, data, sz);
 }
 
-uint32_t 
+uint32_t
 skynet_context_handle(struct skynet_context *ctx) {
 	return ctx->handle;
 }
 
-void 
+void
 skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb) {
 	context->cb = cb;
 	context->cb_ud = ud;
@@ -805,7 +800,7 @@ skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t
 	skynet_mq_push(ctx->queue, &smsg);
 }
 
-void 
+void
 skynet_globalinit(void) {
 	ATOM_INIT(&G_NODE.total , 0);
 	G_NODE.monitor_exit = 0;
@@ -818,7 +813,7 @@ skynet_globalinit(void) {
 	skynet_initthread(THREAD_MAIN);
 }
 
-void 
+void
 skynet_globalexit(void) {
 	pthread_key_delete(G_NODE.handle_key);
 }

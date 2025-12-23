@@ -25,7 +25,7 @@ local function test()
 end
 
 skynet.start(function()
-	skynet.trace_timeout(true)	-- trun on trace for timeout, skynet.task will returns more info.
+	skynet.trace_timeout(true)	-- turn on trace for timeout, skynet.task will returns more info.
 	test()
 
 	skynet.fork(wakeup, coroutine.running())

@@ -1,5 +1,5 @@
 PLAT ?= none
-PLATS = linux freebsd macosx
+PLATS = linux freebsd macosx mingw
 
 CC ?= gcc
 
@@ -25,6 +25,7 @@ EXPORT := -Wl,-E
 linux : PLAT = linux
 macosx : PLAT = macosx
 freebsd : PLAT = freebsd
+mingw : PLAT = mingw
 
 macosx : SHARED := -fPIC -dynamiclib -Wl,-undefined,dynamic_lookup
 macosx : EXPORT :=
@@ -38,3 +39,6 @@ macosx : SKYNET_DEFINES :=-DNOUSE_JEMALLOC
 
 linux macosx freebsd :
 	$(MAKE) all PLAT=$@ SKYNET_LIBS="$(SKYNET_LIBS)" SHARED="$(SHARED)" EXPORT="$(EXPORT)" MALLOC_STATICLIB="$(MALLOC_STATICLIB)" SKYNET_DEFINES="$(SKYNET_DEFINES)"
+
+mingw :
+	$(MAKE) -f mingw.mk all PLAT=$@

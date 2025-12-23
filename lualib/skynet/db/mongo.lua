@@ -988,4 +988,20 @@ aggregate_cursor.limit = mongo_cursor.limit
 aggregate_cursor.next = mongo_cursor.next
 aggregate_cursor.close = mongo_cursor.close
 
+--[[
+支持插件式扩展模式
+比如要添加mongo会话事务接口支持功能可在事务接口使用前执行以下代码：
+local mongo = require "mongo"
+mongo.enable("transaction")
+]]
+local inited_modules = {} -- 确保每个子模块仅能初始化一次
+function mongo.enable(name)
+	if inited_modules[name] then
+		return
+	end
+	inited_modules[name] = true
+	local m = require("skynet.db.mongo." .. name)
+	m.init({ mongo_db = mongo_db }) -- 后续可增加更多的扩展模块支持
+end
+
 return mongo
