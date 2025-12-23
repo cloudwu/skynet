@@ -101,21 +101,23 @@ UpVal *luaF_findupval (lua_State *L, StkId level) {
 
 
 /*
-** Call closing method for object 'obj' with error message 'err'. The
+** Call closing method for object 'obj' with error object 'err'. The
 ** boolean 'yy' controls whether the call is yieldable.
 ** (This function assumes EXTRA_STACK.)
 */
 static void callclosemethod (lua_State *L, TValue *obj, TValue *err, int yy) {
   StkId top = L->top.p;
+  StkId func = top;
   const TValue *tm = luaT_gettmbyobj(L, obj, TM_CLOSE);
-  setobj2s(L, top, tm);  /* will call metamethod... */
-  setobj2s(L, top + 1, obj);  /* with 'self' as the 1st argument */
-  setobj2s(L, top + 2, err);  /* and error msg. as 2nd argument */
-  L->top.p = top + 3;  /* add function and arguments */
+  setobj2s(L, top++, tm);  /* will call metamethod... */
+  setobj2s(L, top++, obj);  /* with 'self' as the 1st argument */
+  if (err != NULL)  /* if there was an error... */
+    setobj2s(L, top++, err);  /* then error object will be 2nd argument */
+  L->top.p = top;  /* add function and arguments */
   if (yy)
-    luaD_call(L, top, 0);
+    luaD_call(L, func, 0);
   else
-    luaD_callnoyield(L, top, 0);
+    luaD_callnoyield(L, func, 0);
 }
 
 
@@ -141,26 +143,28 @@ static void checkclosemth (lua_State *L, StkId level) {
 ** the 'level' of the upvalue being closed, as everything after that
 ** won't be used again.
 */
-static void prepcallclosemth (lua_State *L, StkId level, int status, int yy) {
+static void prepcallclosemth (lua_State *L, StkId level, TStatus status,
+                                            int yy) {
   TValue *uv = s2v(level);  /* value being closed */
   TValue *errobj;
-  if (status == CLOSEKTOP)
-    errobj = &G(L)->nilvalue;  /* error object is nil */
-  else {  /* 'luaD_seterrorobj' will set top to level + 2 */
-    errobj = s2v(level + 1);  /* error object goes after 'uv' */
-    luaD_seterrorobj(L, status, level + 1);  /* set error object */
+  switch (status) {
+    case LUA_OK:
+      L->top.p = level + 1;  /* call will be at this level */
+      /* FALLTHROUGH */
+    case CLOSEKTOP:  /* don't need to change top */
+      errobj = NULL;  /* no error object */
+      break;
+    default:  /* 'luaD_seterrorobj' will set top to level + 2 */
+      errobj = s2v(level + 1);  /* error object goes after 'uv' */
+      luaD_seterrorobj(L, status, level + 1);  /* set error object */
+      break;
   }
   callclosemethod(L, uv, errobj, yy);
 }
 
 
-/*
-** Maximum value for deltas in 'tbclist', dependent on the type
-** of delta. (This macro assumes that an 'L' is in scope where it
-** is used.)
-*/
-#define MAXDELTA  \
-	((256ul << ((sizeof(L->stack.p->tbclist.delta) - 1) * 8)) - 1)
+/* Maximum value for deltas in 'tbclist' */
+#define MAXDELTA       USHRT_MAX
 
 
 /*
@@ -193,8 +197,7 @@ void luaF_unlinkupval (UpVal *uv) {
 */
 void luaF_closeupval (lua_State *L, StkId level) {
   UpVal *uv;
-  StkId upl;  /* stack index pointed by 'uv' */
-  while ((uv = L->openupval) != NULL && (upl = uplevel(uv)) >= level) {
+  while ((uv = L->openupval) != NULL && uplevel(uv) >= level) {
     TValue *slot = &uv->u.value;  /* new position for value */
     lua_assert(uplevel(uv) < L->top.p);
     luaF_unlinkupval(uv);  /* remove upvalue from 'openupval' list */
@@ -225,7 +228,7 @@ static void poptbclist (lua_State *L) {
 ** Close all upvalues and to-be-closed variables up to the given stack
 ** level. Return restored 'level'.
 */
-StkId luaF_close (lua_State *L, StkId level, int status, int yy) {
+StkId luaF_close (lua_State *L, StkId level, TStatus status, int yy) {
   ptrdiff_t levelrel = savestack(L, level);
   luaF_closeupval(L, level);  /* first, close the upvalues */
   while (L->tbclist.p >= level) {  /* traverse tbc's down to that level */
@@ -254,7 +257,7 @@ Proto *luaF_newproto (lua_State *L) {
   f->upvalues = NULL;
   f->sizeupvalues = 0;
   f->numparams = 0;
-  f->is_vararg = 0;
+  f->flag = 0;
   f->maxstacksize = 0;
   f->locvars = NULL;
   f->sizelocvars = 0;
@@ -265,14 +268,31 @@ Proto *luaF_newproto (lua_State *L) {
 }
 
 
+lu_mem luaF_protosize (Proto *p) {
+  lu_mem sz = cast(lu_mem, sizeof(Proto))
+            + cast_uint(p->sizep) * sizeof(Proto*)
+            + cast_uint(p->sizek) * sizeof(TValue)
+            + cast_uint(p->sizelocvars) * sizeof(LocVar)
+            + cast_uint(p->sizeupvalues) * sizeof(Upvaldesc);
+  if (!(p->flag & PF_FIXED)) {
+    sz += cast_uint(p->sizecode) * sizeof(Instruction);
+    sz += cast_uint(p->sizelineinfo) * sizeof(lu_byte);
+    sz += cast_uint(p->sizeabslineinfo) * sizeof(AbsLineInfo);
+  }
+  return sz;
+}
+
+
 void luaF_freeproto (lua_State *L, Proto *f) {
-  luaM_freearray(L, f->code, f->sizecode);
-  luaM_freearray(L, f->p, f->sizep);
-  luaM_freearray(L, f->k, f->sizek);
-  luaM_freearray(L, f->lineinfo, f->sizelineinfo);
-  luaM_freearray(L, f->abslineinfo, f->sizeabslineinfo);
-  luaM_freearray(L, f->locvars, f->sizelocvars);
-  luaM_freearray(L, f->upvalues, f->sizeupvalues);
+  if (!(f->flag & PF_FIXED)) {
+    luaM_freearray(L, f->code, cast_sizet(f->sizecode));
+    luaM_freearray(L, f->lineinfo, cast_sizet(f->sizelineinfo));
+    luaM_freearray(L, f->abslineinfo, cast_sizet(f->sizeabslineinfo));
+  }
+  luaM_freearray(L, f->p, cast_sizet(f->sizep));
+  luaM_freearray(L, f->k, cast_sizet(f->sizek));
+  luaM_freearray(L, f->locvars, cast_sizet(f->sizelocvars));
+  luaM_freearray(L, f->upvalues, cast_sizet(f->sizeupvalues));
   luaM_free(L, f);
 }
 

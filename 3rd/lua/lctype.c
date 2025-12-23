@@ -18,7 +18,7 @@
 
 
 #if defined (LUA_UCID)		/* accept UniCode IDentifiers? */
-/* consider all non-ascii codepoints to be alphabetic */
+/* consider all non-ASCII codepoints to be alphabetic */
 #define NONA		0x01
 #else
 #define NONA		0x00	/* default */

@@ -13,7 +13,7 @@
 
 /* test Lua with compatibility code */
 #define LUA_COMPAT_MATHLIB
-#define LUA_COMPAT_LT_LE
+#undef LUA_COMPAT_GLOBAL
 
 
 #define LUA_DEBUG
@@ -44,6 +44,10 @@
 #define LUA_RAND32
 
 
+/* test stack reallocation without strict address use */
+#define LUAI_STRICT_ADDRESS	0
+
+
 /* memory-allocator control variables */
 typedef struct Memcontrol {
   int failnext;
@@ -58,23 +62,39 @@ typedef struct Memcontrol {
 LUA_API Memcontrol l_memcontrol;
 
 
+#define luai_tracegc(L,f)		luai_tracegctest(L, f)
+extern void luai_tracegctest (lua_State *L, int first);
+
+
 /*
 ** generic variable for debug tricks
 */
 extern void *l_Trick;
 
 
-
 /*
 ** Function to traverse and check all memory used by Lua
 */
-LUAI_FUNC int lua_checkmemory (lua_State *L);
+extern int lua_checkmemory (lua_State *L);
 
 /*
 ** Function to print an object GC-friendly
 */
 struct GCObject;
-LUAI_FUNC void lua_printobj (lua_State *L, struct GCObject *o);
+extern void lua_printobj (lua_State *L, struct GCObject *o);
+
+
+/*
+** Function to print a value
+*/
+struct TValue;
+extern void lua_printvalue (struct TValue *v);
+
+/*
+** Function to print the stack
+*/
+extern void lua_printstack (lua_State *L);
+extern int lua_printallstack (lua_State *L);
 
 
 /* test for lock/unlock */
@@ -101,13 +121,14 @@ LUA_API int luaB_opentests (lua_State *L);
 LUA_API void *debug_realloc (void *ud, void *block,
                              size_t osize, size_t nsize);
 
-#if defined(lua_c)
-#define luaL_newstate()		lua_newstate(debug_realloc, &l_memcontrol)
-#define luaL_openlibs(L)  \
-  { (luaL_openlibs)(L); \
+
+#define luaL_newstate()  \
+	lua_newstate(debug_realloc, &l_memcontrol, luaL_makeseed(NULL))
+#define luai_openlibs(L)  \
+  {  luaL_openlibs(L); \
      luaL_requiref(L, "T", luaB_opentests, 1); \
      lua_pop(L, 1); }
-#endif
+
 
 
 
@@ -121,20 +142,14 @@ LUA_API void *debug_realloc (void *ud, void *block,
 #define STRCACHE_N	23
 #define STRCACHE_M	5
 
-#undef LUAI_USER_ALIGNMENT_T
-#define LUAI_USER_ALIGNMENT_T   union { char b[sizeof(void*) * 8]; }
+#define MAXINDEXRK	1
 
 
 /*
-** This one is not compatible with tests for opcode optimizations,
-** as it blocks some optimizations
-#define MAXINDEXRK	0
+** Reduce maximum stack size to make stack-overflow tests run faster.
+** (But value is still large enough to overflow smaller integers.)
 */
-
-
-/* make stack-overflow tests run faster */
-#undef LUAI_MAXSTACK
-#define LUAI_MAXSTACK   50000
+#define LUAI_MAXSTACK   68000
 
 
 /* test mode uses more stack space */

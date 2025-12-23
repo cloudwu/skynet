@@ -95,7 +95,7 @@ static void *firsttry (global_State *g, void *block, size_t os, size_t ns) {
 
 
 void *luaM_growaux_ (lua_State *L, void *block, int nelems, int *psize,
-                     int size_elems, int limit, const char *what) {
+                     unsigned size_elems, int limit, const char *what) {
   void *newblock;
   int size = *psize;
   if (nelems + 1 <= size)  /* does one extra element still fit? */
@@ -126,10 +126,10 @@ void *luaM_growaux_ (lua_State *L, void *block, int nelems, int *psize,
 ** error.
 */
 void *luaM_shrinkvector_ (lua_State *L, void *block, int *size,
-                          int final_n, int size_elem) {
+                          int final_n, unsigned size_elem) {
   void *newblock;
-  size_t oldsize = cast_sizet((*size) * size_elem);
-  size_t newsize = cast_sizet(final_n * size_elem);
+  size_t oldsize = cast_sizet(*size) * size_elem;
+  size_t newsize = cast_sizet(final_n) * size_elem;
   lua_assert(newsize <= oldsize);
   newblock = luaM_saferealloc_(L, block, oldsize, newsize);
   *size = final_n;
@@ -151,7 +151,7 @@ void luaM_free_ (lua_State *L, void *block, size_t osize) {
   global_State *g = G(L);
   lua_assert((osize == 0) == (block == NULL));
   callfrealloc(g, block, osize, 0);
-  g->GCdebt -= osize;
+  g->GCdebt += cast(l_mem, osize);
 }
 
 
@@ -184,7 +184,7 @@ void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
       return NULL;  /* do not update 'GCdebt' */
   }
   lua_assert((nsize == 0) == (newblock == NULL));
-  g->GCdebt = (g->GCdebt + nsize) - osize;
+  g->GCdebt -= cast(l_mem, nsize) - cast(l_mem, osize);
   return newblock;
 }
 
@@ -203,13 +203,13 @@ void *luaM_malloc_ (lua_State *L, size_t size, int tag) {
     return NULL;  /* that's all */
   else {
     global_State *g = G(L);
-    void *newblock = firsttry(g, NULL, tag, size);
+    void *newblock = firsttry(g, NULL, cast_sizet(tag), size);
     if (l_unlikely(newblock == NULL)) {
-      newblock = tryagain(L, NULL, tag, size);
+      newblock = tryagain(L, NULL, cast_sizet(tag), size);
       if (newblock == NULL)
         luaM_error(L);
     }
-    g->GCdebt += size;
+    g->GCdebt -= cast(l_mem, size);
     return newblock;
   }
 }

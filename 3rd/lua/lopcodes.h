@@ -8,6 +8,7 @@
 #define lopcodes_h
 
 #include "llimits.h"
+#include "lobject.h"
 
 
 /*===========================================================================
@@ -18,25 +19,30 @@
         3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
         1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
 iABC          C(8)     |      B(8)     |k|     A(8)      |   Op(7)     |
+ivABC         vC(10)     |     vB(6)   |k|     A(8)      |   Op(7)     |
 iABx                Bx(17)               |     A(8)      |   Op(7)     |
 iAsBx              sBx (signed)(17)      |     A(8)      |   Op(7)     |
 iAx                           Ax(25)                     |   Op(7)     |
 isJ                           sJ (signed)(25)            |   Op(7)     |
 
-  A signed argument is represented in excess K: the represented value is
-  the written unsigned value minus K, where K is half the maximum for the
-  corresponding unsigned argument.
+  ('v' stands for "variant", 's' for "signed", 'x' for "extended".)
+  A signed argument is represented in excess K: The represented value is
+  the written unsigned value minus K, where K is half (rounded down) the
+  maximum value for the corresponding unsigned argument.
 ===========================================================================*/
 
 
-enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
+/* basic instruction formats */
+enum OpMode {iABC, ivABC, iABx, iAsBx, iAx, isJ};
 
 
 /*
 ** size and position of opcode arguments.
 */
 #define SIZE_C		8
+#define SIZE_vC		10
 #define SIZE_B		8
+#define SIZE_vB		6
 #define SIZE_Bx		(SIZE_C + SIZE_B + 1)
 #define SIZE_A		8
 #define SIZE_Ax		(SIZE_Bx + SIZE_A)
@@ -49,7 +55,9 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 #define POS_A		(POS_OP + SIZE_OP)
 #define POS_k		(POS_A + SIZE_A)
 #define POS_B		(POS_k + 1)
+#define POS_vB		(POS_k + 1)
 #define POS_C		(POS_B + SIZE_B)
+#define POS_vC		(POS_vB + SIZE_vB)
 
 #define POS_Bx		POS_k
 
@@ -64,14 +72,17 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 ** so they must fit in ints.
 */
 
-/* Check whether type 'int' has at least 'b' bits ('b' < 32) */
-#define L_INTHASBITS(b)		((UINT_MAX >> ((b) - 1)) >= 1)
+/*
+** Check whether type 'int' has at least 'b' + 1 bits.
+** 'b' < 32; +1 for the sign bit.
+*/
+#define L_INTHASBITS(b)		((UINT_MAX >> (b)) >= 1)
 
 
 #if L_INTHASBITS(SIZE_Bx)
 #define MAXARG_Bx	((1<<SIZE_Bx)-1)
 #else
-#define MAXARG_Bx	MAX_INT
+#define MAXARG_Bx	INT_MAX
 #endif
 
 #define OFFSET_sBx	(MAXARG_Bx>>1)         /* 'sBx' is signed */
@@ -80,13 +91,13 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 #if L_INTHASBITS(SIZE_Ax)
 #define MAXARG_Ax	((1<<SIZE_Ax)-1)
 #else
-#define MAXARG_Ax	MAX_INT
+#define MAXARG_Ax	INT_MAX
 #endif
 
 #if L_INTHASBITS(SIZE_sJ)
 #define MAXARG_sJ	((1 << SIZE_sJ) - 1)
 #else
-#define MAXARG_sJ	MAX_INT
+#define MAXARG_sJ	INT_MAX
 #endif
 
 #define OFFSET_sJ	(MAXARG_sJ >> 1)
@@ -94,7 +105,9 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 
 #define MAXARG_A	((1<<SIZE_A)-1)
 #define MAXARG_B	((1<<SIZE_B)-1)
+#define MAXARG_vB	((1<<SIZE_vB)-1)
 #define MAXARG_C	((1<<SIZE_C)-1)
+#define MAXARG_vC	((1<<SIZE_vC)-1)
 #define OFFSET_sC	(MAXARG_C >> 1)
 
 #define int2sC(i)	((i) + OFFSET_sC)
@@ -113,28 +126,36 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 
 #define GET_OPCODE(i)	(cast(OpCode, ((i)>>POS_OP) & MASK1(SIZE_OP,0)))
 #define SET_OPCODE(i,o)	((i) = (((i)&MASK0(SIZE_OP,POS_OP)) | \
-		((cast(Instruction, o)<<POS_OP)&MASK1(SIZE_OP,POS_OP))))
+		((cast_Inst(o)<<POS_OP)&MASK1(SIZE_OP,POS_OP))))
 
 #define checkopm(i,m)	(getOpMode(GET_OPCODE(i)) == m)
 
 
 #define getarg(i,pos,size)	(cast_int(((i)>>(pos)) & MASK1(size,0)))
 #define setarg(i,v,pos,size)	((i) = (((i)&MASK0(size,pos)) | \
-                ((cast(Instruction, v)<<pos)&MASK1(size,pos))))
+                ((cast_Inst(v)<<pos)&MASK1(size,pos))))
 
 #define GETARG_A(i)	getarg(i, POS_A, SIZE_A)
 #define SETARG_A(i,v)	setarg(i, v, POS_A, SIZE_A)
 
-#define GETARG_B(i)	check_exp(checkopm(i, iABC), getarg(i, POS_B, SIZE_B))
+#define GETARG_B(i)  \
+	check_exp(checkopm(i, iABC), getarg(i, POS_B, SIZE_B))
+#define GETARG_vB(i)  \
+	check_exp(checkopm(i, ivABC), getarg(i, POS_vB, SIZE_vB))
 #define GETARG_sB(i)	sC2int(GETARG_B(i))
 #define SETARG_B(i,v)	setarg(i, v, POS_B, SIZE_B)
+#define SETARG_vB(i,v)	setarg(i, v, POS_vB, SIZE_vB)
 
-#define GETARG_C(i)	check_exp(checkopm(i, iABC), getarg(i, POS_C, SIZE_C))
+#define GETARG_C(i)  \
+	check_exp(checkopm(i, iABC), getarg(i, POS_C, SIZE_C))
+#define GETARG_vC(i)  \
+	check_exp(checkopm(i, ivABC), getarg(i, POS_vC, SIZE_vC))
 #define GETARG_sC(i)	sC2int(GETARG_C(i))
 #define SETARG_C(i,v)	setarg(i, v, POS_C, SIZE_C)
+#define SETARG_vC(i,v)	setarg(i, v, POS_vC, SIZE_vC)
 
-#define TESTARG_k(i)	check_exp(checkopm(i, iABC), (cast_int(((i) & (1u << POS_k)))))
-#define GETARG_k(i)	check_exp(checkopm(i, iABC), getarg(i, POS_k, 1))
+#define TESTARG_k(i)	(cast_int(((i) & (1u << POS_k))))
+#define GETARG_k(i)	getarg(i, POS_k, 1)
 #define SETARG_k(i,v)	setarg(i, v, POS_k, 1)
 
 #define GETARG_Bx(i)	check_exp(checkopm(i, iABx), getarg(i, POS_Bx, SIZE_Bx))
@@ -153,22 +174,28 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 	setarg(i, cast_uint((j)+OFFSET_sJ), POS_sJ, SIZE_sJ)
 
 
-#define CREATE_ABCk(o,a,b,c,k)	((cast(Instruction, o)<<POS_OP) \
-			| (cast(Instruction, a)<<POS_A) \
-			| (cast(Instruction, b)<<POS_B) \
-			| (cast(Instruction, c)<<POS_C) \
-			| (cast(Instruction, k)<<POS_k))
+#define CREATE_ABCk(o,a,b,c,k)	((cast_Inst(o)<<POS_OP) \
+			| (cast_Inst(a)<<POS_A) \
+			| (cast_Inst(b)<<POS_B) \
+			| (cast_Inst(c)<<POS_C) \
+			| (cast_Inst(k)<<POS_k))
 
-#define CREATE_ABx(o,a,bc)	((cast(Instruction, o)<<POS_OP) \
-			| (cast(Instruction, a)<<POS_A) \
-			| (cast(Instruction, bc)<<POS_Bx))
+#define CREATE_vABCk(o,a,b,c,k)	((cast_Inst(o)<<POS_OP) \
+			| (cast_Inst(a)<<POS_A) \
+			| (cast_Inst(b)<<POS_vB) \
+			| (cast_Inst(c)<<POS_vC) \
+			| (cast_Inst(k)<<POS_k))
 
-#define CREATE_Ax(o,a)		((cast(Instruction, o)<<POS_OP) \
-			| (cast(Instruction, a)<<POS_Ax))
+#define CREATE_ABx(o,a,bc)	((cast_Inst(o)<<POS_OP) \
+			| (cast_Inst(a)<<POS_A) \
+			| (cast_Inst(bc)<<POS_Bx))
 
-#define CREATE_sJ(o,j,k)	((cast(Instruction, o) << POS_OP) \
-			| (cast(Instruction, j) << POS_sJ) \
-			| (cast(Instruction, k) << POS_k))
+#define CREATE_Ax(o,a)		((cast_Inst(o)<<POS_OP) \
+			| (cast_Inst(a)<<POS_Ax))
+
+#define CREATE_sJ(o,j,k)	((cast_Inst(o) << POS_OP) \
+			| (cast_Inst(j) << POS_sJ) \
+			| (cast_Inst(k) << POS_k))
 
 
 #if !defined(MAXINDEXRK)  /* (for debugging only) */
@@ -177,9 +204,16 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 
 
 /*
-** invalid register that fits in 8 bits
+** Maximum size for the stack of a Lua function. It must fit in 8 bits.
+** The highest valid register is one less than this value.
 */
-#define NO_REG		MAXARG_A
+#define MAX_FSTACK	MAXARG_A
+
+/*
+** Invalid register (one more than last valid register).
+*/
+#define NO_REG		MAX_FSTACK
+
 
 
 /*
@@ -190,8 +224,8 @@ enum OpMode {iABC, iABx, iAsBx, iAx, isJ};  /* basic instruction formats */
 
 
 /*
-** Grep "ORDER OP" if you change these enums. Opcodes marked with a (*)
-** has extra descriptions in the notes after the enumeration.
+** Grep "ORDER OP" if you change this enum.
+** See "Notes" below for more information about some instructions.
 */
 
 typedef enum {
@@ -204,7 +238,7 @@ OP_LOADF,/*	A sBx	R[A] := (lua_Number)sBx				*/
 OP_LOADK,/*	A Bx	R[A] := K[Bx]					*/
 OP_LOADKX,/*	A	R[A] := K[extra arg]				*/
 OP_LOADFALSE,/*	A	R[A] := false					*/
-OP_LFALSESKIP,/*A	R[A] := false; pc++	(*)			*/
+OP_LFALSESKIP,/*A	R[A] := false; pc++				*/
 OP_LOADTRUE,/*	A	R[A] := true					*/
 OP_LOADNIL,/*	A B	R[A], R[A+1], ..., R[A+B] := nil		*/
 OP_GETUPVAL,/*	A B	R[A] := UpValue[B]				*/
@@ -220,9 +254,9 @@ OP_SETTABLE,/*	A B C	R[A][R[B]] := RK(C)				*/
 OP_SETI,/*	A B C	R[A][B] := RK(C)				*/
 OP_SETFIELD,/*	A B C	R[A][K[B]:shortstring] := RK(C)			*/
 
-OP_NEWTABLE,/*	A B C k	R[A] := {}					*/
+OP_NEWTABLE,/*	A vB vC k	R[A] := {}				*/
 
-OP_SELF,/*	A B C	R[A+1] := R[B]; R[A] := R[B][RK(C):string]	*/
+OP_SELF,/*	A B C	R[A+1] := R[B]; R[A] := R[B][K[C]:shortstring]	*/
 
 OP_ADDI,/*	A B sC	R[A] := R[B] + sC				*/
 
@@ -238,8 +272,8 @@ OP_BANDK,/*	A B C	R[A] := R[B] & K[C]:integer			*/
 OP_BORK,/*	A B C	R[A] := R[B] | K[C]:integer			*/
 OP_BXORK,/*	A B C	R[A] := R[B] ~ K[C]:integer			*/
 
-OP_SHRI,/*	A B sC	R[A] := R[B] >> sC				*/
 OP_SHLI,/*	A B sC	R[A] := sC << R[B]				*/
+OP_SHRI,/*	A B sC	R[A] := R[B] >> sC				*/
 
 OP_ADD,/*	A B C	R[A] := R[B] + R[C]				*/
 OP_SUB,/*	A B C	R[A] := R[B] - R[C]				*/
@@ -255,7 +289,7 @@ OP_BXOR,/*	A B C	R[A] := R[B] ~ R[C]				*/
 OP_SHL,/*	A B C	R[A] := R[B] << R[C]				*/
 OP_SHR,/*	A B C	R[A] := R[B] >> R[C]				*/
 
-OP_MMBIN,/*	A B C	call C metamethod over R[A] and R[B]	(*)	*/
+OP_MMBIN,/*	A B C	call C metamethod over R[A] and R[B]		*/
 OP_MMBINI,/*	A sB C k	call C metamethod over R[A] and sB	*/
 OP_MMBINK,/*	A B C k		call C metamethod over R[A] and K[B]	*/
 
@@ -281,12 +315,12 @@ OP_GTI,/*	A sB k	if ((R[A] > sB) ~= k) then pc++			*/
 OP_GEI,/*	A sB k	if ((R[A] >= sB) ~= k) then pc++		*/
 
 OP_TEST,/*	A k	if (not R[A] == k) then pc++			*/
-OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B] (*) */
+OP_TESTSET,/*	A B k	if (not R[B] == k) then pc++ else R[A] := R[B]  */
 
 OP_CALL,/*	A B C	R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1]) */
 OP_TAILCALL,/*	A B C k	return R[A](R[A+1], ... ,R[A+B-1])		*/
 
-OP_RETURN,/*	A B C k	return R[A], ... ,R[A+B-2]	(see note)	*/
+OP_RETURN,/*	A B C k	return R[A], ... ,R[A+B-2]			*/
 OP_RETURN0,/*		return						*/
 OP_RETURN1,/*	A	return R[A]					*/
 
@@ -298,13 +332,17 @@ OP_TFORPREP,/*	A Bx	create upvalue for R[A + 3]; pc+=Bx		*/
 OP_TFORCALL,/*	A C	R[A+4], ... ,R[A+3+C] := R[A](R[A+1], R[A+2]);	*/
 OP_TFORLOOP,/*	A Bx	if R[A+2] ~= nil then { R[A]=R[A+2]; pc -= Bx }	*/
 
-OP_SETLIST,/*	A B C k	R[A][C+i] := R[A+i], 1 <= i <= B		*/
+OP_SETLIST,/*	A vB vC k	R[A][vC+i] := R[A+i], 1 <= i <= vB	*/
 
 OP_CLOSURE,/*	A Bx	R[A] := closure(KPROTO[Bx])			*/
 
-OP_VARARG,/*	A C	R[A], R[A+1], ..., R[A+C-2] = vararg		*/
+OP_VARARG,/*	A B C k	R[A], ..., R[A+C-2] = varargs  			*/
 
-OP_VARARGPREP,/*A	(adjust vararg parameters)			*/
+OP_GETVARG, /* A B C	R[A] := R[B][R[C]], R[B] is vararg parameter    */
+
+OP_ERRNNIL,/*	A Bx	raise error if R[A] ~= nil (K[Bx - 1] is global name)*/
+
+OP_VARARGPREP,/* 	(adjust varargs)				*/
 
 OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
 } OpCode;
@@ -333,7 +371,8 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
   OP_RETURN*, OP_SETLIST) may use 'top'.
 
   (*) In OP_VARARG, if (C == 0) then use actual number of varargs and
-  set top (like in OP_CALL with C == 0).
+  set top (like in OP_CALL with C == 0). 'k' means function has a
+  vararg table, which is in R[B].
 
   (*) In OP_RETURN, if (B == 0) then return up to 'top'.
 
@@ -344,22 +383,27 @@ OP_EXTRAARG/*	Ax	extra (larger) argument for previous opcode	*/
   real C = EXTRAARG _ C (the bits of EXTRAARG concatenated with the
   bits of C).
 
-  (*) In OP_NEWTABLE, B is log2 of the hash size (which is always a
+  (*) In OP_NEWTABLE, vB is log2 of the hash size (which is always a
   power of 2) plus 1, or zero for size zero. If not k, the array size
-  is C. Otherwise, the array size is EXTRAARG _ C.
+  is vC. Otherwise, the array size is EXTRAARG _ vC.
+
+  (*) In OP_ERRNNIL, (Bx == 0) means index of global name doesn't
+  fit in Bx. (So, that name is not available for the error message.)
 
   (*) For comparisons, k specifies what condition the test should accept
   (true or false).
 
   (*) In OP_MMBINI/OP_MMBINK, k means the arguments were flipped
-   (the constant is the first operand).
+  (the constant is the first operand).
 
-  (*) All 'skips' (pc++) assume that next instruction is a jump.
+  (*) All comparison and test instructions assume that the instruction
+  being skipped (pc++) is a jump.
 
   (*) In instructions OP_RETURN/OP_TAILCALL, 'k' specifies that the
   function builds upvalues, which may need to be closed. C > 0 means
-  the function is vararg, so that its 'func' must be corrected before
-  returning; in this case, (C - 1) is its number of fixed parameters.
+  the function has hidden vararg arguments, so that its 'func' must be
+  corrected before returning; in this case, (C - 1) is its number of
+  fixed parameters.
 
   (*) In comparisons with an immediate operand, C signals whether the
   original operand was a float. (It must be corrected in case of
@@ -387,19 +431,9 @@ LUAI_DDEC(const lu_byte luaP_opmodes[NUM_OPCODES];)
 #define testOTMode(m)	(luaP_opmodes[m] & (1 << 6))
 #define testMMMode(m)	(luaP_opmodes[m] & (1 << 7))
 
-/* "out top" (set top for next instruction) */
-#define isOT(i)  \
-	((testOTMode(GET_OPCODE(i)) && GETARG_C(i) == 0) || \
-          GET_OPCODE(i) == OP_TAILCALL)
 
-/* "in top" (uses top from previous instruction) */
-#define isIT(i)		(testITMode(GET_OPCODE(i)) && GETARG_B(i) == 0)
+LUAI_FUNC int luaP_isOT (Instruction i);
+LUAI_FUNC int luaP_isIT (Instruction i);
 
-#define opmode(mm,ot,it,t,a,m)  \
-    (((mm) << 7) | ((ot) << 6) | ((it) << 5) | ((t) << 4) | ((a) << 3) | (m))
-
-
-/* number of list items to accumulate before a SETLIST instruction */
-#define LFIELDS_PER_FLUSH	50
 
 #endif

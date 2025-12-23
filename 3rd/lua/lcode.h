@@ -60,15 +60,20 @@ typedef enum UnOpr { OPR_MINUS, OPR_BNOT, OPR_NOT, OPR_LEN, OPR_NOUNOPR } UnOpr;
 #define luaK_jumpto(fs,t)	luaK_patchlist(fs, luaK_jump(fs), t)
 
 LUAI_FUNC int luaK_code (FuncState *fs, Instruction i);
-LUAI_FUNC int luaK_codeABx (FuncState *fs, OpCode o, int A, unsigned int Bx);
-LUAI_FUNC int luaK_codeABCk (FuncState *fs, OpCode o, int A,
-                                            int B, int C, int k);
+LUAI_FUNC int luaK_codeABx (FuncState *fs, OpCode o, int A, int Bx);
+LUAI_FUNC int luaK_codeABCk (FuncState *fs, OpCode o, int A, int B, int C,
+                                            int k);
+LUAI_FUNC int luaK_codevABCk (FuncState *fs, OpCode o, int A, int B, int C,
+                                             int k);
 LUAI_FUNC int luaK_exp2const (FuncState *fs, const expdesc *e, TValue *v);
 LUAI_FUNC void luaK_fixline (FuncState *fs, int line);
 LUAI_FUNC void luaK_nil (FuncState *fs, int from, int n);
+LUAI_FUNC void luaK_codecheckglobal (FuncState *fs, expdesc *var, int k,
+                                                    int line);
 LUAI_FUNC void luaK_reserveregs (FuncState *fs, int n);
 LUAI_FUNC void luaK_checkstack (FuncState *fs, int n);
 LUAI_FUNC void luaK_int (FuncState *fs, int reg, lua_Integer n);
+LUAI_FUNC void luaK_vapar2local (FuncState *fs, expdesc *var);
 LUAI_FUNC void luaK_dischargevars (FuncState *fs, expdesc *e);
 LUAI_FUNC int luaK_exp2anyreg (FuncState *fs, expdesc *e);
 LUAI_FUNC void luaK_exp2anyregup (FuncState *fs, expdesc *e);
@@ -77,7 +82,6 @@ LUAI_FUNC void luaK_exp2val (FuncState *fs, expdesc *e);
 LUAI_FUNC void luaK_self (FuncState *fs, expdesc *e, expdesc *key);
 LUAI_FUNC void luaK_indexed (FuncState *fs, expdesc *t, expdesc *k);
 LUAI_FUNC void luaK_goiftrue (FuncState *fs, expdesc *e);
-LUAI_FUNC void luaK_goiffalse (FuncState *fs, expdesc *e);
 LUAI_FUNC void luaK_storevar (FuncState *fs, expdesc *var, expdesc *e);
 LUAI_FUNC void luaK_setreturns (FuncState *fs, expdesc *e, int nresults);
 LUAI_FUNC void luaK_setoneret (FuncState *fs, expdesc *e);
@@ -95,7 +99,7 @@ LUAI_FUNC void luaK_settablesize (FuncState *fs, int pc,
                                   int ra, int asize, int hsize);
 LUAI_FUNC void luaK_setlist (FuncState *fs, int base, int nelems, int tostore);
 LUAI_FUNC void luaK_finish (FuncState *fs);
-LUAI_FUNC l_noret luaK_semerror (LexState *ls, const char *msg);
+LUAI_FUNC l_noret luaK_semerror (LexState *ls, const char *fmt, ...);
 
 
 #endif
