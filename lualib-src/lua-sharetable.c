@@ -192,7 +192,7 @@ load_matrixfile(lua_State *L) {
 
 static int
 matrix_from_file(lua_State *L) {
-	lua_State *mL = luaL_newstate();
+	lua_State *mL = lua_newstate(luaL_alloc, NULL, G(L)->seed);
 	if (mL == NULL) {
 		return luaL_error(L, "luaL_newstate failed");
 	}
