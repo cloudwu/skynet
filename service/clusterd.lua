@@ -102,9 +102,9 @@ local function loadconfig(tmp)
 	local reload = {}
 	for name,address in pairs(tmp) do
 		if name:sub(1,2) == "__" then
-			name = name:sub(3)
-			config[name] = address
-			skynet.error(string.format("Config %s = %s", name, address))
+			local opt = name:sub(3)
+			config[opt] = address
+			skynet.error(string.format("Config %s = %s", opt, address))
 		else
 			assert(address == false or type(address) == "string")
 			if node_address[name] ~= address then

@@ -96,10 +96,11 @@ function cmd.QUERY(service_name, subname)
 end
 
 local function list_service()
+	local val
 	local result = {}
 	for k,v in pairs(service) do
 		if type(v) == "string" then
-			v = "Error: " .. v
+			val = "Error: " .. v
 		elseif type(v) == "table" then
 			local querying = {}
 			if v.launch then
@@ -118,12 +119,12 @@ local function list_service()
 					table.insert(querying, skynet.address(detail.source) .. " " .. tostring(skynet.call(detail.source, "debug", "TASK", detail.session)))
 				end
 			end
-			v = table.concat(querying, "\n")
+			val = table.concat(querying, "\n")
 		else
-			v = skynet.address(v)
+			val = skynet.address(v)
 		end
 
-		result[k] = v
+		result[k] = val
 	end
 
 	return result
