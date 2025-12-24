@@ -213,10 +213,11 @@ end
 local function compose_table(lines, msg)
 	local tinsert = table.insert
 	tinsert(lines, count_cache[#msg])
+	local val
 	for _,v in ipairs(msg) do
-		v = tostring(v)
-		tinsert(lines,header_cache[#v])
-		tinsert(lines,v)
+		val = tostring(v)
+		tinsert(lines,header_cache[#val])
+		tinsert(lines,val)
 	end
 	tinsert(lines, "\r\n")
 	return lines

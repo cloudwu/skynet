@@ -40,16 +40,16 @@ local function collect_uv(f , uv, env)
 end
 
 local function collect_all_uv(funcs)
-	local global = {}
+	local globals = {}
 	for _, v in pairs(funcs) do
 		if v[4] then
-			collect_uv(v[4], global, envid(v[4]))
+			collect_uv(v[4], globals, envid(v[4]))
 		end
 	end
-	if not global["_ENV"] then
-		global["_ENV"] = {func = collect_uv, index = 1}
+	if not globals["_ENV"] then
+		globals["_ENV"] = {func = collect_uv, index = 1}
 	end
-	return global
+	return globals
 end
 
 local function loader(source)
@@ -70,40 +70,40 @@ end
 local dummy_env = {}
 for k,v in pairs(_ENV) do dummy_env[k] = v end
 
-local function _patch(global, f)
+local function _patch(globals, f)
 	local i = 1
 	while true do
 		local name, value = debug.getupvalue(f, i)
 		if name == nil then
 			break
 		elseif value == nil or value == dummy_env then
-			local old_uv = global[name]
+			local old_uv = globals[name]
 			if old_uv then
 				debug.upvaluejoin(f, i, old_uv.func, old_uv.index)
 			end
 		else
 			if type(value) == "function" then
-				_patch(global, value)
+				_patch(globals, value)
 			end
 		end
 		i = i + 1
 	end
 end
 
-local function patch_func(funcs, global, group, name, f)
+local function patch_func(funcs, globals, group, name, f)
 	local desc = assert(find_func(funcs, group, name) , string.format("Patch mismatch %s.%s", group, name))
-	_patch(global, f)
+	_patch(globals, f)
 	desc[4] = f
 end
 
 local function inject(funcs, source, ...)
 	local patch = si("patch", dummy_env, loader(source))
-	local global = collect_all_uv(funcs)
+	local globals = collect_all_uv(funcs)
 
 	for _, v in pairs(patch) do
 		local _, group, name, f = table.unpack(v)
 		if f then
-			patch_func(funcs, global, group, name, f)
+			patch_func(funcs, globals, group, name, f)
 		end
 	end
 

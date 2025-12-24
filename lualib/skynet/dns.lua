@@ -130,11 +130,11 @@ local function parse_hosts()
 		end
 
 		for host in hosts:gmatch("%S+") do
-			host = host:lower()
-			local rt = rts[host]
+			local h = host:lower()
+			local rt = rts[h]
 			if not rt then
 				rt = {}
-				rts[host] = rt
+				rts[h] = rt
 			end
 
 			if not rt[family] then
