@@ -68,14 +68,19 @@ end
 local function connect(host, timeout)
 	local protocol
 	protocol, host = check_protocol(host)
-	local hostaddr, port = host:match"([^:]+):?(%d*)$"
+	local hostaddr, port = host:match("%[(.-)%]:?(%d*)$")
+	local ipv6 = true
+	if not hostaddr then
+		hostaddr, port = host:match("([^:]+):?(%d*)$")
+		ipv6 = false
+	end
 	if port == "" then
 		port = protocol=="http" and 80 or protocol=="https" and 443
 	else
 		port = tonumber(port)
 	end
 	local hostname
-	if not hostaddr:match(".*%d+$") then
+	if not ipv6 and not hostaddr:match(".*%d+$") then
 		hostname = hostaddr
 		if async_dns then
 			hostaddr = dns.resolve(hostname)
