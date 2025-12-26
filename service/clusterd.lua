@@ -39,7 +39,8 @@ local function open_channel(t, key)
 	end
 	local succ, err, c
 	if address then
-		local host, port = string.match(address, "([^:]+):(.*)$")
+		local host, port = string.match(address, "(.+):([^:]+)$")
+		host = host:match("^%[(.-)%]$") or host
 		c = node_sender[key]
 		if c == nil then
 			c = skynet.newservice("clustersender", key, nodename, host, port)
@@ -147,6 +148,7 @@ function command.listen(source, addr, port, maxclient)
 	if port == nil then
 		local address = assert(node_address[addr], addr .. " is down")
 		addr, port = string.match(address, "(.+):([^:]+)$")
+		addr = addr:match("^%[(.-)%]$") or addr
 		port = tonumber(port)
 		assert(port ~= 0)
 		skynet.call(gate, "lua", "open", { address = addr, port = port, maxclient = maxclient })

@@ -408,7 +408,8 @@ end
 
 function socket.listen(host, port, backlog)
 	if port == nil then
-		host, port = string.match(host, "([^:]+):(.+)$")
+		host, port = string.match(host, "(.+):([^:]+)$")
+		host = host:match("^%[(.-)%]$") or host
 		port = tonumber(port)
 	end
 	local id = driver.listen(host, port, backlog)
