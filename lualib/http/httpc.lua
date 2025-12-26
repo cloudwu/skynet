@@ -65,30 +65,43 @@ local function gen_interface(protocol, fd, hostname)
 	end
 end
 
+local function parse_host(str)
+    if str:match("^%[.+%]") then
+        return "ipv6", str
+    end
+
+    if str:match("^[%d%.:]+$") then
+        return "ipv4", str
+    end
+
+    local host, port = str:match("^([^:]+):(%d+)$")
+    return "hostname", host or str, port
+end
+
 local function connect(host, timeout)
 	local protocol
 	protocol, host = check_protocol(host)
-	local hostaddr, port = host:match("%[(.-)%]:?(%d*)$")
-	local ipv6 = true
-	if not hostaddr then
-		hostaddr, port = host:match("([^:]+):?(%d*)$")
-		ipv6 = false
-	end
-	if port == "" then
-		port = protocol=="http" and 80 or protocol=="https" and 443
-	else
-		port = tonumber(port)
-	end
+
+	local ntype, port
+	ntype, host, port = parse_host(host)
+
 	local hostname
-	if not ipv6 and not hostaddr:match(".*%d+$") then
-		hostname = hostaddr
-		if async_dns then
-			hostaddr = dns.resolve(hostname)
+	if ntype == "hostname" and async_dns then
+		hostname = host
+		local msg
+		host, msg = dns.resolve(host)
+		if not host then
+			error(string.format("%s dns resolve failed msg:%s", hostname, msg))
 		end
 	end
-	local fd = socket.connect(hostaddr, port, timeout)
+
+	if port == nil and not host:find ":%d+$" then
+		port = protocol=="http" and 80 or protocol=="https" and 443
+	end
+
+	local fd = socket.connect(host, port, timeout)
 	if not fd then
-		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostaddr, port, timeout))
+		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, host, port, timeout))
 	end
 	-- print("protocol hostname port", protocol, hostname, port)
 	local interface = gen_interface(protocol, fd, hostname)
