@@ -484,6 +484,14 @@ function socket.udp_dial(addr, port, callback)
 	return id
 end
 
+function socket.list_socket_pool()
+    local ret = {}
+    for id,_ in pairs(socket_pool) do
+        table.insert(ret,id)
+    end
+    return ret
+end
+
 socket.sendto = assert(driver.udp_send)
 socket.udp_address = assert(driver.udp_address)
 socket.netstat = assert(driver.info)
