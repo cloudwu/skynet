@@ -39,11 +39,9 @@ local function open_channel(t, key)
 	end
 	local succ, err, c
 	if address then
-		local host, port = string.match(address, "(.+):([^:]+)$")
-		host = host:match("^%[(.-)%]$") or host
 		c = node_sender[key]
 		if c == nil then
-			c = skynet.newservice("clustersender", key, nodename, host, port)
+			c = skynet.newservice("clustersender", key, nodename, address)
 			if node_sender[key] then
 				-- double check
 				skynet.kill(c)
@@ -53,14 +51,14 @@ local function open_channel(t, key)
 			end
 		end
 
-		succ = pcall(skynet.call, c, "lua", "changenode", host, port)
+		succ = pcall(skynet.call, c, "lua", "changenode", address)
 
 		if succ then
 			t[key] = c
 			ct.channel = c
                         node_sender_closed[key] = nil
 		else
-			err = string.format("changenode [%s] (%s:%s) failed", key, host, port)
+			err = string.format("changenode [%s] (%s:%s) failed", key, address)
 		end
 	elseif address == false then
 		c = node_sender[key]
@@ -147,11 +145,7 @@ function command.listen(source, addr, port, maxclient)
 	local gate = skynet.newservice("gate")
 	if port == nil then
 		local address = assert(node_address[addr], addr .. " is down")
-		addr, port = string.match(address, "(.+):([^:]+)$")
-		addr = addr:match("^%[(.-)%]$") or addr
-		port = tonumber(port)
-		assert(port ~= 0)
-		skynet.call(gate, "lua", "open", { address = addr, port = port, maxclient = maxclient })
+		skynet.call(gate, "lua", "open", { address = address, port = port, maxclient = maxclient })
 		skynet.ret(skynet.pack(addr, port))
 	else
 		local realaddr, realport = skynet.call(gate, "lua", "open", { address = addr, port = port, maxclient = maxclient })

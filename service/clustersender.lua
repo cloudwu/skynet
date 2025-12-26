@@ -60,10 +60,10 @@ end
 
 function command.changenode(host, port)
 	if not host then
-		skynet.error(string.format("Close cluster sender %s:%d", channel.__host, channel.__port))
+		skynet.error("Close cluster sender", channel.__host, channel.__port)
 		channel:close()
 	else
-		channel:changehost(host, tonumber(port))
+		channel:changehost(host, port)
 		channel:connect(true)
 	end
 	skynet.ret(skynet.pack(nil))
