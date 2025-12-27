@@ -73,7 +73,7 @@ local function connect(host, timeout)
 	if async_dns then
         -- hostname string (ends with ":?%d*") must begin with a substring that doesn't contain colon "[^:]"
         -- and end with a character that is not a colon or a digit "[^%d%]:]".
-        -- hostname not end with ".", pattern [%.] can avoid splitting "127.0.0.1" into "127.0.0." and "1"
+        -- hostname not end with ".", pattern "%." can avoid splitting "127.0.0.1" into "127.0.0." and "1"
         hostname, port = host:match "^([^:]-[^%d%]:%.]):?(%d*)$"
         if hostname then
             local msg
