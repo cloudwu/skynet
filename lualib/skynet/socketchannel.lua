@@ -553,7 +553,9 @@ end
 
 function channel:changehost(host, port)
 	self.__host = host
-	self.__port = port
+    if port then
+		self.__port = port
+    end
 	if not self.__closed then
 		close_channel_socket(self)
 	end
