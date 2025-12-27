@@ -19,19 +19,10 @@ function httpc.dns(server,port)
 	dns.server(server,port)
 end
 
-
 local function check_protocol(host)
-	local protocol = host:match("^[Hh][Tt][Tt][Pp][Ss]?://")
+	local protocol, hostname = host:match "^(%a+)://(.*)"
 	if protocol then
-		host = string.gsub(host, "^"..protocol, "")
-		protocol = string.lower(protocol)
-		if protocol == "https://" then
-			return "https", host
-		elseif protocol == "http://" then
-			return "http", host
-		else
-			error(string.format("Invalid protocol: %s", protocol))
-		end
+		return string.lower(protocol), hostname
 	else
 		return "http", host
 	end
@@ -65,16 +56,30 @@ local function gen_interface(protocol, fd, hostname)
 	end
 end
 
-local function connect(host, timeout)
-	local protocol
-	protocol, host = check_protocol(host)
+local default_port = {
+	http = 80,
+	https = 443,
+}
 
-	local hostname, port
+local function connect(host, timeout)
+	local protocol, port
+	protocol, host = check_protocol(host)
+	if not host:find ":%d+$" then
+		port = default_port[protocol] or error("Invalid protocol: " .. protocol)
+	end
 	if async_dns then
-        -- hostname string (ends with ":?%d*") must begin with a substring that doesn't contain colon "[^:]"
-        -- and end with a character that is not a colon or a digit "[^%d%]:]".
-        -- hostname not end with ".", pattern "%." can avoid splitting "127.0.0.1" into "127.0.0." and "1"
-        hostname, port = host:match "^([^:]-[^%d%]:%.]):?(%d*)$"
+		local hostname
+		if port then -- without :%d+$
+			-- if ipv6, contains colons
+			-- if ipv4, end with a digit
+			if host:find "^[^:]-[^%d]$" then
+				hostname = host
+			end
+		else -- with :%d+$ (port)
+			-- hostname string (ends with ":%d+") must begin with a substring that doesn't contain colon "[^:]"
+			-- and end with a character that is not a colon or a digit "[^%d%]]".
+			hostname, port = host:match "^([^:]-[^%d%]]):(%d+)$"
+		end
         if hostname then
             local msg
             host, msg = dns.resolve(hostname)
@@ -84,15 +89,10 @@ local function connect(host, timeout)
         end
 	end
 
-	if port == "" or (port == nil and not host:find ":%d+$") then
-		port = protocol=="http" and 80 or protocol=="https" and 443
-	end
-
 	local fd = socket.connect(host, port, timeout)
 	if not fd then
 		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, host, port, timeout))
 	end
-	-- print("protocol hostname port", protocol, hostname, port)
 	local interface = gen_interface(protocol, fd, hostname)
 	if timeout then
 		skynet.timeout(timeout, function()
