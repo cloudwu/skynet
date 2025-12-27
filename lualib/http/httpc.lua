@@ -68,22 +68,29 @@ end
 local function connect(host, timeout)
 	local protocol
 	protocol, host = check_protocol(host)
-	local hostaddr, port = host:match"([^:]+):?(%d*)$"
-	if port == "" then
+
+	local hostname, port
+	if async_dns then
+        -- hostname string (ends with ":?%d*") must begin with a substring that doesn't contain colon "[^:]"
+        -- and end with a character that is not a colon or a digit "[^%d%]:]".
+        -- hostname not end with ".", pattern "%." can avoid splitting "127.0.0.1" into "127.0.0." and "1"
+        hostname, port = host:match "^([^:]-[^%d%]:%.]):?(%d*)$"
+        if hostname then
+            local msg
+            host, msg = dns.resolve(hostname)
+            if not host then
+                error(string.format("%s dns resolve failed msg:%s", hostname, msg))
+            end
+        end
+	end
+
+	if port == "" or (port == nil and not host:find ":%d+$") then
 		port = protocol=="http" and 80 or protocol=="https" and 443
-	else
-		port = tonumber(port)
 	end
-	local hostname
-	if not hostaddr:match(".*%d+$") then
-		hostname = hostaddr
-		if async_dns then
-			hostaddr = dns.resolve(hostname)
-		end
-	end
-	local fd = socket.connect(hostaddr, port, timeout)
+
+	local fd = socket.connect(host, port, timeout)
 	if not fd then
-		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostaddr, port, timeout))
+		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, host, port, timeout))
 	end
 	-- print("protocol hostname port", protocol, hostname, port)
 	local interface = gen_interface(protocol, fd, hostname)

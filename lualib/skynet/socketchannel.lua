@@ -26,7 +26,7 @@ socket_channel.error = socket_error
 function socket_channel.channel(desc)
 	local c = {
 		__host = assert(desc.host),
-		__port = assert(desc.port),
+		__port = desc.port,
 		__backup = desc.backup,
 		__auth = desc.auth,
 		__response = desc.response,	-- It's for session mode
@@ -328,7 +328,7 @@ local function connect_once(self)
 							self.__overload = true
 							overload(true)
 						else
-							skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d %s:%s)", size, id, self.__host, self.__port))
+							skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id), self.__host, self.__port)
 						end
 					end
 				end
@@ -464,7 +464,7 @@ local function block_connect(self, once)
 
 	r = check_connection(self)
 	if r == nil then
-		skynet.error(string.format("Connect to %s:%d failed (%s)", self.__host, self.__port, err))
+		skynet.error("Connect failed", err, self.__host, self.__port)
 		error(socket_error)
 	else
 		return r
@@ -553,9 +553,9 @@ end
 
 function channel:changehost(host, port)
 	self.__host = host
-	if port then
+    if port then
 		self.__port = port
-	end
+    end
 	if not self.__closed then
 		close_channel_socket(self)
 	end

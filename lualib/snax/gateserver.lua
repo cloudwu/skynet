@@ -39,10 +39,10 @@ function gateserver.start(handler)
 	function CMD.open( source, conf )
 		assert(not socket)
 		local address = conf.address or "0.0.0.0"
-		local port = assert(conf.port)
+		local port = conf.port
 		maxclient = conf.maxclient or 1024
 		nodelay = conf.nodelay
-		skynet.error(string.format("Listen on %s:%d", address, port))
+		skynet.error("Listen on", address, port)
 		socket = socketdriver.listen(address, port, conf.backlog)
 		listen_context.co = coroutine.running()
 		listen_context.fd = socket
