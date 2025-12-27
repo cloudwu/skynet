@@ -65,37 +65,26 @@ local function gen_interface(protocol, fd, hostname)
 	end
 end
 
-local function parse_host(str)
-    if str:match("^%[.+%]") then
-        return "ipv6", str
-    end
-
-    if str:match("^[%d%.:]+$") then
-        return "ipv4", str
-    end
-
-    local host, port = str:match("^([^:]+):(%d+)$")
-    return "hostname", host or str, port
-end
-
 local function connect(host, timeout)
 	local protocol
 	protocol, host = check_protocol(host)
 
-	local ntype, port
-	ntype, host, port = parse_host(host)
-
-	local hostname
-	if ntype == "hostname" and async_dns then
-		hostname = host
-		local msg
-		host, msg = dns.resolve(host)
-		if not host then
-			error(string.format("%s dns resolve failed msg:%s", hostname, msg))
-		end
+	local hostname, port
+	if async_dns then
+        -- hostname string (ends with ":?%d*") must begin with a substring that doesn't contain colon "[^:]"
+        -- and end with a character that is not a colon or a digit "[^%d%]:]".
+        -- hostname not end with ".", pattern [%.] can avoid splitting "127.0.0.1" into "127.0.0." and "1"
+        hostname, port = host:match "^([^:]-[^%d%]:%.]):?(%d*)$"
+        if hostname then
+            local msg
+            host, msg = dns.resolve(hostname)
+            if not host then
+                error(string.format("%s dns resolve failed msg:%s", hostname, msg))
+            end
+        end
 	end
 
-	if port == nil and not host:find ":%d+$" then
+	if port == "" or (port == nil and not host:find ":%d+$") then
 		port = protocol=="http" and 80 or protocol=="https" and 443
 	end
 
