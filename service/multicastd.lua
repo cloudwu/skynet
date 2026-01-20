@@ -139,21 +139,18 @@ end
 -- If the channel is remote, node subscribe it by send a SUBR to the owner .
 function command.SUB(source, c)
 	local node = c % 256
-	if node ~= harbor_id then
+	if node ~= harbor_id and channel[c] == nil then
 		-- remote group
-		if channel[c] == nil then
-			if skynet.call(node_address[node], "lua", "SUBR", c) then
-				return
-			end
-			if channel[c] == nil then
-				-- double check, because skynet.call whould yield, other SUB may occur.
-				channel[c] = {}
-				channel_n[c] = 0
-			end
-		end
+        if skynet.call(node_address[node], "lua", "SUBR", c) then return end
 	end
+    -- Auto create channel if not exists
 	local group = channel[c]
-	if group and not group[source] then
+    if group == nil then
+        channel[c] = {}
+        channel_n[c] = 0
+        group = channel[c]
+    end
+	if not group[source] then
 		channel_n[c] = channel_n[c] + 1
 		group[source] = true
 	end
