@@ -1,0 +1,1 @@
+curl -L -X POST "https://siasky.net/skynet/skyfile/<siapath>" -F 'file=@image.jpg'
