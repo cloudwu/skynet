@@ -126,8 +126,8 @@ void usleep(size_t us) {
     }
 }
 
-void sleep(size_t ms) {
-    Sleep(ms);
+void sleep(size_t sec) {
+    Sleep(sec * 1000UL);
 }
 
 int clock_gettime(int what, struct timespec* ti) {
