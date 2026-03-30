@@ -84,10 +84,10 @@ local function connect(host, timeout)
 	local protocol, host, port = check_protocol(host)
 	local hostaddr = host
 	local hostname
-	if host:find "^[^:]-%D$" then
+	if not host:match("^[%d%.]+$") and not host:find(":") then
 		-- it's a hostname (not ip address), because
-		--   ipv6 contains colons
-		--   ipv4 end with a digit
+		--	ipv4 only contains digits and dots
+		--	ipv6 contains colons
 		hostname = host
 		if async_dns then
 			local msg
