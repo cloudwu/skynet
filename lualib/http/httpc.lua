@@ -23,24 +23,33 @@ local default_port = {
 	https = 443,
 }
 
-local function hostname_port(host)
-	if host:find ".*:.*:" then
-		-- If host contains 2 or more ":", it's ipv6 address
-		local ipv6, port = host:match "^%[(.-)%]:(%d+)$"
+local function parse_host(host)
+	local colon1 = host:find(":", 1, true)
+	if not colon1 then
+		-- no colon: bare hostname or bare ipv4
+		local htype = host:find("^%d+%.%d+%.%d+%.%d+$") and "ipv4" or "hostname"
+		return host, nil, htype
+	end
+
+	if host:find(":", colon1 + 1, true) then
+		-- two or more colons: ipv6
+		local ipv6, port = host:match("^%[(.-)%]:(%d+)$")
 		if ipv6 then
-			return ipv6, port
-		else
-			return host
+			return ipv6, tonumber(port), "ipv6"
 		end
+		return host, nil, "ipv6"
 	end
-	local hostname, port = host:match "(.-):(%d+)$"
-	if hostname then
-		return hostname, port
+
+	-- single colon: host:port
+	local h, port = host:match("^(.-):(%d+)$")
+	if h then
+		local htype = h:find("^%d+%.%d+%.%d+%.%d+$") and "ipv4" or "hostname"
+		return h, tonumber(port), htype
 	end
-	return host
+	return host, nil, "hostname"
 end
 
-local function check_protocol(host)
+local function parse_url(host)
 	local protocol, hostname = host:match "^(%a+)://(.*)"
 	if protocol then
 		protocol = string.lower(protocol)
@@ -48,8 +57,9 @@ local function check_protocol(host)
 		protocol = "http"
 		hostname = host
 	end
-	hostname, port = hostname_port(hostname)
-	return protocol, hostname, port or default_port[protocol] or error("Invalid protocol: " .. protocol)
+	local htype
+	hostname, port, htype = parse_host(hostname)
+	return protocol, hostname, port or default_port[protocol] or error("Invalid protocol: " .. protocol), htype
 end
 
 local SSLCTX_CLIENT = nil
@@ -81,28 +91,23 @@ local function gen_interface(protocol, fd, hostname)
 end
 
 local function connect(host, timeout)
-	local protocol, host, port = check_protocol(host)
-	local hostaddr = host
-	local hostname
-	if not host:match("^[%d%.]+$") and not host:find(":") then
-		-- it's a hostname (not ip address), because
-		--	ipv4 only contains digits and dots
-		--	ipv6 contains colons
-		hostname = host
+	local protocol, hostname, port, htype = parse_url(host)
+	local hostaddr = hostname
+	if htype == "hostname" then
 		if async_dns then
 			local msg
-			hostaddr, msg = dns.resolve(host)
+			hostaddr, msg = dns.resolve(hostname)
 			if not hostaddr then
-				error(string.format("%s dns resolve failed msg:%s", host, msg))
+				error(string.format("%s dns resolve failed msg:%s", hostname, msg))
 			end
 		end
 	end
 
 	local fd = socket.connect(hostaddr, port, timeout)
 	if not fd then
-		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, host, port, timeout))
+		error(string.format("%s connect error host:%s, port:%s, timeout:%s", protocol, hostname, port, timeout))
 	end
-	local interface = gen_interface(protocol, fd, hostname)
+	local interface = gen_interface(protocol, fd, htype == "hostname" and hostname or nil)
 	if timeout then
 		skynet.timeout(timeout, function()
 			if not interface.finish then
