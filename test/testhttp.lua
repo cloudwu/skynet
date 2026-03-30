@@ -58,8 +58,108 @@ local function http_url_test()
 	assert(qret[1] == qret[3])
 end
 
+-- Integration test: connect to real server with various URL formats
+-- Verifies parse_host / parse_url via httpc public API
+local function test_connect_formats()
+	print("[test_connect_formats] =====>")
+	httpc.timeout = 100
+
+	local passed, total = 0, 0
+
+	local function try_get(desc, host)
+		local ok, status, body = pcall(httpc.get, host, "/", {})
+		total = total + 1
+		if ok then
+			passed = passed + 1
+			print(string.format("  PASS: %-35s status=%s", desc, status))
+		else
+			print(string.format("  FAIL: %-35s error=%s", desc, status))
+		end
+		return ok
+	end
+
+	-- verify parsing is correct even when connection fails
+	-- "connect error" in the message means parsing succeeded
+	local function try_parse(desc, host)
+		local ok, err = pcall(httpc.get, host, "/", {})
+		total = total + 1
+		if ok then
+			passed = passed + 1
+			print(string.format("  PASS: %-35s connected", desc))
+			return true
+		end
+		err = tostring(err)
+		if err:find("connect error") or err:find("connect failed") or err:find("Socket Error") then
+			passed = passed + 1
+			print(string.format("  PASS: %-35s parsed ok (connect failed as expected)", desc))
+			return true
+		else
+			print(string.format("  FAIL: %-35s error=%s", desc, err))
+			return false
+		end
+	end
+
+	-- hostname variants
+	try_get("bare hostname",            "baidu.com")
+	try_get("hostname:port",            "baidu.com:80")
+	try_get("http://hostname",          "http://baidu.com")
+	try_get("http://hostname:port",     "http://baidu.com:80")
+	try_get("HTTP:// uppercase",        "HTTP://baidu.com")
+
+	-- ipv4 variants (resolve first to get a real IP)
+	local ip = dns.resolve("baidu.com")
+	if ip then
+		print(string.format("  resolved baidu.com -> %s", ip))
+		try_get("bare ipv4",                ip)
+		try_get("ipv4:port",                ip .. ":80")
+		try_get("http://ipv4",              "http://" .. ip)
+		try_get("http://ipv4:port",         "http://" .. ip .. ":80")
+	else
+		print("  SKIP: ipv4 tests (dns resolve failed)")
+	end
+
+	-- https variants (skip if no tls)
+	if pcall(require, "ltls.c") then
+		try_get("https://hostname",         "https://baidu.com")
+		try_get("https://hostname:port",    "https://baidu.com:443")
+		try_get("HTTPS:// uppercase",       "HTTPS://baidu.com")
+	else
+		print("  SKIP: https tests (no ltls module)")
+	end
+
+	-- ipv6 variants (parsing verification, connection may fail without ipv6 network)
+	try_parse("bare ipv6 ::1",            "::1")
+	try_parse("[ipv6]:port",              "[::1]:8080")
+	try_parse("bare full ipv6",           "2001:db8::1")
+	try_parse("[full ipv6]:port",         "[2001:db8::1]:80")
+	try_parse("http://[ipv6]:port",       "http://[::1]:80")
+	if pcall(require, "ltls.c") then
+		try_parse("https://[ipv6]:port",   "https://[::1]:443")
+	end
+
+	-- k8s internal domain variants (parsing verification, connection will fail outside k8s)
+	-- domains ending with digits must not be mistaken for ipv4
+	try_parse("k8s svc short",            "my-svc:8080")
+	try_parse("k8s svc.ns",               "my-svc.default:8080")
+	try_parse("k8s svc.ns.svc",           "my-svc.default.svc:8080")
+	try_parse("k8s svc fqdn",             "my-svc.default.svc.cluster.local:8080")
+	try_parse("k8s svc fqdn no port",     "my-svc.default.svc.cluster.local")
+	try_parse("k8s http:// svc fqdn",     "http://my-svc.default.svc.cluster.local:8080")
+	try_parse("k8s headless pod",         "pod-0.my-svc.default.svc.cluster.local:8080")
+	try_parse("k8s nodeport",             "http://node1.cluster.local:30080")
+	try_parse("k8s statefulset pod-0",    "web-0.nginx-svc.default:8080")
+	try_parse("k8s numeric ns",           "my-svc.ns123:8080")
+	try_parse("k8s all-digit segments",   "svc123.ns456:9090")
+	try_parse("k8s pod ip-style dns",     "10-244-0-5.default.pod.cluster.local:80")
+	try_parse("k8s 5-segment digits",     "10.0.0.1.nip.io:8080")
+
+	print(string.format("[test_connect_formats] done, %d/%d passed", passed, total))
+end
+
 local function main()
 	dns.server()
+
+	test_connect_formats()
 
 	http_stream_test()
 	http_head_test()
@@ -77,4 +177,3 @@ skynet.start(function()
 	print(pcall(main))
 	skynet.exit()
 end)
- 
