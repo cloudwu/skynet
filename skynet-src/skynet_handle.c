@@ -4,10 +4,20 @@
 #include "skynet_imp.h"
 #include "skynet_server.h"
 #include "rwlock.h"
+#include "spinlock.h"
 
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
+#define HANDLE_CACHE_LINE 64
+
+struct handle_reader_slot {
+	ATOM_INT active;
+	char _pad[HANDLE_CACHE_LINE - sizeof(ATOM_INT)];
+};
+
+static _Thread_local int TLS_SLOT_IDX = -1;
 
 #define DEFAULT_SLOT_SIZE 4
 #define MAX_SLOT_SIZE 0x40000000
@@ -28,15 +38,60 @@ struct handle_storage {
 	int name_cap;
 	int name_count;
 	struct handle_name *name;
+
+	// distributed reader slots
+	ATOM_INT thread_idx;
+	int rslot_count;
+	struct handle_reader_slot *rslots;
 };
 
 static struct handle_storage *H = NULL;
+
+static inline void
+handle_rlock(struct handle_storage *s) {
+	if (TLS_SLOT_IDX >= 0 && TLS_SLOT_IDX < s->rslot_count) {
+		for (;;) {
+			ATOM_STORE(&s->rslots[TLS_SLOT_IDX].active, 1);
+			if (!ATOM_LOAD(&s->lock.write)) {
+				break;
+			}
+			// Writer present — back off to avoid deadlock
+			ATOM_STORE(&s->rslots[TLS_SLOT_IDX].active, 0);
+			while (ATOM_LOAD(&s->lock.write)) { atomic_pause_(); }
+		}
+	} else {
+		rwlock_rlock(&s->lock);
+	}
+}
+
+static inline void
+handle_runlock(struct handle_storage *s) {
+	if (TLS_SLOT_IDX >= 0 && TLS_SLOT_IDX < s->rslot_count) {
+		ATOM_STORE(&s->rslots[TLS_SLOT_IDX].active, 0);
+	} else {
+		rwlock_runlock(&s->lock);
+	}
+}
+
+static inline void
+handle_wlock(struct handle_storage *s) {
+	rwlock_wlock(&s->lock);
+	// Additionally wait for all slot readers
+	for (int i = 0; i < s->rslot_count; i++) {
+		while (ATOM_LOAD(&s->rslots[i].active)) { atomic_pause_(); }
+	}
+}
+
+static inline void
+handle_wunlock(struct handle_storage *s) {
+	rwlock_wunlock(&s->lock);
+}
 
 uint32_t
 skynet_handle_register(struct skynet_context *ctx) {
 	struct handle_storage *s = H;
 
-	rwlock_wlock(&s->lock);
+	handle_wlock(s);
 
 	for (;;) {
 		int i;
@@ -51,7 +106,7 @@ skynet_handle_register(struct skynet_context *ctx) {
 				s->slot[hash] = ctx;
 				s->handle_index = handle + 1;
 
-				rwlock_wunlock(&s->lock);
+				handle_wunlock(s);
 
 				handle |= s->harbor;
 				return handle;
@@ -78,7 +133,7 @@ skynet_handle_retire(uint32_t handle) {
 	int ret = 0;
 	struct handle_storage *s = H;
 
-	rwlock_wlock(&s->lock);
+	handle_wlock(s);
 
 	uint32_t hash = handle & (s->slot_size-1);
 	struct skynet_context * ctx = s->slot[hash];
@@ -102,7 +157,7 @@ skynet_handle_retire(uint32_t handle) {
 		ctx = NULL;
 	}
 
-	rwlock_wunlock(&s->lock);
+	handle_wunlock(s);
 
 	if (ctx) {
 		// release ctx may call skynet_handle_* , so wunlock first.
@@ -119,14 +174,14 @@ skynet_handle_retireall() {
 		int n=0;
 		int i;
 		for (i=0;i<s->slot_size;i++) {
-			rwlock_rlock(&s->lock);
+			handle_rlock(s);
 			struct skynet_context * ctx = s->slot[i];
 			uint32_t handle = 0;
 			if (ctx) {
 				handle = skynet_context_handle(ctx);
 				++n;
 			}
-			rwlock_runlock(&s->lock);
+			handle_runlock(s);
 			if (handle != 0) {
 				skynet_handle_retire(handle);
 			}
@@ -141,7 +196,7 @@ skynet_handle_grab(uint32_t handle) {
 	struct handle_storage *s = H;
 	struct skynet_context * result = NULL;
 
-	rwlock_rlock(&s->lock);
+	handle_rlock(s);
 
 	uint32_t hash = handle & (s->slot_size-1);
 	struct skynet_context * ctx = s->slot[hash];
@@ -150,7 +205,7 @@ skynet_handle_grab(uint32_t handle) {
 		skynet_context_grab(result);
 	}
 
-	rwlock_runlock(&s->lock);
+	handle_runlock(s);
 
 	return result;
 }
@@ -159,7 +214,7 @@ uint32_t
 skynet_handle_findname(const char * name) {
 	struct handle_storage *s = H;
 
-	rwlock_rlock(&s->lock);
+	handle_rlock(s);
 
 	uint32_t handle = 0;
 
@@ -180,7 +235,7 @@ skynet_handle_findname(const char * name) {
 		}
 	}
 
-	rwlock_runlock(&s->lock);
+	handle_runlock(s);
 
 	return handle;
 }
@@ -237,17 +292,25 @@ _insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
 
 const char *
 skynet_handle_namehandle(uint32_t handle, const char *name) {
-	rwlock_wlock(&H->lock);
+	handle_wlock(H);
 
 	const char * ret = _insert_name(H, name, handle);
 
-	rwlock_wunlock(&H->lock);
+	handle_wunlock(H);
 
 	return ret;
 }
 
 void
-skynet_handle_init(int harbor) {
+skynet_handle_register_thread(void) {
+	int idx = ATOM_FINC(&H->thread_idx);
+	if (idx < H->rslot_count) {
+		TLS_SLOT_IDX = idx;
+	}
+}
+
+void
+skynet_handle_init(int harbor, int thread) {
 	assert(H==NULL);
 	struct handle_storage * s = skynet_malloc(sizeof(*H));
 	s->slot_size = DEFAULT_SLOT_SIZE;
@@ -255,6 +318,14 @@ skynet_handle_init(int harbor) {
 	memset(s->slot, 0, s->slot_size * sizeof(struct skynet_context *));
 
 	rwlock_init(&s->lock);
+
+	// Distributed reader slots: workers + monitor + timer + socket
+	s->rslot_count = thread + 3;
+	size_t rslot_sz = (size_t)s->rslot_count * sizeof(struct handle_reader_slot);
+	s->rslots = (struct handle_reader_slot *)skynet_malloc(rslot_sz);
+	memset(s->rslots, 0, rslot_sz);
+	ATOM_INIT(&s->thread_idx, 0);
+
 	// reserve 0 for system
 	s->harbor = (uint32_t) (harbor & 0xff) << HANDLE_REMOTE_SHIFT;
 	s->handle_index = 1;
