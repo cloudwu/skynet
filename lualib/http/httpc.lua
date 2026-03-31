@@ -33,9 +33,9 @@ local function parse_host(host)
 
 	if host:find(":", colon1 + 1, true) then
 		-- two or more colons: ipv6
-		local ipv6, port = host:match("^%[(.-)%]:(%d+)$")
+		local ipv6, port = host:match("^%[(.-)%]:?(%d*)$")
 		if ipv6 then
-			return ipv6, tonumber(port), "ipv6"
+			return ipv6, port ~= "" and tonumber(port) or nil, "ipv6"
 		end
 		error(string.format("Invalid host: bare IPv6 address '%s', use '[%s]' instead", host, host))
 	end

@@ -99,6 +99,25 @@ local function test_connect_formats()
 		end
 	end
 
+	-- verify that invalid input is properly rejected
+	local function try_error(desc, host, pattern)
+		local ok, err = pcall(httpc.get, host, "/", {})
+		total = total + 1
+		if ok then
+			print(string.format("  FAIL: %-35s expected error but succeeded", desc))
+			return false
+		end
+		err = tostring(err)
+		if err:find(pattern) then
+			passed = passed + 1
+			print(string.format("  PASS: %-35s rejected as expected", desc))
+			return true
+		else
+			print(string.format("  FAIL: %-35s wrong error=%s", desc, err))
+			return false
+		end
+	end
+
 	-- hostname variants
 	try_get("bare hostname",            "baidu.com")
 	try_get("hostname:port",            "baidu.com:80")
@@ -127,14 +146,32 @@ local function test_connect_formats()
 		print("  SKIP: https tests (no ltls module)")
 	end
 
-	-- ipv6 variants (parsing verification, connection may fail without ipv6 network)
-	try_parse("bare ipv6 ::1",            "::1")
+	-- bare ipv6 should be rejected (RFC 3986: brackets required)
+	try_error("bare ipv6 ::1 (reject)",    "::1",         "bare IPv6")
+	try_error("bare full ipv6 (reject)",   "2001:db8::1", "bare IPv6")
+
+	-- bracketed ipv6 (parsing verification, connection may fail without ipv6 network)
+	try_parse("[ipv6] no port",            "[::1]")
 	try_parse("[ipv6]:port",              "[::1]:8080")
-	try_parse("bare full ipv6",           "2001:db8::1")
+	try_parse("[full ipv6] no port",      "[2001:db8::1]")
 	try_parse("[full ipv6]:port",         "[2001:db8::1]:80")
+	try_parse("http://[ipv6]",            "http://[::1]")
 	try_parse("http://[ipv6]:port",       "http://[::1]:80")
 	if pcall(require, "ltls.c") then
 		try_parse("https://[ipv6]:port",   "https://[::1]:443")
+	end
+
+	-- ipv6 real connection test via AAAA DNS resolution
+	local ok_aaaa, ipv6 = pcall(dns.resolve, "ipv6.google.com", true)
+	if ok_aaaa and ipv6 then
+		local ipv6_host = string.format("[%s]", ipv6)
+		print(string.format("  resolved ipv6.google.com AAAA -> %s", ipv6))
+		try_parse("[ipv6] from AAAA",          ipv6_host)
+		try_parse("[ipv6]:80 from AAAA",       ipv6_host .. ":80")
+		try_parse("http://[ipv6] from AAAA",    "http://" .. ipv6_host)
+		try_parse("http://[ipv6]:80 from AAAA", "http://" .. ipv6_host .. ":80")
+	else
+		print("  SKIP: ipv6 AAAA tests (dns resolve failed for ipv6.google.com)")
 	end
 
 	-- k8s internal domain variants (parsing verification, connection will fail outside k8s)
