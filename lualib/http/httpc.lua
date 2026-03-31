@@ -121,7 +121,7 @@ local function connect(host, timeout)
 		end)
 	end
 	if interface.init then
-		interface.init(hostname)
+		interface.init(htype == "hostname" and hostname or nil)
 	end
 	return fd, interface, hostheader
 end
