@@ -17,6 +17,7 @@ void skynet_handle_retireall();
 uint32_t skynet_handle_findname(const char * name);
 const char * skynet_handle_namehandle(uint32_t handle, const char *name);
 
-void skynet_handle_init(int harbor);
+void skynet_handle_init(int harbor, int thread);
+void skynet_handle_register_thread();
 
 #endif
