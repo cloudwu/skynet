@@ -33,11 +33,11 @@ local function parse_host(host)
 
 	if host:find(":", colon1 + 1, true) then
 		-- two or more colons: ipv6
-		local ipv6, port = host:match("^%[(.-)%]:(%d+)$")
+		local ipv6, port = host:match("^%[(.-)%]:?(%d*)$")
 		if ipv6 then
-			return ipv6, tonumber(port), "ipv6"
+			return ipv6, port ~= "" and tonumber(port) or nil, "ipv6"
 		end
-		return host, nil, "ipv6"
+		error(string.format("Invalid host: bare IPv6 address '%s', use '[%s]' instead", host, host))
 	end
 
 	-- single colon: host:port
@@ -57,9 +57,14 @@ local function parse_url(host)
 		protocol = "http"
 		hostname = host
 	end
-	local htype
+	local hostheader = hostname
+	local htype, port
 	hostname, port, htype = parse_host(hostname)
-	return protocol, hostname, port or default_port[protocol] or error("Invalid protocol: " .. protocol), htype
+	port = port or default_port[protocol]
+	if not port then
+		error("Invalid protocol: " .. protocol)
+	end
+	return protocol, hostname, port, htype, hostheader
 end
 
 local SSLCTX_CLIENT = nil
@@ -91,7 +96,7 @@ local function gen_interface(protocol, fd, hostname)
 end
 
 local function connect(host, timeout)
-	local protocol, hostname, port, htype = parse_url(host)
+	local protocol, hostname, port, htype, hostheader = parse_url(host)
 	local hostaddr = hostname
 	if htype == "hostname" then
 		if async_dns then
@@ -116,9 +121,9 @@ local function connect(host, timeout)
 		end)
 	end
 	if interface.init then
-		interface.init(host)
+		interface.init(htype == "hostname" and hostname or nil)
 	end
-	return fd, interface, host
+	return fd, interface, hostheader
 end
 
 local function close_interface(interface, fd)
