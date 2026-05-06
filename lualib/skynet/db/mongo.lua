@@ -627,6 +627,11 @@ function mongo_cursor:maxTimeMS(ms)
 	return self
 end
 
+function mongo_cursor:batchSize(amount)
+    self.__batchSize = amount
+    return self
+end
+
 local opt_func = {}
 
 local function opt_define(name)
@@ -645,6 +650,7 @@ opt_define "skip"
 opt_define "limit"
 opt_define "hint"
 opt_define "maxTimeMS"
+opt_define "batchSize"
 
 local function add_opt(self, opt, ...)
 	if opt == nil then
@@ -807,11 +813,16 @@ function mongo_cursor:hasNext()
 		if self.__data == nil then
 			local name = self.__collection.name
 			response = database:runCommand("find", name, "filter", self.__query, "sort", self.__sort,
-				"projection", self.__projection, add_opt(self, "skip", "limit", "hint", "maxTimeMS"))
+				"projection", self.__projection, add_opt(self, "skip", "limit", "hint", "maxTimeMS", "batchSize"))
 		else
 			if self.__cursor  and self.__cursor > 0 then
 				local name = self.__collection.name
-				response = database:runCommand("getMore", bson_int64(self.__cursor), "collection", name)
+				local bz = self.__batchSize
+				if bz and bz > 0 then
+				    response = database:runCommand("getMore", bson_int64(self.__cursor), "collection", name, "batchSize", bz)
+				else
+				    response = database:runCommand("getMore", bson_int64(self.__cursor), "collection", name)
+				end
 			else
 				-- no more
 				self.__document	= nil
