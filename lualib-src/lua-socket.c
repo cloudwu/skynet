@@ -489,9 +489,6 @@ llisten(lua_State *L) {
 	char tmp[sz];
 	int port = 0;
 	const char * host = address_port(L, tmp, addr, 2, &port);
-	if (port == 0) {
-		return luaL_error(L, "Invalid port");
-	}
 	int backlog = luaL_optinteger(L,3,BACKLOG);
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = skynet_socket_listen(ctx, host,port,backlog);
