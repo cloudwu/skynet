@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <assert.h>
+#include <errno.h>
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -411,6 +412,20 @@ lunpack(lua_State *L) {
 	return 4;
 }
 
+static int
+parse_port(lua_State *L, const char *s, const char *addr) {
+	errno = 0;
+
+	char *endptr;
+	unsigned long port = strtoul(s, &endptr, 10);
+
+	if (errno != 0 || endptr == s || *endptr != '\0' || port > UINT16_MAX) {
+		luaL_error(L, "Invalid port in address %s.", addr);
+	}
+
+	return (int)port;
+}
+
 static const char *
 address_port(lua_State *L, char *tmp, const char * addr, int port_index, int *port) {
 	const char * host;
@@ -430,7 +445,7 @@ address_port(lua_State *L, char *tmp, const char * addr, int port_index, int *po
 			if (sep == NULL) {
 				luaL_error(L, "Invalid address %s.",addr);
 			}
-			*port = strtoul(sep+1,NULL,10);
+			*port = parse_port(L, sep + 1, addr);
 		} else {
 			// is ipv4
 			const char * sep = strchr(addr,':');
@@ -440,7 +455,7 @@ address_port(lua_State *L, char *tmp, const char * addr, int port_index, int *po
 			memcpy(tmp, addr, sep-addr);
 			tmp[sep-addr] = '\0';
 			host = tmp;
-			*port = strtoul(sep+1,NULL,10);
+			*port = parse_port(L, sep + 1, addr);
 		}
 	} else {
 		host = addr;
@@ -489,9 +504,6 @@ llisten(lua_State *L) {
 	char tmp[sz];
 	int port = 0;
 	const char * host = address_port(L, tmp, addr, 2, &port);
-	if (port == 0) {
-		return luaL_error(L, "Invalid port");
-	}
 	int backlog = luaL_optinteger(L,3,BACKLOG);
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = skynet_socket_listen(ctx, host,port,backlog);
