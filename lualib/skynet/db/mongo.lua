@@ -217,7 +217,8 @@ function mongo_client:disconnect()
 end
 
 function mongo_client:genId()
-	local id = self.__id + 1
+	-- id should be int32, See https://github.com/cloudwu/skynet/issues/2155
+	local id = (self.__id + 1) & 0x7fffffff
 	self.__id =	id
 	return id
 end
