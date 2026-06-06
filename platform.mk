@@ -1,5 +1,5 @@
 PLAT ?= none
-PLATS = linux freebsd macosx mingw
+PLATS = linux freebsd openbsd macosx mingw
 
 CC ?= gcc
 
@@ -25,6 +25,7 @@ EXPORT := -Wl,-E
 linux : PLAT = linux
 macosx : PLAT = macosx
 freebsd : PLAT = freebsd
+openbsd : PLAT = openbsd
 mingw : PLAT = mingw
 
 macosx : SHARED := -fPIC -dynamiclib -Wl,-undefined,dynamic_lookup
@@ -34,10 +35,10 @@ linux freebsd : SKYNET_LIBS += -lrt
 
 # Turn off jemalloc and malloc hook on macosx
 
-macosx : MALLOC_STATICLIB :=
-macosx : SKYNET_DEFINES :=-DNOUSE_JEMALLOC
+openbsd macosx : MALLOC_STATICLIB :=
+openbsd macosx : SKYNET_DEFINES :=-DNOUSE_JEMALLOC
 
-linux macosx freebsd :
+linux macosx freebsd openbsd :
 	$(MAKE) all PLAT=$@ SKYNET_LIBS="$(SKYNET_LIBS)" SHARED="$(SHARED)" EXPORT="$(EXPORT)" MALLOC_STATICLIB="$(MALLOC_STATICLIB)" SKYNET_DEFINES="$(SKYNET_DEFINES)"
 
 mingw :

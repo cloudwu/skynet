@@ -6,6 +6,7 @@
 #include "spinlock.h"
 
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <unistd.h>
