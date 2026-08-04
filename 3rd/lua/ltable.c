@@ -1200,6 +1200,8 @@ void luaH_finishset (lua_State *L, Table *t, const TValue *key,
 ** barrier and invalidate the TM cache.
 */
 void luaH_set (lua_State *L, Table *t, const TValue *key, TValue *value) {
+  if (l_unlikely(isshared(t)))
+    luaG_runerror(L, "attempt to change a shared table");
   int hres = luaH_pset(t, key, value);
   if (hres != HOK)
     luaH_finishset(L, t, key, value, hres);

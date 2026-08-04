@@ -517,7 +517,7 @@ static int traversearray (global_State *g, Table *h) {
   unsigned i;
   for (i = 0; i < asize; i++) {
     GCObject *o = gcvalarr(h, i);
-    if (o != NULL && iswhite(o)) {
+    if (o != NULL && ispurewhite(o)) {
       marked = 1;
       reallymarkobject(g, o);
     }
