@@ -239,7 +239,7 @@ skynet_posix_memalign(void **memptr, size_t alignment, size_t size) {
 	uint32_t cookie_size = alignment_cookie_size(alignment);
 	int err = je_posix_memalign(memptr, alignment, size + cookie_size);
 	if (err) malloc_oom(size);
-	fill_prefix(*memptr, size, cookie_size);
+	*memptr = fill_prefix(*memptr, size, cookie_size);
 	return err;
 }
 
