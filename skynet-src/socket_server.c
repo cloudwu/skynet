@@ -1266,7 +1266,7 @@ setopt_socket(struct socket_server *ss, struct request_setopt *request) {
 		return;
 	}
 	int v = request->value;
-	setsockopt(s->fd, IPPROTO_TCP, request->what, &v, sizeof(v));
+    setsockopt(s->fd, IPPROTO_TCP, request->what, (char*) & v, sizeof(v));
 }
 
 static void
@@ -1584,7 +1584,7 @@ static int
 report_connect(struct socket_server *ss, struct socket *s, struct socket_lock *l, struct socket_message *result) {
 	int error;
 	socklen_t len = sizeof(error);
-	int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);
+	int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, (char*) &error, &len);
 	if (code < 0 || error) {
 		error = code < 0 ? errno : error;
 		force_close(ss, s, l, result);
@@ -1794,7 +1794,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			if (e->error) {
 				int error;
 				socklen_t len = sizeof(error);
-				int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, &error, &len);
+				int code = getsockopt(s->fd, SOL_SOCKET, SO_ERROR, (char*) &error, &len);
 				const char * err = NULL;
 				if (code < 0) {
 					err = strerror(errno);
