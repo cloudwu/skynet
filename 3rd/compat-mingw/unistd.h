@@ -68,7 +68,11 @@
 #define random rand
 #define srandom srand
 #define snprintf _snprintf
-#define localtime_r _localtime64_s
+
+static inline struct tm *
+localtime_r(const time_t *timer, struct tm *result) {
+	return _localtime64_s(result, timer) == 0 ? result : NULL;
+}
 
 #define pid_t int
 
