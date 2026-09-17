@@ -798,6 +798,11 @@ function skynet.ignoreret()
 	session_coroutine_id[running_thread] = nil
 end
 
+-- 当前协程是否持有可 ret 的会话
+function skynet.session_holding()
+    return session_coroutine_id[running_thread] ~= nil
+end
+
 function skynet.response(pack)
 	pack = pack or skynet.pack
 
