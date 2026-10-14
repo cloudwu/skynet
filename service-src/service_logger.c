@@ -1,4 +1,5 @@
 #include "skynet.h"
+#include "skynet_handle.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,7 @@ logger_release(struct logger * inst) {
 }
 
 #define SIZETIMEFMT	250
+#define SIZENAME	64
 
 static int
 timestring(struct logger *inst, char tmp[SIZETIMEFMT]) {
@@ -60,6 +62,15 @@ logger_cb(struct skynet_context * context, void *ud, int type, int session, uint
 			fprintf(inst->handle, "%s.%02d ", tmp, csec);
 		}
 		fprintf(inst->handle, "[:%08x] ", source);
+		char name[SIZENAME];
+		int n = skynet_handle_toname(source, name, sizeof(name));
+		if (n > 0) {
+			fprintf(inst->handle, "[%s] ", name);
+		} else if (n < 0) {
+			fprintf(inst->handle, "[name too long] ");
+		} else {
+			fprintf(inst->handle, "[unknown] ");
+		}
 		fwrite(msg, sz , 1, inst->handle);
 		fprintf(inst->handle, "\n");
 		fflush(inst->handle);

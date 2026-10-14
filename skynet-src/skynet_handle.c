@@ -6,6 +6,7 @@
 #include "rwlock.h"
 #include "spinlock.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -240,6 +241,35 @@ skynet_handle_findname(const char * name) {
 	return handle;
 }
 
+int
+skynet_handle_toname(uint32_t handle, char *buf, size_t sz) {
+	struct handle_storage *s = H;
+
+	handle_rlock(s);
+
+	const char *name = NULL;
+	int i;
+	for (i = 0; i < s->name_count; ++i) {
+		if (s->name[i].handle == handle) {
+			name = s->name[i].name;
+			break;
+		}
+	}
+	if (name == NULL) {
+		handle_runlock(s);
+		return 0;
+	}
+
+	size_t need = strlen(name) + 1;
+	if (sz < need) {
+		handle_runlock(s);
+		return -1;
+	}
+	memcpy(buf, name, need);
+	handle_runlock(s);
+	return 1;
+}
+
 static void
 _insert_name_before(struct handle_storage *s, char *name, uint32_t handle, int before) {
 	if (s->name_count >= s->name_cap) {
@@ -284,8 +314,29 @@ _insert_name(struct handle_storage *s, const char * name, uint32_t handle) {
 		}
 	}
 	char * result = skynet_strdup(name);
+	if (result == NULL) {
+		return NULL;
+	}
 
-	_insert_name_before(s, result, handle, begin);
+	int i;
+	int j=0, n=s->name_count;
+	int insert_pos = begin;
+	int deleted = 0;
+	for (i=0; i<n; ++i) {
+		if (s->name[i].handle == handle) {
+			if (i < insert_pos) {
+				++deleted;
+			}
+			skynet_free(s->name[i].name);
+			continue;
+		} else if (i!=j) {
+			s->name[j] = s->name[i];
+		}
+		++j;
+	}
+	s->name_count = j;
+
+	_insert_name_before(s, result, handle, insert_pos - deleted);
 
 	return result;
 }

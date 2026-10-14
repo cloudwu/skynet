@@ -2,6 +2,7 @@
 #define SKYNET_CONTEXT_HANDLE_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 // reserve high 8 bits for remote id
 #define HANDLE_MASK 0xffffff
@@ -16,6 +17,7 @@ void skynet_handle_retireall();
 
 uint32_t skynet_handle_findname(const char * name);
 const char * skynet_handle_namehandle(uint32_t handle, const char *name);
+int skynet_handle_toname(uint32_t handle, char *buf, size_t sz);
 
 void skynet_handle_init(int harbor, int thread);
 void skynet_handle_register_thread();

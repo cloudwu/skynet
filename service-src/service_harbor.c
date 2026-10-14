@@ -2,6 +2,7 @@
 #include "skynet_harbor.h"
 #include "skynet_socket.h"
 #include "skynet_handle.h"
+#include "skynet_server.h"
 
 /*
 	harbor listen the PTYPE_HARBOR (in text)
@@ -742,6 +743,10 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 	if (harbor_id == 0) {
 		close_all_remotes(h);
 	}
+
+	char name[32];
+	snprintf(name, sizeof(name), "harbor %d", harbor_id);
+	skynet_handle_namehandle(skynet_context_handle(ctx), name);
 	skynet_callback(ctx, h, mainloop);
 	skynet_harbor_start(ctx);
 

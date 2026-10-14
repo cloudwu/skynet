@@ -164,7 +164,7 @@ local function launch_master(conf)
 	end)
 
 	for i=1,instance do
-		table.insert(slave, skynet.newservice(SERVICE_NAME))
+		table.insert(slave, skynet.newservice(SERVICE_NAME .. " " .. i))
 	end
 
 	skynet.error(string.format("login server listen at : %s %d", host, port))

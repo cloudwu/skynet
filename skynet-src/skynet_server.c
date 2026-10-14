@@ -158,6 +158,9 @@ skynet_context_new(const char * name, const char *param) {
 	context_inc();
 
 	CHECKCALLING_BEGIN(ctx)
+	if(strcmp(name,  "snlua")==0 && param){
+		skynet_handle_namehandle(ctx->handle, param);
+	}
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
 	CHECKCALLING_END(ctx)
 	if (r == 0) {

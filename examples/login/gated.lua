@@ -1,9 +1,10 @@
 local msgserver = require "snax.msgserver"
 local crypt = require "skynet.crypt"
 local skynet = require "skynet"
+require "skynet.manager"
 
 local loginservice = tonumber(...)
-
+skynet.register(".gated"..skynet.address(loginservice))
 local server = {}
 local users = {}
 local username_map = {}
