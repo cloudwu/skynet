@@ -209,13 +209,17 @@ local op_code = {
 }
 
 local function write_frame(self, op, payload_data, masking_key)
+    -- Mask outgoing client frames by default.
+    if self.mode == "client" and not masking_key then
+        masking_key = string.unpack(">I4", crypt.randomkey())
+    end
+
     payload_data = payload_data or ""
     local payload_len = #payload_data
     local op_v = assert(op_code[op])
     local v1 = 0x80 | op_v -- fin is 1 with opcode
     local s
     local mask = masking_key and 0x80 or 0x00
-    -- mask set to 0
     if payload_len < 126 then
         s = string.pack("I1I1", v1, mask | payload_len)
     elseif payload_len <= 0xffff then
