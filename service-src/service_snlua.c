@@ -121,8 +121,9 @@ get_time() {
 }
 
 static inline double
-diff_time(double start) {
+diff_time(double start, double *pnow) {
 	double now = get_time();
+	if (pnow) *pnow = now;
 	if (now < start) {
 		return now + 0x10000 - start;
 	} else {
@@ -200,7 +201,7 @@ timing_resume(lua_State *L, int co_index, int n) {
 
 	if (timing_enable(L, co_index, &start_time)) {
 		double total_time = timing_total(L, co_index);
-		double diff = diff_time(start_time);
+		double diff = diff_time(start_time, NULL);
 		total_time += diff;
 #ifdef DEBUG_LOG
 		fprintf(stderr, "PROFILE [%p] yield (%lf/%lf)\n", co, diff, total_time);
@@ -294,8 +295,8 @@ lstart(lua_State *L) {
 	return 0;
 }
 
-static int
-lstop(lua_State *L) {
+static double
+timing_elapsed(lua_State *L, int stop) {
 	if (lua_gettop(L) != 0) {
 		lua_settop(L,1);
 		luaL_checktype(L, 1, LUA_TTHREAD);
@@ -304,25 +305,46 @@ lstop(lua_State *L) {
 	}
 	lua_Number start_time = 0;
 	if (!timing_enable(L, 1, &start_time)) {
-		return luaL_error(L, "Call profile.start() before profile.stop()");
+		return luaL_error(L, "Call profile.start() first, stop:%d", stop);
 	}
-	double ti = diff_time(start_time);
+	double now;
+	double ti = diff_time(start_time, &now);
 	double total_time = timing_total(L,1);
-
-	lua_pushvalue(L, 1);	// push coroutine
-	lua_pushnil(L);
-	lua_rawset(L, lua_upvalueindex(1));
-
-	lua_pushvalue(L, 1);	// push coroutine
-	lua_pushnil(L);
-	lua_rawset(L, lua_upvalueindex(2));
-
 	total_time += ti;
-	lua_pushnumber(L, total_time);
-#ifdef DEBUG_LOG
-	fprintf(stderr, "PROFILE [%p] stop (%lf/%lf)\n", lua_tothread(L,1), ti, total_time);
-#endif
+	if (stop) {
+		lua_pushvalue(L, 1);	// push coroutine
+		lua_pushnil(L);
+		lua_rawset(L, lua_upvalueindex(1));
 
+		lua_pushvalue(L, 1);	// push coroutine
+		lua_pushnil(L);
+		lua_rawset(L, lua_upvalueindex(2));
+	} else {
+		lua_pushvalue(L, 1);
+		lua_pushnumber(L, now);
+		lua_rawset(L, lua_upvalueindex(1));	// set start time
+		
+		lua_pushvalue(L, 1);
+		lua_pushnumber(L, total_time);
+		lua_rawset(L, lua_upvalueindex(2));
+	}
+#ifdef DEBUG_LOG
+	fprintf(stderr, "profile [%p] stop: %d (%lf/%lf)\n", lua_tothread(L,1), stop, ti, total_time);
+#endif
+	return total_time;
+}
+
+static int
+lelapsed(lua_State *L) {
+	double total_time = timing_elapsed(L, 0);
+	lua_pushnumber(L, total_time);
+	return 1;
+}
+
+static int
+lstop(lua_State *L) {
+	double total_time = timing_elapsed(L, 1);
+	lua_pushnumber(L, total_time);
 	return 1;
 }
 
@@ -330,6 +352,7 @@ static int
 init_profile(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "start", lstart },
+		{ "elapsed", lelapsed },
 		{ "stop", lstop },
 		{ "resume", luaB_coresume },
 		{ "wrap", luaB_cowrap },
