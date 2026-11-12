@@ -391,15 +391,15 @@ static void warnfcont (void *ud, const char *message, int tocont);
 static int
 checkcontrol (void *ud, const char *message, int tocont) {
 	if (tocont || *(message++) != '@')  /* not a control message? */
-    	return 0;
-  	else {
+		return 0;
+	else {
 		struct snlua *l = (struct snlua *)ud;
-	    if (strcmp(message, "off") == 0)
+		if (strcmp(message, "off") == 0)
 			lua_setwarnf(l->L, warnfoff, l);  /* turn warnings off */
-    	else if (strcmp(message, "on") == 0)
+		else if (strcmp(message, "on") == 0)
 			lua_setwarnf(l->L, warnfon, l);   /* turn warnings on */
-    	return 1;  /* it was a control message */
-  	}
+		return 1;  /* it was a control message */
+	}
 }
 
 static void
@@ -414,21 +414,26 @@ warnfoff (void *ud, const char *message, int tocont) {
 static void
 warnfcont (void *ud, const char *message, int tocont) {
 	struct snlua *l = (struct snlua *)ud;
-	skynet_error(l->ctx, "%s", message);  /* write message */
-	if (tocont)  /* not the last part? */
-    	lua_setwarnf(l->L, warnfcont, l);  /* to be continued */
-	else {  /* last part */
-    	lua_setwarnf(l->L, warnfon, l);  /* next call is a new message */
+	if (tocont) {  /* not the last part? */
+		skynet_error(l->ctx, "Lua warning+ %s", message);
+		lua_setwarnf(l->L, warnfcont, l);  /* to be continued */
+	} else {  /* last part */
+		skynet_error(l->ctx, "Lua warning> %s", message);
+		lua_setwarnf(l->L, warnfon, l);  /* next call is a new message */
 	}
 }
 
 static void
 warnfon (void *ud, const char *message, int tocont) {
 	struct snlua *l = (struct snlua *)ud;
-  	if (checkcontrol(ud, message, tocont))  /* control message? */
-    	return;  /* nothing else to be done */
-  	skynet_error(l->ctx, "%s", "Lua warning: ");  /* start a new warning */
-	warnfcont(ud, message, tocont);  /* finish processing */
+	if (checkcontrol(ud, message, tocont))  /* control message? */
+		return;  /* nothing else to be done */
+	if (tocont) {
+		skynet_error(l->ctx, "Lua warning< %s", message);  /* start a multi-part warning */
+		lua_setwarnf(l->L, warnfcont, l);
+	} else {
+		skynet_error(l->ctx, "Lua warning: %s", message);  /* single-part warning */
+	}
 }
 
 static int

@@ -3,6 +3,7 @@ local skynet = require "skynet"
 skynet.start(function()
 	warn("@on")
 	warn("test warning")
+	warn("multi-part ", "test ", "warning")
 	warn("@off")
 	warn("INVISIBLE warning")
 	warn("@on")
