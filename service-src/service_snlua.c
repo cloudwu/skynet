@@ -380,10 +380,62 @@ optstring(struct skynet_context *ctx, const char *key, const char * str) {
 	return ret;
 }
 
+static void warnfoff (void *ud, const char *message, int tocont);
+static void warnfon (void *ud, const char *message, int tocont);
+static void warnfcont (void *ud, const char *message, int tocont);
+
+/*
+** Check whether message is a control message. If so, execute the
+** control or ignore it if unknown.
+*/
+static int
+checkcontrol (void *ud, const char *message, int tocont) {
+	if (tocont || *(message++) != '@')  /* not a control message? */
+    	return 0;
+  	else {
+		struct snlua *l = (struct snlua *)ud;
+	    if (strcmp(message, "off") == 0)
+			lua_setwarnf(l->L, warnfoff, l);  /* turn warnings off */
+    	else if (strcmp(message, "on") == 0)
+			lua_setwarnf(l->L, warnfon, l);   /* turn warnings on */
+    	return 1;  /* it was a control message */
+  	}
+}
+
+static void
+warnfoff (void *ud, const char *message, int tocont) {
+	checkcontrol(ud, message, tocont);
+}
+
+/*
+** Writes the message and handle 'tocont', finishing the message
+** if needed and setting the next warn function.
+*/
+static void
+warnfcont (void *ud, const char *message, int tocont) {
+	struct snlua *l = (struct snlua *)ud;
+	skynet_error(l->ctx, "%s", message);  /* write message */
+	if (tocont)  /* not the last part? */
+    	lua_setwarnf(l->L, warnfcont, l);  /* to be continued */
+	else {  /* last part */
+    	lua_setwarnf(l->L, warnfon, l);  /* next call is a new message */
+	}
+}
+
+static void
+warnfon (void *ud, const char *message, int tocont) {
+	struct snlua *l = (struct snlua *)ud;
+  	if (checkcontrol(ud, message, tocont))  /* control message? */
+    	return;  /* nothing else to be done */
+  	skynet_error(l->ctx, "%s", "Lua warning: ");  /* start a new warning */
+	warnfcont(ud, message, tocont);  /* finish processing */
+}
+
 static int
 init_cb(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz) {
 	lua_State *L = l->L;
 	l->ctx = ctx;
+	lua_setwarnf(L, warnfon, l);
 	lua_gc(L, LUA_GCSTOP, 0);
 	lua_pushboolean(L, 1);  /* signal for libraries to ignore env. vars. */
 	lua_setfield(L, LUA_REGISTRYINDEX, "LUA_NOENV");
