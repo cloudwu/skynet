@@ -611,6 +611,53 @@ luaseri_unpack(lua_State *L) {
 	return lua_gettop(L) - 1;
 }
 
+// args: (lightuserdata,size) | string, offset (base 0), n
+// return: offset, ...
+int
+luaseri_unpackn(lua_State *L) {
+	void *buffer;
+	int len;
+	int offset;
+	int limit;
+	if (lua_type(L,1) == LUA_TSTRING) {
+		size_t sz;
+		buffer = (void *)lua_tolstring(L,1,&sz);
+		len = (int)sz;
+		offset = luaL_checkinteger(L, 2);
+		limit = luaL_optinteger(L, 3, -1);
+		len -= offset;
+	} else {
+		buffer = lua_touserdata(L,1);
+		len = luaL_checkinteger(L,2);
+		if (buffer == NULL) {
+			return luaL_error(L, "deserialize null pointer");
+		}
+		offset = luaL_checkinteger(L, 3);
+		limit = luaL_optinteger(L, 4, -1);
+		len -= offset;
+	}
+	lua_settop(L,1);
+	struct read_block rb;
+	rball_init(&rb, (char *)buffer + offset, len);
+
+	int i;
+	for (i=0;limit < 0 || i < limit;i++) {
+		if (i%8==7) {
+			luaL_checkstack(L,LUA_MINSTACK,NULL);
+		}
+		uint8_t type = 0;
+		const uint8_t * t = (const uint8_t *)rb_read(&rb, sizeof(type));
+		if (t==NULL)
+			break;
+		type = *t;
+		push_value(L, &rb, type & 0x7, type>>3);
+	}
+
+	lua_pushinteger(L, rb.ptr + offset);
+	lua_replace(L, 1);
+	return lua_gettop(L);
+}
+
 LUAMOD_API int
 luaseri_pack(lua_State *L) {
 	struct block temp;
