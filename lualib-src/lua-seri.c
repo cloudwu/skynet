@@ -617,28 +617,26 @@ int
 luaseri_unpackn(lua_State *L) {
 	void *buffer;
 	int len;
-	int offset;
-	int limit;
+	int offset_index;
 	if (lua_type(L,1) == LUA_TSTRING) {
 		size_t sz;
 		buffer = (void *)lua_tolstring(L,1,&sz);
 		len = (int)sz;
-		offset = luaL_checkinteger(L, 2);
-		limit = luaL_optinteger(L, 3, -1);
-		len -= offset;
+		offset_index = 2;
 	} else {
 		buffer = lua_touserdata(L,1);
 		len = luaL_checkinteger(L,2);
 		if (buffer == NULL) {
 			return luaL_error(L, "deserialize null pointer");
 		}
-		offset = luaL_checkinteger(L, 3);
-		limit = luaL_optinteger(L, 4, -1);
-		len -= offset;
+		offset_index = 3;
 	}
+	int offset = luaL_checkinteger(L, offset_index);
+	int limit = luaL_optinteger(L, offset_index+1, -1);
+
 	lua_settop(L,1);
 	struct read_block rb;
-	rball_init(&rb, (char *)buffer + offset, len);
+	rball_init(&rb, (char *)buffer + offset, len - offset);
 
 	int i;
 	for (i=0;limit < 0 || i < limit;i++) {
