@@ -632,6 +632,8 @@ luaseri_unpackn(lua_State *L) {
 		offset_index = 3;
 	}
 	int offset = luaL_checkinteger(L, offset_index);
+	if (offset > len || offset < 0)
+		return luaL_error(L, "invalid offset %d (length %d)", offset, len);
 	int limit = luaL_optinteger(L, offset_index+1, -1);
 
 	lua_settop(L,1);
