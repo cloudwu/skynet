@@ -42,7 +42,7 @@ local function auth_token(plugin, password, nonce)
     return crypt.xor_str(first, sha256(sha256(first) .. nonce))
 end
 
-local function full_auth(password, nonce, key_path, send)
+local function full_auth(password, nonce, key_path, allow_retrieval, send)
     local pem
     if key_path then
         local file = assert(io.open(key_path, "rb"))
@@ -50,6 +50,8 @@ local function full_auth(password, nonce, key_path, send)
         file:close()
         pem = assert(data, err)
     else
+        assert(allow_retrieval,
+            "MySQL full authentication requires server_public_key_path or allow_public_key_retrieval = true")
         local reply = send("\2")
         assert(reply:byte() == 1, "expected MySQL RSA public key packet")
         pem = reply:sub(2)
@@ -60,8 +62,11 @@ local function full_auth(password, nonce, key_path, send)
     return key:encrypt(crypt.xor_str(password .. "\0", nonce), { rsaPadding = pkey.RSA_PKCS1_OAEP_PADDING })
 end
 
-return function(self, user, password, charset, database, on_connect, key_path,
+return function(self, user, password, charset, database, opts,
                 compose_packet, recv_packet, parse_err_packet)
+    local on_connect = opts.on_connect
+    local key_path = opts.server_public_key_path
+    local allow_retrieval = opts.allow_public_key_retrieval == true
     return function(channel)
         -- A reconnect may have pending commands. Keep handshake sequencing local.
         local exchange = { packet_no = -1 }
@@ -127,7 +132,7 @@ return function(self, user, password, charset, database, on_connect, key_path,
             if packet == "\1\3" then
                 packet = channel:response(receive)
             elseif packet == "\1\4" then
-                packet = send(full_auth(password, nonce, key_path, send))
+                packet = send(full_auth(password, nonce, key_path, allow_retrieval, send))
             end
         end
         assert(packet:byte() == 0 and #packet >= 7, "expected final MySQL authentication OK")

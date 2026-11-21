@@ -744,8 +744,8 @@ function _M.connect(opts)
     local auth
     if opts.plugin_auth == true or opts.server_public_key_path then
         local _plugin_login = require "skynet.db.mysql.auth"
-        auth = _plugin_login(self, user, password, charset, database, opts.on_connect,
-            opts.server_public_key_path, _compose_packet, _recv_packet, _parse_err_packet)
+        auth = _plugin_login(self, user, password, charset, database, opts,
+            _compose_packet, _recv_packet, _parse_err_packet)
     else
         auth = _mysql_login(self, user, password, charset, database, opts.on_connect)
     end
