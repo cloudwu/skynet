@@ -741,11 +741,19 @@ function _M.connect(opts)
     local user = opts.user or ""
     local password = opts.password or ""
     local charset = CHARSET_MAP[opts.charset or "_default"]
+    local auth
+    if opts.plugin_auth == true or opts.server_public_key_path then
+        local _plugin_login = require "skynet.db.mysql.auth"
+        auth = _plugin_login(self, user, password, charset, database, opts,
+            _compose_packet, _recv_packet, _parse_err_packet)
+    else
+        auth = _mysql_login(self, user, password, charset, database, opts.on_connect)
+    end
     local channel =
         socketchannel.channel {
         host = opts.host,
         port = opts.port or 3306,
-        auth = _mysql_login(self, user, password, charset, database, opts.on_connect),
+        auth = auth,
         overload = opts.overload
     }
     self.sockchannel = channel
