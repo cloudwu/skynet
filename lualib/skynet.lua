@@ -710,6 +710,7 @@ end
 skynet.pack = assert(c.pack)
 skynet.packstring = assert(c.packstring)
 skynet.unpack = assert(c.unpack)
+skynet.unpackn = assert(c.unpackn)
 skynet.tostring = assert(c.tostring)
 skynet.trash = assert(c.trash)
 
