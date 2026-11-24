@@ -83,6 +83,7 @@ local COM_STMT_CLOSE = "\x19"
 local COM_STMT_RESET = "\x1a"
 local CURSOR_TYPE_NO_CURSOR = 0x00
 local SERVER_MORE_RESULTS_EXISTS = 8
+local MAX_PACKET_PAYLOAD = 0xffffff
 
 local mt = {__index = _M}
 
@@ -222,28 +223,62 @@ local function _compute_token(password, scramble)
 end
 
 local function _compose_packet(self, req)
-    self.packet_no = self.packet_no + 1
     local size = #req
-    return strpack("<I3Bc" .. size, size, self.packet_no, req)
+    local packet_no = self.packet_no
+    if size < MAX_PACKET_PAYLOAD then
+        self.packet_no = (packet_no + 1) & 0xff
+        return strpack("<I3Bc" .. size, size, self.packet_no, req)
+    end
+
+    -- Socket writes a string list as one buffer, keeping packets of a
+    -- command together when several coroutines share the connection.
+    local parts = {}
+    -- Visiting size + 1 adds the empty terminator for exact multiples.
+    for pos = 1, size + 1, MAX_PACKET_PAYLOAD do
+        local len = math.min(size - pos + 1, MAX_PACKET_PAYLOAD)
+        packet_no = (packet_no + 1) & 0xff
+        parts[#parts + 1] = strpack("<I3B", len, packet_no)
+        parts[#parts + 1] = sub(req, pos, pos + len - 1)
+    end
+    self.packet_no = packet_no
+    return parts
 end
 
 local function _recv_packet(self, sock)
-    local data = sock:read(4)
-    if not data then
-        return nil, nil, "failed to receive packet header: "
-    end
+    local parts, packet_no, chunk, len
+    repeat
+        local header = sock:read(4)
+        if not header then
+            return nil, nil, "failed to receive packet header: "
+        end
 
-    local len, pos = _get_byte3(data, 1)
-    if len == 0 then
-        return nil, nil, "empty packet"
-    end
+        local next_no
+        len, next_no = strunpack("<I3B", header)
+        if packet_no and next_no ~= ((packet_no + 1) & 0xff) then
+            return nil, nil, "unexpected MySQL packet number"
+        end
+        packet_no = next_no
+        if len == 0 then
+            if not parts then
+                return nil, nil, "empty packet"
+            end
+            break
+        end
 
-    self.packet_no = strbyte(data, pos)
+        chunk = sock:read(len)
+        if not chunk then
+            return nil, nil, "failed to read packet content: "
+        end
+        if len == MAX_PACKET_PAYLOAD then
+            parts = parts or {}
+        end
+        if parts then
+            parts[#parts + 1] = chunk
+        end
+    until len < MAX_PACKET_PAYLOAD
 
-    data = sock:read(len)
-    if not data then
-        return nil, nil, "failed to read packet content: "
-    end
+    self.packet_no = packet_no
+    local data = parts and table.concat(parts) or chunk
 
     local field_count = strbyte(data, 1)
     local typ
@@ -251,7 +286,8 @@ local function _recv_packet(self, sock)
         typ = "OK"
     elseif field_count == 0xff then
         typ = "ERR"
-    elseif field_count == 0xfe then
+    elseif field_count == 0xfe and #data < 9 then
+        -- Text rows can also start with 0xfe, followed by an 8-byte length.
         typ = "EOF"
     else
         typ = "DATA"
