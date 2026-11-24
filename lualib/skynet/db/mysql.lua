@@ -846,16 +846,20 @@ local function _get_datetime(data, pos)
     local len, year, month, day, hour, minute, second
     local value
     len, pos = _from_length_coded_bin(data, pos)
-    if len == 7 then
+    if len == 11 then
+        local microsecond
+        year, month, day, hour, minute, second, microsecond, pos = strunpack("<I2BBBBBI4", data, pos)
+        value = strformat("%04d-%02d-%02d %02d:%02d:%02d.%06d", year, month, day, hour, minute, second, microsecond)
+    elseif len == 7 then
         year, month, day, hour, minute, second, pos = string.unpack("<I2BBBBB", data, pos)
         value = strformat("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second)
     elseif len == 4 then
         year, month, day, pos = string.unpack("<I2BB", data, pos)
         value = strformat("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, 0, 0, 0)
+    elseif len == 0 then
+        value = "0000-00-00 00:00:00"
     else
-        value = "2017-09-09 20:08:09"
-        --unsupported format
-        pos = pos + len
+        error("unsupported MySQL datetime length: " .. tostring(len))
     end
     return value, pos
 end
