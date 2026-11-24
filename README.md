@@ -13,7 +13,7 @@ For Linux, install autoconf first for jemalloc:
 ```
 git clone https://github.com/cloudwu/skynet.git
 cd skynet
-make 'PLATFORM'  # PLATFORM can be linux, macosx, freebsd, openbsd now
+make PLATFORM  # Replace PLATFORM with linux, macosx, freebsd, or openbsd.
 ```
 
 Or:
@@ -23,7 +23,9 @@ export PLAT=linux
 make
 ```
 
-For FreeBSD , use gmake instead of make.
+For FreeBSD, use `gmake` instead of `make`.
+
+On Linux, install the `x86_64-w64-mingw32` toolchain and run `make mingw` to cross-compile for Windows.
 
 ## Test
 
@@ -36,7 +38,7 @@ Run these in different consoles:
 
 ## About Lua version
 
-Skynet now uses a modified version of lua 5.5.0 ( https://github.com/ejoy/lua/tree/skynet55 ) for multiple lua states.
+Skynet uses a [modified version of Lua 5.5.1](https://github.com/ejoy/lua/tree/skynet55) for multiple Lua states.
 
 Official Lua versions can also be used as long as the Makefile is edited.
 
